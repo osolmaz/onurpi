@@ -4,10 +4,11 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 
 ## Packages
 
-- [`@onurpi/turn-fold`](packages/turn-fold/): turn-level transcript folding that preserves the final
-  response.
-- [`pi-tui-history-replay`](packages/pi-tui-history-replay/): vendored full visible branch history
-  across context compaction.
+| Package                                                    | Purpose                                                         |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                 | Turn-level transcript folding that preserves the final response |
+| [`pi-tui-history-replay`](packages/pi-tui-history-replay/) | Vendored full visible branch history across context compaction  |
+| [`@onurpi/pi-must-win`](packages/pi-must-win/)             | Umbrella Pi branding, starting with Git commit attribution      |
 
 ## Install
 
@@ -20,6 +21,7 @@ cd ~/repos/onurpi
 npm ci
 pi install ./packages/turn-fold
 pi install ./packages/pi-tui-history-replay
+pi install ./packages/pi-must-win
 ```
 
 Run `/reload` in an existing Pi session after installation.
@@ -45,9 +47,9 @@ cp settings.json ~/.pi/agent/settings.json
 
 ## Structure
 
-Each extension is an independent package under `packages/` with its own `package.json`, entry point,
-tests, and README. Package manifests declare Pi entry points through `pi.extensions`; the private
-root manifest also registers them for workspace-wide development.
+Each extension is an independent package under `packages/` with its own `package.json` and entry
+point. Tests and a README live beside the source. Package manifests declare Pi entry points through
+`pi.extensions`. The private root manifest also registers them for workspace-wide development.
 
 This workspace follows the package-directory structure used by
 [`ogulcancelik/pi-extensions`](https://github.com/ogulcancelik/pi-extensions), while keeping shared

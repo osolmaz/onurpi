@@ -2,7 +2,8 @@
   "packages": [
     "git:github.com/osolmaz/pi-workflows",
     "../../repos/onurpi/packages/turn-fold",
-    "../../repos/onurpi/packages/pi-tui-history-replay"
+    "../../repos/onurpi/packages/pi-tui-history-replay",
+    "../../repos/onurpi/packages/pi-must-win"
   ],
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",
