@@ -121,9 +121,7 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
     applyMode(pi, state, modeFromBranch(ctx), false);
-    queueMicrotask(() => {
-      loadVisibleHistory(state, ctx);
-    });
+    loadVisibleHistory(state, ctx);
   });
 
   pi.on("session_compact", (_event, ctx) => {

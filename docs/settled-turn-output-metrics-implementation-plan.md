@@ -167,16 +167,16 @@ transcript rendering.
 
 ## Event wiring
 
-Load historical groups from `ctx.sessionManager.buildContextEntries()`. On `session_start`, schedule
-this read in a microtask after all session-start handlers have installed their transcript patches.
-This keeps turn-fold aligned with the entries Pi will render, including the local history-replay
-extension. If the first retained entry is an assistant or tool result, seed a partial group so a
-split turn remains visible. Reload from the same visible entries in `session_compact` before Pi
-rebuilds its transcript. Update the assistant `message_end` handler in `packages/turn-fold/index.ts`
-to queue its current group before abort handling. In `agent_settled`, pair queued groups with the
-latest persisted assistant-role messages from compaction-aware entries. Keep malformed assistant
-entries in this positional selection, then skip their metrics contribution. Derive output before
-settling the group. The handlers should remain safe for normal, aborted, and error responses.
+Load historical groups from `ctx.sessionManager.buildContextEntries()`. Register the history-replay
+extension before turn-fold in the root Pi manifest and tracked global settings. Its session-start
+patch then runs first, so turn-fold reads the exact entries Pi will render. If the first retained
+entry is an assistant or tool result, seed a partial group so a split turn remains visible. Reload
+from the same visible entries in `session_compact` before Pi rebuilds its transcript. Update the
+assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current group before
+abort handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role
+messages from compaction-aware entries. Keep malformed assistant entries in this positional
+selection, then skip their metrics contribution. Derive output before settling the group. The
+handlers should remain safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.
