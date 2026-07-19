@@ -43,6 +43,10 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
+function loadVisibleHistory(state: TurnFoldState, ctx: ExtensionContext): void {
+  state.loadHistory(ctx.sessionManager.buildContextEntries());
+}
+
 function applyMode(
   pi: ExtensionAPI,
   state: TurnFoldState,
@@ -116,13 +120,15 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.loadHistory(ctx.sessionManager.buildContextEntries());
     applyMode(pi, state, modeFromBranch(ctx), false);
+    queueMicrotask(() => {
+      loadVisibleHistory(state, ctx);
+    });
   });
 
   pi.on("session_compact", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.loadHistory(ctx.sessionManager.buildContextEntries());
+    loadVisibleHistory(state, ctx);
   });
 
   pi.on("agent_start", (_event, ctx) => {
