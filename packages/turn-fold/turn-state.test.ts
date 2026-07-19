@@ -203,6 +203,7 @@ describe("TurnFoldState history", () => {
       { message: fourthMessage, type: "message" },
       { message: { content: "prompt 5", role: "user", timestamp: 500 }, type: "message" },
       { message: fifthMessage, type: "message" },
+      { message: { content: "incomplete", role: "user", timestamp: 600 }, type: "message" },
     ];
 
     state.loadHistory(entries);

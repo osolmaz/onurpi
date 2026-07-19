@@ -24,6 +24,12 @@ type ComponentInfo = {
   sequence: number;
 };
 
+type CollapsedHistory = {
+  anchor: object | undefined;
+  groupIds: ReadonlySet<string>;
+  summary: FoldHistorySummary;
+};
+
 type TurnGroup = {
   aborted: boolean;
   assistants: Map<object, AssistantSnapshot>;
@@ -140,6 +146,7 @@ export class TurnFoldState {
   private assistantGroupByKey = new Map<string, string>();
   private componentInfo = new WeakMap<object, { groupId: string }>();
   private groupCounter = 0;
+  private historyCache: CollapsedHistory | undefined;
   private groups = new Map<string, TurnGroup>();
   private mode: TurnFoldMode = "live";
   private pendingFinalAssistants = new Map<object, string>();
@@ -154,6 +161,7 @@ export class TurnFoldState {
   setMode(mode: TurnFoldMode): void {
     this.mode = mode;
     if (mode !== "expanded") this.previousCompactMode = mode;
+    this.invalidateHistory();
   }
 
   toggleExpanded(): TurnFoldMode {
@@ -218,6 +226,7 @@ export class TurnFoldState {
       group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
     }
     this.pendingFinalAssistants.clear();
+    this.invalidateHistory();
   }
 
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
@@ -271,6 +280,7 @@ export class TurnFoldState {
       group.endedAt = endedAt;
     }
     this.activeGroupId = undefined;
+    this.invalidateHistory();
   }
 
   viewFor(component: object, now = Date.now()): ComponentView | undefined {
@@ -278,13 +288,12 @@ export class TurnFoldState {
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group) return undefined;
 
-    const collapsedGroups = this.collapsedGroups();
-    if (collapsedGroups.includes(group)) {
-      const historyAnchor = this.historyAnchor(collapsedGroups);
+    const collapsedHistory = this.collapsedHistory();
+    if (collapsedHistory.groupIds.has(group.id)) {
       const summary = this.summary(group, this.finalAssistant(group), now);
       return {
-        display: component === historyAnchor ? "history" : "hidden",
-        ...(component === historyAnchor ? { history: this.historySummary(collapsedGroups) } : {}),
+        display: component === collapsedHistory.anchor ? "history" : "hidden",
+        ...(component === collapsedHistory.anchor ? { history: collapsedHistory.summary } : {}),
         summary,
       };
     }
@@ -305,10 +314,22 @@ export class TurnFoldState {
     };
   }
 
-  private collapsedGroups(): TurnGroup[] {
-    if (this.mode === "expanded") return [];
-    const settledGroups = [...this.groups.values()].filter((group) => group.settled);
-    return settledGroups.slice(0, -RECENT_SETTLED_TURN_COUNT);
+  private collapsedHistory(): CollapsedHistory {
+    if (this.historyCache) return this.historyCache;
+
+    const completedGroups =
+      this.mode === "expanded"
+        ? []
+        : [...this.groups.values()].filter(
+            (group) => group.settled && group.finalizedAssistantOutputs.size > 0,
+          );
+    const groups = completedGroups.slice(0, -RECENT_SETTLED_TURN_COUNT);
+    this.historyCache = {
+      anchor: this.historyAnchor(groups),
+      groupIds: new Set(groups.map((group) => group.id)),
+      summary: this.historySummary(groups),
+    };
+    return this.historyCache;
   }
 
   private historyAnchor(groups: readonly TurnGroup[]): object | undefined {
@@ -335,12 +356,17 @@ export class TurnFoldState {
     };
   }
 
+  private invalidateHistory(): void {
+    this.historyCache = undefined;
+  }
+
   private resetGroups(): void {
     this.activeGroupId = undefined;
     this.assistantGroupByKey = new Map();
     this.componentInfo = new WeakMap();
     this.groups = new Map();
     this.groupCounter = 0;
+    this.historyCache = undefined;
     this.pendingFinalAssistants = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
@@ -388,6 +414,7 @@ export class TurnFoldState {
     this.sequence += 1;
     group.components.set(component, { kind, sequence: this.sequence });
     this.componentInfo.set(component, { groupId: group.id });
+    this.invalidateHistory();
   }
 
   private createGroup(startedAt: number, settled: boolean): TurnGroup {

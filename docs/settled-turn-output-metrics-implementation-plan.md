@@ -148,13 +148,18 @@ Do not add recent or average throughput to the settled row. Recent throughput de
 five seconds of generation and may be zero after a tool wait. Dividing tokens by total turn duration
 would mix model generation with tool execution and would not represent decode speed.
 
-Add a history display after normal fold selection. In compact modes, take all settled turn groups
-except the newest three. Use their earliest rendered assistant or tool component as the single
-history-row anchor and hide the rest of their assistant and tool components. The aggregate must use
-durable group data because the anchor may render before later tool components. Render-component maps
-may still be incomplete at that point. Track tool-call IDs from assistant messages and tool events,
-and calculate history response counts from finalized assistant outputs. Expanded mode restores all
-rows.
+Add a history display after normal fold selection. In compact modes, take completed turn groups,
+excluding an unfinished user prompt, except for the newest three. Use their earliest rendered
+assistant or tool component as the single history-row anchor and hide the rest of their assistant
+and tool components. The aggregate must use durable group data because the anchor may render before
+later tool components. Render-component maps may still be incomplete at that point. Track tool-call
+IDs from assistant messages and tool events, and calculate history response counts from finalized
+assistant outputs. Expanded mode restores all rows.
+
+Cache the collapsed group IDs, aggregate summary, and anchor. Invalidate that cache when the compact
+mode changes, a component is associated, final assistant outputs are recorded, or an active turn
+settles. `viewFor()` must only perform constant-time membership checks during normal transcript
+rendering.
 
 ## Event wiring
 
