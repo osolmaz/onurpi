@@ -38,3 +38,12 @@ jobs:
       - name: Check pi-tui-history-replay package with Slophammer
         working-directory: packages/pi-tui-history-replay
         run: npm run slophammer
+      - name: Check @onurpi/live-stats package
+        working-directory: packages/live-stats
+        run: npm run check
+      - name: Mutate @onurpi/live-stats package
+        working-directory: packages/live-stats
+        run: npm run mutate
+      - name: Check @onurpi/live-stats package with Slophammer
+        working-directory: packages/live-stats
+        run: npm run slophammer

@@ -4,10 +4,12 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 
 ## Packages
 
-- [`@onurpi/turn-fold`](packages/turn-fold/): turn-level transcript folding that preserves the final
-  response.
-- [`pi-tui-history-replay`](packages/pi-tui-history-replay/): vendored full visible branch history
-  across context compaction.
+[`@onurpi/turn-fold`](packages/turn-fold/) provides turn-level transcript folding while preserving
+the final response. [`pi-tui-history-replay`](packages/pi-tui-history-replay/) keeps the full
+visible branch across context compaction.
+
+[`@onurpi/live-stats`](packages/live-stats/) adds elapsed time, output tokens, and recent output
+throughput to Pi's working row.
 
 ## Install
 
@@ -20,6 +22,8 @@ cd ~/repos/onurpi
 npm ci
 pi install ./packages/turn-fold
 pi install ./packages/pi-tui-history-replay
+pi install ./packages/live-stats
+pi list
 ```
 
 Run `/reload` in an existing Pi session after installation.
@@ -45,9 +49,9 @@ cp settings.json ~/.pi/agent/settings.json
 
 ## Structure
 
-Each extension is an independent package under `packages/` with its own `package.json`, entry point,
-tests, and README. Package manifests declare Pi entry points through `pi.extensions`; the private
-root manifest also registers them for workspace-wide development.
+Each extension is an independent package under `packages/` with a manifest and entry point. Its
+README and tests live beside the source. Package manifests declare Pi entry points through
+`pi.extensions`. The private root manifest also registers them for workspace-wide development.
 
 This workspace follows the package-directory structure used by
 [`ogulcancelik/pi-extensions`](https://github.com/ogulcancelik/pi-extensions), while keeping shared
