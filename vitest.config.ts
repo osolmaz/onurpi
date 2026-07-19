@@ -8,6 +8,7 @@ export default defineConfig({
         "packages/turn-fold/mode.ts",
         "packages/turn-fold/turn-state.ts",
         "packages/pi-tui-history-replay/history-replay.ts",
+        "packages/live-stats/live-stats.ts",
         "packages/pi-must-win/git-commit-trailers.ts",
         "packages/pi-must-win/features/commit-attribution.ts",
       ],

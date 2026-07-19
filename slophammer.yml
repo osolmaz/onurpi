@@ -19,6 +19,7 @@ typescript:
       - packages/turn-fold/fold-policy.ts
       - packages/turn-fold/mode.ts
       - packages/pi-tui-history-replay/history-replay.ts
+      - packages/live-stats/live-stats.ts
       - packages/pi-must-win/git-commit-trailers.ts
       - packages/pi-must-win/features/commit-attribution.ts
   dependency_boundaries:
@@ -28,6 +29,9 @@ typescript:
     - from: packages/pi-tui-history-replay
       allow:
         - packages/pi-tui-history-replay
+    - from: packages/live-stats
+      allow:
+        - packages/live-stats
     - from: packages/pi-must-win
       allow:
         - packages/pi-must-win
