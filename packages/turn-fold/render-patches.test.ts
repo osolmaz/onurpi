@@ -1,8 +1,40 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFoldSummary, renderFoldSummary } from "./render-patches.ts";
+import {
+  formatFoldHistorySummary,
+  formatFoldSummary,
+  renderFoldHistorySummary,
+  renderFoldSummary,
+} from "./render-patches.ts";
 
 describe("fold summary rendering", () => {
+  it("formats collapsed history above retained turns", () => {
+    expect(
+      formatFoldHistorySummary({
+        failedTools: 1,
+        messages: 12,
+        outputApproximate: true,
+        outputTokens: 1_250,
+        tools: 8,
+        turns: 5,
+      }),
+    ).toBe("▶ 5 previous turns · 12 msgs · ~1.3K out · 8 tools · 1 failure · Ctrl+Shift+O");
+    expect(
+      renderFoldHistorySummary(
+        {
+          failedTools: 0,
+          messages: 2,
+          outputApproximate: false,
+          outputTokens: 3,
+          tools: 0,
+          turns: 2,
+        },
+        100,
+        undefined,
+      ),
+    ).toEqual(["", "▶ 2 previous turns · 2 msgs · 3 out · Ctrl+Shift+O"]);
+  });
+
   it("formats a settled turn", () => {
     expect(
       formatFoldSummary({

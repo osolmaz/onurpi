@@ -160,7 +160,79 @@ describe("TurnFoldState views", () => {
     });
     expect(state.viewFor(finalAssistant, 250)?.display).toBe("original");
   });
+});
 
+describe("TurnFoldState history", () => {
+  it("collapses older settled turns above the latest three", () => {
+    const state = new TurnFoldState();
+    const firstMessage = assistantMessage(
+      110,
+      [
+        { text: "one", type: "text" },
+        { id: "tool-history", name: "read", type: "toolCall" },
+      ],
+      1,
+    );
+    const secondMessage = assistantMessage(210, [{ text: "two", type: "text" }], 2);
+    const thirdMessage = assistantMessage(310, [{ text: "three", type: "text" }], 3);
+    const fourthMessage = assistantMessage(410, [{ text: "four", type: "text" }], 4);
+    const fifthMessage = assistantMessage(510, [{ text: "five", type: "text" }], 5);
+    const firstComponent = {};
+    const secondComponent = {};
+    const thirdComponent = {};
+    const fourthComponent = {};
+    const fifthComponent = {};
+    const entries = [
+      { message: { content: "prompt 1", role: "user", timestamp: 100 }, type: "message" },
+      { message: firstMessage, type: "message" },
+      {
+        message: {
+          content: [{ text: "failed", type: "text" }],
+          isError: true,
+          role: "toolResult",
+          timestamp: 120,
+          toolCallId: "tool-history",
+        },
+        type: "message",
+      },
+      { message: { content: "prompt 2", role: "user", timestamp: 200 }, type: "message" },
+      { message: secondMessage, type: "message" },
+      { message: { content: "prompt 3", role: "user", timestamp: 300 }, type: "message" },
+      { message: thirdMessage, type: "message" },
+      { message: { content: "prompt 4", role: "user", timestamp: 400 }, type: "message" },
+      { message: fourthMessage, type: "message" },
+      { message: { content: "prompt 5", role: "user", timestamp: 500 }, type: "message" },
+      { message: fifthMessage, type: "message" },
+    ];
+
+    state.loadHistory(entries);
+    state.associateAssistant(firstComponent, firstMessage);
+    state.associateAssistant(secondComponent, secondMessage);
+    state.associateAssistant(thirdComponent, thirdMessage);
+    state.associateAssistant(fourthComponent, fourthMessage);
+    state.associateAssistant(fifthComponent, fifthMessage);
+
+    expect(state.viewFor(firstComponent)).toMatchObject({
+      display: "history",
+      history: {
+        failedTools: 1,
+        messages: 2,
+        outputApproximate: false,
+        outputTokens: 3,
+        tools: 1,
+        turns: 2,
+      },
+    });
+    expect(state.viewFor(secondComponent)?.display).toBe("hidden");
+    expect(state.viewFor(thirdComponent)?.display).toBe("original");
+    expect(state.viewFor(fifthComponent)?.display).toBe("original");
+
+    state.setMode("expanded");
+    expect(state.viewFor(firstComponent)?.display).toBe("original");
+  });
+});
+
+describe("TurnFoldState view selection", () => {
   it("uses the latest text-only assistant message as the final response", () => {
     const state = new TurnFoldState();
     const first = {};

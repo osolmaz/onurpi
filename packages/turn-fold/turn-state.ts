@@ -6,6 +6,8 @@ import {
   type OutputTokenTotal,
 } from "./output-metrics.ts";
 
+const RECENT_SETTLED_TURN_COUNT = 3;
+
 type ComponentKind = "assistant" | "tool";
 
 type AssistantSnapshot = {
@@ -32,6 +34,7 @@ type TurnGroup = {
   id: string;
   settled: boolean;
   startedAt: number;
+  toolCallIds: Set<string>;
   tools: Map<object, string>;
 };
 
@@ -46,8 +49,18 @@ export type FoldSummary = {
   tools: number;
 };
 
+export type FoldHistorySummary = {
+  failedTools: number;
+  messages: number;
+  outputApproximate: boolean;
+  outputTokens: number;
+  tools: number;
+  turns: number;
+};
+
 export type ComponentView = {
   display: FoldDisplay;
+  history?: FoldHistorySummary;
   summary: FoldSummary;
 };
 
@@ -172,8 +185,10 @@ export class TurnFoldState {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
     const groupId = this.ensureActive(snapshot.timestamp);
+    const group = this.groups.get(groupId);
     this.assistantGroupByKey.set(snapshot.key, groupId);
     for (const toolCallId of snapshot.toolCallIds) {
+      group?.toolCallIds.add(toolCallId);
       this.toolGroupById.set(toolCallId, groupId);
     }
   }
@@ -206,7 +221,9 @@ export class TurnFoldState {
   }
 
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
-    this.toolGroupById.set(toolCallId, this.ensureActive(startedAt));
+    const groupId = this.ensureActive(startedAt);
+    this.groups.get(groupId)?.toolCallIds.add(toolCallId);
+    this.toolGroupById.set(toolCallId, groupId);
   }
 
   registerToolEnd(toolCallId: string, failed: boolean): void {
@@ -261,6 +278,17 @@ export class TurnFoldState {
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group) return undefined;
 
+    const collapsedGroups = this.collapsedGroups();
+    if (collapsedGroups.includes(group)) {
+      const historyAnchor = this.historyAnchor(collapsedGroups);
+      const summary = this.summary(group, this.finalAssistant(group), now);
+      return {
+        display: component === historyAnchor ? "history" : "hidden",
+        ...(component === historyAnchor ? { history: this.historySummary(collapsedGroups) } : {}),
+        summary,
+      };
+    }
+
     const finalAssistant = this.finalAssistant(group);
     const anchor = this.foldAnchor(group, finalAssistant);
     const display = foldDisplay({
@@ -274,6 +302,36 @@ export class TurnFoldState {
     return {
       display,
       summary: this.summary(group, finalAssistant, now),
+    };
+  }
+
+  private collapsedGroups(): TurnGroup[] {
+    if (this.mode === "expanded") return [];
+    const settledGroups = [...this.groups.values()].filter((group) => group.settled);
+    return settledGroups.slice(0, -RECENT_SETTLED_TURN_COUNT);
+  }
+
+  private historyAnchor(groups: readonly TurnGroup[]): object | undefined {
+    for (const group of groups) {
+      const anchor = [...group.components]
+        .sort(([, left], [, right]) => left.sequence - right.sequence)
+        .at(0)?.[0];
+      if (anchor) return anchor;
+    }
+    return undefined;
+  }
+
+  private historySummary(groups: readonly TurnGroup[]): FoldHistorySummary {
+    const output = combineOutputTotals(
+      groups.flatMap((group) => [...group.finalizedAssistantOutputs.values()]),
+    );
+    return {
+      failedTools: groups.reduce((total, group) => total + group.failedToolCallIds.size, 0),
+      messages: groups.reduce((total, group) => total + group.finalizedAssistantOutputs.size, 0),
+      outputApproximate: output.approximate,
+      outputTokens: output.tokens,
+      tools: groups.reduce((total, group) => total + group.toolCallIds.size, 0),
+      turns: groups.length,
     };
   }
 
@@ -304,6 +362,7 @@ export class TurnFoldState {
     group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
     if (snapshot.aborted) group.aborted = true;
     for (const toolCallId of snapshot.toolCallIds) {
+      group.toolCallIds.add(toolCallId);
       this.toolGroupById.set(toolCallId, group.id);
     }
     group.endedAt = Math.max(group.endedAt ?? 0, snapshot.timestamp);
@@ -311,7 +370,10 @@ export class TurnFoldState {
 
   private indexHistoricalToolResult(group: TurnGroup, message: unknown): void {
     const toolCallId = stringField(message, "toolCallId");
-    if (toolCallId) this.toolGroupById.set(toolCallId, group.id);
+    if (toolCallId) {
+      group.toolCallIds.add(toolCallId);
+      this.toolGroupById.set(toolCallId, group.id);
+    }
     if (toolCallId && isRecord(message) && message["isError"] === true) {
       group.failedToolCallIds.add(toolCallId);
     }
@@ -339,6 +401,7 @@ export class TurnFoldState {
       id: `turn-${String(this.groupCounter)}`,
       settled,
       startedAt,
+      toolCallIds: new Set(),
       tools: new Map(),
     };
     this.groups.set(group.id, group);
@@ -386,7 +449,7 @@ export class TurnFoldState {
       outputApproximate: output.approximate,
       outputTokens: output.tokens,
       running: !group.settled,
-      tools: group.tools.size,
+      tools: group.toolCallIds.size,
     };
   }
 }

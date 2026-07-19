@@ -21,6 +21,16 @@ combined count as approximate:
 The active folded row should remain unchanged. Pi's working row already shows the changing output
 count and recent throughput while an agent run is active.
 
+Turn-fold should keep the three newest settled turns visible. It should replace older assistant and
+tool activity with one history row above the retained turns:
+
+```text
+▶ 5 previous turns · 12 msgs · ~1.3K out · 8 tools · Ctrl+Shift+O
+```
+
+The history row reports completed assistant responses, output tokens, tool calls, and failures. User
+prompts remain visible, which preserves the request context for the retained assistant responses.
+
 ## Source of truth
 
 Finalized assistant messages already contain the data needed for a settled summary. Turn-fold should
@@ -138,6 +148,13 @@ Do not add recent or average throughput to the settled row. Recent throughput de
 five seconds of generation and may be zero after a tool wait. Dividing tokens by total turn duration
 would mix model generation with tool execution and would not represent decode speed.
 
+Add a history display after normal fold selection. In compact modes, take all settled turn groups
+except the newest three. Use their earliest rendered assistant or tool component as the single
+history-row anchor and hide the rest of their assistant and tool components. The aggregate must use
+durable group data rather than render-component maps because the anchor may render before later tool
+components. Track tool-call IDs from assistant messages and tool events, and calculate history
+response counts from finalized assistant outputs. Expanded mode restores all rows.
+
 ## Event wiring
 
 Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current
@@ -163,11 +180,13 @@ Add `packages/turn-fold/output-metrics.test.ts` for the pure calculation. Cover:
 
 Extend `packages/turn-fold/turn-state.test.ts` with completed multi-response turns, aborted turns,
 and history reconstruction. Assert that a historical summary has the same output total before and
-after TUI component association. This test protects the separation between durable turn data and
-render state.
+after TUI component association. Test that the aggregate replaces all but the three newest settled
+turns and expanded mode restores the older rows. This protects the separation between durable turn
+data and render state.
 
-Update `packages/turn-fold/render-patches.test.ts` for exact and approximate rows. Keep coverage for
-failures, abort notices, running summaries, blank-line placement, and narrow widths.
+Update `packages/turn-fold/render-patches.test.ts` for exact and approximate rows. Add a history-row
+format test. Keep coverage for failures, abort notices, running summaries, blank-line placement, and
+narrow widths.
 
 ## Quality configuration
 
