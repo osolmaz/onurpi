@@ -1,0 +1,69 @@
+# @onurpi/turn-fold
+
+Turn-level transcript folding for the Pi coding agent.
+
+`@onurpi/turn-fold` keeps the final assistant response visible while replacing the intermediate assistant
+messages and tool rows from a completed turn with one compact summary. The underlying session
+messages are not changed and remain in model context.
+
+## Modes
+
+| Mode         | Behavior                                                                 |
+| ------------ | ------------------------------------------------------------------------ |
+| `live`       | Shows normal activity while Pi works, then folds the completed turn.     |
+| `final-only` | Shows one live activity row, followed by the summary and final response. |
+| `expanded`   | Shows the complete transcript.                                           |
+
+`live` is the default.
+
+A folded row looks like:
+
+```text
+▶ Worked for 14s · 8 tools · 2 msgs · Ctrl+Shift+O
+```
+
+## Use during development
+
+From the repository root:
+
+```bash
+npm install
+pi -e ./packages/turn-fold/index.ts
+```
+
+The package is private and is not published yet.
+
+## Controls
+
+```text
+/turn-fold                         open the mode picker
+/turn-fold live                    show activity, then fold
+/turn-fold final-only              hide intermediate activity while running
+/turn-fold expanded                show complete turns
+/turn-fold toggle                  toggle the compact mode and expanded mode
+/turn-fold status                  show the current mode
+```
+
+`Ctrl+Shift+O` toggles between the current compact mode and expanded mode. `Ctrl+O` remains Pi's
+separate tool-output detail toggle.
+
+Mode changes are stored as custom session entries, so each session restores its latest choice.
+Historical turns are reconstructed from the active session branch when Pi starts or reloads.
+
+## Current implementation boundary
+
+Pi does not expose a public whole-turn transcript renderer. This extension uses Pi's exported
+assistant and tool component classes but patches their rendering methods. It targets Pi 0.80.10 or
+newer and must be retested when Pi changes its interactive transcript components.
+
+Pi's public TUI API is keyboard-focused and does not provide inline mouse-click handlers for
+transcript rows. The mode picker and shortcut provide expansion without pretending the summary row
+is clickable.
+
+## Quality checks
+
+```bash
+npm run check
+npm run mutate
+npm run slophammer
+```

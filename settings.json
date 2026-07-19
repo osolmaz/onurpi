@@ -1,0 +1,11 @@
+{
+  "packages": [
+    "git:github.com/osolmaz/pi-workflows",
+    "../../repos/onurpi/packages/turn-fold",
+    "../../repos/onurpi/packages/pi-tui-history-replay"
+  ],
+  "lastChangelogVersion": "0.80.10",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "high"
+}

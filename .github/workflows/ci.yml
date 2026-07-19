@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run mutate
+      - run: npx --no-install slophammer-ts check . --execute
+      - name: Check @onurpi/turn-fold package
+        working-directory: packages/turn-fold
+        run: npm run check
+      - name: Mutate @onurpi/turn-fold package
+        working-directory: packages/turn-fold
+        run: npm run mutate
+      - name: Check @onurpi/turn-fold package with Slophammer
+        working-directory: packages/turn-fold
+        run: npm run slophammer
+      - name: Check pi-tui-history-replay package
+        working-directory: packages/pi-tui-history-replay
+        run: npm run check
+      - name: Mutate pi-tui-history-replay package
+        working-directory: packages/pi-tui-history-replay
+        run: npm run mutate
+      - name: Check pi-tui-history-replay package with Slophammer
+        working-directory: packages/pi-tui-history-replay
+        run: npm run slophammer

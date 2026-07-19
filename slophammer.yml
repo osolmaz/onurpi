@@ -1,0 +1,28 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - packages
+    exclude:
+      - "**/*.test.ts"
+      - pattern: "**/eslint.config.mjs"
+        reason: Independent packages keep self-contained lint configuration for standalone checks.
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  mutation:
+    targets:
+      - packages/turn-fold/fold-policy.ts
+      - packages/turn-fold/mode.ts
+      - packages/pi-tui-history-replay/history-replay.ts
+  dependency_boundaries:
+    - from: packages/turn-fold
+      allow:
+        - packages/turn-fold
+    - from: packages/pi-tui-history-replay
+      allow:
+        - packages/pi-tui-history-replay
