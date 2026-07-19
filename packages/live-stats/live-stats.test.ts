@@ -87,6 +87,16 @@ describe("LiveStatsTracker", () => {
     expect(tracker.snapshot(7_000).tokensPerSecond).toBe(0);
   });
 
+  it("keeps a stable rate denominator as old samples expire", () => {
+    const tracker = new LiveStatsTracker(5_000, 1);
+    tracker.start(0);
+    tracker.addDelta("12345", 1_000);
+    tracker.addDelta("67890", 5_900);
+
+    expect(tracker.snapshot(6_000).tokensPerSecond).toBe(2);
+    expect(tracker.snapshot(6_100).tokensPerSecond).toBe(1);
+  });
+
   it("combines token increments recorded at the same time", () => {
     const tracker = new LiveStatsTracker(5_000, 1);
     tracker.start(0);

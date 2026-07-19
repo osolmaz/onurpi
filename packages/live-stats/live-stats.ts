@@ -36,6 +36,7 @@ export class LiveStatsTracker {
   private completedOutputApproximate = false;
   private currentMessageChars = 0;
   private currentMessageEstimatedTokens = 0;
+  private firstOutputAtMs: number | undefined;
   private samples: TokenSample[] = [];
 
   public constructor(
@@ -55,6 +56,7 @@ export class LiveStatsTracker {
     this.completedOutputTokens = 0;
     this.completedOutputApproximate = false;
     this.resetCurrentMessage();
+    this.firstOutputAtMs = undefined;
     this.samples = [];
   }
 
@@ -105,10 +107,12 @@ export class LiveStatsTracker {
     this.completedOutputTokens = 0;
     this.completedOutputApproximate = false;
     this.resetCurrentMessage();
+    this.firstOutputAtMs = undefined;
     this.samples = [];
   }
 
   private addSample(nowMs: number, tokens: number): void {
+    this.firstOutputAtMs ??= nowMs;
     const last = this.samples.at(-1);
     if (last?.atMs === nowMs) {
       last.tokens += tokens;
@@ -121,15 +125,16 @@ export class LiveStatsTracker {
   }
 
   private recentRate(nowMs: number): number | undefined {
-    const cutoff = nowMs - this.sampleWindowMs;
-    const recentSamples = this.samples.filter((sample) => sample.atMs >= cutoff);
-    const oldestSample = recentSamples[0];
-    if (oldestSample === undefined) return this.samples.length === 0 ? undefined : 0;
+    if (this.firstOutputAtMs === undefined) return undefined;
 
-    const durationMs = Math.min(nowMs - oldestSample.atMs, this.sampleWindowMs);
+    const durationMs = Math.min(nowMs - this.firstOutputAtMs, this.sampleWindowMs);
     if (durationMs <= 0) return undefined;
 
-    const recentTokens = recentSamples.reduce((total, sample) => total + sample.tokens, 0);
+    const cutoff = nowMs - this.sampleWindowMs;
+    const recentTokens = this.samples.reduce(
+      (total, sample) => total + (sample.atMs >= cutoff ? sample.tokens : 0),
+      0,
+    );
     return recentTokens / (durationMs / 1_000);
   }
 
