@@ -38,6 +38,7 @@ describe("TurnFoldState", () => {
     expect(state.viewFor(intermediate, 150)).toEqual({
       display: "summary",
       summary: {
+        aborted: false,
         durationMs: 50,
         failedTools: 0,
         intermediateMessages: 1,
@@ -99,6 +100,7 @@ describe("TurnFoldState", () => {
     state.associateAssistant(finalAssistant, final);
 
     expect(state.viewFor(intermediate, 250)?.summary).toEqual({
+      aborted: false,
       durationMs: 40,
       failedTools: 1,
       intermediateMessages: 1,
@@ -169,6 +171,7 @@ describe("TurnFoldState", () => {
     state.settleActive(20);
 
     expect(state.viewFor(tool, 20)?.summary).toEqual({
+      aborted: false,
       durationMs: 10,
       failedTools: 1,
       intermediateMessages: 0,
@@ -182,5 +185,51 @@ describe("TurnFoldState", () => {
     state.setMode("final-only");
     expect(state.toggleExpanded()).toBe("expanded");
     expect(state.toggleExpanded()).toBe("final-only");
+  });
+});
+
+describe("aborted turn folding", () => {
+  it("uses the aborted assistant as an anchor for the settled summary", () => {
+    const state = new TurnFoldState();
+    const assistant = {};
+    const message = {
+      ...assistantMessage(110, []),
+      stopReason: "aborted",
+    };
+
+    state.ensureActive(100);
+    state.registerAssistantMessage(message);
+    state.associateAssistant(assistant, message);
+    state.abortActive(150);
+
+    expect(state.viewFor(assistant, 150)).toEqual({
+      display: "summary",
+      summary: {
+        aborted: true,
+        durationMs: 50,
+        failedTools: 0,
+        intermediateMessages: 0,
+        running: false,
+        tools: 0,
+      },
+    });
+  });
+
+  it("reconstructs the abort summary from session history", () => {
+    const state = new TurnFoldState();
+    const assistant = {};
+    const message = {
+      ...assistantMessage(120, []),
+      stopReason: "aborted",
+    };
+
+    state.loadHistory([
+      { message: { content: "Start", role: "user", timestamp: 100 }, type: "message" },
+      { message, type: "message" },
+    ]);
+    state.associateAssistant(assistant, message);
+
+    expect(state.viewFor(assistant, 150)?.summary.aborted).toBe(true);
+    expect(state.viewFor(assistant, 150)?.display).toBe("summary");
   });
 });

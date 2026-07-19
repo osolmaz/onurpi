@@ -38,6 +38,12 @@ jobs:
       - name: Check @onurpi/live-stats package with Slophammer
         working-directory: packages/live-stats
         run: npm run slophammer
+      - name: Check @onurpi/pi-must-win package
+        working-directory: packages/pi-must-win
+        run: npm run check
+      - name: Check @onurpi/pi-must-win package with Slophammer
+        working-directory: packages/pi-must-win
+        run: npm run slophammer
 
   mutation:
     if: github.event_name == 'workflow_dispatch'
@@ -58,4 +64,7 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/live-stats package
         working-directory: packages/live-stats
+        run: npm run mutate
+      - name: Mutate @onurpi/pi-must-win package
+        working-directory: packages/pi-must-win
         run: npm run mutate

@@ -1,36 +1,40 @@
 {
-  "name": "@onurpi/workspace",
+  "name": "@onurpi/pi-must-win",
+  "version": "0.1.0",
   "private": true,
+  "description": "Umbrella Pi branding extension, starting with Git commit attribution",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
-  "workspaces": [
-    "packages/*"
+  "keywords": [
+    "pi-package",
+    "pi",
+    "branding",
+    "git",
+    "co-authored-by"
   ],
   "pi": {
     "extensions": [
-      "./packages/turn-fold/index.ts",
-      "./packages/pi-tui-history-replay/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/pi-must-win/index.ts"
+      "./index.ts"
     ]
   },
   "scripts": {
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "lint": "eslint .",
+    "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
     "dry": "slophammer-ts dry .",
-    "mutate": "stryker run",
+    "mutate": "stryker run stryker.config.mjs",
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.10"
+  },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.80.10",
-    "@earendil-works/pi-tui": "0.80.10",
     "@eslint/js": "9.39.2",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",

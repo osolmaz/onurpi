@@ -4,12 +4,12 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 
 ## Packages
 
-[`@onurpi/turn-fold`](packages/turn-fold/) provides turn-level transcript folding while preserving
-the final response. [`pi-tui-history-replay`](packages/pi-tui-history-replay/) keeps the full
-visible branch across context compaction.
-
-[`@onurpi/live-stats`](packages/live-stats/) adds elapsed time, output tokens, and recent output
-throughput to Pi's working row.
+| Package                                                    | Purpose                                                         |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                 | Turn-level transcript folding that preserves the final response |
+| [`pi-tui-history-replay`](packages/pi-tui-history-replay/) | Vendored full visible branch history across context compaction  |
+| [`@onurpi/live-stats`](packages/live-stats/)               | Live elapsed time, output tokens, and recent output throughput  |
+| [`@onurpi/pi-must-win`](packages/pi-must-win/)             | Umbrella Pi branding, starting with Git commit attribution      |
 
 ## Install
 
@@ -23,6 +23,7 @@ npm ci
 pi install ./packages/turn-fold
 pi install ./packages/pi-tui-history-replay
 pi install ./packages/live-stats
+pi install ./packages/pi-must-win
 pi list
 ```
 
@@ -49,8 +50,8 @@ cp settings.json ~/.pi/agent/settings.json
 
 ## Structure
 
-Each extension is an independent package under `packages/` with a manifest and entry point. Its
-README and tests live beside the source. Package manifests declare Pi entry points through
+Each extension is an independent package under `packages/` with its own `package.json` and entry
+point. Tests and a README live beside the source. Package manifests declare Pi entry points through
 `pi.extensions`. The private root manifest also registers them for workspace-wide development.
 
 This workspace follows the package-directory structure used by
