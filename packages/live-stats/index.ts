@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { formatWorkingMessage, LiveStatsTracker } from "./live-stats.ts";
+import { countOutputContentChars, formatWorkingMessage, LiveStatsTracker } from "./live-stats.ts";
 
 const REFRESH_INTERVAL_MS = 250;
 
@@ -55,7 +55,11 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   pi.on("message_end", (event, ctx) => {
     if (ctx.mode !== "tui" || event.message.role !== "assistant") return;
-    tracker.finishMessage(event.message.usage.output);
+
+    tracker.finishMessage(
+      event.message.usage.output,
+      countOutputContentChars(event.message.content),
+    );
     render(ctx);
   });
 

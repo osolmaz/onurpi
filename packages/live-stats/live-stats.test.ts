@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countOutputContentChars,
   formatElapsed,
   formatTokenCount,
   formatWorkingMessage,
@@ -133,6 +134,27 @@ describe("LiveStatsTracker", () => {
     });
   });
 
+  it("estimates finalized content when a provider emits no deltas or usage", () => {
+    const tracker = new LiveStatsTracker();
+    tracker.start(0);
+    tracker.finishMessage(0, 12);
+    tracker.finishMessage(0, -1);
+
+    expect(tracker.snapshot(1_000)).toMatchObject({
+      outputTokens: 3,
+      outputApproximate: true,
+    });
+  });
+
+  it("keeps the larger stream estimate when final content is shorter", () => {
+    const tracker = new LiveStatsTracker();
+    tracker.start(0);
+    tracker.addDelta("12345678", 500);
+    tracker.finishMessage(0, 4);
+
+    expect(tracker.snapshot(1_000).outputTokens).toBe(2);
+  });
+
   it("can reset the current message without affecting completed usage", () => {
     const tracker = new LiveStatsTracker();
     tracker.start(0);
@@ -152,6 +174,18 @@ describe("LiveStatsTracker", () => {
     tracker.start(1_000);
 
     expect(tracker.snapshot(500).elapsedMs).toBe(0);
+  });
+});
+
+describe("countOutputContentChars", () => {
+  it("counts text, thinking, and serialized tool calls", () => {
+    expect(
+      countOutputContentChars([
+        { type: "text", text: "hello" },
+        { type: "thinking", thinking: "abc" },
+        { type: "toolCall", name: "read", arguments: { path: "a" } },
+      ]),
+    ).toBe(24);
   });
 });
 

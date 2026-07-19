@@ -13,6 +13,23 @@ export type LiveStatsSnapshot = {
   tokensPerSecond: number | undefined;
 };
 
+type OutputContent =
+  | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string }
+  | { type: "toolCall"; name: string; arguments: Record<string, unknown> };
+
+export function countOutputContentChars(content: readonly OutputContent[]): number {
+  let chars = 0;
+  for (const block of content) {
+    if (block.type === "text") chars += block.text.length;
+    if (block.type === "thinking") chars += block.thinking.length;
+    if (block.type === "toolCall") {
+      chars += block.name.length + JSON.stringify(block.arguments).length;
+    }
+  }
+  return chars;
+}
+
 export class LiveStatsTracker {
   private startedAtMs: number | undefined;
   private completedOutputTokens = 0;
@@ -57,14 +74,16 @@ export class LiveStatsTracker {
     if (increment > 0) this.addSample(nowMs, increment);
   }
 
-  public finishMessage(reportedOutputTokens: number): void {
+  public finishMessage(reportedOutputTokens: number, finalContentChars = 0): void {
     if (!this.active) return;
 
     if (reportedOutputTokens > 0) {
       this.completedOutputTokens += reportedOutputTokens;
     } else {
-      this.completedOutputTokens += this.currentMessageEstimatedTokens;
-      this.completedOutputApproximate ||= this.currentMessageEstimatedTokens > 0;
+      const finalContentEstimate = Math.ceil(Math.max(0, finalContentChars) / this.charsPerToken);
+      const fallbackEstimate = Math.max(this.currentMessageEstimatedTokens, finalContentEstimate);
+      this.completedOutputTokens += fallbackEstimate;
+      this.completedOutputApproximate ||= fallbackEstimate > 0;
     }
     this.resetCurrentMessage();
   }
