@@ -177,9 +177,10 @@ history-replay's one-shot compaction marker until Pi consumes it for the rebuild
 still active, discard the deferred reload and retain its active group, pending final responses, and
 output tracking. Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to
 queue its current group before abort handling. In `agent_settled`, pair queued groups with the
-latest persisted assistant-role messages from compaction-aware entries. Keep malformed assistant
-entries in this positional selection, then skip their metrics contribution. Derive output before
-settling the group. The handlers should remain safe for normal, aborted, and error responses.
+latest persisted assistant-role messages from the full active branch. This keeps finalization
+complete when compaction splits an active turn. Keep malformed assistant entries in this positional
+selection, then skip their metrics contribution. Derive output before settling the group. The
+handlers should remain safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.

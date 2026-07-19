@@ -167,7 +167,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("agent_settled", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.finalizeAssistantOutputs(ctx.sessionManager.buildContextEntries());
+    state.finalizeAssistantOutputs(ctx.sessionManager.getBranch());
     state.settleActive();
   });
 
