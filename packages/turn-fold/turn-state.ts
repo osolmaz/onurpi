@@ -141,6 +141,11 @@ function latestBySequence(
   }, undefined);
 }
 
+function groupNumber(id: string): number {
+  const value = Number(id.slice("turn-".length));
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
 export class TurnFoldState {
   private activeGroupId: string | undefined;
   private assistantComponentByKey = new Map<string, object>();
@@ -194,8 +199,7 @@ export class TurnFoldState {
     if (!this.historyReload || this.componentInfo.has(component)) return;
     const entries = this.historyReload;
     this.historyReload = undefined;
-    if (this.activeGroupId) return;
-    this.loadHistory(entries());
+    this.reloadHistory(entries());
   }
 
   ensureActive(startedAt = Date.now()): string {
@@ -412,6 +416,45 @@ export class TurnFoldState {
     this.pendingFinalAssistants = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
+  }
+
+  private reloadHistory(entries: readonly unknown[]): void {
+    const activeGroupId = this.activeGroupId;
+    const activeGroup = activeGroupId ? this.groups.get(activeGroupId) : undefined;
+    const pendingFinalAssistants = this.pendingFinalAssistants;
+    this.loadHistory(entries);
+    if (!activeGroupId || !activeGroup) return;
+
+    const visibleActiveGroup = [...this.groups.values()].at(-1);
+    if (visibleActiveGroup) this.mergeVisibleActiveGroup(activeGroup, visibleActiveGroup);
+    if (visibleActiveGroup) this.groups.delete(visibleActiveGroup.id);
+    this.groups.set(activeGroup.id, activeGroup);
+    this.reassignGroupId(visibleActiveGroup?.id, activeGroup.id);
+    this.groupCounter = Math.max(this.groupCounter, groupNumber(activeGroup.id));
+    this.activeGroupId = activeGroup.id;
+    this.pendingFinalAssistants = pendingFinalAssistants;
+  }
+
+  private mergeVisibleActiveGroup(active: TurnGroup, visible: TurnGroup): void {
+    active.assistants.clear();
+    active.components.clear();
+    active.tools.clear();
+    active.failedToolCallIds = new Set([...active.failedToolCallIds, ...visible.failedToolCallIds]);
+    active.finalizedAssistantOutputs = new Map([
+      ...active.finalizedAssistantOutputs,
+      ...visible.finalizedAssistantOutputs,
+    ]);
+    active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
+  }
+
+  private reassignGroupId(fromGroupId: string | undefined, toGroupId: string): void {
+    if (!fromGroupId) return;
+    for (const [key, groupId] of this.assistantGroupByKey) {
+      if (groupId === fromGroupId) this.assistantGroupByKey.set(key, toGroupId);
+    }
+    for (const [key, groupId] of this.toolGroupById) {
+      if (groupId === fromGroupId) this.toolGroupById.set(key, toGroupId);
+    }
   }
 
   private historicalGroup(

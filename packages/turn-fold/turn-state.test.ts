@@ -294,7 +294,8 @@ describe("TurnFoldState history", () => {
     state.associateAssistant(originalComponent, message);
     state.queueFinalAssistant(message);
     state.deferHistoryReload(() => [
-      { message: { content: "reloaded", role: "user", timestamp: 200 }, type: "message" },
+      { message: { content: "reloaded", role: "user", timestamp: 100 }, type: "message" },
+      { message, type: "message" },
     ]);
     state.reloadHistoryForNewComponent(rebuiltComponent);
     state.associateAssistant(rebuiltComponent, message);

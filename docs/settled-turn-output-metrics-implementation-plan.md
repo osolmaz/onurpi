@@ -174,13 +174,14 @@ entry is an assistant or tool result, seed a partial group so a split turn remai
 `session_compact`, save a visible-entry reader without invoking it. On the first new assistant or
 tool component after Pi rebuilds the transcript, reload state from that reader. This preserves
 history-replay's one-shot compaction marker until Pi consumes it for the rebuild. If an agent run is
-still active, discard the deferred reload and retain its active group, pending final responses, and
-output tracking. Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to
-queue its current group before abort handling. In `agent_settled`, pair queued groups with the
-latest persisted assistant-role messages from the full active branch. This keeps finalization
-complete when compaction splits an active turn. Keep malformed assistant entries in this positional
-selection, then skip their metrics contribution. Derive output before settling the group. The
-handlers should remain safe for normal, aborted, and error responses.
+still active, reload the visible groups while preserving the active group, pending final responses,
+and output tracking. Merge the rebuilt tail group into the active group and remap its response and
+tool IDs. Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its
+current group before abort handling. In `agent_settled`, pair queued groups with the latest
+persisted assistant-role messages from the full active branch. This keeps finalization complete when
+compaction splits an active turn. Keep malformed assistant entries in this positional selection,
+then skip their metrics contribution. Derive output before settling the group. The handlers should
+remain safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.
