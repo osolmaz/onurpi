@@ -98,6 +98,31 @@ describe("TurnFoldState finalized output", () => {
   });
 });
 
+describe("TurnFoldState finalized output replacements", () => {
+  it("does not assign an older response when the latest replacement is malformed", () => {
+    const state = new TurnFoldState();
+    const historical = assistantMessage(110, [{ text: "history", type: "text" }], 100);
+    const current = assistantMessage(210, [{ text: "current", type: "text" }], 5);
+    const component = {};
+
+    state.loadHistory([
+      { message: { content: "earlier", role: "user", timestamp: 100 }, type: "message" },
+      { message: historical, type: "message" },
+    ]);
+    state.ensureActive(200);
+    state.registerAssistantMessage(current);
+    state.queueFinalAssistant(current);
+    state.associateAssistant(component, current);
+    state.finalizeAssistantOutputs([
+      { message: historical, type: "message" },
+      { message: { content: [], role: "assistant" }, type: "message" },
+    ]);
+    state.settleActive(220);
+
+    expect(state.viewFor(component, 220)?.summary.outputTokens).toBe(0);
+  });
+});
+
 describe("TurnFoldState views", () => {
   it("renders one live summary in final-only mode", () => {
     const state = new TurnFoldState();

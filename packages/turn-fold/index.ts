@@ -116,7 +116,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.loadHistory(ctx.sessionManager.getBranch());
+    state.loadHistory(ctx.sessionManager.buildContextEntries());
     applyMode(pi, state, modeFromBranch(ctx), false);
   });
 
@@ -158,7 +158,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("agent_settled", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.finalizeAssistantOutputs(ctx.sessionManager.getBranch());
+    state.finalizeAssistantOutputs(ctx.sessionManager.buildContextEntries());
     state.settleActive();
   });
 

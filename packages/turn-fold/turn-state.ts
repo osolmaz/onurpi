@@ -144,7 +144,7 @@ function latestBySequence(
 export class TurnFoldState {
   private activeGroupId: string | undefined;
   private assistantGroupByKey = new Map<string, string>();
-  private componentInfo = new WeakMap<object, { groupId: string }>();
+  private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private groupCounter = 0;
   private historyCache: CollapsedHistory | undefined;
   private groups = new Map<string, TurnGroup>();
@@ -213,7 +213,7 @@ export class TurnFoldState {
     if (this.pendingFinalAssistants.size === 0) return;
     const finalizedMessages = entries
       .map(messageFromEntry)
-      .filter((message) => assistantSnapshot(message) !== undefined)
+      .filter((message) => stringField(message, "role") === "assistant")
       .slice(-this.pendingFinalAssistants.size);
     const groupIds = [...this.pendingFinalAssistants.values()];
 
@@ -356,6 +356,15 @@ export class TurnFoldState {
     };
   }
 
+  private updateHistoryAnchor(component: object, groupId: string, sequence: number): void {
+    const history = this.historyCache;
+    if (!history?.groupIds.has(groupId)) return;
+    const anchor = history.anchor;
+    const anchorInfo = anchor ? this.componentInfo.get(anchor) : undefined;
+    if (anchorInfo !== undefined && anchorInfo.sequence <= sequence) return;
+    this.historyCache = { ...history, anchor: component };
+  }
+
   private invalidateHistory(): void {
     this.historyCache = undefined;
   }
@@ -412,9 +421,10 @@ export class TurnFoldState {
   private associateComponent(component: object, group: TurnGroup, kind: ComponentKind): void {
     if (this.componentInfo.has(component)) return;
     this.sequence += 1;
-    group.components.set(component, { kind, sequence: this.sequence });
-    this.componentInfo.set(component, { groupId: group.id });
-    this.invalidateHistory();
+    const info = { kind, sequence: this.sequence };
+    group.components.set(component, info);
+    this.componentInfo.set(component, { groupId: group.id, sequence: info.sequence });
+    this.updateHistoryAnchor(component, group.id, info.sequence);
   }
 
   private createGroup(startedAt: number, settled: boolean): TurnGroup {

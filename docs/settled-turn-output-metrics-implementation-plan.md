@@ -156,17 +156,21 @@ later tool components. Render-component maps may still be incomplete at that poi
 IDs from assistant messages and tool events, and calculate history response counts from finalized
 assistant outputs. Expanded mode restores all rows.
 
-Cache the collapsed group IDs, aggregate summary, and anchor. Invalidate that cache when the compact
-mode changes, a component is associated, final assistant outputs are recorded, or an active turn
-settles. `viewFor()` must only perform constant-time membership checks during normal transcript
-rendering.
+Build retained history from compaction-aware session entries so the history row only describes rows
+that expanded mode can restore. Cache the collapsed group IDs and aggregate summary. Invalidate that
+cache when the compact mode changes, final assistant outputs are recorded, or an active turn
+settles. When an assistant or tool component is associated during rendering, update the cached
+anchor only if that component comes earlier. `viewFor()` must only perform constant-time membership
+checks during normal transcript rendering.
 
 ## Event wiring
 
-Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current
-group before abort handling. In `agent_settled`, pair those queued groups with the latest persisted
-assistant messages from the active branch. Derive output before settling the group. The handlers
-should remain safe for normal, aborted, and error responses.
+Load historical groups from `ctx.sessionManager.buildContextEntries()`. Update the assistant
+`message_end` handler in `packages/turn-fold/index.ts` to queue its current group before abort
+handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role messages
+from compaction-aware entries. Keep malformed assistant entries in this positional selection, then
+skip their metrics contribution. Derive output before settling the group. The handlers should remain
+safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.
