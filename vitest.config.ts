@@ -6,6 +6,7 @@ export default defineConfig({
       include: [
         "packages/turn-fold/fold-policy.ts",
         "packages/turn-fold/mode.ts",
+        "packages/turn-fold/output-metrics.ts",
         "packages/turn-fold/turn-state.ts",
         "packages/pi-tui-history-replay/history-replay.ts",
         "packages/live-stats/live-stats.ts",

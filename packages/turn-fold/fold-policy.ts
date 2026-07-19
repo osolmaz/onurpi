@@ -1,6 +1,6 @@
 import type { TurnFoldMode } from "./mode.ts";
 
-export type FoldDisplay = "hidden" | "original" | "summary";
+export type FoldDisplay = "hidden" | "history" | "original" | "summary";
 
 export type FoldDisplayInput = {
   aborted: boolean;

@@ -19,8 +19,25 @@ messages are not changed and remain in model context.
 A folded row looks like:
 
 ```text
-▶ Worked for 14s · 8 tools · 2 msgs · Ctrl+Shift+O
+▶ Worked for 14s · 438 out · 8 tools · 2 msgs · Ctrl+Shift+O
 ```
+
+The output count covers every assistant response in the turn, including responses that call tools.
+Turn-fold uses provider-reported output usage when available. If a provider omits usage, turn-fold
+estimates the missing response from its finalized content and prefixes the combined count with `~`.
+It derives this information from existing session messages and does not store a separate metrics
+record.
+
+Turn-fold keeps the three newest settled turns in the transcript. Older assistant and tool activity
+is replaced with one history row above them:
+
+```text
+▶ 5 previous turns · 12 msgs · ~1.3K out · 8 tools · Ctrl+Shift+O
+```
+
+The row counts completed assistant responses, output tokens, and tool calls across the collapsed
+turns. Each user prompt starts a turn. User prompts remain visible so the retained responses keep
+their request context. Use `Ctrl+Shift+O` or `/turn-fold expanded` to show every row.
 
 ## Use during development
 

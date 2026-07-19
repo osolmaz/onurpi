@@ -43,6 +43,10 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
+function loadVisibleHistory(state: TurnFoldState, ctx: ExtensionContext): void {
+  state.loadHistory(ctx.sessionManager.buildContextEntries());
+}
+
 function applyMode(
   pi: ExtensionAPI,
   state: TurnFoldState,
@@ -116,8 +120,18 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    state.loadHistory(ctx.sessionManager.getBranch());
     applyMode(pi, state, modeFromBranch(ctx), false);
+    loadVisibleHistory(state, ctx);
+  });
+
+  pi.on("session_compact", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
+    state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
+  });
+
+  pi.on("session_tree", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
+    state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
   pi.on("agent_start", (_event, ctx) => {
@@ -128,7 +142,7 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("message_start", (event, ctx) => {
     currentTheme = ctx.ui.theme;
     const role = messageRole(event.message);
-    if (role === "user") state.ensureActive(messageTimestamp(event.message));
+    if (role === "user") state.startUserTurn(messageTimestamp(event.message));
     if (role === "assistant") state.registerAssistantMessage(event.message);
   });
 
@@ -141,6 +155,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) === "assistant") {
       state.registerAssistantMessage(event.message);
+      state.queueFinalAssistant(event.message);
       if (messageStopReason(event.message) === "aborted") state.abortActive();
     }
   });
@@ -157,6 +172,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("agent_settled", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
+    state.finalizeAssistantOutputs(ctx.sessionManager.getBranch());
     state.settleActive();
   });
 

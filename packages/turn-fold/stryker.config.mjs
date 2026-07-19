@@ -1,5 +1,5 @@
 export default {
-  mutate: ["fold-policy.ts", "mode.ts"],
+  mutate: ["fold-policy.ts", "mode.ts", "output-metrics.ts"],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

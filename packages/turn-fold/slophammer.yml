@@ -16,6 +16,7 @@ typescript:
     targets:
       - fold-policy.ts
       - mode.ts
+      - output-metrics.ts
   dependency_boundaries:
     - from: .
       allow: []

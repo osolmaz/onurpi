@@ -5,7 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-import type { FoldSummary } from "./turn-state.ts";
+import type { FoldHistorySummary, FoldSummary } from "./turn-state.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 export type RestoreRenderPatches = () => void;
@@ -28,6 +28,27 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
   return `${String(count)} ${count === 1 ? singular : plural}`;
 }
 
+function formatCompact(value: number, suffix: string): string {
+  const decimals = value < 10 ? 1 : 0;
+  return `${value.toFixed(decimals).replace(/\.0$/u, "")}${suffix}`;
+}
+
+function formatTokenCount(tokens: number): string {
+  const value = Math.max(0, tokens);
+  if (value < 1_000) return Math.round(value).toString();
+  if (value < 1_000_000) return formatCompact(value / 1_000, "K");
+  return formatCompact(value / 1_000_000, "M");
+}
+
+export function formatFoldHistorySummary(summary: FoldHistorySummary): string {
+  const parts = [countLabel(summary.turns, "previous turn"), countLabel(summary.messages, "msg")];
+  const approximate = summary.outputApproximate ? "~" : "";
+  parts.push(`${approximate}${formatTokenCount(summary.outputTokens)} out`);
+  if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
+  if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
+  return `▶ ${parts.join(" · ")} · Ctrl+Shift+O`;
+}
+
 export function formatFoldSummary(summary: FoldSummary): string {
   const parts = [countLabel(summary.tools, "tool")];
   if (summary.intermediateMessages > 0) {
@@ -36,7 +57,9 @@ export function formatFoldSummary(summary: FoldSummary): string {
   if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
 
   if (summary.running) return `◆ Working · ${parts.join(" · ")}`;
-  return `▶ Worked for ${formatDuration(summary.durationMs)} · ${parts.join(" · ")} · Ctrl+Shift+O`;
+  const approximate = summary.outputApproximate ? "~" : "";
+  const output = `${approximate}${formatTokenCount(summary.outputTokens)} out`;
+  return `▶ Worked for ${formatDuration(summary.durationMs)} · ${output} · ${parts.join(" · ")} · Ctrl+Shift+O`;
 }
 
 export function renderFoldSummary(
@@ -52,6 +75,17 @@ export function renderFoldSummary(
   if (!summary.aborted) return ["", styled];
   const aborted = theme ? theme.fg("error", "Operation aborted") : "Operation aborted";
   return ["", styled, aborted];
+}
+
+export function renderFoldHistorySummary(
+  summary: FoldHistorySummary,
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (width <= 0) return [];
+  const text = truncateToWidth(formatFoldHistorySummary(summary), width, "…");
+  const styled = theme ? theme.fg(summary.failedTools > 0 ? "warning" : "muted", text) : text;
+  return ["", styled];
 }
 
 export function installRenderPatches(
@@ -71,6 +105,7 @@ export function installRenderPatches(
     message: AssistantMessage,
   ): void {
     originalAssistantUpdate.call(this, message);
+    state.reloadHistoryForNewComponent(this);
     state.associateAssistant(this, message);
   };
 
@@ -83,15 +118,22 @@ export function installRenderPatches(
     const view = state.viewFor(this);
     if (!view || view.display === "original") return originalAssistantRender.call(this, width);
     if (view.display === "hidden") return [];
+    if (view.display === "history" && view.history) {
+      return renderFoldHistorySummary(view.history, width, getTheme());
+    }
     return renderFoldSummary(view.summary, width, getTheme());
   };
 
   const patchedToolRender = function (this: ToolExecutionComponent, width: number): string[] {
+    state.reloadHistoryForNewComponent(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);
     const view = state.viewFor(this);
     if (!view || view.display === "original") return originalToolRender.call(this, width);
     if (view.display === "hidden") return [];
+    if (view.display === "history" && view.history) {
+      return renderFoldHistorySummary(view.history, width, getTheme());
+    }
     return renderFoldSummary(view.summary, width, getTheme());
   };
 
