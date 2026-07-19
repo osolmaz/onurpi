@@ -105,6 +105,7 @@ export function installRenderPatches(
     message: AssistantMessage,
   ): void {
     originalAssistantUpdate.call(this, message);
+    state.reloadHistoryForNewComponent(this);
     state.associateAssistant(this, message);
   };
 
@@ -124,6 +125,7 @@ export function installRenderPatches(
   };
 
   const patchedToolRender = function (this: ToolExecutionComponent, width: number): string[] {
+    state.reloadHistoryForNewComponent(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);
     const view = state.viewFor(this);

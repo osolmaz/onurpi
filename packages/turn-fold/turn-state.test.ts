@@ -263,6 +263,26 @@ describe("TurnFoldState history", () => {
     expect(state.viewFor(rebuiltComponent)?.display).toBe("history");
   });
 
+  it("reloads visible history when the rebuilt transcript creates a new component", () => {
+    const state = new TurnFoldState();
+    const oldMessage = assistantMessage(110, [{ text: "old", type: "text" }], 1);
+    const newMessage = assistantMessage(210, [{ text: "new", type: "text" }], 7);
+    const component = {};
+
+    state.loadHistory([
+      { message: { content: "old prompt", role: "user", timestamp: 100 }, type: "message" },
+      { message: oldMessage, type: "message" },
+    ]);
+    state.deferHistoryReload(() => [
+      { message: { content: "new prompt", role: "user", timestamp: 200 }, type: "message" },
+      { message: newMessage, type: "message" },
+    ]);
+    state.reloadHistoryForNewComponent(component);
+    state.associateAssistant(component, newMessage);
+
+    expect(state.viewFor(component, 220)?.summary.outputTokens).toBe(7);
+  });
+
   it("groups a compaction prefix that begins with an assistant response", () => {
     const state = new TurnFoldState();
     const component = {};

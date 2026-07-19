@@ -148,6 +148,7 @@ export class TurnFoldState {
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private groupCounter = 0;
   private historyCache: CollapsedHistory | undefined;
+  private historyReload: (() => readonly unknown[]) | undefined;
   private groups = new Map<string, TurnGroup>();
   private mode: TurnFoldMode = "live";
   private pendingFinalAssistants = new Map<object, string>();
@@ -183,6 +184,17 @@ export class TurnFoldState {
         if (currentGroup) this.indexHistoricalMessage(currentGroup, message);
       }
     }
+  }
+
+  deferHistoryReload(entries: () => readonly unknown[]): void {
+    this.historyReload = entries;
+  }
+
+  reloadHistoryForNewComponent(component: object): void {
+    if (!this.historyReload || this.componentInfo.has(component)) return;
+    const entries = this.historyReload;
+    this.historyReload = undefined;
+    this.loadHistory(entries());
   }
 
   ensureActive(startedAt = Date.now()): string {
@@ -395,6 +407,7 @@ export class TurnFoldState {
     this.groups = new Map();
     this.groupCounter = 0;
     this.historyCache = undefined;
+    this.historyReload = undefined;
     this.pendingFinalAssistants = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();

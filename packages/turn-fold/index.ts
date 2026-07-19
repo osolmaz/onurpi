@@ -126,7 +126,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("session_compact", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
-    loadVisibleHistory(state, ctx);
+    state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
   pi.on("agent_start", (_event, ctx) => {

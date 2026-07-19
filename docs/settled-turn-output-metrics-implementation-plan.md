@@ -170,8 +170,10 @@ transcript rendering.
 Load historical groups from `ctx.sessionManager.buildContextEntries()`. Register the history-replay
 extension before turn-fold in the root Pi manifest and tracked global settings. Its session-start
 patch then runs first, so turn-fold reads the exact entries Pi will render. If the first retained
-entry is an assistant or tool result, seed a partial group so a split turn remains visible. Reload
-from the same visible entries in `session_compact` before Pi rebuilds its transcript. Update the
+entry is an assistant or tool result, seed a partial group so a split turn remains visible. In
+`session_compact`, save a visible-entry reader without invoking it. On the first new assistant or
+tool component after Pi rebuilds the transcript, reload state from that reader. This preserves
+history-replay's one-shot compaction marker until Pi consumes it for the rebuild. Update the
 assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current group before
 abort handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role
 messages from compaction-aware entries. Keep malformed assistant entries in this positional
