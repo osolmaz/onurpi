@@ -129,6 +129,11 @@ export default function turnFold(pi: ExtensionAPI): void {
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
+  pi.on("session_tree", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
+    state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
+  });
+
   pi.on("agent_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
     state.ensureActive();

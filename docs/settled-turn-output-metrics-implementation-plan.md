@@ -171,12 +171,12 @@ Load historical groups from `ctx.sessionManager.buildContextEntries()`. Register
 extension before turn-fold in the root Pi manifest and tracked global settings. Its session-start
 patch then runs first, so turn-fold reads the exact entries Pi will render. If the first retained
 entry is an assistant or tool result, seed a partial group so a split turn remains visible. In
-`session_compact`, save a visible-entry reader without invoking it. On the first new assistant or
-tool component after Pi rebuilds the transcript, reload state from that reader. This preserves
-history-replay's one-shot compaction marker until Pi consumes it for the rebuild. If an agent run is
-still active, reload the visible groups while preserving the active group, pending final responses,
-and output tracking. Merge every rebuilt group belonging to the active run into the active group and
-remap its response and tool IDs. Update the assistant `message_end` handler in
+`session_compact` and `session_tree`, save a visible-entry reader without invoking it. On the first
+new assistant or tool component after Pi rebuilds the transcript, reload state from that reader.
+This preserves history-replay's one-shot compaction marker until Pi consumes it for the rebuild. If
+an agent run is still active, reload the visible groups while preserving the active group, pending
+final responses, and output tracking. Merge every rebuilt group belonging to the active run into the
+active group and remap its response and tool IDs. Update the assistant `message_end` handler in
 `packages/turn-fold/index.ts` to queue its current group before abort handling. In `agent_settled`,
 pair queued groups with the latest persisted assistant-role messages from the full active branch.
 This keeps finalization complete when compaction splits an active turn. Keep malformed assistant
