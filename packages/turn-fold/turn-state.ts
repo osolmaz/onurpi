@@ -421,39 +421,76 @@ export class TurnFoldState {
   private reloadHistory(entries: readonly unknown[]): void {
     const activeGroupId = this.activeGroupId;
     const activeGroup = activeGroupId ? this.groups.get(activeGroupId) : undefined;
+    const activeAssistantKeys = this.keysForGroup(this.assistantGroupByKey, activeGroupId);
+    const activeToolCallIds = this.keysForGroup(this.toolGroupById, activeGroupId);
     const pendingFinalAssistants = this.pendingFinalAssistants;
     this.loadHistory(entries);
     if (!activeGroupId || !activeGroup) return;
 
-    const visibleActiveGroup = [...this.groups.values()].at(-1);
-    if (visibleActiveGroup) this.mergeVisibleActiveGroup(activeGroup, visibleActiveGroup);
-    if (visibleActiveGroup) this.groups.delete(visibleActiveGroup.id);
+    const visibleGroups = [...this.groups.values()];
+    const activeGroups = this.reloadedActiveGroups(
+      visibleGroups,
+      activeGroup,
+      activeAssistantKeys,
+      activeToolCallIds,
+    );
+    this.mergeVisibleActiveGroups(activeGroup, activeGroups);
+    const activeGroupIds = new Set(activeGroups.map((group) => group.id));
+    for (const group of activeGroups) this.groups.delete(group.id);
     this.groups.set(activeGroup.id, activeGroup);
-    this.reassignGroupId(visibleActiveGroup?.id, activeGroup.id);
+    this.reassignGroupIds(activeGroupIds, activeGroup.id);
     this.groupCounter = Math.max(this.groupCounter, groupNumber(activeGroup.id));
     this.activeGroupId = activeGroup.id;
     this.pendingFinalAssistants = pendingFinalAssistants;
   }
 
-  private mergeVisibleActiveGroup(active: TurnGroup, visible: TurnGroup): void {
+  private reloadedActiveGroups(
+    visibleGroups: readonly TurnGroup[],
+    activeGroup: TurnGroup,
+    activeAssistantKeys: ReadonlySet<string>,
+    activeToolCallIds: ReadonlySet<string>,
+  ): readonly TurnGroup[] {
+    const matchingGroup = visibleGroups.findIndex(
+      (group) =>
+        [...group.finalizedAssistantOutputs.keys()].some((key) => activeAssistantKeys.has(key)) ||
+        [...group.toolCallIds].some((id) => activeToolCallIds.has(id)) ||
+        (group.endedAt ?? -Infinity) >= activeGroup.startedAt,
+    );
+    if (matchingGroup >= 0) return visibleGroups.slice(matchingGroup);
+    const lastGroup = visibleGroups.at(-1);
+    return lastGroup ? [lastGroup] : [];
+  }
+
+  private mergeVisibleActiveGroups(active: TurnGroup, visibleGroups: readonly TurnGroup[]): void {
     active.assistants.clear();
     active.components.clear();
     active.tools.clear();
-    active.failedToolCallIds = new Set([...active.failedToolCallIds, ...visible.failedToolCallIds]);
-    active.finalizedAssistantOutputs = new Map([
-      ...active.finalizedAssistantOutputs,
-      ...visible.finalizedAssistantOutputs,
-    ]);
-    active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
+    for (const visible of visibleGroups) {
+      active.failedToolCallIds = new Set([
+        ...active.failedToolCallIds,
+        ...visible.failedToolCallIds,
+      ]);
+      active.finalizedAssistantOutputs = new Map([
+        ...active.finalizedAssistantOutputs,
+        ...visible.finalizedAssistantOutputs,
+      ]);
+      active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
+    }
   }
 
-  private reassignGroupId(fromGroupId: string | undefined, toGroupId: string): void {
-    if (!fromGroupId) return;
+  private keysForGroup(
+    values: ReadonlyMap<string, string>,
+    groupId: string | undefined,
+  ): Set<string> {
+    return new Set([...values].flatMap(([key, value]) => (value === groupId ? [key] : [])));
+  }
+
+  private reassignGroupIds(fromGroupIds: ReadonlySet<string>, toGroupId: string): void {
     for (const [key, groupId] of this.assistantGroupByKey) {
-      if (groupId === fromGroupId) this.assistantGroupByKey.set(key, toGroupId);
+      if (fromGroupIds.has(groupId)) this.assistantGroupByKey.set(key, toGroupId);
     }
     for (const [key, groupId] of this.toolGroupById) {
-      if (groupId === fromGroupId) this.toolGroupById.set(key, toGroupId);
+      if (fromGroupIds.has(groupId)) this.toolGroupById.set(key, toGroupId);
     }
   }
 
