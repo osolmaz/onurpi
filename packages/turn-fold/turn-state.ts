@@ -194,6 +194,7 @@ export class TurnFoldState {
     if (!this.historyReload || this.componentInfo.has(component)) return;
     const entries = this.historyReload;
     this.historyReload = undefined;
+    if (this.activeGroupId) return;
     this.loadHistory(entries());
   }
 

@@ -283,6 +283,27 @@ describe("TurnFoldState history", () => {
     expect(state.viewFor(component, 220)?.summary.outputTokens).toBe(7);
   });
 
+  it("keeps active output tracking through a deferred transcript reload", () => {
+    const state = new TurnFoldState();
+    const originalComponent = {};
+    const rebuiltComponent = {};
+    const message = assistantMessage(110, [{ text: "active", type: "text" }], 7);
+
+    state.ensureActive(100);
+    state.registerAssistantMessage(message);
+    state.associateAssistant(originalComponent, message);
+    state.queueFinalAssistant(message);
+    state.deferHistoryReload(() => [
+      { message: { content: "reloaded", role: "user", timestamp: 200 }, type: "message" },
+    ]);
+    state.reloadHistoryForNewComponent(rebuiltComponent);
+    state.associateAssistant(rebuiltComponent, message);
+    state.finalizeAssistantOutputs([{ message, type: "message" }]);
+    state.settleActive(120);
+
+    expect(state.viewFor(rebuiltComponent, 120)?.summary.outputTokens).toBe(7);
+  });
+
   it("groups a compaction prefix that begins with an assistant response", () => {
     const state = new TurnFoldState();
     const component = {};
