@@ -151,9 +151,10 @@ would mix model generation with tool execution and would not represent decode sp
 Add a history display after normal fold selection. In compact modes, take all settled turn groups
 except the newest three. Use their earliest rendered assistant or tool component as the single
 history-row anchor and hide the rest of their assistant and tool components. The aggregate must use
-durable group data rather than render-component maps because the anchor may render before later tool
-components. Track tool-call IDs from assistant messages and tool events, and calculate history
-response counts from finalized assistant outputs. Expanded mode restores all rows.
+durable group data because the anchor may render before later tool components. Render-component maps
+may still be incomplete at that point. Track tool-call IDs from assistant messages and tool events,
+and calculate history response counts from finalized assistant outputs. Expanded mode restores all
+rows.
 
 ## Event wiring
 
