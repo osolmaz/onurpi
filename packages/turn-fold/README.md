@@ -19,8 +19,14 @@ messages are not changed and remain in model context.
 A folded row looks like:
 
 ```text
-▶ Worked for 14s · 8 tools · 2 msgs · Ctrl+Shift+O
+▶ Worked for 14s · 438 out · 8 tools · 2 msgs · Ctrl+Shift+O
 ```
+
+The output count covers every assistant response in the turn, including responses that call tools.
+Turn-fold uses provider-reported output usage when available. If a provider omits usage, turn-fold
+estimates the missing response from its finalized content and prefixes the combined count with `~`.
+It derives this information from existing session messages and does not store a separate metrics
+record.
 
 ## Use during development
 

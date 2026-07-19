@@ -1,5 +1,10 @@
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
 import type { TurnFoldMode } from "./mode.ts";
+import {
+  combineOutputTotals,
+  deriveAssistantOutput,
+  type OutputTokenTotal,
+} from "./output-metrics.ts";
 
 type ComponentKind = "assistant" | "tool";
 
@@ -23,6 +28,7 @@ type TurnGroup = {
   components: Map<object, ComponentInfo>;
   endedAt?: number;
   failedToolCallIds: Set<string>;
+  finalizedAssistantOutputs: Map<string, OutputTokenTotal>;
   id: string;
   settled: boolean;
   startedAt: number;
@@ -34,6 +40,8 @@ export type FoldSummary = {
   durationMs: number;
   failedTools: number;
   intermediateMessages: number;
+  outputApproximate: boolean;
+  outputTokens: number;
   running: boolean;
   tools: number;
 };
@@ -169,6 +177,17 @@ export class TurnFoldState {
     }
   }
 
+  recordFinalAssistant(message: unknown): void {
+    const snapshot = assistantSnapshot(message);
+    if (!snapshot) return;
+    const groupId = this.assistantGroupByKey.get(snapshot.key) ?? this.activeGroupId;
+    const group = groupId ? this.groups.get(groupId) : undefined;
+    if (!group) return;
+
+    this.assistantGroupByKey.set(snapshot.key, group.id);
+    group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
+  }
+
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
     this.toolGroupById.set(toolCallId, this.ensureActive(startedAt));
   }
@@ -264,6 +283,7 @@ export class TurnFoldState {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
     this.assistantGroupByKey.set(snapshot.key, group.id);
+    group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
     if (snapshot.aborted) group.aborted = true;
     for (const toolCallId of snapshot.toolCallIds) {
       this.toolGroupById.set(toolCallId, group.id);
@@ -297,6 +317,7 @@ export class TurnFoldState {
       assistants: new Map(),
       components: new Map(),
       failedToolCallIds: new Set(),
+      finalizedAssistantOutputs: new Map(),
       id: `turn-${String(this.groupCounter)}`,
       settled,
       startedAt,
@@ -338,11 +359,14 @@ export class TurnFoldState {
     const intermediateMessages = [...group.assistants].filter(
       ([component, snapshot]) => component !== finalAssistant && snapshot.hasText,
     ).length;
+    const output = combineOutputTotals([...group.finalizedAssistantOutputs.values()]);
     return {
       aborted: group.aborted,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
       failedTools: group.failedToolCallIds.size,
       intermediateMessages,
+      outputApproximate: output.approximate,
+      outputTokens: output.tokens,
       running: !group.settled,
       tools: group.tools.size,
     };

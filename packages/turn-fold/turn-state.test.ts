@@ -5,33 +5,45 @@ import { TurnFoldState } from "./turn-state.ts";
 function assistantMessage(
   timestamp: number,
   content: Record<string, unknown>[],
+  outputTokens?: number,
 ): Record<string, unknown> {
   return {
     content,
     provider: "test",
     role: "assistant",
     timestamp,
+    ...(outputTokens === undefined ? {} : { usage: { output: outputTokens } }),
   };
 }
 
-describe("TurnFoldState", () => {
+describe("TurnFoldState finalized output", () => {
   it("folds an active run after it settles", () => {
     const state = new TurnFoldState();
     const intermediate = {};
     const tool = {};
     const finalAssistant = {};
-    const intermediateMessage = assistantMessage(110, [
-      { text: "I will inspect the project.", type: "text" },
-      { id: "tool-1", name: "read", type: "toolCall" },
-    ]);
-    const finalMessage = assistantMessage(140, [{ text: "The project is ready.", type: "text" }]);
+    const intermediateMessage = assistantMessage(
+      110,
+      [
+        { text: "I will inspect the project.", type: "text" },
+        { id: "tool-1", name: "read", type: "toolCall" },
+      ],
+      30,
+    );
+    const finalMessage = assistantMessage(
+      140,
+      [{ text: "The project is ready.", type: "text" }],
+      8,
+    );
 
     state.ensureActive(100);
     state.registerAssistantMessage(intermediateMessage);
+    state.recordFinalAssistant(intermediateMessage);
     state.associateAssistant(intermediate, intermediateMessage);
     state.registerToolStart("tool-1", 115);
     state.associateTool(tool, "tool-1");
     state.registerAssistantMessage(finalMessage);
+    state.recordFinalAssistant(finalMessage);
     state.associateAssistant(finalAssistant, finalMessage);
     state.settleActive(150);
 
@@ -42,6 +54,8 @@ describe("TurnFoldState", () => {
         durationMs: 50,
         failedTools: 0,
         intermediateMessages: 1,
+        outputApproximate: false,
+        outputTokens: 38,
         running: false,
         tools: 1,
       },
@@ -50,6 +64,32 @@ describe("TurnFoldState", () => {
     expect(state.viewFor(finalAssistant, 150)?.display).toBe("original");
   });
 
+  it("combines exact and estimated finalized responses idempotently", () => {
+    const state = new TurnFoldState();
+    const intermediate = {};
+    const finalAssistant = {};
+    const first = assistantMessage(110, [{ id: "tool-1", name: "read", type: "toolCall" }], 20);
+    const final = assistantMessage(140, [{ text: "hello", type: "text" }]);
+
+    state.ensureActive(100);
+    state.registerAssistantMessage(first);
+    state.recordFinalAssistant(first);
+    state.associateAssistant(intermediate, first);
+    state.registerToolStart("tool-1", 115);
+    state.registerAssistantMessage(final);
+    state.recordFinalAssistant(final);
+    state.recordFinalAssistant(final);
+    state.associateAssistant(finalAssistant, final);
+    state.settleActive(150);
+
+    expect(state.viewFor(intermediate, 150)?.summary).toMatchObject({
+      outputApproximate: true,
+      outputTokens: 22,
+    });
+  });
+});
+
+describe("TurnFoldState views", () => {
   it("renders one live summary in final-only mode", () => {
     const state = new TurnFoldState();
     const assistant = {};
@@ -104,6 +144,8 @@ describe("TurnFoldState", () => {
       durationMs: 40,
       failedTools: 1,
       intermediateMessages: 1,
+      outputApproximate: true,
+      outputTokens: 6,
       running: false,
       tools: 1,
     });
@@ -175,6 +217,8 @@ describe("TurnFoldState", () => {
       durationMs: 10,
       failedTools: 1,
       intermediateMessages: 0,
+      outputApproximate: false,
+      outputTokens: 0,
       running: false,
       tools: 1,
     });
@@ -199,6 +243,7 @@ describe("aborted turn folding", () => {
 
     state.ensureActive(100);
     state.registerAssistantMessage(message);
+    state.recordFinalAssistant(message);
     state.associateAssistant(assistant, message);
     state.abortActive(150);
 
@@ -209,6 +254,8 @@ describe("aborted turn folding", () => {
         durationMs: 50,
         failedTools: 0,
         intermediateMessages: 0,
+        outputApproximate: false,
+        outputTokens: 0,
         running: false,
         tools: 0,
       },

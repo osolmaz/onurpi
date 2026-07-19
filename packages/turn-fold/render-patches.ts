@@ -28,6 +28,18 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
   return `${String(count)} ${count === 1 ? singular : plural}`;
 }
 
+function formatCompact(value: number, suffix: string): string {
+  const decimals = value < 10 ? 1 : 0;
+  return `${value.toFixed(decimals).replace(/\.0$/u, "")}${suffix}`;
+}
+
+function formatTokenCount(tokens: number): string {
+  const value = Math.max(0, tokens);
+  if (value < 1_000) return Math.round(value).toString();
+  if (value < 1_000_000) return formatCompact(value / 1_000, "K");
+  return formatCompact(value / 1_000_000, "M");
+}
+
 export function formatFoldSummary(summary: FoldSummary): string {
   const parts = [countLabel(summary.tools, "tool")];
   if (summary.intermediateMessages > 0) {
@@ -36,7 +48,9 @@ export function formatFoldSummary(summary: FoldSummary): string {
   if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
 
   if (summary.running) return `◆ Working · ${parts.join(" · ")}`;
-  return `▶ Worked for ${formatDuration(summary.durationMs)} · ${parts.join(" · ")} · Ctrl+Shift+O`;
+  const approximate = summary.outputApproximate ? "~" : "";
+  const output = `${approximate}${formatTokenCount(summary.outputTokens)} out`;
+  return `▶ Worked for ${formatDuration(summary.durationMs)} · ${output} · ${parts.join(" · ")} · Ctrl+Shift+O`;
 }
 
 export function renderFoldSummary(

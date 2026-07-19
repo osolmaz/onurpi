@@ -4,6 +4,7 @@ export default {
   mutate: [
     "packages/turn-fold/fold-policy.ts",
     "packages/turn-fold/mode.ts",
+    "packages/turn-fold/output-metrics.ts",
     "packages/pi-tui-history-replay/history-replay.ts",
     "packages/live-stats/live-stats.ts",
     "packages/pi-must-win/git-commit-trailers.ts",

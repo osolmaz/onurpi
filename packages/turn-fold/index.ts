@@ -141,6 +141,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) === "assistant") {
       state.registerAssistantMessage(event.message);
+      state.recordFinalAssistant(event.message);
       if (messageStopReason(event.message) === "aborted") state.abortActive();
     }
   });
