@@ -352,6 +352,25 @@ describe("TurnFoldState history", () => {
   });
 });
 
+describe("TurnFoldState user turns", () => {
+  it("starts a distinct turn for consecutive queued prompts", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const response = assistantMessage(120, [{ text: "queued", type: "text" }], 1);
+
+    state.ensureActive(90);
+    state.startUserTurn(100);
+    state.startUserTurn(110);
+    state.registerAssistantMessage(response);
+    state.queueFinalAssistant(response);
+    state.associateAssistant(component, response);
+    state.finalizeAssistantOutputs([{ message: response, type: "message" }]);
+    state.settleActive(130);
+
+    expect(state.viewFor(component, 130)?.summary.durationMs).toBe(20);
+  });
+});
+
 describe("TurnFoldState view selection", () => {
   it("uses the latest text-only assistant message as the final response", () => {
     const state = new TurnFoldState();

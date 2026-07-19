@@ -40,6 +40,7 @@ type TurnGroup = {
   id: string;
   settled: boolean;
   startedAt: number;
+  startedByUser: boolean;
   toolCallIds: Set<string>;
   tools: Map<object, string>;
 };
@@ -183,7 +184,11 @@ export class TurnFoldState {
       const message = messageFromEntry(entry);
       const role = stringField(message, "role");
       if (role === "user") {
-        currentGroup = this.createGroup(numberField(message, "timestamp") ?? Date.now(), true);
+        currentGroup = this.createGroup(
+          numberField(message, "timestamp") ?? Date.now(),
+          true,
+          true,
+        );
       } else {
         currentGroup = this.historicalGroup(currentGroup, role, message);
         if (currentGroup) this.indexHistoricalMessage(currentGroup, message);
@@ -211,14 +216,16 @@ export class TurnFoldState {
 
   startUserTurn(startedAt = Date.now()): string {
     const activeGroup = this.activeGroupId ? this.groups.get(this.activeGroupId) : undefined;
-    if (!activeGroup) return this.ensureActive(startedAt);
-    if (!this.groupHasActivity(activeGroup)) {
+    if (activeGroup && !activeGroup.startedByUser && !this.groupHasActivity(activeGroup)) {
       activeGroup.startedAt = startedAt;
+      activeGroup.startedByUser = true;
       return activeGroup.id;
     }
 
-    this.finishActive(false, startedAt);
-    return this.ensureActive(startedAt);
+    if (activeGroup) this.finishActive(false, startedAt);
+    const group = this.createGroup(startedAt, false, true);
+    this.activeGroupId = group.id;
+    return group.id;
   }
 
   registerAssistantMessage(message: unknown): void {
@@ -573,7 +580,7 @@ export class TurnFoldState {
     this.updateHistoryAnchor(component, group.id, info.sequence);
   }
 
-  private createGroup(startedAt: number, settled: boolean): TurnGroup {
+  private createGroup(startedAt: number, settled: boolean, startedByUser = false): TurnGroup {
     this.groupCounter += 1;
     const group: TurnGroup = {
       aborted: false,
@@ -584,6 +591,7 @@ export class TurnFoldState {
       id: `turn-${String(this.groupCounter)}`,
       settled,
       startedAt,
+      startedByUser,
       toolCallIds: new Set(),
       tools: new Map(),
     };
