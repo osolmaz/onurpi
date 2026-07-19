@@ -45,7 +45,10 @@ describe("TurnFoldState finalized output", () => {
     state.registerAssistantMessage(finalMessage);
     state.queueFinalAssistant(finalMessage);
     state.associateAssistant(finalAssistant, finalMessage);
-    state.finalizeAssistantOutputs();
+    state.finalizeAssistantOutputs([
+      { message: intermediateMessage, type: "message" },
+      { message: finalMessage, type: "message" },
+    ]);
     state.settleActive(150);
 
     expect(state.viewFor(intermediate, 150)).toEqual({
@@ -80,9 +83,12 @@ describe("TurnFoldState finalized output", () => {
     state.registerAssistantMessage(final);
     state.queueFinalAssistant(final);
     state.queueFinalAssistant(final);
-    final["usage"] = { output: 7 };
+    const finalReplacement = assistantMessage(140, [{ text: "replaced", type: "text" }], 7);
     state.associateAssistant(finalAssistant, final);
-    state.finalizeAssistantOutputs();
+    state.finalizeAssistantOutputs([
+      { message: first, type: "message" },
+      { message: finalReplacement, type: "message" },
+    ]);
     state.settleActive(150);
 
     expect(state.viewFor(intermediate, 150)?.summary).toMatchObject({
@@ -249,7 +255,7 @@ describe("aborted turn folding", () => {
     state.queueFinalAssistant(message);
     state.associateAssistant(assistant, message);
     state.abortActive(150);
-    state.finalizeAssistantOutputs();
+    state.finalizeAssistantOutputs([{ message, type: "message" }]);
 
     expect(state.viewFor(assistant, 150)).toEqual({
       display: "summary",

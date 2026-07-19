@@ -100,12 +100,12 @@ component has rendered. Add a map keyed by the finalized assistant snapshot key:
 finalizedAssistantOutputs: Map<string, OutputTokenTotal>;
 ```
 
-Add state methods that queue and finalize assistant output idempotently. `message_end` should
-capture the message object and its group, while `agent_settled` should derive output after every
-extension has completed its chained `message_end` replacements. Pi mutates the original message
-object to the final replacement, so deferred derivation matches the message written to session
-history. Store the result by finalized assistant key. Replacing instead of appending prevents
-duplicate totals if Pi replays an event.
+Add state methods that queue and finalize assistant output idempotently. `message_end` should record
+the target group in response order. At `agent_settled`, read the matching finalized assistant
+messages from the end of `ctx.sessionManager.getBranch()`. Pi has applied every chained
+`message_end` replacement before persisting those messages, so this path matches session history
+even when turn-fold receives an intermediate replacement object. Store each result by finalized
+assistant key. Replacing instead of appending prevents duplicate totals if Pi replays an event.
 
 Historical reconstruction can derive output immediately in `indexHistoricalAssistant` because those
 messages are already final. Streaming `message_update` events should continue to update grouping
@@ -140,10 +140,10 @@ would mix model generation with tool execution and would not represent decode sp
 
 ## Event wiring
 
-Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue the message and
-its current group before abort handling. Finalize queued output in `agent_settled`, after Pi has
-applied all chained message replacements and before the group is settled. The handlers should remain
-safe for normal, aborted, and error responses.
+Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current
+group before abort handling. In `agent_settled`, pair those queued groups with the latest persisted
+assistant messages from the active branch. Derive output before settling the group. The handlers
+should remain safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.

@@ -186,10 +186,18 @@ export class TurnFoldState {
     this.pendingFinalAssistants.set(message, groupId);
   }
 
-  finalizeAssistantOutputs(): void {
-    for (const [message, groupId] of this.pendingFinalAssistants) {
+  finalizeAssistantOutputs(entries: readonly unknown[]): void {
+    if (this.pendingFinalAssistants.size === 0) return;
+    const finalizedMessages = entries
+      .map(messageFromEntry)
+      .filter((message) => assistantSnapshot(message) !== undefined)
+      .slice(-this.pendingFinalAssistants.size);
+    const groupIds = [...this.pendingFinalAssistants.values()];
+
+    for (const [index, message] of finalizedMessages.entries()) {
       const snapshot = assistantSnapshot(message);
-      const group = this.groups.get(groupId);
+      const groupId = groupIds[index];
+      const group = groupId ? this.groups.get(groupId) : undefined;
       if (!snapshot || !group) continue;
       this.assistantGroupByKey.set(snapshot.key, group.id);
       group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
