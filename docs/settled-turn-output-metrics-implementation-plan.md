@@ -100,19 +100,17 @@ component has rendered. Add a map keyed by the finalized assistant snapshot key:
 finalizedAssistantOutputs: Map<string, OutputTokenTotal>;
 ```
 
-Add a state method that records a finalized assistant message idempotently. It should find the group
-through `assistantGroupByKey`, falling back to the active group during a live run, and then replace
-the value for that assistant key. Replacing instead of appending prevents duplicate totals if Pi
-replays a final update.
+Add state methods that queue and finalize assistant output idempotently. `message_end` should
+capture the message object and its group, while `agent_settled` should derive output after every
+extension has completed its chained `message_end` replacements. Pi mutates the original message
+object to the final replacement, so deferred derivation matches the message written to session
+history. Store the result by finalized assistant key. Replacing instead of appending prevents
+duplicate totals if Pi replays an event.
 
-Call this method in two places:
-
-- `message_end`, after registering a finalized assistant message
-- `indexHistoricalAssistant`, while rebuilding groups from `ctx.sessionManager.getBranch()`
-
-Streaming `message_update` events should continue to update grouping state, but they should not add
-settled output totals. This avoids counting partial content and prevents assistant keys that change
-while tool calls stream from appearing as separate responses.
+Historical reconstruction can derive output immediately in `indexHistoricalAssistant` because those
+messages are already final. Streaming `message_update` events should continue to update grouping
+state without adding output totals. This avoids counting partial content and prevents assistant keys
+that change while tool calls stream from appearing as separate responses.
 
 `summary()` should combine the group's finalized assistant outputs. Running summaries may carry the
 calculated fields internally, but their renderer should omit them.
@@ -142,9 +140,10 @@ would mix model generation with tool execution and would not represent decode sp
 
 ## Event wiring
 
-Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to record final output
-before abort handling settles the group. The handler should remain safe for normal, aborted, and
-error responses.
+Update the assistant `message_end` handler in `packages/turn-fold/index.ts` to queue the message and
+its current group before abort handling. Finalize queued output in `agent_settled`, after Pi has
+applied all chained message replacements and before the group is settled. The handlers should remain
+safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.

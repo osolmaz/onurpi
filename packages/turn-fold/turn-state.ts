@@ -129,6 +129,7 @@ export class TurnFoldState {
   private groupCounter = 0;
   private groups = new Map<string, TurnGroup>();
   private mode: TurnFoldMode = "live";
+  private pendingFinalAssistants = new Map<object, string>();
   private previousCompactMode: Exclude<TurnFoldMode, "expanded"> = "live";
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
@@ -177,15 +178,23 @@ export class TurnFoldState {
     }
   }
 
-  recordFinalAssistant(message: unknown): void {
+  queueFinalAssistant(message: unknown): void {
     const snapshot = assistantSnapshot(message);
-    if (!snapshot) return;
+    if (!snapshot || !isRecord(message)) return;
     const groupId = this.assistantGroupByKey.get(snapshot.key) ?? this.activeGroupId;
-    const group = groupId ? this.groups.get(groupId) : undefined;
-    if (!group) return;
+    if (!groupId || !this.groups.has(groupId)) return;
+    this.pendingFinalAssistants.set(message, groupId);
+  }
 
-    this.assistantGroupByKey.set(snapshot.key, group.id);
-    group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
+  finalizeAssistantOutputs(): void {
+    for (const [message, groupId] of this.pendingFinalAssistants) {
+      const snapshot = assistantSnapshot(message);
+      const group = this.groups.get(groupId);
+      if (!snapshot || !group) continue;
+      this.assistantGroupByKey.set(snapshot.key, group.id);
+      group.finalizedAssistantOutputs.set(snapshot.key, deriveAssistantOutput(message));
+    }
+    this.pendingFinalAssistants.clear();
   }
 
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
@@ -266,6 +275,7 @@ export class TurnFoldState {
     this.componentInfo = new WeakMap();
     this.groups = new Map();
     this.groupCounter = 0;
+    this.pendingFinalAssistants = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
   }

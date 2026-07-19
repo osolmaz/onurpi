@@ -141,7 +141,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) === "assistant") {
       state.registerAssistantMessage(event.message);
-      state.recordFinalAssistant(event.message);
+      state.queueFinalAssistant(event.message);
       if (messageStopReason(event.message) === "aborted") state.abortActive();
     }
   });
@@ -158,6 +158,7 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("agent_settled", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
+    state.finalizeAssistantOutputs();
     state.settleActive();
   });
 

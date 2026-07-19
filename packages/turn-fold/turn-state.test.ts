@@ -38,13 +38,14 @@ describe("TurnFoldState finalized output", () => {
 
     state.ensureActive(100);
     state.registerAssistantMessage(intermediateMessage);
-    state.recordFinalAssistant(intermediateMessage);
+    state.queueFinalAssistant(intermediateMessage);
     state.associateAssistant(intermediate, intermediateMessage);
     state.registerToolStart("tool-1", 115);
     state.associateTool(tool, "tool-1");
     state.registerAssistantMessage(finalMessage);
-    state.recordFinalAssistant(finalMessage);
+    state.queueFinalAssistant(finalMessage);
     state.associateAssistant(finalAssistant, finalMessage);
+    state.finalizeAssistantOutputs();
     state.settleActive(150);
 
     expect(state.viewFor(intermediate, 150)).toEqual({
@@ -64,7 +65,7 @@ describe("TurnFoldState finalized output", () => {
     expect(state.viewFor(finalAssistant, 150)?.display).toBe("original");
   });
 
-  it("combines exact and estimated finalized responses idempotently", () => {
+  it("uses the final chained message replacement idempotently", () => {
     const state = new TurnFoldState();
     const intermediate = {};
     const finalAssistant = {};
@@ -73,18 +74,20 @@ describe("TurnFoldState finalized output", () => {
 
     state.ensureActive(100);
     state.registerAssistantMessage(first);
-    state.recordFinalAssistant(first);
+    state.queueFinalAssistant(first);
     state.associateAssistant(intermediate, first);
     state.registerToolStart("tool-1", 115);
     state.registerAssistantMessage(final);
-    state.recordFinalAssistant(final);
-    state.recordFinalAssistant(final);
+    state.queueFinalAssistant(final);
+    state.queueFinalAssistant(final);
+    final["usage"] = { output: 7 };
     state.associateAssistant(finalAssistant, final);
+    state.finalizeAssistantOutputs();
     state.settleActive(150);
 
     expect(state.viewFor(intermediate, 150)?.summary).toMatchObject({
-      outputApproximate: true,
-      outputTokens: 22,
+      outputApproximate: false,
+      outputTokens: 27,
     });
   });
 });
@@ -243,9 +246,10 @@ describe("aborted turn folding", () => {
 
     state.ensureActive(100);
     state.registerAssistantMessage(message);
-    state.recordFinalAssistant(message);
+    state.queueFinalAssistant(message);
     state.associateAssistant(assistant, message);
     state.abortActive(150);
+    state.finalizeAssistantOutputs();
 
     expect(state.viewFor(assistant, 150)).toEqual({
       display: "summary",
