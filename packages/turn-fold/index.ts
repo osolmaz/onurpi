@@ -120,6 +120,11 @@ export default function turnFold(pi: ExtensionAPI): void {
     applyMode(pi, state, modeFromBranch(ctx), false);
   });
 
+  pi.on("session_compact", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
+    state.loadHistory(ctx.sessionManager.buildContextEntries());
+  });
+
   pi.on("agent_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
     state.ensureActive();

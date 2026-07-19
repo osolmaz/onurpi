@@ -160,17 +160,21 @@ Build retained history from compaction-aware session entries so the history row 
 that expanded mode can restore. Cache the collapsed group IDs and aggregate summary. Invalidate that
 cache when the compact mode changes, final assistant outputs are recorded, or an active turn
 settles. When an assistant or tool component is associated during rendering, update the cached
-anchor only if that component comes earlier. `viewFor()` must only perform constant-time membership
-checks during normal transcript rendering.
+anchor only if that component comes earlier. A new component for an already-associated assistant
+snapshot signals a transcript rebuild. Clear render-component associations and choose a fresh anchor
+from the new components. `viewFor()` must only perform constant-time membership checks during normal
+transcript rendering.
 
 ## Event wiring
 
-Load historical groups from `ctx.sessionManager.buildContextEntries()`. Update the assistant
-`message_end` handler in `packages/turn-fold/index.ts` to queue its current group before abort
-handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role messages
-from compaction-aware entries. Keep malformed assistant entries in this positional selection, then
-skip their metrics contribution. Derive output before settling the group. The handlers should remain
-safe for normal, aborted, and error responses.
+Load historical groups from `ctx.sessionManager.buildContextEntries()`. If the first retained entry
+is an assistant or tool result, seed a partial group so a split turn remains visible. Reload from
+the same compaction-aware entries in `session_compact` before Pi rebuilds its transcript. Update the
+assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current group before
+abort handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role
+messages from compaction-aware entries. Keep malformed assistant entries in this positional
+selection, then skip their metrics contribution. Derive output before settling the group. The
+handlers should remain safe for normal, aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.

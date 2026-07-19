@@ -143,6 +143,7 @@ function latestBySequence(
 
 export class TurnFoldState {
   private activeGroupId: string | undefined;
+  private assistantComponentByKey = new Map<string, object>();
   private assistantGroupByKey = new Map<string, string>();
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private groupCounter = 0;
@@ -174,11 +175,13 @@ export class TurnFoldState {
     let currentGroup: TurnGroup | undefined;
     for (const entry of entries) {
       const message = messageFromEntry(entry);
-      if (stringField(message, "role") === "user") {
+      const role = stringField(message, "role");
+      if (role === "user") {
         currentGroup = this.createGroup(numberField(message, "timestamp") ?? Date.now(), true);
-        continue;
+      } else {
+        currentGroup = this.historicalGroup(currentGroup, role, message);
+        if (currentGroup) this.indexHistoricalMessage(currentGroup, message);
       }
-      if (currentGroup) this.indexHistoricalMessage(currentGroup, message);
     }
   }
 
@@ -244,6 +247,9 @@ export class TurnFoldState {
   associateAssistant(component: object, message: unknown): void {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
+    const previousComponent = this.assistantComponentByKey.get(snapshot.key);
+    if (previousComponent && previousComponent !== component) this.resetComponentAssociations();
+    this.assistantComponentByKey.set(snapshot.key, component);
     const groupId = this.assistantGroupByKey.get(snapshot.key) ?? this.activeGroupId;
     if (!groupId) return;
     const group = this.groups.get(groupId);
@@ -369,8 +375,21 @@ export class TurnFoldState {
     this.historyCache = undefined;
   }
 
+  private resetComponentAssociations(): void {
+    this.assistantComponentByKey = new Map();
+    this.componentInfo = new WeakMap();
+    this.sequence = 0;
+    for (const group of this.groups.values()) {
+      group.assistants.clear();
+      group.components.clear();
+      group.tools.clear();
+    }
+    this.invalidateHistory();
+  }
+
   private resetGroups(): void {
     this.activeGroupId = undefined;
+    this.assistantComponentByKey = new Map();
     this.assistantGroupByKey = new Map();
     this.componentInfo = new WeakMap();
     this.groups = new Map();
@@ -379,6 +398,16 @@ export class TurnFoldState {
     this.pendingFinalAssistants = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
+  }
+
+  private historicalGroup(
+    currentGroup: TurnGroup | undefined,
+    role: string | undefined,
+    message: unknown,
+  ): TurnGroup | undefined {
+    if (currentGroup) return currentGroup;
+    if (role !== "assistant" && role !== "toolResult") return undefined;
+    return this.createGroup(numberField(message, "timestamp") ?? Date.now(), true);
   }
 
   private indexHistoricalMessage(group: TurnGroup, message: unknown): void {

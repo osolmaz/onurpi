@@ -255,6 +255,26 @@ describe("TurnFoldState history", () => {
 
     state.setMode("expanded");
     expect(state.viewFor(firstComponent)?.display).toBe("original");
+
+    const rebuiltComponent = {};
+    state.setMode("live");
+    state.associateAssistant(rebuiltComponent, firstMessage);
+    expect(state.viewFor(firstComponent)).toBeUndefined();
+    expect(state.viewFor(rebuiltComponent)?.display).toBe("history");
+  });
+
+  it("groups a compaction prefix that begins with an assistant response", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const message = assistantMessage(110, [{ text: "retained prefix", type: "text" }], 7);
+
+    state.loadHistory([{ message, type: "message" }]);
+    state.associateAssistant(component, message);
+
+    expect(state.viewFor(component, 120)?.summary).toMatchObject({
+      outputApproximate: false,
+      outputTokens: 7,
+    });
   });
 });
 
