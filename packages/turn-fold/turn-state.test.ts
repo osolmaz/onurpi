@@ -305,18 +305,19 @@ describe("TurnFoldState history", () => {
     expect(state.viewFor(rebuiltComponent, 120)?.summary.outputTokens).toBe(7);
   });
 
-  it("merges all active steering-message groups through a deferred reload", () => {
+  it("keeps steering prompts as separate turns through a deferred reload", () => {
     const state = new TurnFoldState();
     const firstComponent = {};
     const secondComponent = {};
     const first = assistantMessage(110, [{ text: "first", type: "text" }], 1);
     const second = assistantMessage(130, [{ text: "second", type: "text" }], 2);
 
-    state.ensureActive(100);
-    for (const message of [first, second]) {
-      state.registerAssistantMessage(message);
-      state.queueFinalAssistant(message);
-    }
+    state.startUserTurn(100);
+    state.registerAssistantMessage(first);
+    state.queueFinalAssistant(first);
+    state.startUserTurn(120);
+    state.registerAssistantMessage(second);
+    state.queueFinalAssistant(second);
     state.deferHistoryReload(() => [
       { message: { content: "first prompt", role: "user", timestamp: 100 }, type: "message" },
       { message: first, type: "message" },
@@ -332,12 +333,8 @@ describe("TurnFoldState history", () => {
     ]);
     state.settleActive(140);
 
-    expect(state.viewFor(firstComponent, 140)?.summary).toMatchObject({
-      intermediateMessages: 1,
-      outputTokens: 3,
-    });
-    expect(state.viewFor(firstComponent, 140)?.display).toBe("summary");
-    expect(state.viewFor(secondComponent, 140)?.display).toBe("original");
+    expect(state.viewFor(firstComponent, 140)?.summary.outputTokens).toBe(1);
+    expect(state.viewFor(secondComponent, 140)?.summary.outputTokens).toBe(2);
   });
 
   it("groups a compaction prefix that begins with an assistant response", () => {

@@ -142,7 +142,7 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("message_start", (event, ctx) => {
     currentTheme = ctx.ui.theme;
     const role = messageRole(event.message);
-    if (role === "user") state.ensureActive(messageTimestamp(event.message));
+    if (role === "user") state.startUserTurn(messageTimestamp(event.message));
     if (role === "assistant") state.registerAssistantMessage(event.message);
   });
 

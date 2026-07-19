@@ -209,6 +209,18 @@ export class TurnFoldState {
     return group.id;
   }
 
+  startUserTurn(startedAt = Date.now()): string {
+    const activeGroup = this.activeGroupId ? this.groups.get(this.activeGroupId) : undefined;
+    if (!activeGroup) return this.ensureActive(startedAt);
+    if (!this.groupHasActivity(activeGroup)) {
+      activeGroup.startedAt = startedAt;
+      return activeGroup.id;
+    }
+
+    this.finishActive(false, startedAt);
+    return this.ensureActive(startedAt);
+  }
+
   registerAssistantMessage(message: unknown): void {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
@@ -292,6 +304,15 @@ export class TurnFoldState {
 
   abortActive(endedAt = Date.now()): void {
     this.finishActive(true, endedAt);
+  }
+
+  private groupHasActivity(group: TurnGroup): boolean {
+    return (
+      group.assistants.size > 0 ||
+      group.finalizedAssistantOutputs.size > 0 ||
+      group.toolCallIds.size > 0 ||
+      [...this.assistantGroupByKey.values()].some((groupId) => groupId === group.id)
+    );
   }
 
   private finishActive(aborted: boolean, endedAt: number): void {
@@ -423,7 +444,9 @@ export class TurnFoldState {
     const activeGroup = activeGroupId ? this.groups.get(activeGroupId) : undefined;
     const activeAssistantKeys = this.keysForGroup(this.assistantGroupByKey, activeGroupId);
     const activeToolCallIds = this.keysForGroup(this.toolGroupById, activeGroupId);
-    const pendingFinalAssistants = this.pendingFinalAssistants;
+    const pendingFinalAssistants = new Map(
+      [...this.pendingFinalAssistants].filter(([, groupId]) => groupId === activeGroupId),
+    );
     this.loadHistory(entries);
     if (!activeGroupId || !activeGroup) return;
 

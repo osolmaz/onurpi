@@ -36,8 +36,8 @@ is replaced with one history row above them:
 ```
 
 The row counts completed assistant responses, output tokens, and tool calls across the collapsed
-turns. User prompts remain visible so the retained responses keep their request context. Use
-`Ctrl+Shift+O` or `/turn-fold expanded` to show every row.
+turns. Each user prompt starts a turn. User prompts remain visible so the retained responses keep
+their request context. Use `Ctrl+Shift+O` or `/turn-fold expanded` to show every row.
 
 ## Use during development
 

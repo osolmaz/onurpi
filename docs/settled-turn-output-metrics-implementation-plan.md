@@ -28,8 +28,10 @@ tool activity with one history row above the retained turns:
 ▶ 5 previous turns · 12 msgs · ~1.3K out · 8 tools · Ctrl+Shift+O
 ```
 
-The history row reports completed assistant responses, output tokens, tool calls, and failures. User
-prompts remain visible, which preserves the request context for the retained assistant responses.
+The history row reports completed assistant responses, output tokens, tool calls, and failures. A
+user message starts a turn, so queued steering and follow-up prompts remain separate durable turns.
+User prompts remain visible, which preserves the request context for the retained assistant
+responses.
 
 ## Source of truth
 
@@ -175,13 +177,14 @@ entry is an assistant or tool result, seed a partial group so a split turn remai
 new assistant or tool component after Pi rebuilds the transcript, reload state from that reader.
 This preserves history-replay's one-shot compaction marker until Pi consumes it for the rebuild. If
 an agent run is still active, reload the visible groups while preserving the active group, pending
-final responses, and output tracking. Merge every rebuilt group belonging to the active run into the
-active group and remap its response and tool IDs. Update the assistant `message_end` handler in
-`packages/turn-fold/index.ts` to queue its current group before abort handling. In `agent_settled`,
-pair queued groups with the latest persisted assistant-role messages from the full active branch.
-This keeps finalization complete when compaction splits an active turn. Keep malformed assistant
-entries in this positional selection, then skip their metrics contribution. Derive output before
-settling the group. The handlers should remain safe for normal, aborted, and error responses.
+final responses, and output tracking. Merge the rebuilt active group and remap its response and tool
+IDs. Treat each user-message event as a new turn, matching historical reconstruction. Update the
+assistant `message_end` handler in `packages/turn-fold/index.ts` to queue its current group before
+abort handling. In `agent_settled`, pair queued groups with the latest persisted assistant-role
+messages from the full active branch. This keeps finalization complete when compaction splits an
+active turn. Keep malformed assistant entries in this positional selection, then skip their metrics
+contribution. Derive output before settling the group. The handlers should remain safe for normal,
+aborted, and error responses.
 
 No changes are needed in `packages/live-stats/`. It remains responsible for the active working row
 and resets its in-memory tracker after the agent settles.
