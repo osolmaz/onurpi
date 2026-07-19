@@ -37,6 +37,12 @@ function messageRole(message: unknown): string | undefined {
   return typeof role === "string" ? role : undefined;
 }
 
+function messageStopReason(message: unknown): string | undefined {
+  if (typeof message !== "object" || message === null) return undefined;
+  const stopReason: unknown = Reflect.get(message, "stopReason");
+  return typeof stopReason === "string" ? stopReason : undefined;
+}
+
 function applyMode(
   pi: ExtensionAPI,
   state: TurnFoldState,
@@ -135,6 +141,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) === "assistant") {
       state.registerAssistantMessage(event.message);
+      if (messageStopReason(event.message) === "aborted") state.abortActive();
     }
   });
 

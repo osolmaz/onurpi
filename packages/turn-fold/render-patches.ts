@@ -46,8 +46,12 @@ export function renderFoldSummary(
 ): string[] {
   if (width <= 0) return [];
   const text = truncateToWidth(formatFoldSummary(summary), width, "…");
-  const styled = theme ? theme.fg(summary.failedTools > 0 ? "warning" : "muted", text) : text;
-  return ["", styled];
+  const styled = theme
+    ? theme.fg(summary.failedTools > 0 || summary.aborted ? "warning" : "muted", text)
+    : text;
+  if (!summary.aborted) return ["", styled];
+  const aborted = theme ? theme.fg("error", "Operation aborted") : "Operation aborted";
+  return ["", styled, aborted];
 }
 
 export function installRenderPatches(

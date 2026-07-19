@@ -4,6 +4,7 @@ import type { TurnFoldMode } from "./mode.ts";
 type ComponentKind = "assistant" | "tool";
 
 type AssistantSnapshot = {
+  aborted: boolean;
   hasText: boolean;
   hasToolCalls: boolean;
   key: string;
@@ -17,6 +18,7 @@ type ComponentInfo = {
 };
 
 type TurnGroup = {
+  aborted: boolean;
   assistants: Map<object, AssistantSnapshot>;
   components: Map<object, ComponentInfo>;
   endedAt?: number;
@@ -28,6 +30,7 @@ type TurnGroup = {
 };
 
 export type FoldSummary = {
+  aborted: boolean;
   durationMs: number;
   failedTools: number;
   intermediateMessages: number;
@@ -85,6 +88,7 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
   const { hasText, toolCallIds } = summarizeAssistantContent(contentItems(message));
   const responseId = stringField(message, "responseId") ?? "";
   return {
+    aborted: stringField(message, "stopReason") === "aborted",
     hasText,
     hasToolCalls: toolCallIds.length > 0,
     key: `${String(timestamp)}:${responseId}:${toolCallIds.join(",")}`,
@@ -198,9 +202,18 @@ export class TurnFoldState {
   }
 
   settleActive(endedAt = Date.now()): void {
+    this.finishActive(false, endedAt);
+  }
+
+  abortActive(endedAt = Date.now()): void {
+    this.finishActive(true, endedAt);
+  }
+
+  private finishActive(aborted: boolean, endedAt: number): void {
     if (!this.activeGroupId) return;
     const group = this.groups.get(this.activeGroupId);
     if (group) {
+      group.aborted = aborted;
       group.settled = true;
       group.endedAt = endedAt;
     }
@@ -217,6 +230,7 @@ export class TurnFoldState {
     const display = foldDisplay({
       isAnchor: component === anchor,
       isFinalAssistant: component === finalAssistant,
+      aborted: group.aborted,
       mode: this.mode,
       settled: group.settled,
     });
@@ -250,6 +264,7 @@ export class TurnFoldState {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
     this.assistantGroupByKey.set(snapshot.key, group.id);
+    if (snapshot.aborted) group.aborted = true;
     for (const toolCallId of snapshot.toolCallIds) {
       this.toolGroupById.set(toolCallId, group.id);
     }
@@ -278,6 +293,7 @@ export class TurnFoldState {
   private createGroup(startedAt: number, settled: boolean): TurnGroup {
     this.groupCounter += 1;
     const group: TurnGroup = {
+      aborted: false,
       assistants: new Map(),
       components: new Map(),
       failedToolCallIds: new Set(),
@@ -291,6 +307,13 @@ export class TurnFoldState {
   }
 
   private finalAssistant(group: TurnGroup): object | undefined {
+    const abortedAssistants = [...group.assistants]
+      .filter(([, snapshot]) => snapshot.aborted)
+      .map(([component]) => component);
+    if (abortedAssistants.length > 0) {
+      return latestBySequence(group.components, abortedAssistants);
+    }
+
     const assistantsWithText = [...group.assistants]
       .filter(([, snapshot]) => snapshot.hasText)
       .map(([component]) => component);
@@ -304,10 +327,11 @@ export class TurnFoldState {
   }
 
   private foldAnchor(group: TurnGroup, finalAssistant: object | undefined): object | undefined {
-    return [...group.components]
+    const firstIntermediate = [...group.components]
       .filter(([component]) => component !== finalAssistant)
       .sort(([, left], [, right]) => left.sequence - right.sequence)
       .at(0)?.[0];
+    return firstIntermediate ?? (group.aborted ? finalAssistant : undefined);
   }
 
   private summary(group: TurnGroup, finalAssistant: object | undefined, now: number): FoldSummary {
@@ -315,6 +339,7 @@ export class TurnFoldState {
       ([component, snapshot]) => component !== finalAssistant && snapshot.hasText,
     ).length;
     return {
+      aborted: group.aborted,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
       failedTools: group.failedToolCallIds.size,
       intermediateMessages,

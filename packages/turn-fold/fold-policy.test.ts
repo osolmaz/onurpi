@@ -6,6 +6,7 @@ describe("fold display policy", () => {
   it("shows complete turns in expanded mode", () => {
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
         mode: "expanded",
@@ -17,6 +18,7 @@ describe("fold display policy", () => {
   it("shows activity while live mode is running", () => {
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
         mode: "live",
@@ -28,6 +30,7 @@ describe("fold display policy", () => {
   it("shows only a summary while final-only mode is running", () => {
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: true,
         isFinalAssistant: false,
         mode: "final-only",
@@ -36,6 +39,7 @@ describe("fold display policy", () => {
     ).toBe("summary");
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
         mode: "final-only",
@@ -47,6 +51,7 @@ describe("fold display policy", () => {
   it("folds settled activity while retaining the final assistant message", () => {
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: true,
         isFinalAssistant: false,
         mode: "live",
@@ -55,6 +60,7 @@ describe("fold display policy", () => {
     ).toBe("summary");
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
         mode: "live",
@@ -63,11 +69,33 @@ describe("fold display policy", () => {
     ).toBe("hidden");
     expect(
       foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: true,
         mode: "live",
         settled: true,
       }),
     ).toBe("original");
+  });
+
+  it("uses the aborted assistant as the summary anchor instead of a final response", () => {
+    expect(
+      foldDisplay({
+        aborted: true,
+        isAnchor: true,
+        isFinalAssistant: true,
+        mode: "live",
+        settled: true,
+      }),
+    ).toBe("summary");
+    expect(
+      foldDisplay({
+        aborted: true,
+        isAnchor: false,
+        isFinalAssistant: true,
+        mode: "live",
+        settled: true,
+      }),
+    ).toBe("hidden");
   });
 });
