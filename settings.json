@@ -7,5 +7,6 @@
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
-  "defaultThinkingLevel": "high"
+  "defaultThinkingLevel": "high",
+  "outputPad": 0
 }
