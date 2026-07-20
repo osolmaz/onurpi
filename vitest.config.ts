@@ -12,6 +12,7 @@ export default defineConfig({
         "packages/live-stats/live-stats.ts",
         "packages/nyan-mode/src/cost.ts",
         "packages/nyan-mode/src/image.ts",
+        "packages/nyan-mode/src/kitty-probe.ts",
         "packages/nyan-mode/src/layout.ts",
         "packages/nyan-mode/src/painter.ts",
         "packages/nyan-mode/src/png.ts",

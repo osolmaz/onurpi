@@ -4,6 +4,7 @@ import { basename } from "node:path";
 import {
   createNyanRunwayPainter,
   cumulativeApiCost,
+  ensureKittyGraphics,
   formatApiCost,
   getNyanDebugInfo,
   renderAnimatedNyanRunway,
@@ -43,12 +44,17 @@ export default function nyanMode(pi: ExtensionAPI): void {
         tui.requestRender();
       };
       const painter = createNyanRunwayPainter(tui);
+      let disposed = false;
       renderFooter = requestRender;
       activePainter = painter;
       const unsubscribeBranch = footerData.onBranchChange(requestRender);
+      void ensureKittyGraphics(tui).then((supported) => {
+        if (supported && !disposed) requestRender();
+      });
 
       return {
         dispose(): void {
+          disposed = true;
           unsubscribeBranch();
           painter.dispose();
           if (renderFooter === requestRender) renderFooter = undefined;

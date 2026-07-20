@@ -7,7 +7,7 @@ empty context ──────────────────────
 0%                                                     100%
 ```
 
-The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in terminals that Pi detects as Kitty-image capable, including compatible Kitty, Ghostty, and WezTerm configurations. Pi normally disables image protocols inside `tmux` and `screen` because passthrough is unreliable.
+The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. When SSH or another launcher strips terminal-identification variables, the extension queries the terminal directly and enables Kitty rendering only after a successful protocol response.
 
 ## Commands
 

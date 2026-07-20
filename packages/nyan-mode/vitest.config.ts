@@ -9,6 +9,7 @@ export default defineConfig({
       include: [
         "src/cost.ts",
         "src/image.ts",
+        "src/kitty-probe.ts",
         "src/layout.ts",
         "src/painter.ts",
         "src/png.ts",
