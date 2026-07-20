@@ -86,6 +86,36 @@ describe("compact streaming", () => {
     expect(state.viewFor(component, 120)?.summary.messages).toBe(1);
   });
 
+  it("distinguishes assistant responses that share a timestamp", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const tool = {};
+    const final = {};
+    const firstMessage = assistantMessage(110, [
+      { text: "Working", type: "text" },
+      { id: "same-ms-tool", name: "read", type: "toolCall" },
+    ]);
+    const finalMessage = assistantMessage(110, [{ text: "Done", type: "text" }]);
+
+    state.ensureActive(100);
+    state.beginAssistantMessage(firstMessage);
+    state.associateAssistant(first, firstMessage);
+    state.endAssistantMessage(firstMessage);
+    state.registerToolStart("same-ms-tool", 110);
+    state.associateTool(tool, "same-ms-tool");
+    state.beginAssistantMessage(finalMessage);
+    state.associateAssistant(final, finalMessage);
+    state.endAssistantMessage(finalMessage);
+    state.settleActive(120);
+
+    expect(state.viewFor(first)?.display).toBe("hidden");
+    expect(state.viewFor(tool)?.display).toBe("hidden");
+    expect(state.viewFor(final, 120)).toMatchObject({
+      display: "settled-final",
+      summary: { messages: 2, tools: 1 },
+    });
+  });
+
   it("counts tool rows but not tool-call-only assistant shells", () => {
     const state = new TurnFoldState();
     const first = {};

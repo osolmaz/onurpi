@@ -142,7 +142,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     const role = messageRole(event.message);
     if (role === "user") state.startUserTurn(messageTimestamp(event.message));
-    if (role === "assistant") state.registerAssistantMessage(event.message);
+    if (role === "assistant") state.beginAssistantMessage(event.message);
   });
 
   pi.on("message_update", (event, ctx) => {
@@ -153,7 +153,7 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("message_end", (event, ctx) => {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) !== "assistant") return;
-    state.registerAssistantMessage(event.message);
+    state.endAssistantMessage(event.message);
     if (messageStopReason(event.message) === "aborted") state.abortActive();
   });
 

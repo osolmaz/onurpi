@@ -93,7 +93,7 @@ function summarizeAssistantContent(items: readonly unknown[]): {
   return { hasVisibleContent, toolCallIds };
 }
 
-function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
+function assistantSnapshot(message: unknown, key: string): AssistantSnapshot | undefined {
   if (stringField(message, "role") !== "assistant") return undefined;
   const timestamp = numberField(message, "timestamp");
   if (timestamp === undefined) return undefined;
@@ -107,7 +107,7 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
       (stopReason === "error" && toolCallIds.length === 0),
     hasVisibleContent,
     interrupted: stopReason === "aborted",
-    key: String(timestamp),
+    key,
     terminalErrorToolCallIds: stopReason === "error" ? toolCallIds : [],
     timestamp,
     toolCallIds,
@@ -162,13 +162,18 @@ function assistantDisplayClassChanged(
 }
 
 export class TurnFoldState {
+  private activeAssistantKey: string | undefined;
+  private activeAssistantTimestamp: number | undefined;
   private activeGroupId: string | undefined;
   private assistantComponentByKey = new Map<string, object>();
   private assistantGroupByKey = new Map<string, string>();
+  private assistantKeyByMessage = new WeakMap<object, string>();
+  private assistantOrdinalByTimestamp = new Map<number, number>();
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private groupCounter = 0;
   private groups = new Map<string, TurnGroup>();
   private historyReload: (() => readonly unknown[]) | undefined;
+  private latestAssistantKeyByTimestamp = new Map<number, string>();
   private mode: TurnFoldMode = "compact";
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
@@ -240,14 +245,31 @@ export class TurnFoldState {
     return group.id;
   }
 
+  beginAssistantMessage(message: unknown): void {
+    const timestamp = numberField(message, "timestamp");
+    if (stringField(message, "role") !== "assistant" || timestamp === undefined) return;
+    const key = this.newAssistantKey(timestamp);
+    this.activeAssistantKey = key;
+    this.activeAssistantTimestamp = timestamp;
+    this.registerAssistantSnapshot(message, key);
+  }
+
   registerAssistantMessage(message: unknown): void {
-    const snapshot = assistantSnapshot(message);
-    if (!snapshot) return;
-    const groupId = this.ensureActive(snapshot.timestamp);
-    const group = this.groups.get(groupId);
-    if (!group) return;
-    const changed = this.indexAssistantSnapshot(group, groupId, snapshot);
-    if (changed) this.invalidateGroupComponents(group);
+    const timestamp = numberField(message, "timestamp");
+    if (stringField(message, "role") !== "assistant" || timestamp === undefined) return;
+    const key =
+      this.messageAssistantKey(message) ??
+      (this.activeAssistantTimestamp === timestamp ? this.activeAssistantKey : undefined) ??
+      this.latestAssistantKeyByTimestamp.get(timestamp) ??
+      this.newAssistantKey(timestamp);
+    this.registerAssistantSnapshot(message, key);
+  }
+
+  endAssistantMessage(message: unknown): void {
+    this.registerAssistantMessage(message);
+    if (numberField(message, "timestamp") !== this.activeAssistantTimestamp) return;
+    this.activeAssistantKey = undefined;
+    this.activeAssistantTimestamp = undefined;
   }
 
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
@@ -268,7 +290,12 @@ export class TurnFoldState {
   }
 
   associateAssistant(component: object, message: unknown): void {
-    const snapshot = assistantSnapshot(message);
+    const timestamp = numberField(message, "timestamp");
+    if (timestamp === undefined) return;
+    const key =
+      this.messageAssistantKey(message) ?? this.latestAssistantKeyByTimestamp.get(timestamp);
+    if (!key) return;
+    const snapshot = assistantSnapshot(message, key);
     if (!snapshot) return;
     const group = this.groupForAssistantComponent(component, snapshot);
     if (!group) return;
@@ -321,6 +348,30 @@ export class TurnFoldState {
       settled: group.settled,
     });
     return { display, summary: this.summary(group, now) };
+  }
+
+  private messageAssistantKey(message: unknown): string | undefined {
+    return isRecord(message) ? this.assistantKeyByMessage.get(message) : undefined;
+  }
+
+  private newAssistantKey(timestamp: number): string {
+    const ordinal = (this.assistantOrdinalByTimestamp.get(timestamp) ?? 0) + 1;
+    const key = `${String(timestamp)}:${String(ordinal)}`;
+    this.assistantOrdinalByTimestamp.set(timestamp, ordinal);
+    this.latestAssistantKeyByTimestamp.set(timestamp, key);
+    return key;
+  }
+
+  private registerAssistantSnapshot(message: unknown, key: string): void {
+    const snapshot = assistantSnapshot(message, key);
+    if (!snapshot) return;
+    if (isRecord(message)) this.assistantKeyByMessage.set(message, key);
+    this.latestAssistantKeyByTimestamp.set(snapshot.timestamp, key);
+    const groupId = this.ensureActive(snapshot.timestamp);
+    const group = this.groups.get(groupId);
+    if (!group) return;
+    const changed = this.indexAssistantSnapshot(group, groupId, snapshot);
+    if (changed) this.invalidateGroupComponents(group);
   }
 
   private groupForAssistantComponent(
@@ -468,8 +519,12 @@ export class TurnFoldState {
     message: unknown,
     completedAt: number | undefined,
   ): void {
-    const snapshot = assistantSnapshot(message);
+    const timestamp = numberField(message, "timestamp");
+    if (timestamp === undefined) return;
+    const key = this.newAssistantKey(timestamp);
+    const snapshot = assistantSnapshot(message, key);
     if (!snapshot) return;
+    if (isRecord(message)) this.assistantKeyByMessage.set(message, key);
     group.assistantKeys.add(snapshot.key);
     if (snapshot.interrupted) group.aborted = true;
     group.terminalErrorToolCallIds = new Set(snapshot.terminalErrorToolCallIds);
@@ -518,13 +573,18 @@ export class TurnFoldState {
   }
 
   private resetGroups(): void {
+    this.activeAssistantKey = undefined;
+    this.activeAssistantTimestamp = undefined;
     this.activeGroupId = undefined;
     this.assistantComponentByKey = new Map();
     this.assistantGroupByKey = new Map();
+    this.assistantKeyByMessage = new WeakMap();
+    this.assistantOrdinalByTimestamp = new Map();
     this.componentInfo = new WeakMap();
     this.groups = new Map();
     this.groupCounter = 0;
     this.historyReload = undefined;
+    this.latestAssistantKeyByTimestamp = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
   }
