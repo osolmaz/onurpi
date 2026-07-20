@@ -21,9 +21,11 @@ import {
   type FittedRunway,
 } from "./src/layout.ts";
 
+const TEXT_ANIMATION_INTERVAL_MS = 500;
+
 export default function nyanMode(pi: ExtensionAPI): void {
   let enabled = true;
-  let displayMode: NyanDisplayMode = "auto";
+  let displayMode: NyanDisplayMode = "text";
   let renderFooter: (() => void) | undefined;
   let activePainter: NyanRunwayPainter | undefined;
 
@@ -178,7 +180,7 @@ function footerSnapshot(ctx: ExtensionContext): FooterSnapshot {
   return {
     ...usageSnapshot(ctx),
     ...modelSnapshot(ctx),
-    animationFrame: Math.floor(Date.now() / 180),
+    animationFrame: Math.floor(Date.now() / TEXT_ANIMATION_INTERVAL_MS),
     cumulativeCost: cumulativeApiCost(ctx.sessionManager.getEntries()),
     dancing: !ctx.isIdle(),
     project: project || ctx.cwd,

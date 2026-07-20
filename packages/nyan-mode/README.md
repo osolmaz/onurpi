@@ -1,6 +1,6 @@
 # Nyan Mode
 
-Nyan Mode adds an animated bitmap Nyan Cat context runway to Pi's footer. The cat moves from left to right as the active model context fills and returns toward the left after compaction or a new session. The footer retains Pi's cumulative API cost and subscription indicator.
+Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a kaomoji moves from left to right as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
 
 ```text
 empty context ─────────────────────────────── full context
@@ -13,7 +13,7 @@ The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics p
 
 ```text
 /nyan          Toggle Nyan Mode
-/nyan on       Enable the selected rendering mode
+/nyan on       Enable the selected rendering mode (text by default)
 /nyan off      Disable Nyan Mode
 /nyan auto     Prefer bitmap and fall back to text
 /nyan bitmap   Force bitmap rendering
