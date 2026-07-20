@@ -27,7 +27,13 @@ export function createNyanRunwayPainter(
   return new KittyNyanRunwayPainter(toTuiLike(tui), options);
 }
 
-function toTuiLike(value: unknown): TuiLike {
+type LiveTui = {
+  terminal: TuiLike["terminal"];
+  getPreviousLines(): readonly string[] | undefined;
+  getPreviousViewportTop(): number | undefined;
+};
+
+function toTuiLike(value: unknown): LiveTui {
   if (!isRecord(value) || !isRecord(value["terminal"])) {
     throw new TypeError("Nyan Mode requires a Pi TUI terminal");
   }
@@ -38,29 +44,30 @@ function toTuiLike(value: unknown): TuiLike {
     throw new TypeError("Nyan Mode requires a writable Pi TUI terminal");
   }
 
-  const tui: TuiLike = {
+  return {
     terminal: {
       rows,
       write(data: string): void {
         Reflect.apply(write, terminal, [data]);
       },
     },
+    getPreviousLines: () => stringLines(value["previousLines"]),
+    getPreviousViewportTop: () => finiteNumber(value["previousViewportTop"]),
   };
-  attachPreviousLines(tui, value["previousLines"]);
-  attachViewportTop(tui, value["previousViewportTop"]);
-  return tui;
 }
 
-function attachPreviousLines(tui: TuiLike, value: unknown): void {
-  if (!Array.isArray(value)) return;
-  if (!value.every((line) => typeof line === "string")) return;
-  tui.previousLines = value;
+function stringLines(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const lines: string[] = [];
+  for (const line of value) {
+    if (typeof line !== "string") return undefined;
+    lines.push(line);
+  }
+  return lines;
 }
 
-function attachViewportTop(tui: TuiLike, value: unknown): void {
-  if (typeof value !== "number") return;
-  if (!Number.isFinite(value)) return;
-  tui.previousViewportTop = value;
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,7 +113,7 @@ class KittyNyanRunwayPainter implements NyanRunwayPainter {
   private disposed = false;
 
   constructor(
-    private readonly tui: TuiLike,
+    private readonly tui: LiveTui,
     options: NyanRunwayPainterOptions,
   ) {
     this.assetDir = options.assetDir ?? DEFAULT_ASSET_DIR;
@@ -232,10 +239,9 @@ class KittyNyanRunwayPainter implements NyanRunwayPainter {
   }
 
   private footerScreenRow(): number | undefined {
-    const logicalRow = this.tui.previousLines?.length;
+    const logicalRow = this.tui.getPreviousLines()?.length;
     if (logicalRow === undefined || logicalRow < 1) return undefined;
-    const viewportTop = this.tui.previousViewportTop ?? 0;
-    const screenRow = logicalRow - viewportTop;
+    const screenRow = logicalRow - (this.tui.getPreviousViewportTop() ?? 0);
     return screenRow >= 1 && screenRow <= this.tui.terminal.rows ? screenRow : undefined;
   }
 }

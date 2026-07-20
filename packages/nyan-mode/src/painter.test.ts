@@ -65,11 +65,13 @@ describe("Kitty Nyan painter", () => {
   it("paints, animates, and clears a footer image", () => {
     const writes: string[] = [];
     const tui: TuiLike = {
-      previousLines: ["chat", "footer"],
-      previousViewportTop: 0,
+      previousLines: [],
+      previousViewportTop: 3,
       terminal: { rows: 10, write: (data) => writes.push(data) },
     };
     const painter = createNyanRunwayPainter(tui, { frameIntervalMs: 100 });
+    tui.previousLines = ["chat", "footer"];
+    tui.previousViewportTop = 0;
 
     painter.setTarget({ cells: 8, startColumn: 3, percent: 50 });
     vi.advanceTimersByTime(0);
