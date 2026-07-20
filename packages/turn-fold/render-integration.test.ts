@@ -1,7 +1,9 @@
 import {
   AssistantMessageComponent,
   initTheme,
+  SkillInvocationMessageComponent,
   ToolExecutionComponent,
+  UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { Container, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, expect, it } from "vitest";
@@ -102,6 +104,73 @@ let restore: RestoreRenderPatches | undefined;
 afterEach(() => {
   restore?.();
   restore = undefined;
+});
+
+it("renders local user and completion times in transcript order", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const startedAt = new Date();
+  startedAt.setHours(8, 5, 0, 0);
+  const completedAt = new Date(startedAt);
+  completedAt.setMinutes(6);
+  const final = assistantMessage(completedAt.getTime(), [{ text: "Final response", type: "text" }]);
+
+  state.loadHistory([
+    {
+      message: { content: "Prompt", role: "user", timestamp: startedAt.getTime() },
+      type: "message",
+    },
+    { message: final, timestamp: completedAt.toISOString(), type: "message" },
+  ]);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+
+  const rendered = frame(transcript);
+  expect(rendered.indexOf("Prompt")).toBeLessThan(rendered.indexOf("08:05"));
+  expect(rendered.indexOf("08:05")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(rendered).toContain("Worked for 1m · 08:06");
+  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Final response"));
+  expect(rendered).not.toContain("Ctrl+Shift+O");
+});
+
+it("timestamps skill-only user rows without duplicating timestamps", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const firstAt = new Date();
+  firstAt.setHours(9, 10, 0, 0);
+  const secondAt = new Date(firstAt);
+  secondAt.setMinutes(11);
+
+  state.loadHistory([
+    { message: { content: "first", role: "user", timestamp: firstAt.getTime() }, type: "message" },
+    {
+      message: { content: "second", role: "user", timestamp: secondAt.getTime() },
+      type: "message",
+    },
+  ]);
+  transcript.addChild(
+    new SkillInvocationMessageComponent({
+      content: "skill body",
+      location: "/tmp/SKILL.md",
+      name: "test-skill",
+      userMessage: "Visible prompt",
+    }),
+  );
+  transcript.addChild(new UserMessageComponent("Visible prompt", undefined, 0));
+  transcript.addChild(
+    new SkillInvocationMessageComponent({
+      content: "skill body",
+      location: "/tmp/SKILL.md",
+      name: "skill-only",
+      userMessage: undefined,
+    }),
+  );
+
+  const rendered = frame(transcript);
+  expect(rendered.match(/09:10/gu)).toHaveLength(1);
+  expect(rendered.match(/09:11/gu)).toHaveLength(1);
 });
 
 it("compacts ten sequential tool calls while leaving the working line visible", () => {

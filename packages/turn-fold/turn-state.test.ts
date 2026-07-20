@@ -175,6 +175,7 @@ describe("compact settled turns", () => {
       display: "settled-final",
       summary: {
         aborted: false,
+        completedAt: 150,
         durationMs: 50,
         failedTools: 0,
         hiddenActivities: 0,
@@ -270,6 +271,24 @@ describe("expanded transcript", () => {
 });
 
 describe("historical transcript", () => {
+  it("associates user components with local-time source timestamps in order", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const second = {};
+
+    state.loadHistory([
+      { message: { content: "same", role: "user", timestamp: 100 }, type: "message" },
+      { message: assistantMessage(110, [{ text: "done", type: "text" }]), type: "message" },
+      { message: { content: "same", role: "user", timestamp: 200 }, type: "message" },
+    ]);
+    state.associateUser(first);
+    state.associateUser(first);
+    state.associateUser(second);
+
+    expect(state.userTimestampFor(first)).toBe(100);
+    expect(state.userTimestampFor(second)).toBe(200);
+  });
+
   it("reconstructs turns and keeps each last assistant response", () => {
     const state = new TurnFoldState();
     const firstIntermediate = {};

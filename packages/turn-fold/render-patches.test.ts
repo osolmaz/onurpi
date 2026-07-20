@@ -11,6 +11,7 @@ import type { FoldSummary } from "./turn-state.ts";
 function summary(overrides: Partial<FoldSummary> = {}): FoldSummary {
   return {
     aborted: false,
+    completedAt: undefined,
     durationMs: 65_000,
     failedTools: 0,
     hiddenActivities: 7,
@@ -24,27 +25,31 @@ function summary(overrides: Partial<FoldSummary> = {}): FoldSummary {
 describe("turn fold summary rendering", () => {
   it("formats the streaming overflow summary", () => {
     expect(formatStreamingSummary(summary({ running: true }))).toBe(
-      "▶ 7 earlier activities · 10 tools · 4 msgs · Ctrl+Shift+O",
+      "▶ 7 earlier activities · 10 tools · 4 msgs",
     );
   });
 
   it("formats normal and interrupted settled summaries", () => {
-    expect(formatSettledSummary(summary())).toBe(
-      "▶ Worked for 1m 5s · 10 tools · 4 msgs · Ctrl+Shift+O",
-    );
+    expect(formatSettledSummary(summary())).toBe("▶ Worked for 1m 5s · 10 tools · 4 msgs");
     expect(formatSettledSummary(summary({ aborted: true, failedTools: 1 }))).toBe(
-      "▶ Worked for 1m 5s · 10 tools · 4 msgs · 1 failure · interrupted · Ctrl+Shift+O",
+      "▶ Worked for 1m 5s · 10 tools · 4 msgs · 1 failure · interrupted",
+    );
+
+    const completedAt = new Date(2026, 6, 20, 18, 43).getTime();
+    const now = new Date(2026, 6, 20, 19, 0).getTime();
+    expect(formatSettledSummary(summary({ completedAt }), now)).toBe(
+      "▶ Worked for 1m 5s · 18:43 · 10 tools · 4 msgs",
     );
   });
 
   it("renders summaries with a leading blank row and respects zero width", () => {
     expect(renderStreamingSummary(summary({ running: true }), 100, undefined)).toEqual([
       "",
-      "▶ 7 earlier activities · 10 tools · 4 msgs · Ctrl+Shift+O",
+      "▶ 7 earlier activities · 10 tools · 4 msgs",
     ]);
     expect(renderSettledSummary(summary({ durationMs: 500 }), 100, undefined)).toEqual([
       "",
-      "▶ Worked for <1s · 10 tools · 4 msgs · Ctrl+Shift+O",
+      "▶ Worked for <1s · 10 tools · 4 msgs",
     ]);
     expect(renderSettledSummary(summary(), 0, undefined)).toEqual([]);
   });

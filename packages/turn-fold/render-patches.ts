@@ -1,11 +1,14 @@
 import {
   AssistantMessageComponent,
+  SkillInvocationMessageComponent,
   type Theme,
   ToolExecutionComponent,
+  UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
+import { formatLocalTimestamp } from "./local-time.ts";
 import type { FoldDisplay } from "./fold-policy.ts";
 import type { FoldSummary } from "./turn-state.ts";
 import { TurnFoldState } from "./turn-state.ts";
@@ -34,16 +37,20 @@ export function formatStreamingSummary(summary: FoldSummary): string {
   const parts = [countLabel(summary.hiddenActivities, "earlier activity", "earlier activities")];
   if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
-  return `▶ ${parts.join(" · ")} · Ctrl+Shift+O`;
+  return `▶ ${parts.join(" · ")}`;
 }
 
-export function formatSettledSummary(summary: FoldSummary): string {
+export function formatSettledSummary(summary: FoldSummary, now = Date.now()): string {
   const parts = [`Worked for ${formatDuration(summary.durationMs)}`];
+  if (summary.completedAt !== undefined) {
+    const completedAt = formatLocalTimestamp(summary.completedAt, now);
+    if (completedAt) parts.push(completedAt);
+  }
   if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
   if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
   if (summary.aborted) parts.push("interrupted");
-  return `▶ ${parts.join(" · ")} · Ctrl+Shift+O`;
+  return `▶ ${parts.join(" · ")}`;
 }
 
 function styledSummary(
@@ -103,6 +110,64 @@ function settledSummaryAndFinal(
   ];
 }
 
+function appendUserTimestamp(
+  original: string[],
+  timestamp: number | undefined,
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (timestamp === undefined || width <= 0) return original;
+  const label = truncateToWidth(formatLocalTimestamp(timestamp), width, "");
+  if (!label) return original;
+  const padding = " ".repeat(Math.max(0, width - label.length));
+  return [...original, padding + (theme ? theme.fg("dim", label) : label)];
+}
+
+function skillHasUserMessage(component: SkillInvocationMessageComponent): boolean {
+  const skillBlock: unknown = Reflect.get(component, "skillBlock");
+  if (typeof skillBlock !== "object" || skillBlock === null) return false;
+  const userMessage: unknown = Reflect.get(skillBlock, "userMessage");
+  return typeof userMessage === "string" && userMessage.trim().length > 0;
+}
+
+function installUserTimestampPatches(
+  state: TurnFoldState,
+  getTheme: () => Theme | undefined,
+): RestoreRenderPatches {
+  const userPrototype = UserMessageComponent.prototype;
+  const originalUserRender = userPrototype.render;
+  const skillPrototype = SkillInvocationMessageComponent.prototype;
+  const originalSkillRender = skillPrototype.render;
+
+  const patchedUserRender = function (this: UserMessageComponent, width: number): string[] {
+    state.reloadHistoryForNewComponent(this);
+    state.associateUser(this);
+    return appendUserTimestamp(
+      originalUserRender.call(this, width),
+      state.userTimestampFor(this),
+      width,
+      getTheme(),
+    );
+  };
+  const patchedSkillRender = function (
+    this: SkillInvocationMessageComponent,
+    width: number,
+  ): string[] {
+    const original = originalSkillRender.call(this, width);
+    if (skillHasUserMessage(this)) return original;
+    state.reloadHistoryForNewComponent(this);
+    state.associateUser(this);
+    return appendUserTimestamp(original, state.userTimestampFor(this), width, getTheme());
+  };
+
+  userPrototype.render = patchedUserRender;
+  skillPrototype.render = patchedSkillRender;
+  return () => {
+    if (userPrototype.render === patchedUserRender) userPrototype.render = originalUserRender;
+    if (skillPrototype.render === patchedSkillRender) skillPrototype.render = originalSkillRender;
+  };
+}
+
 function renderFoldView(
   display: FoldDisplay,
   original: () => string[],
@@ -124,6 +189,7 @@ export function installRenderPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
 ): RestoreRenderPatches {
+  const restoreUserTimestamps = installUserTimestampPatches(state, getTheme);
   const assistantPrototype = AssistantMessageComponent.prototype;
   const originalAssistantUpdate = assistantPrototype.updateContent;
   const originalAssistantRender = assistantPrototype.render;
@@ -188,6 +254,7 @@ export function installRenderPatches(
   toolPrototype.render = patchedToolRender;
 
   return () => {
+    restoreUserTimestamps();
     if (assistantPrototype.updateContent === patchedAssistantUpdate) {
       assistantPrototype.updateContent = originalAssistantUpdate;
     }
