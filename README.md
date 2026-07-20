@@ -9,7 +9,6 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 | [`@onurpi/turn-fold`](packages/turn-fold/)                 | Turn-level transcript folding that preserves the final response |
 | [`pi-tui-history-replay`](packages/pi-tui-history-replay/) | Vendored full visible branch history across context compaction  |
 | [`@onurpi/live-stats`](packages/live-stats/)               | Live elapsed time, output tokens, and recent output throughput  |
-| [`@onurpi/pi-must-win`](packages/pi-must-win/)             | Umbrella Pi branding, starting with Git commit attribution      |
 
 ## Install
 
@@ -23,7 +22,7 @@ npm ci
 pi install ./packages/turn-fold
 pi install ./packages/pi-tui-history-replay
 pi install ./packages/live-stats
-pi install ./packages/pi-must-win
+pi install git:github.com/osolmaz/pi-must-win
 pi list
 ```
 

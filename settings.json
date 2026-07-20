@@ -4,7 +4,7 @@
     "../../repos/onurpi/packages/pi-tui-history-replay",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
-    "../../repos/onurpi/packages/pi-must-win",
+    "git:github.com/osolmaz/pi-must-win",
     "npm:pi-web-access@0.13.0"
   ],
   "lastChangelogVersion": "0.80.10",

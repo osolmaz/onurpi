@@ -12,8 +12,7 @@
     "extensions": [
       "./packages/pi-tui-history-replay/index.ts",
       "./packages/turn-fold/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/pi-must-win/index.ts"
+      "./packages/live-stats/index.ts"
     ]
   },
   "scripts": {

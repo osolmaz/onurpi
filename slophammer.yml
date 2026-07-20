@@ -21,8 +21,6 @@ typescript:
       - packages/turn-fold/output-metrics.ts
       - packages/pi-tui-history-replay/history-replay.ts
       - packages/live-stats/live-stats.ts
-      - packages/pi-must-win/git-commit-trailers.ts
-      - packages/pi-must-win/features/commit-attribution.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -33,6 +31,3 @@ typescript:
     - from: packages/live-stats
       allow:
         - packages/live-stats
-    - from: packages/pi-must-win
-      allow:
-        - packages/pi-must-win
