@@ -17,6 +17,7 @@ typescript:
       - fold-policy.ts
       - mode.ts
       - output-metrics.ts
+      - tool-padding.ts
   dependency_boundaries:
     - from: .
       allow: []

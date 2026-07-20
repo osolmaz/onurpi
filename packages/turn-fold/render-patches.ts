@@ -5,6 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
+import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import type { FoldHistorySummary, FoldSummary } from "./turn-state.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -125,6 +126,7 @@ export function installRenderPatches(
   };
 
   const patchedToolRender = function (this: ToolExecutionComponent, width: number): string[] {
+    removeToolHorizontalPadding(this);
     state.reloadHistoryForNewComponent(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);

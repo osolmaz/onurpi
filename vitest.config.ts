@@ -8,6 +8,7 @@ export default defineConfig({
         "packages/turn-fold/mode.ts",
         "packages/turn-fold/output-metrics.ts",
         "packages/turn-fold/turn-state.ts",
+        "packages/turn-fold/tool-padding.ts",
         "packages/pi-tui-history-replay/history-replay.ts",
         "packages/live-stats/live-stats.ts",
         "packages/prompt-queue/queue-model.ts",
