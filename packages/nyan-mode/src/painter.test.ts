@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { NyanRunwayPainter, TuiLike } from "./types.ts";
+import type { NyanRunwayPainter } from "./types.ts";
 
 const tuiMocks = vi.hoisted(() => ({
   imageProtocol: "kitty" as string | null,
@@ -9,39 +9,44 @@ const tuiMocks = vi.hoisted(() => ({
 
 vi.mock("@earendil-works/pi-tui", () => ({
   allocateImageId: () => 17,
-  deleteKittyImage: (id: number) => `DELETE:${String(id)}`,
   getCapabilities: () => ({ images: tuiMocks.imageProtocol }),
   renderImage: tuiMocks.renderImage,
 }));
 
 import { createNyanRunwayPainter, renderAnimatedNyanRunway } from "./painter.ts";
 
-function stubPainter(setTarget = vi.fn(), clear = vi.fn()): NyanRunwayPainter {
+function stubPainter(
+  render: NyanRunwayPainter["render"] = vi.fn(() => "IMAGE"),
+  clear: NyanRunwayPainter["clear"] = vi.fn(),
+): NyanRunwayPainter {
   return {
-    setTarget,
+    render,
     clear,
     dispose: vi.fn(),
     debugInfo: () => "stub",
   };
 }
 
-describe("animated runway reservation", () => {
+describe("animated runway rendering", () => {
   beforeEach(() => {
     tuiMocks.imageProtocol = "kitty";
   });
 
-  it("reserves cells and updates a supported painter", () => {
-    const setTarget = vi.fn();
-    const painter = stubPainter(setTarget);
+  it("embeds an image sequence and reserves its terminal cells", () => {
+    const render = vi.fn(() => "IMAGE");
+    const painter = stubPainter(render);
     expect(renderAnimatedNyanRunway(painter, { cells: 8.9, startColumn: 3, percent: 25 })).toBe(
-      "        ",
+      "IMAGE        ",
     );
-    expect(setTarget).toHaveBeenCalledWith({ cells: 8, startColumn: 3, percent: 25 });
+    expect(render).toHaveBeenCalledWith({ cells: 8, startColumn: 3, percent: 25 });
   });
 
   it("clears the painter when rendering is unavailable", () => {
     const clear = vi.fn();
-    const painter = stubPainter(vi.fn(), clear);
+    const painter = stubPainter(
+      vi.fn(() => undefined),
+      clear,
+    );
     tuiMocks.imageProtocol = null;
     expect(renderAnimatedNyanRunway(painter, { cells: 8, startColumn: 3 })).toBeUndefined();
     tuiMocks.imageProtocol = "kitty";
@@ -51,58 +56,41 @@ describe("animated runway reservation", () => {
   });
 });
 
-describe("Kitty Nyan painter", () => {
+describe("inline Nyan painter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     tuiMocks.imageProtocol = "kitty";
     tuiMocks.renderImage.mockClear();
+    tuiMocks.renderImage.mockReturnValue({ rows: 1, sequence: "IMAGE" });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("paints, animates, and clears a footer image", () => {
-    const writes: string[] = [];
-    const tui: TuiLike = {
-      previousLines: [],
-      previousViewportTop: 3,
-      terminal: { rows: 1, write: (data) => writes.push(data) },
-    };
-    const painter = createNyanRunwayPainter(tui, { frameIntervalMs: 100 });
-    tui.previousLines = ["chat", "footer"];
-    tui.previousViewportTop = 0;
-    tui.terminal.rows = 10;
+  it("renders inline, animates through TUI renders, and clears its timer", () => {
+    const requestRender = vi.fn();
+    const painter = createNyanRunwayPainter({ requestRender }, { frameIntervalMs: 100 });
 
-    painter.setTarget({ cells: 8, startColumn: 3, percent: 50 });
-    vi.advanceTimersByTime(0);
+    expect(painter.render({ cells: 8, startColumn: 3, percent: 50 })).toBe("IMAGE");
     expect(tuiMocks.renderImage).toHaveBeenCalledTimes(1);
-    expect(writes[0]).toContain("\x1b[2;3HIMAGE");
-    expect(painter.debugInfo()).toBe("cells=8 col=3 target=50%");
+    expect(painter.debugInfo()).toBe("inline cells=8 col=3 target=50%");
 
     vi.advanceTimersByTime(100);
+    expect(requestRender).toHaveBeenCalledTimes(1);
+    expect(painter.render({ cells: 10, startColumn: 4, percent: 75 })).toBe("IMAGE");
     expect(tuiMocks.renderImage).toHaveBeenCalledTimes(2);
-    expect(writes.at(-1)).toContain("DELETE:17");
 
     painter.clear();
     expect(painter.debugInfo()).toBe("idle");
-    expect(writes.at(-1)).toContain("DELETE:17");
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("does not paint outside the visible viewport or after disposal", () => {
-    const write = vi.fn();
-    const painter = createNyanRunwayPainter({
-      previousLines: ["chat", "footer"],
-      previousViewportTop: 5,
-      terminal: { rows: 2, write },
-    });
-    painter.setTarget({ cells: 8, startColumn: 1 });
-    vi.advanceTimersByTime(0);
-    expect(write).not.toHaveBeenCalled();
-
+  it("stops rendering after disposal and rejects an unsupported TUI", () => {
+    const painter = createNyanRunwayPainter({ requestRender: vi.fn() });
     painter.dispose();
-    painter.setTarget({ cells: 8, startColumn: 1 });
+    expect(painter.render({ cells: 8, startColumn: 1 })).toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
+    expect(() => createNyanRunwayPainter({})).toThrow("Pi TUI renderer");
   });
 });

@@ -6,17 +6,6 @@ export type XpmImage = {
   pixels: Buffer;
 };
 
-export type TerminalLike = {
-  rows: number;
-  write(data: string): void;
-};
-
-export type TuiLike = {
-  terminal: TerminalLike;
-  previousLines?: readonly string[];
-  previousViewportTop?: number;
-};
-
 export type RenderNyanRunwayOptions = {
   percent?: number | null;
   cells: number;
@@ -39,7 +28,7 @@ export type NyanRunwayPainterOptions = {
 };
 
 export type NyanRunwayPainter = {
-  setTarget(layout: NyanRunwayLayout): void;
+  render(layout: NyanRunwayLayout): string | undefined;
   clear(): void;
   dispose(): void;
   debugInfo(): string;
