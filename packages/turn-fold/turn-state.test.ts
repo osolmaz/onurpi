@@ -79,9 +79,10 @@ describe("compact streaming", () => {
     };
 
     state.ensureActive(100);
-    state.registerAssistantMessage(start);
+    state.beginAssistantMessage(start);
     state.registerAssistantMessage(updated);
     state.associateAssistant(component, updated);
+    state.endAssistantMessage({ ...updated, stopReason: "toolUse" });
 
     expect(state.viewFor(component, 120)?.summary.messages).toBe(1);
   });
@@ -356,8 +357,13 @@ describe("historical transcript", () => {
       { message: { content: "prompt", role: "user" }, type: "message" },
       { message: { role: "toolResult", timestamp: 3 }, type: "message" },
     ]);
+    state.beginAssistantMessage({ role: "assistant" });
+    state.beginAssistantMessage({ role: "user", timestamp: 330 });
     state.registerAssistantMessage({ role: "assistant" });
+    state.endAssistantMessage({ content: [], role: "assistant", timestamp: 330 });
+    state.settleActive();
     state.associateAssistant(unknown, { role: "assistant" });
+    state.associateAssistant(unknown, assistantMessage(340, []));
     state.associateTool(unknown, "missing");
     state.settleActive();
 
