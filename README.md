@@ -20,8 +20,8 @@ pi install git:github.com/osolmaz/onurpi
 ```
 
 Run `/reload` in an existing Pi session after installation. After new commits land on `main`, run
-`pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to
-pick them up.
+`pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to pick
+them up.
 
 ## Global settings
 
@@ -30,17 +30,21 @@ pick them up.
 state remain outside this repository. Review settings for credentials or machine-specific values
 before committing future changes.
 
-Update the tracked copy after changing Pi settings:
+Two scripts keep the copies in agreement without ever leaking machine-local development state. Both
+derive the canonical package entries from the root manifest (`pi.extensions`), so the list never
+needs manual maintenance:
 
 ```bash
-cp ~/.pi/agent/settings.json settings.json
+npm run settings:sync   # live settings -> tracked settings.json, repo entries normalized
+npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
 ```
 
-Apply the tracked settings from the repository root:
-
-```bash
-cp settings.json ~/.pi/agent/settings.json
-```
+An entry counts as belonging to this repo when it points into the main checkout, into an
+`onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. Those entries are replaced with
+one canonical `../../repos/onurpi/packages/<name>` entry per registered package. External entries
+(npm packages, other git repos) and all other settings pass through untouched. During development
+the live file may point anywhere — a worktree, a dev-only package — and `sync` still writes the
+correct canonical values to the tracked copy.
 
 ## Structure
 
@@ -54,19 +58,11 @@ TypeScript quality tooling at the workspace root.
 
 ## Development
 
-Extensions are developed from a live Pi session: edit the working tree, then `/reload`. That only
-works while the installed package points at the working tree instead of the GitHub clone, so the
-workspace has two modes, switched with one command:
-
-```bash
-npm run pi:dev     # settings point at ~/repos/onurpi; /reload picks up local edits
-npm run pi:stable  # settings point at git:github.com/osolmaz/onurpi (pushed code)
-```
-
-Use dev mode while working on an extension. Once the work is merged, switch back to stable mode so
-sessions load pinned, pushed code and are immune to branch switches and uncommitted edits. Both
-modes register the same extensions through the root manifest. Never leave both entries installed
-at once; the extensions would load twice.
+Extensions are developed from a live Pi session: edit a checkout, then `/reload`. On this machine
+the canonical install is per-package local paths into the main checkout, so `/reload` picks up local
+edits directly. To develop in a worktree instead, point the live settings entry at the worktree
+path; when done, `npm run settings:reset` restores the canonical entries and `npm run settings:sync`
+updates the tracked copy.
 
 Quick-test without touching settings at all:
 

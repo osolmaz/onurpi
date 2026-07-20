@@ -1,15 +1,17 @@
 {
   "packages": [
     "git:github.com/osolmaz/pi-workflows",
+    "npm:pi-web-access@0.13.0",
+    "git:github.com/osolmaz/pi-must-win",
     "../../repos/onurpi/packages/pi-tui-history-replay",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
-    "git:github.com/osolmaz/pi-must-win",
-    "npm:pi-web-access@0.13.0"
+    "../../repos/onurpi/packages/prompt-queue"
   ],
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
-  "outputPad": 0
+  "outputPad": 0,
+  "theme": "onur-dark"
 }

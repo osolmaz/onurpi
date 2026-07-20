@@ -17,8 +17,8 @@
     ]
   },
   "scripts": {
-    "pi:dev": "pi install . && pi remove git:github.com/osolmaz/onurpi",
-    "pi:stable": "pi install git:github.com/osolmaz/onurpi && pi remove .",
+    "settings:sync": "node scripts/sync-settings.ts sync",
+    "settings:reset": "node scripts/sync-settings.ts reset",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint .",

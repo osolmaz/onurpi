@@ -16,5 +16,5 @@
     "types": ["node", "vitest/globals"],
     "useUnknownInCatchVariables": true
   },
-  "include": ["packages/**/*.ts", "vitest.config.ts"]
+  "include": ["packages/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
 }
