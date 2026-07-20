@@ -18,6 +18,20 @@ function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   };
 }
 
+function canRender(
+  ctx: ExtensionContext,
+  trackerActive: boolean,
+  phrase: string | undefined,
+  shimmerStartedAtMs: number | undefined,
+): boolean {
+  return (
+    ctx.mode === "tui" &&
+    trackerActive &&
+    phrase !== undefined &&
+    shimmerStartedAtMs !== undefined
+  );
+}
+
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
@@ -31,14 +45,7 @@ export default function liveStats(pi: ExtensionAPI): void {
   };
 
   const render = (ctx: ExtensionContext): void => {
-    if (
-      ctx.mode !== "tui" ||
-      !tracker.active ||
-      workingPhrase.current === undefined ||
-      shimmerStartedAtMs === undefined
-    ) {
-      return;
-    }
+    if (!canRender(ctx, tracker.active, workingPhrase.current, shimmerStartedAtMs)) return;
     const now = Date.now();
     const message = formatShimmeringWorkingMessage(
       tracker.snapshot(now),
