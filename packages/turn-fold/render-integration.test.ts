@@ -129,8 +129,9 @@ it("renders local user and completion times in transcript order", () => {
   const rendered = frame(transcript);
   expect(rendered.indexOf("Prompt")).toBeLessThan(rendered.indexOf("08:05"));
   expect(rendered.indexOf("08:05")).toBeLessThan(rendered.indexOf("Worked for"));
-  expect(rendered).toContain("Worked for 1m · 08:06");
+  expect(rendered).toContain("Worked for 1m · 1 msg");
   expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Final response"));
+  expect(rendered.indexOf("Final response")).toBeLessThan(rendered.indexOf("08:06"));
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 

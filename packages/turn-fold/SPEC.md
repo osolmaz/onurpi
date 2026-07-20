@@ -10,13 +10,13 @@ A **turn** starts with a user message and includes the assistant messages and to
 
 An **activity row** is a visible assistant text or thinking row, or a tool execution row. An assistant shell that contains only tool calls is not an activity row.
 
-A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for` and includes the local completion time.
+A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for`.
 
 The **final content row** is the one assistant or tool row retained after a compact turn settles.
 
 ## Display invariants
 
-Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata beneath it. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
+Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. The retained final content row shows the local completion time beneath its content. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
 In compact mode, every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
@@ -55,9 +55,10 @@ A settled compact turn MUST show one settled summary line followed by one final 
 ```text
 User message
 
-▶ Worked for 14s · 18:43 · 8 tools · 9 msgs
+▶ Worked for 14s · 8 tools · 9 msgs
 
 Final assistant response
+                              18:43
 ```
 
 The settled summary reports elapsed time. It may include assistant-message, tool, failure, and output-token counts when those values are available. Zero-valued optional counts may be omitted.
@@ -82,9 +83,10 @@ The settled summary includes `interrupted`. The fallback or partial response MUS
 ```text
 User message
 
-▶ Worked for 11s · 18:43 · 1 msg · interrupted
+▶ Worked for 11s · 1 msg · interrupted
 
 Operation interrupted
+                              18:43
 ```
 
 ## Failed turns
@@ -107,7 +109,7 @@ The first rendered frame after reconstruction MUST obey the same compact-mode ru
 
 Distinct assistant messages remain distinct even when they share the same millisecond timestamp. Streaming updates for one assistant message still count as one message.
 
-Elapsed time and local completion time come from persisted turn completion data when available. Time spent between saving and reopening a session MUST NOT increase the displayed duration. Epoch timestamps remain unchanged in session state and are formatted only for display.
+Elapsed time and the final-content timestamp come from persisted turn completion data when available. Time spent between saving and reopening a session MUST NOT increase the displayed duration. Epoch timestamps remain unchanged in session state and are formatted only for display.
 
 ## State boundaries
 
@@ -138,7 +140,7 @@ Turn Fold patches Pi's exported `AssistantMessageComponent` and `ToolExecutionCo
 A release is conforming only when automated or PTY tests verify all of the following:
 
 - Ten sequential tool calls show one streaming summary, the latest three activities, and Pi's working indicator.
-- User and settled-summary timestamps render in local time without changing stored epoch values.
+- User and final-content timestamps render in local time without changing stored epoch values.
 - Settlement leaves the summary directly below the user message and one final content row below it.
 - Interruption retains partial output or `Operation interrupted` below an interrupted summary.
 - Terminal tool failures retain the correct failed tool row and failure count.

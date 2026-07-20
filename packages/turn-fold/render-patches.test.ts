@@ -37,9 +37,8 @@ describe("turn fold summary rendering", () => {
     );
 
     const completedAt = new Date(2026, 6, 20, 18, 43).getTime();
-    const now = new Date(2026, 6, 20, 19, 0).getTime();
-    expect(formatSettledSummary(summary({ completedAt }), now)).toBe(
-      "▶ Worked for 1m 5s · 18:43 · 10 tools · 4 msgs",
+    expect(formatSettledSummary(summary({ completedAt }))).toBe(
+      "▶ Worked for 1m 5s · 10 tools · 4 msgs",
     );
   });
 

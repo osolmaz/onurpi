@@ -40,12 +40,8 @@ export function formatStreamingSummary(summary: FoldSummary): string {
   return `▶ ${parts.join(" · ")}`;
 }
 
-export function formatSettledSummary(summary: FoldSummary, now = Date.now()): string {
+export function formatSettledSummary(summary: FoldSummary): string {
   const parts = [`Worked for ${formatDuration(summary.durationMs)}`];
-  if (summary.completedAt !== undefined) {
-    const completedAt = formatLocalTimestamp(summary.completedAt, now);
-    if (completedAt) parts.push(completedAt);
-  }
   if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
   if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
@@ -97,7 +93,9 @@ function settledFinal(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
+  const visible =
+    original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
+  return timestampAfterContent(visible, summary.completedAt, width, theme);
 }
 
 function settledSummaryAndFinal(
@@ -126,6 +124,23 @@ function timestampBackground(
   theme: Theme | undefined,
 ): string {
   return theme ? theme.bg(background, content) : content;
+}
+
+function timestampAfterContent(
+  original: string[],
+  timestamp: number | undefined,
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (timestamp === undefined || width <= 0 || original.length === 0) return original;
+  const label = truncateToWidth(formatLocalTimestamp(timestamp), width, "");
+  if (!label) return original;
+  const lines = [...original];
+  const lastIndex = lines.length - 1;
+  const lastLine = lines[lastIndex] ?? "";
+  const prefix = lastLine.startsWith(USER_ZONE_END) ? USER_ZONE_END : "";
+  if (prefix) lines[lastIndex] = lastLine.slice(prefix.length);
+  return [...lines, prefix + timestampContent(label, width, theme)];
 }
 
 function timestampOnBottomLine(
