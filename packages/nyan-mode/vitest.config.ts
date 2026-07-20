@@ -7,6 +7,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       include: [
+        "src/cost.ts",
         "src/image.ts",
         "src/layout.ts",
         "src/painter.ts",

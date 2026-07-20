@@ -1,5 +1,5 @@
 export default {
-  mutate: ["src/png.ts", "src/progress.ts"],
+  mutate: ["src/cost.ts", "src/png.ts", "src/progress.ts"],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

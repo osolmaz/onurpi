@@ -1,6 +1,6 @@
 # Nyan Mode
 
-Nyan Mode adds an animated bitmap Nyan Cat context runway to Pi's footer. The cat moves from left to right as the active model context fills and returns toward the left after compaction or a new session.
+Nyan Mode adds an animated bitmap Nyan Cat context runway to Pi's footer. The cat moves from left to right as the active model context fills and returns toward the left after compaction or a new session. The footer retains Pi's cumulative API cost and subscription indicator.
 
 ```text
 empty context ─────────────────────────────── full context
@@ -27,10 +27,12 @@ From the repository root:
 
 ```bash
 npm --workspace @onurpi/nyan-mode run check
-npm --workspace @onurpi/nyan-mode run mutate
 npm --workspace @onurpi/nyan-mode run slophammer
 pi -e ./packages/nyan-mode/index.ts
 ```
+
+Optional manual mutation testing remains available with
+`npm --workspace @onurpi/nyan-mode run mutate`.
 
 See [UPSTREAM.md](UPSTREAM.md) for provenance, the security review, and local changes.
 

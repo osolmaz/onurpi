@@ -3,6 +3,8 @@ import { basename } from "node:path";
 
 import {
   createNyanRunwayPainter,
+  cumulativeApiCost,
+  formatApiCost,
   getNyanDebugInfo,
   renderAnimatedNyanRunway,
   type NyanRunwayPainter,
@@ -97,10 +99,12 @@ function debugMessage(enabled: boolean, painter: NyanRunwayPainter | undefined):
 
 type FooterSnapshot = {
   contextWindow: number | undefined;
+  cumulativeCost: number;
   modelId: string | undefined;
   percent: number | undefined;
   project: string;
   reasoning: boolean | undefined;
+  usingSubscription: boolean;
 };
 
 type FooterLineOptions = FooterSnapshot & {
@@ -117,8 +121,16 @@ function footerSnapshot(ctx: ExtensionContext): FooterSnapshot {
   return {
     ...usageSnapshot(ctx),
     ...modelSnapshot(ctx),
+    cumulativeCost: cumulativeApiCost(ctx.sessionManager.getEntries()),
     project: project || ctx.cwd,
+    usingSubscription: usingSubscription(ctx),
   };
+}
+
+function usingSubscription(ctx: ExtensionContext): boolean {
+  if (!ctx.model) return false;
+  const model = ctx.modelRegistry.find(ctx.model.provider, ctx.model.id);
+  return model ? ctx.modelRegistry.isUsingOAuth(model) : false;
 }
 
 function usageSnapshot(ctx: ExtensionContext): Pick<FooterSnapshot, "contextWindow" | "percent"> {
@@ -138,6 +150,8 @@ function renderFooterLine(options: FooterLineOptions): string {
   const left = leftFooter(options.theme, options.project, options.branch);
   const right = rightFooter(
     options.theme,
+    options.cumulativeCost,
+    options.usingSubscription,
     options.percent,
     options.contextWindow,
     model,
@@ -160,6 +174,8 @@ function leftFooter(theme: Theme, project: string, branch: string | null): strin
 
 function rightFooter(
   theme: Theme,
+  cumulativeCost: number,
+  usingSubscription: boolean,
   percent: number | undefined,
   contextWindow: number | undefined,
   model: string,
@@ -167,6 +183,7 @@ function rightFooter(
   thinkingLevel: string,
 ): string {
   return joinParts([
+    mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
     colorContext(theme, percent, formatContext(percent, contextWindow)),
     reasoning ? theme.fg("muted", `think ${thinkingLevel}`) : undefined,
     theme.fg("accent", model),
@@ -197,6 +214,10 @@ function composeNyanLine(
           startColumn: layout.startColumn,
         });
   return runway ? `${layout.left} ${runway} ${layout.right}` : undefined;
+}
+
+function mutedLabel(theme: Theme, label: string | undefined): string | undefined {
+  return label ? theme.fg("muted", label) : undefined;
 }
 
 function colorContext(theme: Theme, percent: number | undefined, label: string): string {
