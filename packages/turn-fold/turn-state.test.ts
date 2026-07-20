@@ -59,9 +59,28 @@ describe("compact streaming", () => {
     registerAssistant(state, second, assistantMessage(120, [{ text: "Second", type: "text" }]));
 
     expect(firstInvalidations).toBeGreaterThan(afterFirst);
+    const beforeTokenUpdate = firstInvalidations;
+    state.registerAssistantMessage(
+      assistantMessage(120, [{ text: "Second, still streaming", type: "text" }]),
+    );
+    expect(firstInvalidations).toBe(beforeTokenUpdate);
     const beforeModeChange = firstInvalidations;
     state.setMode("expanded");
     expect(firstInvalidations).toBeGreaterThan(beforeModeChange);
+  });
+
+  it("counts one assistant response across streaming tool-call updates", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const start = assistantMessage(110, []);
+    const updated = assistantMessage(110, [{ id: "tool-live", name: "read", type: "toolCall" }]);
+
+    state.ensureActive(100);
+    state.registerAssistantMessage(start);
+    state.registerAssistantMessage(updated);
+    state.associateAssistant(component, updated);
+
+    expect(state.viewFor(component, 120)?.summary.messages).toBe(1);
   });
 
   it("counts tool rows but not tool-call-only assistant shells", () => {
@@ -149,6 +168,25 @@ describe("compact settled turns", () => {
     });
   });
 
+  it("keeps retries in one turn and does not label a successful retry interrupted", () => {
+    const state = new TurnFoldState();
+    const failed = {};
+    const succeeded = {};
+    const error = assistantMessage(110, [], "error");
+    const success = assistantMessage(140, [{ text: "Recovered", type: "text" }]);
+
+    state.ensureActive(100);
+    registerAssistant(state, failed, error);
+    registerAssistant(state, succeeded, success);
+    state.settleActive(150);
+
+    expect(state.viewFor(failed)?.display).toBe("hidden");
+    expect(state.viewFor(succeeded, 150)).toMatchObject({
+      display: "settled-final",
+      summary: { aborted: false, messages: 2 },
+    });
+  });
+
   it("keeps the latest visible message when a run settles without a final response", () => {
     const state = new TurnFoldState();
     const message = {};
@@ -228,6 +266,20 @@ describe("historical transcript", () => {
     expect(state.viewFor(firstTool)?.display).toBe("hidden");
     expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
     expect(state.viewFor(secondFinal)?.display).toBe("settled-final");
+  });
+
+  it("uses persisted completion time when restoring worked duration", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const message = assistantMessage(1_100, [{ text: "Done", type: "text" }]);
+
+    state.loadHistory([
+      { message: { content: "prompt", role: "user", timestamp: 1_000 }, type: "message" },
+      { message, timestamp: new Date(5_000).toISOString(), type: "message" },
+    ]);
+    state.associateAssistant(component, message);
+
+    expect(state.viewFor(component)?.summary.durationMs).toBe(4_000);
   });
 
   it("preserves an active turn through a deferred transcript rebuild", () => {

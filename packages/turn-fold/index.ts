@@ -154,8 +154,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     currentTheme = ctx.ui.theme;
     if (messageRole(event.message) !== "assistant") return;
     state.registerAssistantMessage(event.message);
-    const stopReason = messageStopReason(event.message);
-    if (stopReason === "aborted" || stopReason === "error") state.abortActive();
+    if (messageStopReason(event.message) === "aborted") state.abortActive();
   });
 
   pi.on("tool_execution_start", (event, ctx) => {

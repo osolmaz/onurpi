@@ -6,8 +6,9 @@ const LIVE_ACTIVITY_LIMIT = 3;
 type ComponentKind = "assistant" | "tool";
 
 type AssistantSnapshot = {
-  aborted: boolean;
+  hasTerminalNotice: boolean;
   hasVisibleContent: boolean;
+  interrupted: boolean;
   key: string;
   timestamp: number;
   toolCallIds: string[];
@@ -99,9 +100,11 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
   const responseId = stringField(message, "responseId") ?? "";
   const stopReason = stringField(message, "stopReason");
   return {
-    aborted: stopReason === "aborted" || stopReason === "error",
+    hasTerminalNotice:
+      stopReason === "aborted" || stopReason === "error" || stopReason === "length",
     hasVisibleContent,
-    key: `${String(timestamp)}:${responseId}:${toolCallIds.join(",")}`,
+    interrupted: stopReason === "aborted",
+    key: `${String(timestamp)}:${responseId}`,
     timestamp,
     toolCallIds,
   };
@@ -110,6 +113,15 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
 function messageFromEntry(entry: unknown): unknown {
   if (!isRecord(entry) || entry["type"] !== "message") return undefined;
   return entry["message"];
+}
+
+function entryTimestamp(entry: unknown): number | undefined {
+  if (!isRecord(entry)) return undefined;
+  const timestamp = entry["timestamp"];
+  if (typeof timestamp === "number" && Number.isFinite(timestamp)) return timestamp;
+  if (typeof timestamp !== "string") return undefined;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function latestBySequence(
@@ -132,6 +144,17 @@ function groupNumber(id: string): number {
 function invalidateComponent(component: object): void {
   const invalidate: unknown = Reflect.get(component, "invalidate");
   if (typeof invalidate === "function") Reflect.apply(invalidate, component, []);
+}
+
+function assistantDisplayClassChanged(
+  previous: AssistantSnapshot | undefined,
+  current: AssistantSnapshot,
+): boolean {
+  if (!previous) return false;
+  return (
+    previous.hasVisibleContent !== current.hasVisibleContent ||
+    previous.hasTerminalNotice !== current.hasTerminalNotice
+  );
 }
 
 export class TurnFoldState {
@@ -174,7 +197,9 @@ export class TurnFoldState {
         );
       } else {
         currentGroup = this.historicalGroup(currentGroup, role, message);
-        if (currentGroup) this.indexHistoricalMessage(currentGroup, message);
+        if (currentGroup) {
+          this.indexHistoricalMessage(currentGroup, message, entryTimestamp(entry));
+        }
       }
     }
   }
@@ -216,45 +241,40 @@ export class TurnFoldState {
     if (!snapshot) return;
     const groupId = this.ensureActive(snapshot.timestamp);
     const group = this.groups.get(groupId);
-    group?.assistantKeys.add(snapshot.key);
-    if (group && snapshot.aborted) group.aborted = true;
-    this.assistantGroupByKey.set(snapshot.key, groupId);
-    for (const toolCallId of snapshot.toolCallIds) {
-      group?.toolCallIds.add(toolCallId);
-      this.toolGroupById.set(toolCallId, groupId);
-    }
-    if (group) this.invalidateGroupComponents(group);
+    if (!group) return;
+    const changed = this.indexAssistantSnapshot(group, groupId, snapshot);
+    if (changed) this.invalidateGroupComponents(group);
   }
 
   registerToolStart(toolCallId: string, startedAt = Date.now()): void {
     const groupId = this.ensureActive(startedAt);
     const group = this.groups.get(groupId);
+    const added = group ? !group.toolCallIds.has(toolCallId) : false;
     group?.toolCallIds.add(toolCallId);
     this.toolGroupById.set(toolCallId, groupId);
-    if (group) this.invalidateGroupComponents(group);
+    if (group && added) this.invalidateGroupComponents(group);
   }
 
   registerToolEnd(toolCallId: string, failed: boolean): void {
     const groupId = this.toolGroupById.get(toolCallId);
     const group = groupId ? this.groups.get(groupId) : undefined;
-    if (!group) return;
-    if (failed) group.failedToolCallIds.add(toolCallId);
+    if (!group || !failed || group.failedToolCallIds.has(toolCallId)) return;
+    group.failedToolCallIds.add(toolCallId);
     this.invalidateGroupComponents(group);
   }
 
   associateAssistant(component: object, message: unknown): void {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
-    const previousComponent = this.assistantComponentByKey.get(snapshot.key);
-    if (previousComponent && previousComponent !== component) this.resetComponentAssociations();
-    this.assistantComponentByKey.set(snapshot.key, component);
-    const groupId = this.assistantGroupByKey.get(snapshot.key) ?? this.activeGroupId;
-    const group = groupId ? this.groups.get(groupId) : undefined;
+    const group = this.groupForAssistantComponent(component, snapshot);
     if (!group) return;
 
+    const previousSnapshot = group.assistants.get(component);
     const added = this.associateComponent(component, group, "assistant");
     group.assistants.set(component, snapshot);
-    if (added) this.invalidateGroupComponents(group);
+    if (added || assistantDisplayClassChanged(previousSnapshot, snapshot)) {
+      this.invalidateGroupComponents(group);
+    }
   }
 
   associateTool(component: object, toolCallId: string): void {
@@ -299,6 +319,36 @@ export class TurnFoldState {
     return { display, summary: this.summary(group, now) };
   }
 
+  private groupForAssistantComponent(
+    component: object,
+    snapshot: AssistantSnapshot,
+  ): TurnGroup | undefined {
+    const previousComponent = this.assistantComponentByKey.get(snapshot.key);
+    if (previousComponent && previousComponent !== component) this.resetComponentAssociations();
+    this.assistantComponentByKey.set(snapshot.key, component);
+    const groupId = this.assistantGroupByKey.get(snapshot.key) ?? this.activeGroupId;
+    return groupId ? this.groups.get(groupId) : undefined;
+  }
+
+  private indexAssistantSnapshot(
+    group: TurnGroup,
+    groupId: string,
+    snapshot: AssistantSnapshot,
+  ): boolean {
+    const previousMessages = group.assistantKeys.size;
+    const previousTools = group.toolCallIds.size;
+    group.assistantKeys.add(snapshot.key);
+    if (snapshot.interrupted) group.aborted = true;
+    this.assistantGroupByKey.set(snapshot.key, groupId);
+    for (const toolCallId of snapshot.toolCallIds) {
+      group.toolCallIds.add(toolCallId);
+      this.toolGroupById.set(toolCallId, groupId);
+    }
+    return (
+      group.assistantKeys.size !== previousMessages || group.toolCallIds.size !== previousTools
+    );
+  }
+
   private groupHasActivity(group: TurnGroup): boolean {
     return group.assistantKeys.size > 0 || group.toolCallIds.size > 0;
   }
@@ -324,7 +374,7 @@ export class TurnFoldState {
 
   private lastAssistant(group: TurnGroup): object | undefined {
     const candidates = [...group.assistants]
-      .filter(([, snapshot]) => snapshot.hasVisibleContent || snapshot.aborted)
+      .filter(([, snapshot]) => snapshot.hasVisibleContent || snapshot.hasTerminalNotice)
       .map(([component]) => component);
     return latestBySequence(group.components, candidates);
   }
@@ -384,26 +434,38 @@ export class TurnFoldState {
     return this.createGroup(numberField(message, "timestamp") ?? Date.now(), true);
   }
 
-  private indexHistoricalMessage(group: TurnGroup, message: unknown): void {
+  private indexHistoricalMessage(
+    group: TurnGroup,
+    message: unknown,
+    completedAt: number | undefined,
+  ): void {
     const role = stringField(message, "role");
-    if (role === "assistant") this.indexHistoricalAssistant(group, message);
-    if (role === "toolResult") this.indexHistoricalToolResult(group, message);
+    if (role === "assistant") this.indexHistoricalAssistant(group, message, completedAt);
+    if (role === "toolResult") this.indexHistoricalToolResult(group, message, completedAt);
   }
 
-  private indexHistoricalAssistant(group: TurnGroup, message: unknown): void {
+  private indexHistoricalAssistant(
+    group: TurnGroup,
+    message: unknown,
+    completedAt: number | undefined,
+  ): void {
     const snapshot = assistantSnapshot(message);
     if (!snapshot) return;
     group.assistantKeys.add(snapshot.key);
-    if (snapshot.aborted) group.aborted = true;
+    if (snapshot.interrupted) group.aborted = true;
     this.assistantGroupByKey.set(snapshot.key, group.id);
     for (const toolCallId of snapshot.toolCallIds) {
       group.toolCallIds.add(toolCallId);
       this.toolGroupById.set(toolCallId, group.id);
     }
-    group.endedAt = Math.max(group.endedAt ?? 0, snapshot.timestamp);
+    group.endedAt = Math.max(group.endedAt ?? 0, completedAt ?? snapshot.timestamp);
   }
 
-  private indexHistoricalToolResult(group: TurnGroup, message: unknown): void {
+  private indexHistoricalToolResult(
+    group: TurnGroup,
+    message: unknown,
+    completedAt: number | undefined,
+  ): void {
     const toolCallId = stringField(message, "toolCallId");
     if (toolCallId) {
       group.toolCallIds.add(toolCallId);
@@ -412,7 +474,7 @@ export class TurnFoldState {
     if (toolCallId && isRecord(message) && message["isError"] === true) {
       group.failedToolCallIds.add(toolCallId);
     }
-    const timestamp = numberField(message, "timestamp");
+    const timestamp = completedAt ?? numberField(message, "timestamp");
     if (timestamp !== undefined) group.endedAt = Math.max(group.endedAt ?? 0, timestamp);
   }
 
