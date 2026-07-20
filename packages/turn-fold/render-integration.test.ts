@@ -3,7 +3,7 @@ import {
   initTheme,
   ToolExecutionComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Text, TUI, type Terminal } from "@earendil-works/pi-tui";
+import { Container, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
@@ -184,5 +184,42 @@ describe("real Pi component render patches", () => {
     expect(rendered).toContain("Operation interrupted");
     expect(rendered).toContain("Worked for");
     expect(rendered.indexOf("Operation interrupted")).toBeLessThan(rendered.indexOf("Worked for"));
+    expect(transcript.render(8).every((line) => visibleWidth(line) <= 8)).toBe(true);
+    expect(transcript.render(0)).toEqual([]);
+  });
+
+  it("keeps a pending tool error visible before the worked line", () => {
+    const state = new TurnFoldState();
+    const transcript = new Container();
+    const ui = stoppedTui();
+    restore = installRenderPatches(state, () => undefined);
+    state.ensureActive(100);
+
+    const failed = assistantMessage(
+      120,
+      [{ arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" }],
+      "error",
+    );
+    state.registerAssistantMessage(failed);
+    transcript.addChild(new AssistantMessageComponent(failed, false, undefined, undefined, 0));
+    state.registerToolStart("failed-tool", 125);
+    const tool = new ToolExecutionComponent(
+      "failed_tool",
+      "failed-tool",
+      {},
+      undefined,
+      undefined,
+      ui,
+      "/tmp",
+    );
+    tool.markExecutionStarted();
+    tool.updateResult({ content: [{ text: "Provider failure", type: "text" }], isError: true });
+    transcript.addChild(tool);
+    state.settleActive(150);
+
+    const rendered = frame(transcript);
+    expect(rendered).toContain("Provider failure");
+    expect(rendered.indexOf("Provider failure")).toBeLessThan(rendered.indexOf("Worked for"));
+    expect(rendered).not.toContain("Operation interrupted");
   });
 });

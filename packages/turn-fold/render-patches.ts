@@ -75,8 +75,9 @@ export function renderSettledSummary(
   return styledSummary(formatSettledSummary(summary), summary, width, theme);
 }
 
-function interruptionFallback(theme: Theme | undefined): string[] {
-  const text = "Operation interrupted";
+function interruptionFallback(theme: Theme | undefined, width: number): string[] {
+  if (width <= 0) return [];
+  const text = truncateToWidth("Operation interrupted", width, "…");
   return ["", theme ? theme.fg("error", text) : text];
 }
 
@@ -86,7 +87,8 @@ function appendSettledSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  const visible = original.length === 0 && summary.aborted ? interruptionFallback(theme) : original;
+  const visible =
+    original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
   return [...visible, ...renderSettledSummary(summary, width, theme)];
 }
 

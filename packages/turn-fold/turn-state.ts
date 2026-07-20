@@ -101,7 +101,9 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
   const stopReason = stringField(message, "stopReason");
   return {
     hasTerminalNotice:
-      stopReason === "aborted" || stopReason === "error" || stopReason === "length",
+      stopReason === "aborted" ||
+      stopReason === "length" ||
+      (stopReason === "error" && toolCallIds.length === 0),
     hasVisibleContent,
     interrupted: stopReason === "aborted",
     key: `${String(timestamp)}:${responseId}`,
