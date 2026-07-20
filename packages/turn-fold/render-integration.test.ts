@@ -253,31 +253,39 @@ it("keeps a pending tool error visible before the worked line", () => {
     120,
     [
       { text: "Stale partial response", type: "text" },
-      { arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" },
+      { arguments: {}, id: "failed-tool-1", name: "tool", type: "toolCall" },
+      { arguments: {}, id: "failed-tool-2", name: "tool", type: "toolCall" },
     ],
     "error",
   );
   state.registerAssistantMessage(failed);
   transcript.addChild(new AssistantMessageComponent(failed, false, undefined, undefined, 0));
-  state.registerToolStart("failed-tool", 125);
-  const tool = new ToolExecutionComponent(
-    "failed_tool",
-    "failed-tool",
-    {},
-    undefined,
-    undefined,
-    ui,
-    "/tmp",
-  );
-  tool.markExecutionStarted();
-  tool.updateResult({ content: [{ text: "Provider failure", type: "text" }], isError: true });
-  transcript.addChild(tool);
+  for (const index of [1, 2]) {
+    const toolCallId = `failed-tool-${String(index)}`;
+    state.registerToolStart(toolCallId, 124 + index);
+    const tool = new ToolExecutionComponent(
+      `failed_tool_${String(index)}`,
+      toolCallId,
+      {},
+      undefined,
+      undefined,
+      ui,
+      "/tmp",
+    );
+    tool.markExecutionStarted();
+    tool.updateResult({
+      content: [{ text: `Provider failure ${String(index)}`, type: "text" }],
+      isError: true,
+    });
+    transcript.addChild(tool);
+  }
   state.settleActive(150);
 
   const rendered = frame(transcript);
-  expect(rendered).toContain("Provider failure");
+  expect(rendered).not.toContain("Provider failure 1");
+  expect(rendered).toContain("Provider failure 2");
   expect(rendered).not.toContain("Stale partial response");
-  expect(rendered).toContain("1 failure");
-  expect(rendered.indexOf("Provider failure")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(rendered).toContain("2 failures");
+  expect(rendered.indexOf("Provider failure 2")).toBeLessThan(rendered.indexOf("Worked for"));
   expect(rendered).not.toContain("Operation interrupted");
 });
