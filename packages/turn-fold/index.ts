@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { installRenderPatches } from "./render-patches.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
@@ -8,13 +8,12 @@ const CONFIG_ENTRY_TYPE = "onurpi-turn-fold-config";
 const TOGGLE_SHORTCUT = "ctrl+shift+o";
 
 const MODE_LABELS: readonly { label: string; mode: TurnFoldMode }[] = [
-  { label: "Latest 3 then fold", mode: "live" },
-  { label: "Final response only", mode: "final-only" },
+  { label: "Compact transcript", mode: "compact" },
   { label: "Expanded transcript", mode: "expanded" },
 ];
 
 function modeFromBranch(ctx: ExtensionContext): TurnFoldMode {
-  let mode: TurnFoldMode = "live";
+  let mode: TurnFoldMode = "compact";
   for (const entry of ctx.sessionManager.getBranch()) {
     if (entry.type !== "custom" || entry.customType !== CONFIG_ENTRY_TYPE) continue;
     const data: unknown = entry.data;
@@ -63,7 +62,7 @@ async function chooseMode(
   ctx: ExtensionContext,
 ): Promise<void> {
   if (!ctx.hasUI) {
-    ctx.ui.notify("Use /turn-fold final-only|live|expanded in this mode.", "warning");
+    ctx.ui.notify("Use /turn-fold compact|expanded in this mode.", "warning");
     return;
   }
   const selection = await ctx.ui.select(
@@ -76,9 +75,9 @@ async function chooseMode(
 
 function registerCommands(pi: ExtensionAPI, state: TurnFoldState): void {
   pi.registerCommand("turn-fold", {
-    description: "Choose final-only, live, or expanded turn rendering.",
+    description: "Choose compact or expanded transcript rendering.",
     getArgumentCompletions(prefix) {
-      return ["final-only", "live", "expanded", "status", "toggle"]
+      return ["compact", "expanded", "status", "toggle"]
         .filter((value) => value.startsWith(prefix.trim()))
         .map((value) => ({ label: value, value }));
     },
@@ -100,12 +99,12 @@ function registerCommands(pi: ExtensionAPI, state: TurnFoldState): void {
         applyMode(pi, state, command, true);
         return;
       }
-      ctx.ui.notify("Usage: /turn-fold [final-only|live|expanded|status|toggle]", "warning");
+      ctx.ui.notify("Usage: /turn-fold [compact|expanded|status|toggle]", "warning");
     },
   });
 
   pi.registerShortcut(TOGGLE_SHORTCUT, {
-    description: "Toggle folded and expanded turn rendering",
+    description: "Toggle compact and expanded transcript rendering",
     handler: () => {
       applyMode(pi, state, state.toggleExpanded(), true);
     },
@@ -114,65 +113,47 @@ function registerCommands(pi: ExtensionAPI, state: TurnFoldState): void {
 
 export default function turnFold(pi: ExtensionAPI): void {
   const state = new TurnFoldState();
-  let currentTheme: Theme | undefined;
-  const restorePatches = installRenderPatches(state, () => currentTheme);
+  const restorePatches = installRenderPatches(state);
   registerCommands(pi, state);
 
   pi.on("session_start", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
     applyMode(pi, state, modeFromBranch(ctx), false);
     loadVisibleHistory(state, ctx);
   });
 
   pi.on("session_compact", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
   pi.on("session_tree", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
-  pi.on("agent_start", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
+  pi.on("agent_start", () => {
     state.ensureActive();
   });
 
-  pi.on("message_start", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
+  pi.on("message_start", (event) => {
     const role = messageRole(event.message);
     if (role === "user") state.startUserTurn(messageTimestamp(event.message));
     if (role === "assistant") state.registerAssistantMessage(event.message);
   });
 
-  pi.on("message_update", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
+  pi.on("message_update", (event) => {
     state.registerAssistantMessage(event.message);
   });
 
-  pi.on("message_end", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    if (messageRole(event.message) === "assistant") {
-      state.registerAssistantMessage(event.message);
-      state.queueFinalAssistant(event.message);
-      if (messageStopReason(event.message) === "aborted") state.abortActive();
-    }
+  pi.on("message_end", (event) => {
+    if (messageRole(event.message) !== "assistant") return;
+    state.registerAssistantMessage(event.message);
+    if (messageStopReason(event.message) === "aborted") state.abortActive();
   });
 
-  pi.on("tool_execution_start", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
+  pi.on("tool_execution_start", (event) => {
     state.registerToolStart(event.toolCallId);
   });
 
-  pi.on("tool_execution_end", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.registerToolEnd(event.toolCallId, event.isError);
-  });
-
-  pi.on("agent_settled", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.finalizeAssistantOutputs(ctx.sessionManager.getBranch());
+  pi.on("agent_settled", () => {
     state.settleActive();
   });
 
