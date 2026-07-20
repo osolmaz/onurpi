@@ -1,6 +1,7 @@
-import { allocateImageId, getCapabilities, renderImage } from "@earendil-works/pi-tui";
+import { allocateImageId, renderImage } from "@earendil-works/pi-tui";
 
 import { getCachedNyanPng } from "./image.ts";
+import { isKittyGraphicsVerified } from "./kitty-probe.ts";
 import { normalizeProgress } from "./progress.ts";
 import type {
   NyanRunwayLayout,
@@ -47,11 +48,7 @@ export function renderAnimatedNyanRunway(
 ): string | undefined {
   const cells = Math.floor(options.cells);
   const minimumCells = options.minimumCells ?? 8;
-  if (
-    getCapabilities().images !== "kitty" ||
-    cells < minimumCells ||
-    options.startColumn === undefined
-  ) {
+  if (!isKittyGraphicsVerified() || cells < minimumCells || options.startColumn === undefined) {
     painter.clear();
     return undefined;
   }
@@ -88,7 +85,7 @@ class InlineNyanRunwayPainter implements NyanRunwayPainter {
   }
 
   render(layout: NyanRunwayLayout): string | undefined {
-    if (this.disposed || getCapabilities().images !== "kitty") return undefined;
+    if (this.disposed || !isKittyGraphicsVerified()) return undefined;
     const cells = Math.max(this.minimumCells, Math.floor(layout.cells));
     this.layout = { ...layout, cells };
     this.targetProgress = normalizeProgress(layout.percent);

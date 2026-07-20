@@ -5,6 +5,8 @@ const PROBE_TIMEOUT_MS = 500;
 
 export const KITTY_GRAPHICS_QUERY = `\x1b_Gi=${String(PROBE_IMAGE_ID)},s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\`;
 
+let kittyGraphicsVerified = false;
+
 type ProbeTerminal = {
   write(data: string): void;
 };
@@ -19,13 +21,18 @@ export async function ensureKittyGraphics(
   input: ProbeInput = process.stdin,
   timeoutMs = PROBE_TIMEOUT_MS,
 ): Promise<boolean> {
-  if (getCapabilities().images === "kitty") return true;
+  kittyGraphicsVerified = false;
   const writable = writableTerminal(terminalTarget(terminal));
   if (!writable || timeoutMs <= 0) return false;
 
   const supported = await queryKittyGraphics(writable, input, timeoutMs);
+  kittyGraphicsVerified = supported;
   if (supported) setCapabilities({ ...getCapabilities(), images: "kitty" });
   return supported;
+}
+
+export function isKittyGraphicsVerified(): boolean {
+  return kittyGraphicsVerified;
 }
 
 function queryKittyGraphics(

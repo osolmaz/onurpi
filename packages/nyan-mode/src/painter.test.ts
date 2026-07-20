@@ -9,8 +9,11 @@ const tuiMocks = vi.hoisted(() => ({
 
 vi.mock("@earendil-works/pi-tui", () => ({
   allocateImageId: () => 17,
-  getCapabilities: () => ({ images: tuiMocks.imageProtocol }),
   renderImage: tuiMocks.renderImage,
+}));
+
+vi.mock("./kitty-probe.ts", () => ({
+  isKittyGraphicsVerified: () => tuiMocks.imageProtocol === "kitty",
 }));
 
 import { createNyanRunwayPainter, renderAnimatedNyanRunway } from "./painter.ts";

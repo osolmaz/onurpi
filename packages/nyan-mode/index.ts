@@ -62,8 +62,8 @@ export default function nyanMode(pi: ExtensionAPI): void {
       renderFooter = requestRender;
       activePainter = painter;
       const unsubscribeBranch = footerData.onBranchChange(requestRender);
-      void ensureKittyGraphics(tui).then((supported) => {
-        if (supported && !disposed) requestRender();
+      void ensureKittyGraphics(tui).then(() => {
+        if (!disposed) requestRender();
       });
 
       return {
@@ -152,8 +152,10 @@ function debugMessage(
 }
 
 type FooterSnapshot = {
+  animationFrame: number;
   contextWindow: number | undefined;
   cumulativeCost: number;
+  dancing: boolean;
   modelId: string | undefined;
   percent: number | undefined;
   project: string;
@@ -176,7 +178,9 @@ function footerSnapshot(ctx: ExtensionContext): FooterSnapshot {
   return {
     ...usageSnapshot(ctx),
     ...modelSnapshot(ctx),
+    animationFrame: Math.floor(Date.now() / 180),
     cumulativeCost: cumulativeApiCost(ctx.sessionManager.getEntries()),
+    dancing: !ctx.isIdle(),
     project: project || ctx.cwd,
     usingSubscription: usingSubscription(ctx),
   };
@@ -216,6 +220,8 @@ function renderFooterLine(options: FooterLineOptions): string {
   const nyanLine = options.enabled
     ? composeNyanLine(
         options.painter,
+        options.animationFrame,
+        options.dancing,
         left,
         right,
         options.percent,
@@ -228,7 +234,6 @@ function renderFooterLine(options: FooterLineOptions): string {
 
 function leftFooter(theme: Theme, project: string, branch: string | null): string {
   return joinParts([
-    theme.bg("toolSuccessBg", theme.fg("text", " NYAN ")),
     theme.fg("accent", "π"),
     theme.fg("text", branch ? `${project}  ${branch}` : project),
   ]);
@@ -254,6 +259,8 @@ function rightFooter(
 
 function composeNyanLine(
   painter: NyanRunwayPainter,
+  animationFrame: number,
+  dancing: boolean,
   left: string,
   right: string,
   percent: number | undefined,
@@ -268,7 +275,7 @@ function composeNyanLine(
   const bitmap = renderBitmapRunway(painter, layout, percent, displayMode);
   if (bitmap) return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
   if (displayMode === "bitmap") return undefined;
-  const text = renderTextNyan(layout.cells, percent);
+  const text = renderTextNyan(layout.cells, percent, dancing, animationFrame);
   return text ? `${layout.left} ${text} ${layout.right}` : undefined;
 }
 

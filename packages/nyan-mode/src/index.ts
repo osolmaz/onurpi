@@ -1,6 +1,10 @@
 export { cumulativeApiCost, formatApiCost } from "./cost.ts";
 export { getNyanDebugInfo } from "./diagnostics.ts";
-export { ensureKittyGraphics, KITTY_GRAPHICS_QUERY } from "./kitty-probe.ts";
+export {
+  ensureKittyGraphics,
+  isKittyGraphicsVerified,
+  KITTY_GRAPHICS_QUERY,
+} from "./kitty-probe.ts";
 export { createNyanRunwayPainter, renderAnimatedNyanRunway } from "./painter.ts";
 export { renderTextNyan } from "./text-runway.ts";
 export type {

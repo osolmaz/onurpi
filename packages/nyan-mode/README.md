@@ -7,7 +7,7 @@ empty context ──────────────────────
 0%                                                     100%
 ```
 
-The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. When SSH or another launcher strips terminal-identification variables, the extension queries the terminal directly and enables Kitty rendering only after a successful protocol response. Terminals and transports without Kitty support, including Mosh, receive a colored ANSI kaomoji and rainbow trail instead. Use `/nyan text` when an intermediate transport falsely reports working Kitty support.
+The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating rainbow trail instead. The kaomoji alternates dance poses while Pi is streaming. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
 
 ## Commands
 

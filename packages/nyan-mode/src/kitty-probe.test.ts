@@ -10,7 +10,11 @@ vi.mock("@earendil-works/pi-tui", () => ({
   setCapabilities: tuiMocks.setCapabilities,
 }));
 
-import { ensureKittyGraphics, KITTY_GRAPHICS_QUERY } from "./kitty-probe.ts";
+import {
+  ensureKittyGraphics,
+  isKittyGraphicsVerified,
+  KITTY_GRAPHICS_QUERY,
+} from "./kitty-probe.ts";
 
 class ProbeInput {
   private listener: ((data: unknown) => void) | undefined;
@@ -52,6 +56,7 @@ describe("Kitty graphics probe", () => {
       trueColor: true,
       hyperlinks: false,
     });
+    expect(isKittyGraphicsVerified()).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -61,14 +66,20 @@ describe("Kitty graphics probe", () => {
     await vi.advanceTimersByTimeAsync(500);
     await expect(result).resolves.toBe(false);
     expect(tuiMocks.setCapabilities).not.toHaveBeenCalled();
+    expect(isKittyGraphicsVerified()).toBe(false);
   });
 
-  it("uses known support without probing and rejects unwritable terminals", async () => {
+  it("verifies end-to-end support even when the environment reports Kitty", async () => {
     tuiMocks.capabilities = { images: "kitty", trueColor: true, hyperlinks: true };
-    await expect(ensureKittyGraphics(undefined, new ProbeInput(), 500)).resolves.toBe(true);
+    const input = new ProbeInput();
+    const write = vi.fn(() => {
+      input.emit("\x1b_Gi=2147483646;OK\x1b\\");
+    });
+    await expect(ensureKittyGraphics({ write }, input, 500)).resolves.toBe(true);
+    expect(write).toHaveBeenCalledWith(KITTY_GRAPHICS_QUERY);
 
-    tuiMocks.capabilities = { images: null, trueColor: true, hyperlinks: false };
     await expect(ensureKittyGraphics(undefined, new ProbeInput(), 500)).resolves.toBe(false);
+    expect(isKittyGraphicsVerified()).toBe(false);
     await expect(ensureKittyGraphics({ write: vi.fn() }, new ProbeInput(), 0)).resolves.toBe(false);
   });
 });
