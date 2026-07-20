@@ -25,10 +25,7 @@ function canRender(
   shimmerStartedAtMs: number | undefined,
 ): boolean {
   return (
-    ctx.mode === "tui" &&
-    trackerActive &&
-    phrase !== undefined &&
-    shimmerStartedAtMs !== undefined
+    ctx.mode === "tui" && trackerActive && phrase !== undefined && shimmerStartedAtMs !== undefined
   );
 }
 
