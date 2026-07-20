@@ -128,6 +128,12 @@ export class ManagerWindowState {
     return true;
   }
 
+  toggleSelectedMode(): boolean {
+    const entry = this.selection();
+    if (entry?.target.kind !== "queue") return false;
+    return this.queue.toggleMode(entry.target.id);
+  }
+
   moveSelected(direction: -1 | 1): boolean {
     const entry = this.selection();
     if (entry?.target.kind !== "queue") return false;

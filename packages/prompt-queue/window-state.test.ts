@@ -156,6 +156,22 @@ describe("ManagerWindowState", () => {
     expect(state.entries().map((entry) => entry.text)).toEqual(["h1"]);
   });
 
+  it("toggles the selected queue item between queue and steer", () => {
+    const state = makeState(["q1", "q2"], []);
+    state.moveCursor(1);
+    expect(state.toggleSelectedMode()).toBe(true);
+    expect(state.selection()?.mode).toBe("steer");
+    expect(state.entries()[0]?.mode).toBe("queue");
+    expect(state.toggleSelectedMode()).toBe(true);
+    expect(state.selection()?.mode).toBe("queue");
+  });
+
+  it("refuses to toggle mode on the history tab or when empty", () => {
+    const state = makeState([], ["h1"]);
+    expect(state.toggleSelectedMode()).toBe(false);
+    expect(makeState([], []).toggleSelectedMode()).toBe(false);
+  });
+
   it("reorders queue items and keeps the cursor on the moved item", () => {
     const state = makeState(["q1", "q2"], []);
     expect(state.moveSelected(1)).toBe(true);

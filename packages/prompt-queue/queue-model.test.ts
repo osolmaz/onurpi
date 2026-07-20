@@ -36,6 +36,24 @@ describe("PromptQueue", () => {
     expect(queue.items().map((item) => item.text)).toEqual(["one"]);
   });
 
+  it("toggles item mode in both directions, preserving id, text, and position", () => {
+    const queue = new PromptQueue();
+    const first = queue.add("one", "queue");
+    queue.add("two", "steer");
+    expect(queue.toggleMode(first.id)).toBe(true);
+    expect(queue.items()[0]).toEqual({ id: first.id, mode: "steer", text: "one" });
+    expect(queue.toggleMode(first.id)).toBe(true);
+    expect(queue.items()[0]).toEqual({ id: first.id, mode: "queue", text: "one" });
+    expect(queue.items()[1]?.mode).toBe("steer");
+  });
+
+  it("rejects mode toggles for unknown ids", () => {
+    const queue = new PromptQueue();
+    queue.add("one", "queue");
+    expect(queue.toggleMode(99)).toBe(false);
+    expect(queue.items()[0]?.mode).toBe("queue");
+  });
+
   it("removes items by id", () => {
     const queue = new PromptQueue();
     const first = queue.add("one", "queue");

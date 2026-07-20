@@ -33,12 +33,13 @@ session prompt history. It opens on the queue tab when anything is pending, othe
 tab, and jumps to history when the last queue item is deleted.
 
 ```text
-↑↓ move · ⇥ switch tab · enter to editor · e edit · x delete · p/n reorder · esc close
+↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · esc close
 ```
 
 - `Tab`, `Left`, or `Right` switches between the queue and history tabs.
 - `Enter` inserts the selected text into the prompt editor (queue items are removed from the queue).
 - `e` opens Pi's editor dialog to edit the selected queue item or history entry in place.
+- `s` toggles the selected queue item between queued and steering delivery.
 - `x` deletes the selected item.
 - `p` / `n` move a queue item earlier or later. History entries cannot be reordered.
 

@@ -38,6 +38,14 @@ export class PromptQueue {
     return true;
   }
 
+  toggleMode(id: number): boolean {
+    const index = this.indexOf(id);
+    const current = this.list[index];
+    if (!current) return false;
+    this.list[index] = { ...current, mode: current.mode === "steer" ? "queue" : "steer" };
+    return true;
+  }
+
   remove(id: number): boolean {
     const index = this.indexOf(id);
     if (index === -1) return false;

@@ -11,7 +11,7 @@ import {
 
 const MAX_VISIBLE_ROWS = 14;
 const HINT =
-  "↑↓ move · ⇥ switch tab · enter to editor · e edit · x delete · p/n reorder · esc close";
+  "↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · esc close";
 
 /**
  * Full-width tabbed list view shown in place of the prompt editor. Queue
@@ -33,6 +33,7 @@ export class ManagerWindow {
   private handleKey(data: string): void {
     if (this.handleSpecialKey(data)) return;
     if (data === "e") this.finishEdit();
+    else if (data === "s") this.state.toggleSelectedMode();
     else if (data === "x") this.state.deleteSelected();
     else if (data === "p") this.state.moveSelected(-1);
     else if (data === "n") this.state.moveSelected(1);
