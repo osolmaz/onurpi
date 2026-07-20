@@ -1,12 +1,18 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { countOutputContentChars, formatWorkingMessage, LiveStatsTracker } from "./live-stats.ts";
+import {
+  countOutputContentChars,
+  formatBoldWorkingMessage,
+  LiveStatsTracker,
+} from "./live-stats.ts";
+import { WorkingPhraseState } from "./working-phrases.ts";
 
 const REFRESH_INTERVAL_MS = 250;
 
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
+  const workingPhrase = new WorkingPhraseState();
 
   const stopTimer = (): void => {
     if (refreshTimer === undefined) return;
@@ -15,13 +21,19 @@ export default function liveStats(pi: ExtensionAPI): void {
   };
 
   const render = (ctx: ExtensionContext): void => {
-    if (ctx.mode !== "tui" || !tracker.active) return;
-    ctx.ui.setWorkingMessage(formatWorkingMessage(tracker.snapshot(Date.now())));
+    if (ctx.mode !== "tui" || !tracker.active || workingPhrase.current === undefined) return;
+    const message = formatBoldWorkingMessage(
+      tracker.snapshot(Date.now()),
+      workingPhrase.current,
+      (text) => ctx.ui.theme.bold(text),
+    );
+    ctx.ui.setWorkingMessage(message);
   };
 
   const reset = (ctx: ExtensionContext): void => {
     stopTimer();
     tracker.reset();
+    workingPhrase.reset();
     if (ctx.mode === "tui") ctx.ui.setWorkingMessage();
   };
 
@@ -29,6 +41,7 @@ export default function liveStats(pi: ExtensionAPI): void {
     if (ctx.mode !== "tui") return;
 
     stopTimer();
+    workingPhrase.start();
     tracker.start(Date.now());
     render(ctx);
     refreshTimer = setInterval(() => {

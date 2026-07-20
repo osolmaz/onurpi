@@ -162,10 +162,18 @@ export function formatTokenCount(tokens: number): string {
   return formatCompact(value / 1_000_000, "M");
 }
 
-export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
+export function formatWorkingMessage(snapshot: LiveStatsSnapshot, workingPhrase: string): string {
   const approximate = snapshot.outputApproximate ? "~" : "";
   const rate = snapshot.tokensPerSecond?.toFixed(1) ?? "—";
-  return `Working (${formatElapsed(snapshot.elapsedMs)} · ${approximate}${formatTokenCount(snapshot.outputTokens)} out · ${rate} tok/s)`;
+  return `${workingPhrase}… (${formatElapsed(snapshot.elapsedMs)} · ${approximate}${formatTokenCount(snapshot.outputTokens)} out · ${rate} tok/s)`;
+}
+
+export function formatBoldWorkingMessage(
+  snapshot: LiveStatsSnapshot,
+  workingPhrase: string,
+  bold: (message: string) => string,
+): string {
+  return bold(formatWorkingMessage(snapshot, workingPhrase));
 }
 
 function formatCompact(value: number, suffix: string): string {
