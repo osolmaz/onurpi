@@ -14,6 +14,7 @@ type AssistantSnapshot = {
   aborted: boolean;
   hasText: boolean;
   hasToolCalls: boolean;
+  hasVisibleContent: boolean;
   key: string;
   timestamp: number;
   toolCallIds: string[];
@@ -71,6 +72,8 @@ export type ComponentView = {
   summary: FoldSummary;
 };
 
+const LIVE_ACTIVITY_LIMIT = 3;
+
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;
 }
@@ -92,20 +95,30 @@ function contentItems(message: unknown): readonly unknown[] {
   return Array.isArray(message["content"]) ? message["content"] : [];
 }
 
+function hasNonBlankContent(value: unknown, type: string, key: string): boolean {
+  if (stringField(value, "type") !== type) return false;
+  return Boolean(stringField(value, key)?.trim());
+}
+
 function summarizeAssistantContent(items: readonly unknown[]): {
   hasText: boolean;
+  hasVisibleContent: boolean;
   toolCallIds: string[];
 } {
   let hasText = false;
+  let hasVisibleContent = false;
   const toolCallIds: string[] = [];
   for (const item of items) {
     const type = stringField(item, "type");
-    const text = type === "text" ? stringField(item, "text") : undefined;
-    if (text?.trim()) hasText = true;
+    if (hasNonBlankContent(item, "text", "text")) {
+      hasText = true;
+      hasVisibleContent = true;
+    }
+    if (hasNonBlankContent(item, "thinking", "thinking")) hasVisibleContent = true;
     const toolCallId = type === "toolCall" ? stringField(item, "id") : undefined;
     if (toolCallId) toolCallIds.push(toolCallId);
   }
-  return { hasText, toolCallIds };
+  return { hasText, hasVisibleContent, toolCallIds };
 }
 
 function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
@@ -113,12 +126,15 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
   const timestamp = numberField(message, "timestamp");
   if (timestamp === undefined) return undefined;
 
-  const { hasText, toolCallIds } = summarizeAssistantContent(contentItems(message));
+  const { hasText, hasVisibleContent, toolCallIds } = summarizeAssistantContent(
+    contentItems(message),
+  );
   const responseId = stringField(message, "responseId") ?? "";
   return {
     aborted: stringField(message, "stopReason") === "aborted",
     hasText,
     hasToolCalls: toolCallIds.length > 0,
+    hasVisibleContent,
     key: `${String(timestamp)}:${responseId}:${toolCallIds.join(",")}`,
     timestamp,
     toolCallIds,
@@ -354,6 +370,7 @@ export class TurnFoldState {
     const display = foldDisplay({
       isAnchor: component === anchor,
       isFinalAssistant: component === finalAssistant,
+      isRecentActivity: this.isRecentActivity(group, component),
       aborted: group.aborted,
       mode: this.mode,
       settled: group.settled,
@@ -617,6 +634,17 @@ export class TurnFoldState {
       group.components,
       withoutTools.length > 0 ? withoutTools : assistantsWithText,
     );
+  }
+
+  private isRecentActivity(group: TurnGroup, component: object): boolean {
+    const recentComponents = [...group.components]
+      .filter(
+        ([candidate, info]) =>
+          info.kind === "tool" || group.assistants.get(candidate)?.hasVisibleContent === true,
+      )
+      .sort(([, left], [, right]) => right.sequence - left.sequence)
+      .slice(0, LIVE_ACTIVITY_LIMIT);
+    return recentComponents.some(([candidate]) => candidate === component);
   }
 
   private foldAnchor(group: TurnGroup, finalAssistant: object | undefined): object | undefined {

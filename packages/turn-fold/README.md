@@ -2,17 +2,18 @@
 
 Turn-level transcript folding for the Pi coding agent.
 
-`@onurpi/turn-fold` keeps the final assistant response visible while replacing the intermediate assistant
-messages and tool rows from a completed turn with one compact summary. The underlying session
-messages are not changed and remain in model context.
+`@onurpi/turn-fold` keeps only the latest three visible activity rows while Pi is working. When the
+turn completes, it keeps the final assistant response visible and replaces intermediate assistant
+messages and tool rows with one compact summary. The underlying session messages are not changed
+and remain in model context.
 
 ## Modes
 
-| Mode         | Behavior                                                                 |
-| ------------ | ------------------------------------------------------------------------ |
-| `live`       | Shows normal activity while Pi works, then folds the completed turn.     |
-| `final-only` | Shows one live activity row, followed by the summary and final response. |
-| `expanded`   | Shows the complete transcript.                                           |
+| Mode         | Behavior                                                                  |
+| ------------ | ------------------------------------------------------------------------- |
+| `live`       | Shows the latest three activity rows while Pi works, then folds the turn. |
+| `final-only` | Shows one live activity row, followed by the summary and final response.  |
+| `expanded`   | Shows the complete transcript.                                            |
 
 `live` is the default.
 
@@ -54,7 +55,7 @@ The package is private and is not published yet.
 
 ```text
 /turn-fold                         open the mode picker
-/turn-fold live                    show activity, then fold
+/turn-fold live                    show the latest three activity rows, then fold
 /turn-fold final-only              hide intermediate activity while running
 /turn-fold expanded                show complete turns
 /turn-fold toggle                  toggle the compact mode and expanded mode

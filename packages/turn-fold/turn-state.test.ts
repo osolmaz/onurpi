@@ -452,6 +452,44 @@ describe("TurnFoldState view selection", () => {
   });
 });
 
+describe("live turn folding", () => {
+  it("keeps only the latest three visible activity rows while running", () => {
+    const state = new TurnFoldState();
+    const firstAssistant = {};
+    const secondAssistant = {};
+    const toolOnlyAssistant = {};
+    const thinkingAssistant = {};
+    const tool = {};
+    const firstMessage = assistantMessage(110, [{ text: "First", type: "text" }]);
+    const secondMessage = assistantMessage(120, [{ text: "Second", type: "text" }]);
+    const toolOnlyMessage = assistantMessage(130, [
+      { id: "tool-live", name: "read", type: "toolCall" },
+    ]);
+    const thinkingMessage = assistantMessage(140, [
+      { thinking: "Still working", type: "thinking" },
+    ]);
+
+    state.ensureActive(100);
+    for (const [component, message] of [
+      [firstAssistant, firstMessage],
+      [secondAssistant, secondMessage],
+      [toolOnlyAssistant, toolOnlyMessage],
+      [thinkingAssistant, thinkingMessage],
+    ] as const) {
+      state.registerAssistantMessage(message);
+      state.associateAssistant(component, message);
+    }
+    state.registerToolStart("tool-live", 145);
+    state.associateTool(tool, "tool-live");
+
+    expect(state.viewFor(firstAssistant, 150)?.display).toBe("hidden");
+    expect(state.viewFor(secondAssistant, 150)?.display).toBe("original");
+    expect(state.viewFor(toolOnlyAssistant, 150)?.display).toBe("hidden");
+    expect(state.viewFor(thinkingAssistant, 150)?.display).toBe("original");
+    expect(state.viewFor(tool, 150)?.display).toBe("original");
+  });
+});
+
 describe("aborted turn folding", () => {
   it("uses the aborted assistant as an anchor for the settled summary", () => {
     const state = new TurnFoldState();

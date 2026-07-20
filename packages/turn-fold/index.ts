@@ -8,7 +8,7 @@ const CONFIG_ENTRY_TYPE = "onurpi-turn-fold-config";
 const TOGGLE_SHORTCUT = "ctrl+shift+o";
 
 const MODE_LABELS: readonly { label: string; mode: TurnFoldMode }[] = [
-  { label: "Live then fold", mode: "live" },
+  { label: "Latest 3 then fold", mode: "live" },
   { label: "Final response only", mode: "final-only" },
   { label: "Expanded transcript", mode: "expanded" },
 ];

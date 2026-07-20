@@ -9,22 +9,34 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
+        isRecentActivity: false,
         mode: "expanded",
         settled: true,
       }),
     ).toBe("original");
   });
 
-  it("shows activity while live mode is running", () => {
+  it("shows only recent activity while live mode is running", () => {
     expect(
       foldDisplay({
         aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
+        isRecentActivity: true,
         mode: "live",
         settled: false,
       }),
     ).toBe("original");
+    expect(
+      foldDisplay({
+        aborted: false,
+        isAnchor: false,
+        isFinalAssistant: false,
+        isRecentActivity: false,
+        mode: "live",
+        settled: false,
+      }),
+    ).toBe("hidden");
   });
 
   it("shows only a summary while final-only mode is running", () => {
@@ -33,6 +45,7 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: true,
         isFinalAssistant: false,
+        isRecentActivity: true,
         mode: "final-only",
         settled: false,
       }),
@@ -42,6 +55,7 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
+        isRecentActivity: true,
         mode: "final-only",
         settled: false,
       }),
@@ -54,6 +68,7 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: true,
         isFinalAssistant: false,
+        isRecentActivity: false,
         mode: "live",
         settled: true,
       }),
@@ -63,6 +78,7 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
+        isRecentActivity: true,
         mode: "live",
         settled: true,
       }),
@@ -72,6 +88,7 @@ describe("fold display policy", () => {
         aborted: false,
         isAnchor: false,
         isFinalAssistant: true,
+        isRecentActivity: false,
         mode: "live",
         settled: true,
       }),
@@ -84,6 +101,7 @@ describe("fold display policy", () => {
         aborted: true,
         isAnchor: true,
         isFinalAssistant: true,
+        isRecentActivity: true,
         mode: "live",
         settled: true,
       }),
@@ -93,6 +111,7 @@ describe("fold display policy", () => {
         aborted: true,
         isAnchor: false,
         isFinalAssistant: true,
+        isRecentActivity: false,
         mode: "live",
         settled: true,
       }),
