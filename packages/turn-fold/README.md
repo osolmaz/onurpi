@@ -4,7 +4,8 @@ Compact transcript rendering for the Pi coding agent.
 
 `@onurpi/turn-fold` keeps Pi's working line and the latest three activity rows visible during a
 run. Earlier activity is replaced by one summary row directly below the user message. When the run
-stops, that position holds the `Worked for …` line. Tool rows and intermediate assistant messages
+stops, that position holds the `Worked for …` line with the local completion time. User messages
+show their local timestamp beneath the message. Tool rows and intermediate assistant messages
 disappear, leaving the final response below the summary. Interrupted runs retain their last partial
 response or a fallback message.
 
@@ -41,8 +42,8 @@ The package is private and is not published yet.
 /turn-fold status           show the current mode
 ```
 
-`Ctrl+Shift+O` switches between compact and expanded rendering. `Ctrl+O` remains Pi's separate
-tool-output detail toggle.
+`Ctrl+Shift+O` switches between compact and expanded rendering without adding a shortcut hint to
+summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
 Mode changes are stored as custom session entries, so each session restores its latest supported
 choice. Historical turns are reconstructed from the active session branch when Pi starts or

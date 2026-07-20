@@ -38,6 +38,7 @@ type TurnGroup = {
 
 export type FoldSummary = {
   aborted: boolean;
+  completedAt: number | undefined;
   durationMs: number;
   failedTools: number;
   hiddenActivities: number;
@@ -177,6 +178,9 @@ export class TurnFoldState {
   private mode: TurnFoldMode = "compact";
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
+  private userComponentGroup = new WeakMap<object, string>();
+  private userGroupCursor = 0;
+  private userGroupIds: string[] = [];
 
   getMode(): TurnFoldMode {
     return this.mode;
@@ -236,6 +240,7 @@ export class TurnFoldState {
     if (activeGroup && !activeGroup.startedByUser && !this.groupHasActivity(activeGroup)) {
       activeGroup.startedAt = startedAt;
       activeGroup.startedByUser = true;
+      this.userGroupIds.push(activeGroup.id);
       return activeGroup.id;
     }
 
@@ -287,6 +292,19 @@ export class TurnFoldState {
     if (!group || !failed || group.failedToolCallIds.has(toolCallId)) return;
     group.failedToolCallIds.add(toolCallId);
     this.invalidateGroupComponents(group);
+  }
+
+  associateUser(component: object): void {
+    if (this.userComponentGroup.has(component)) return;
+    const groupId = this.userGroupIds[this.userGroupCursor];
+    if (!groupId || !this.groups.has(groupId)) return;
+    this.userComponentGroup.set(component, groupId);
+    this.userGroupCursor += 1;
+  }
+
+  userTimestampFor(component: object): number | undefined {
+    const groupId = this.userComponentGroup.get(component);
+    return groupId ? this.groups.get(groupId)?.startedAt : undefined;
   }
 
   associateAssistant(component: object, message: unknown): void {
@@ -463,6 +481,7 @@ export class TurnFoldState {
     const activityCount = this.activityComponents(group).length;
     return {
       aborted: group.aborted,
+      completedAt: group.endedAt,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
       failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
       hiddenActivities: Math.max(0, activityCount - LIVE_ACTIVITY_LIMIT),
@@ -498,6 +517,7 @@ export class TurnFoldState {
       tools: new Map(),
     };
     this.groups.set(group.id, group);
+    if (startedByUser) this.userGroupIds.push(group.id);
     return group;
   }
 
@@ -572,6 +592,8 @@ export class TurnFoldState {
     this.assistantComponentByKey = new Map();
     this.componentInfo = new WeakMap();
     this.sequence = 0;
+    this.userComponentGroup = new WeakMap();
+    this.userGroupCursor = 0;
     for (const group of this.groups.values()) {
       group.assistants.clear();
       group.components.clear();
@@ -594,6 +616,9 @@ export class TurnFoldState {
     this.latestAssistantKeyByTimestamp = new Map();
     this.sequence = 0;
     this.toolGroupById = new Map();
+    this.userComponentGroup = new WeakMap();
+    this.userGroupCursor = 0;
+    this.userGroupIds = [];
   }
 
   private reloadHistory(entries: readonly unknown[]): void {
@@ -651,5 +676,8 @@ export class TurnFoldState {
     for (const [key, groupId] of this.toolGroupById) {
       if (fromGroupIds.has(groupId)) this.toolGroupById.set(key, toGroupId);
     }
+    this.userGroupIds = this.userGroupIds.map((groupId) =>
+      fromGroupIds.has(groupId) ? toGroupId : groupId,
+    );
   }
 }
