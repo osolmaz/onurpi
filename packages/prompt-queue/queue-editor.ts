@@ -105,6 +105,12 @@ export class QueuePromptEditor extends CustomEditor {
     this.forcedMode = undefined;
     const decision = decideSubmit(text, this.hooks.isBusy());
     if (decision === "ignore") return;
+    if (decision === "directive") {
+      // Slash and bash commands are not prompts: they stay out of the
+      // prompt history and must not resume held delivery.
+      this.innerSubmit?.(text);
+      return;
+    }
     this.hooks.recordHistory(text);
     if (forced !== undefined || decision === "enqueue") {
       this.addToHistory(text);

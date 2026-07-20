@@ -16,11 +16,12 @@ describe("decideSubmit", () => {
     expect(decideSubmit("hello", true)).toBe("enqueue");
   });
 
-  it("always passes slash commands and bash directives through", () => {
-    expect(decideSubmit("/compact", true)).toBe("pass");
-    expect(decideSubmit("!ls", true)).toBe("pass");
-    expect(decideSubmit("  /model", true)).toBe("pass");
-    expect(decideSubmit("/compact", false)).toBe("pass");
+  it("classifies slash commands and bash directives regardless of busy state", () => {
+    expect(decideSubmit("/compact", true)).toBe("directive");
+    expect(decideSubmit("!ls", true)).toBe("directive");
+    expect(decideSubmit("  /model", true)).toBe("directive");
+    expect(decideSubmit("/compact", false)).toBe("directive");
+    expect(decideSubmit("!ls", false)).toBe("directive");
   });
 });
 

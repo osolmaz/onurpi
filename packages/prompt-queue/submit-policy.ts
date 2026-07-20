@@ -1,4 +1,4 @@
-export type SubmitDecision = "ignore" | "pass" | "enqueue";
+export type SubmitDecision = "ignore" | "directive" | "pass" | "enqueue";
 
 /**
  * Slash commands and bash directives must go through Pi's own submission
@@ -12,13 +12,14 @@ function isDirective(text: string): boolean {
 /**
  * Decide what happens when the user presses enter in the prompt editor.
  * Plain prompts are captured into the extension queue while the agent is
- * busy; everything else follows Pi's built-in behavior.
+ * busy. Directives are distinguished from passed-through prompts because
+ * only real prompts count as re-engagement that resumes held delivery.
  */
 export function decideSubmit(text: string, busy: boolean): SubmitDecision {
   const trimmed = text.trim();
   if (!trimmed) return "ignore";
-  if (!busy || isDirective(trimmed)) return "pass";
-  return "enqueue";
+  if (isDirective(trimmed)) return "directive";
+  return busy ? "enqueue" : "pass";
 }
 
 /**
