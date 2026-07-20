@@ -17,6 +17,7 @@ export type WindowRow =
 
 export type ManagerResult =
   | { kind: "close" }
+  | { kind: "resume" }
   | { kind: "edit"; target: WindowTarget; text: string }
   | { kind: "insert"; text: string };
 

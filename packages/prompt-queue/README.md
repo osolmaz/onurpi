@@ -22,9 +22,10 @@ never queued.
 
 - Steering items are injected at the next turn boundary, before the next LLM call.
 - Queued follow-ups are sent one at a time whenever the agent settles.
-- Delivery pauses while the manager window is open and resumes when it closes.
-- Aborting a run (`Esc`) holds the queue until you submit a new prompt or visit the manager, so a
-  stopped run is never restarted silently.
+- Delivery pauses while the manager window is open.
+- Aborting a run (`Esc`) holds the queue so a stopped run is never restarted silently. Resume it
+  explicitly with `r` in the manager window or `/queue resume`, or implicitly by submitting or
+  queuing a new prompt. Just opening and closing the manager does not resume.
 
 ## Manager window
 
@@ -33,7 +34,7 @@ session prompt history. It opens on the queue tab when anything is pending, othe
 tab, and jumps to history when the last queue item is deleted.
 
 ```text
-↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · esc close
+↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · r resume · esc close
 ```
 
 - `Tab`, `Left`, or `Right` switches between the queue and history tabs.
@@ -42,6 +43,7 @@ tab, and jumps to history when the last queue item is deleted.
 - `s` toggles the selected queue item between queued and steering delivery.
 - `x` deletes the selected item.
 - `p` / `n` move a queue item earlier or later. History entries cannot be reordered.
+- `r` closes the window and resumes delivery after an interrupt.
 
 History is session-scoped: it is seeded from the current session branch on startup and extended with
 every submitted prompt.

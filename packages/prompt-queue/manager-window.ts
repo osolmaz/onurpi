@@ -11,7 +11,7 @@ import {
 
 const MAX_VISIBLE_ROWS = 14;
 const HINT =
-  "↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · esc close";
+  "↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · r resume · esc close";
 
 /**
  * Full-width tabbed list view shown in place of the prompt editor. Queue
@@ -37,6 +37,7 @@ export class ManagerWindow {
     else if (data === "x") this.state.deleteSelected();
     else if (data === "p") this.state.moveSelected(-1);
     else if (data === "n") this.state.moveSelected(1);
+    else if (data === "r") this.done({ kind: "resume" });
   }
 
   private handleSpecialKey(data: string): boolean {

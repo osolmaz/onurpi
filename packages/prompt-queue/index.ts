@@ -80,7 +80,8 @@ class PromptQueueRuntime {
     if (this.queue.size === 0 || this.gate.held) return;
     this.gate.held = true;
     this.ctx?.ui.notify(
-      `Prompt queue paused (${String(this.queue.size)} pending). Press ↑ or /queue to manage.`,
+      `Prompt queue paused (${String(this.queue.size)} pending). ` +
+        "Resume with r in the manager (↑), /queue resume, or a new prompt.",
       "info",
     );
     this.updateWidget();
@@ -105,15 +106,18 @@ class PromptQueueRuntime {
     else this.history.updateAt(target.index, text);
   }
 
-  private async runManager(ctx: ExtensionContext, state: ManagerWindowState): Promise<void> {
+  private async runManager(
+    ctx: ExtensionContext,
+    state: ManagerWindowState,
+  ): Promise<"close" | "resume"> {
     for (;;) {
       const result = await ctx.ui.custom<ManagerResult>(
         (tui, theme, _keybindings, done) => new ManagerWindow(state, tui, theme, done),
       );
-      if (result.kind === "close") return;
+      if (result.kind === "close" || result.kind === "resume") return result.kind;
       if (result.kind === "insert") {
         ctx.ui.setEditorText(result.text);
-        return;
+        return "close";
       }
       const edited = await ctx.ui.editor("Edit prompt", result.text);
       if (edited !== undefined && edited.trim().length > 0) this.applyEdit(result.target, edited);
@@ -126,14 +130,21 @@ class PromptQueueRuntime {
     if (ctx?.mode !== "tui" || this.gate.windowOpen) return;
     this.gate.windowOpen = true;
     this.updateWidget();
+    let outcome: "close" | "resume" = "close";
     try {
-      await this.runManager(ctx, new ManagerWindowState(this.queue, this.history));
+      outcome = await this.runManager(ctx, new ManagerWindowState(this.queue, this.history));
     } finally {
       this.gate.windowOpen = false;
-      this.gate.held = false;
+      if (outcome === "resume") this.gate.held = false;
       this.deliverNextWhenIdle();
       this.updateWidget();
     }
+  }
+
+  resume(): void {
+    this.gate.held = false;
+    this.deliverNextWhenIdle();
+    this.updateWidget();
   }
 
   openManagerSafely(): void {
@@ -168,9 +179,15 @@ export default function promptQueue(pi: ExtensionAPI): void {
   const runtime = new PromptQueueRuntime(pi);
 
   pi.registerCommand("queue", {
-    description: "Open the prompt queue and history manager",
-    handler: async (_args, ctx) => {
+    description: "Open the prompt queue and history manager; `resume` continues delivery",
+    getArgumentCompletions: (prefix) =>
+      "resume".startsWith(prefix) ? [{ value: "resume", label: "resume" }] : null,
+    handler: async (args, ctx) => {
       runtime.setContext(ctx);
+      if (args.trim() === "resume") {
+        runtime.resume();
+        return;
+      }
       if (ctx.mode !== "tui") {
         ctx.ui.notify("The prompt queue manager needs interactive mode.", "warning");
         return;
