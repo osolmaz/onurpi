@@ -14,7 +14,7 @@ export const TURKISH_WORKING_PHRASES = [
   "Sistemi dürtüyorum",
   "Taşları yerine oturtuyorum",
   "Hallediyorum",
-  "Bir şeyler çeviriyorum",
+  "Bir işler çeviriyorum",
   "Altından girip üstünden çıkıyorum",
   "Şanzımana kuvvet",
   "Ustası hallediyor",
