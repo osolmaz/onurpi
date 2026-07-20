@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   countOutputContentChars,
-  formatBoldWorkingMessage,
   formatElapsed,
+  formatShimmeringWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
   LiveStatsTracker,
@@ -260,19 +260,30 @@ describe("formatWorkingMessage", () => {
     ).toBe("Piston aşağı indi… (0s · 0 out · — tok/s)");
   });
 
-  it("applies bold styling to the complete working message", () => {
-    expect(
-      formatBoldWorkingMessage(
-        {
-          elapsedMs: 1_000,
-          outputTokens: 12,
-          outputApproximate: false,
-          tokensPerSecond: 4,
-        },
-        "Kanırtıyorum",
-        (message) => `<b>${message}</b>`,
-      ),
-    ).toBe("<b>Kanırtıyorum… (1s · 12 out · 4.0 tok/s)</b>");
+  it("moves a shimmer across the bold working phrase", () => {
+    const snapshot = {
+      elapsedMs: 1_000,
+      outputTokens: 12,
+      outputApproximate: false,
+      tokensPerSecond: 4,
+    };
+    const styles = {
+      bold: (text: string) => `<b>${text}</b>`,
+      muted: (text: string) => `<muted>${text}</muted>`,
+      accent: (text: string) => `<accent>${text}</accent>`,
+    };
+
+    const firstFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_600, styles);
+    const secondFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_400, styles);
+
+    expect(firstFrame).toMatch(
+      /^<b><accent>A<\/accent><accent>B<\/accent><muted>…<\/muted>/u,
+    );
+    expect(firstFrame).toContain("<muted> (1s · 12 out · 4.0 tok/s)</muted></b>");
+    expect(secondFrame).toMatch(
+      /^<b><accent>A<\/accent><accent>B<\/accent><accent>…<\/accent>/u,
+    );
+    expect(secondFrame).not.toBe(firstFrame);
   });
 });
 
