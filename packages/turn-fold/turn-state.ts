@@ -343,6 +343,7 @@ export class TurnFoldState {
     const display = foldDisplay({
       isFinalAnchor: component === this.finalAnchor(group),
       isRecentActivity: this.isRecentActivity(group, component),
+      isSettledSummaryAnchor: component === this.settledSummaryAnchor(group),
       isStreamingSummaryAnchor: component === this.streamingSummaryAnchor(group),
       mode: this.mode,
       settled: group.settled,
@@ -426,6 +427,12 @@ export class TurnFoldState {
 
   private streamingSummaryAnchor(group: TurnGroup): object | undefined {
     return this.activityComponents(group).slice(LIVE_ACTIVITY_LIMIT).at(-1)?.[0];
+  }
+
+  private settledSummaryAnchor(group: TurnGroup): object | undefined {
+    return [...group.components].sort(
+      ([, left], [, right]) => left.sequence - right.sequence,
+    )[0]?.[0];
   }
 
   private lastAssistant(group: TurnGroup): object | undefined {

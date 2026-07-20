@@ -158,7 +158,7 @@ it("compacts ten sequential tool calls while leaving the working line visible", 
   expect(toolNames(settledFrame)).toEqual([]);
   expect(settledFrame).toContain("Final response");
   expect(settledFrame).toContain("Worked for");
-  expect(settledFrame.indexOf("Final response")).toBeLessThan(settledFrame.indexOf("Worked for"));
+  expect(settledFrame.indexOf("Worked for")).toBeLessThan(settledFrame.indexOf("Final response"));
 
   state.setMode("expanded");
   expect(toolNames(frame(transcript))).toHaveLength(10);
@@ -217,9 +217,10 @@ it("chooses the final historical tool on the first replay frame", () => {
   const firstFrame = frame(transcript);
   expect(toolNames(firstFrame)).toEqual(["tool_3"]);
   expect(firstFrame.match(/Worked for/gu)).toHaveLength(1);
+  expect(firstFrame.indexOf("Worked for")).toBeLessThan(firstFrame.indexOf("tool_3"));
 });
 
-it("renders an interruption fallback before the worked line", () => {
+it("renders an interruption fallback after the worked line", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -237,12 +238,12 @@ it("renders an interruption fallback before the worked line", () => {
   const rendered = frame(transcript);
   expect(rendered).toContain("Operation interrupted");
   expect(rendered).toContain("Worked for");
-  expect(rendered.indexOf("Operation interrupted")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Operation interrupted"));
   expect(transcript.render(8).every((line) => visibleWidth(line) <= 8)).toBe(true);
   expect(transcript.render(0)).toEqual([]);
 });
 
-it("keeps a pending tool error visible before the worked line", () => {
+it("keeps a pending tool error visible after the worked line", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const ui = stoppedTui();
@@ -285,6 +286,6 @@ it("keeps a pending tool error visible before the worked line", () => {
   expect(rendered).toContain("Provider failure 2");
   expect(rendered).not.toContain("Stale partial response");
   expect(rendered).toContain("2 failures");
-  expect(rendered.indexOf("Provider failure 2")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Provider failure 2"));
   expect(rendered).not.toContain("Operation interrupted");
 });

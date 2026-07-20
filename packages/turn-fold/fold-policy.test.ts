@@ -8,6 +8,7 @@ describe("fold display policy", () => {
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: false,
+        isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: true,
         mode: "compact",
         settled: false,
@@ -17,6 +18,7 @@ describe("fold display policy", () => {
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: true,
+        isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: false,
@@ -26,6 +28,7 @@ describe("fold display policy", () => {
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: false,
+        isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: false,
@@ -33,11 +36,22 @@ describe("fold display policy", () => {
     ).toBe("hidden");
   });
 
-  it("shows only the final anchor after compact activity settles", () => {
+  it("shows the summary anchor before the final anchor after settlement", () => {
+    expect(
+      foldDisplay({
+        isFinalAnchor: false,
+        isRecentActivity: false,
+        isSettledSummaryAnchor: true,
+        isStreamingSummaryAnchor: false,
+        mode: "compact",
+        settled: true,
+      }),
+    ).toBe("settled-summary");
     expect(
       foldDisplay({
         isFinalAnchor: true,
         isRecentActivity: false,
+        isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: true,
@@ -45,8 +59,19 @@ describe("fold display policy", () => {
     ).toBe("settled-final");
     expect(
       foldDisplay({
+        isFinalAnchor: true,
+        isRecentActivity: false,
+        isSettledSummaryAnchor: true,
+        isStreamingSummaryAnchor: false,
+        mode: "compact",
+        settled: true,
+      }),
+    ).toBe("settled-summary-final");
+    expect(
+      foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: true,
+        isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: true,
         mode: "compact",
         settled: true,
@@ -59,6 +84,7 @@ describe("fold display policy", () => {
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: false,
+        isSettledSummaryAnchor: true,
         isStreamingSummaryAnchor: false,
         mode: "expanded",
         settled: true,
