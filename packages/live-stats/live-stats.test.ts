@@ -278,6 +278,8 @@ describe("formatWorkingMessage", () => {
 
 describe("pickWorkingPhrase", () => {
   it("selects across the Turkish phrase list", () => {
+    expect(TURKISH_WORKING_PHRASES).toContain("Usta");
+    expect(TURKISH_WORKING_PHRASES).toContain("Yaparım");
     expect(pickWorkingPhrase(() => 0)).toBe("Yardırıyorum");
     expect(pickWorkingPhrase(() => 0.999_999)).toBe("Sıçtın mavisini izliyorum");
   });

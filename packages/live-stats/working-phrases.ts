@@ -18,6 +18,8 @@ export const TURKISH_WORKING_PHRASES = [
   "Altından girip üstünden çıkıyorum",
   "Şanzımana kuvvet",
   "Ustası hallediyor",
+  "Usta",
+  "Yaparım",
   "Kayış koptu kopacak",
   "Sıçtın mavisini izliyorum",
 ] as const;
