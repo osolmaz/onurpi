@@ -97,7 +97,6 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
   if (timestamp === undefined) return undefined;
 
   const { hasVisibleContent, toolCallIds } = summarizeAssistantContent(contentItems(message));
-  const responseId = stringField(message, "responseId") ?? "";
   const stopReason = stringField(message, "stopReason");
   return {
     hasTerminalNotice:
@@ -106,7 +105,7 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
       (stopReason === "error" && toolCallIds.length === 0),
     hasVisibleContent,
     interrupted: stopReason === "aborted",
-    key: `${String(timestamp)}:${responseId}`,
+    key: String(timestamp),
     timestamp,
     toolCallIds,
   };

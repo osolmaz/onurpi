@@ -73,7 +73,10 @@ describe("compact streaming", () => {
     const state = new TurnFoldState();
     const component = {};
     const start = assistantMessage(110, []);
-    const updated = assistantMessage(110, [{ id: "tool-live", name: "read", type: "toolCall" }]);
+    const updated = {
+      ...assistantMessage(110, [{ id: "tool-live", name: "read", type: "toolCall" }]),
+      responseId: "response-arrived-during-streaming",
+    };
 
     state.ensureActive(100);
     state.registerAssistantMessage(start);
