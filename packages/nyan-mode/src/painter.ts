@@ -46,7 +46,9 @@ function toTuiLike(value: unknown): LiveTui {
 
   return {
     terminal: {
-      rows,
+      get rows(): number {
+        return finiteNumber(terminal["rows"]) ?? rows;
+      },
       write(data: string): void {
         Reflect.apply(write, terminal, [data]);
       },

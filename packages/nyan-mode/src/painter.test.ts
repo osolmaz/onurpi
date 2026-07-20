@@ -67,11 +67,12 @@ describe("Kitty Nyan painter", () => {
     const tui: TuiLike = {
       previousLines: [],
       previousViewportTop: 3,
-      terminal: { rows: 10, write: (data) => writes.push(data) },
+      terminal: { rows: 1, write: (data) => writes.push(data) },
     };
     const painter = createNyanRunwayPainter(tui, { frameIntervalMs: 100 });
     tui.previousLines = ["chat", "footer"];
     tui.previousViewportTop = 0;
+    tui.terminal.rows = 10;
 
     painter.setTarget({ cells: 8, startColumn: 3, percent: 50 });
     vi.advanceTimersByTime(0);
