@@ -7,16 +7,18 @@ empty context ──────────────────────
 0%                                                     100%
 ```
 
-The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. When SSH or another launcher strips terminal-identification variables, the extension queries the terminal directly and enables Kitty rendering only after a successful protocol response. Terminals and transports without Kitty support, including Mosh, receive a colored ANSI rainbow runway instead.
+The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. When SSH or another launcher strips terminal-identification variables, the extension queries the terminal directly and enables Kitty rendering only after a successful protocol response. Terminals and transports without Kitty support, including Mosh, receive a colored ANSI kaomoji and rainbow trail instead. Use `/nyan text` when an intermediate transport falsely reports working Kitty support.
 
 ## Commands
 
 ```text
 /nyan          Toggle Nyan Mode
-/nyan on       Enable bitmap rendering
-/nyan off      Disable bitmap rendering
-/nyan bitmap   Enable bitmap rendering
-/nyan debug    Show image protocol, asset, and painter status
+/nyan on       Enable the selected rendering mode
+/nyan off      Disable Nyan Mode
+/nyan auto     Prefer bitmap and fall back to text
+/nyan bitmap   Force bitmap rendering
+/nyan text     Force ANSI kaomoji rendering
+/nyan debug    Show mode, image protocol, asset, and painter status
 ```
 
 When bitmap rendering is unavailable or the footer is too narrow, the footer remains usable without the runway.

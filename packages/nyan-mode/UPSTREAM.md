@@ -20,6 +20,6 @@ The extension executes no processes, installs no shell hooks, accesses no creden
 - Added strict input validation, bounded caches, tests, coverage, mutation testing, and Slophammer configuration.
 - Split pure layout and image logic from Pi event wiring.
 - Rendered images inline through Pi's differential renderer so startup and resize redraws own image placement and cleanup.
-- Added a fixed-width ANSI rainbow runway for Mosh and other transports without Kitty graphics support.
+- Added a fixed-width colored ANSI kaomoji and rainbow trail for Mosh and other transports without Kitty graphics support, with an explicit text mode for false-positive capability detection.
 - Removed upstream examples and the deprecated static renderer because the requested capability is the drop-in animated footer.
 - Preserved the bitmap-only behavior, six original animation frames, context-percentage positioning, smooth movement, Kitty capability check, `/nyan` commands, GPL license, notice, and original artwork licenses.

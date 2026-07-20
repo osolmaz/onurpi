@@ -14,7 +14,7 @@ export default defineConfig({
         "src/painter.ts",
         "src/png.ts",
         "src/progress.ts",
-        "src/rainbow.ts",
+        "src/text-runway.ts",
         "src/xpm.ts",
       ],
       thresholds: {

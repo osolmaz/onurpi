@@ -8,7 +8,7 @@ import {
   formatApiCost,
   getNyanDebugInfo,
   renderAnimatedNyanRunway,
-  renderAnsiRainbow,
+  renderTextNyan,
   type NyanRunwayPainter,
 } from "./src/index.ts";
 import {
@@ -18,10 +18,12 @@ import {
   formatContext,
   joinParts,
   shortModel,
+  type FittedRunway,
 } from "./src/layout.ts";
 
 export default function nyanMode(pi: ExtensionAPI): void {
   let enabled = true;
+  let displayMode: NyanDisplayMode = "auto";
   let renderFooter: (() => void) | undefined;
   let activePainter: NyanRunwayPainter | undefined;
 
@@ -30,18 +32,22 @@ export default function nyanMode(pi: ExtensionAPI): void {
     handler: (args, ctx) => {
       const value = args.trim().toLowerCase();
       if (value === "debug") {
-        ctx.ui.notify(debugMessage(enabled, activePainter), "info");
+        ctx.ui.notify(debugMessage(enabled, displayMode, activePainter), "info");
         return Promise.resolve();
       }
-      if (value === "text") {
-        ctx.ui.notify("Nyan text mode was removed; bitmap mode only.", "info");
+      const notify = (message: string): void => {
+        ctx.ui.notify(message, "info");
+      };
+      const requestedMode = nyanDisplayMode(value);
+      if (requestedMode) {
+        enabled = true;
+        displayMode = requestedMode;
+        activateDisplayMode(displayMode, activePainter, renderFooter, notify);
         return Promise.resolve();
       }
 
       enabled = nextEnabled(value, enabled);
-      if (!enabled) activePainter?.clear();
-      ctx.ui.notify(`Nyan Mode ${enabled ? "enabled" : "disabled"}`, "info");
-      renderFooter?.();
+      applyEnabled(enabled, activePainter, renderFooter, notify);
       return Promise.resolve();
     },
   });
@@ -76,6 +82,7 @@ export default function nyanMode(pi: ExtensionAPI): void {
             renderFooterLine({
               ...footerSnapshot(ctx),
               branch: footerData.getGitBranch(),
+              displayMode,
               enabled,
               painter,
               theme,
@@ -93,17 +100,50 @@ export default function nyanMode(pi: ExtensionAPI): void {
   });
 }
 
+type NyanDisplayMode = "auto" | "bitmap" | "text";
+
+function nyanDisplayMode(value: string): NyanDisplayMode | undefined {
+  return value === "auto" || value === "bitmap" || value === "text" ? value : undefined;
+}
+
 function nextEnabled(value: string, enabled: boolean): boolean {
-  if (value === "on" || value === "bitmap") return true;
+  if (value === "on") return true;
   if (value === "off") return false;
   return !enabled;
 }
 
-function debugMessage(enabled: boolean, painter: NyanRunwayPainter | undefined): string {
+function activateDisplayMode(
+  displayMode: NyanDisplayMode,
+  painter: NyanRunwayPainter | undefined,
+  renderFooter: (() => void) | undefined,
+  notify: (message: string) => void,
+): void {
+  if (displayMode === "text") painter?.clear();
+  notify(`Nyan Mode ${displayMode}`);
+  renderFooter?.();
+}
+
+function applyEnabled(
+  enabled: boolean,
+  painter: NyanRunwayPainter | undefined,
+  renderFooter: (() => void) | undefined,
+  notify: (message: string) => void,
+): void {
+  if (!enabled) painter?.clear();
+  notify(`Nyan Mode ${enabled ? "enabled" : "disabled"}`);
+  renderFooter?.();
+}
+
+function debugMessage(
+  enabled: boolean,
+  displayMode: NyanDisplayMode,
+  painter: NyanRunwayPainter | undefined,
+): string {
   const info = getNyanDebugInfo();
   return joinParts([
     "Nyan:",
     `enabled=${String(enabled)}`,
+    `mode=${displayMode}`,
     `supported=${String(info.supported)}`,
     `imageProtocol=${info.imageProtocol ?? "none"}`,
     `assets=${String(info.assetsAvailable)}`,
@@ -123,6 +163,7 @@ type FooterSnapshot = {
 
 type FooterLineOptions = FooterSnapshot & {
   branch: string | null;
+  displayMode: NyanDisplayMode;
   enabled: boolean;
   painter: NyanRunwayPainter;
   theme: Theme;
@@ -173,7 +214,14 @@ function renderFooterLine(options: FooterLineOptions): string {
     options.thinkingLevel,
   );
   const nyanLine = options.enabled
-    ? composeNyanLine(options.painter, left, right, options.percent, options.width)
+    ? composeNyanLine(
+        options.painter,
+        left,
+        right,
+        options.percent,
+        options.width,
+        options.displayMode,
+      )
     : undefined;
   return nyanLine ?? composeLine(left, "", right, options.width);
 }
@@ -210,28 +258,40 @@ function composeNyanLine(
   right: string,
   percent: number | undefined,
   width: number,
+  displayMode: NyanDisplayMode,
 ): string | undefined {
   const layout = fitRunway(left, right, width);
   if (!layout) {
     painter.clear();
     return undefined;
   }
-  const bitmap =
-    percent === undefined
-      ? renderAnimatedNyanRunway(painter, {
-          cells: layout.cells,
-          startColumn: layout.startColumn,
-        })
-      : renderAnimatedNyanRunway(painter, {
-          percent,
-          cells: layout.cells,
-          startColumn: layout.startColumn,
-        });
-  if (bitmap) {
-    return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
+  const bitmap = renderBitmapRunway(painter, layout, percent, displayMode);
+  if (bitmap) return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
+  if (displayMode === "bitmap") return undefined;
+  const text = renderTextNyan(layout.cells, percent);
+  return text ? `${layout.left} ${text} ${layout.right}` : undefined;
+}
+
+function renderBitmapRunway(
+  painter: NyanRunwayPainter,
+  layout: FittedRunway,
+  percent: number | undefined,
+  displayMode: NyanDisplayMode,
+): string | undefined {
+  if (displayMode === "text") {
+    painter.clear();
+    return undefined;
   }
-  const rainbow = renderAnsiRainbow(layout.cells);
-  return rainbow ? `${layout.left} ${rainbow} ${layout.right}` : undefined;
+  return percent === undefined
+    ? renderAnimatedNyanRunway(painter, {
+        cells: layout.cells,
+        startColumn: layout.startColumn,
+      })
+    : renderAnimatedNyanRunway(painter, {
+        percent,
+        cells: layout.cells,
+        startColumn: layout.startColumn,
+      });
 }
 
 function mutedLabel(theme: Theme, label: string | undefined): string | undefined {

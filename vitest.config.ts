@@ -18,7 +18,7 @@ export default defineConfig({
         "packages/nyan-mode/src/painter.ts",
         "packages/nyan-mode/src/png.ts",
         "packages/nyan-mode/src/progress.ts",
-        "packages/nyan-mode/src/rainbow.ts",
+        "packages/nyan-mode/src/text-runway.ts",
         "packages/nyan-mode/src/xpm.ts",
         "packages/prompt-queue/queue-model.ts",
         "packages/prompt-queue/history-model.ts",
