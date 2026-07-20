@@ -4,10 +4,19 @@ import {
   countOutputContentChars,
   formatShimmeringWorkingMessage,
   LiveStatsTracker,
+  type WorkingMessageStyles,
 } from "./live-stats.ts";
 import { WorkingPhraseState } from "./working-phrases.ts";
 
 const REFRESH_INTERVAL_MS = 50;
+
+function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
+  return {
+    bold: (text) => ctx.ui.theme.bold(text),
+    muted: (text) => ctx.ui.theme.fg("muted", text),
+    accent: (text) => ctx.ui.theme.fg("accent", text),
+  };
+}
 
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
@@ -35,11 +44,7 @@ export default function liveStats(pi: ExtensionAPI): void {
       tracker.snapshot(now),
       workingPhrase.current,
       now - shimmerStartedAtMs,
-      {
-        bold: (text) => ctx.ui.theme.bold(text),
-        muted: (text) => ctx.ui.theme.fg("muted", text),
-        accent: (text) => ctx.ui.theme.fg("accent", text),
-      },
+      workingMessageStyles(ctx),
     );
     ctx.ui.setWorkingMessage(message);
   };
