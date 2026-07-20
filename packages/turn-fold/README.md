@@ -2,16 +2,16 @@
 
 Turn-level transcript folding for the Pi coding agent.
 
-`@onurpi/turn-fold` keeps only the latest three visible activity rows while Pi is working. When the
-turn completes, it keeps the final assistant response visible and replaces intermediate assistant
-messages and tool rows with one compact summary. The underlying session messages are not changed
-and remain in model context.
+`@onurpi/turn-fold` keeps only the latest three visible activity rows while Pi is working and
+compresses earlier activity into one updating summary. When the turn completes, it keeps the final
+assistant response visible and replaces intermediate assistant messages and tool rows with one
+compact summary. The underlying session messages are not changed and remain in model context.
 
 ## Modes
 
 | Mode         | Behavior                                                                  |
 | ------------ | ------------------------------------------------------------------------- |
-| `live`       | Shows the latest three activity rows while Pi works, then folds the turn. |
+| `live`       | Shows one working summary and the latest three activity rows, then folds. |
 | `final-only` | Shows one live activity row, followed by the summary and final response.  |
 | `expanded`   | Shows the complete transcript.                                            |
 

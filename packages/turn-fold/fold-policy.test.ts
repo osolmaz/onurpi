@@ -30,6 +30,26 @@ describe("fold display policy", () => {
     expect(
       foldDisplay({
         aborted: false,
+        isAnchor: true,
+        isFinalAssistant: false,
+        isRecentActivity: false,
+        mode: "live",
+        settled: false,
+      }),
+    ).toBe("summary");
+    expect(
+      foldDisplay({
+        aborted: false,
+        isAnchor: true,
+        isFinalAssistant: false,
+        isRecentActivity: true,
+        mode: "live",
+        settled: false,
+      }),
+    ).toBe("original");
+    expect(
+      foldDisplay({
+        aborted: false,
         isAnchor: false,
         isFinalAssistant: false,
         isRecentActivity: false,

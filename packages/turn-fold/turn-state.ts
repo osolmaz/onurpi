@@ -366,7 +366,7 @@ export class TurnFoldState {
     }
 
     const finalAssistant = this.finalAssistant(group);
-    const anchor = this.foldAnchor(group, finalAssistant);
+    const anchor = this.displayAnchor(group, finalAssistant);
     const display = foldDisplay({
       isAnchor: component === anchor,
       isFinalAssistant: component === finalAssistant,
@@ -636,15 +636,26 @@ export class TurnFoldState {
     );
   }
 
-  private isRecentActivity(group: TurnGroup, component: object): boolean {
-    const recentComponents = [...group.components]
+  private activityComponents(group: TurnGroup): [object, ComponentInfo][] {
+    return [...group.components]
       .filter(
         ([candidate, info]) =>
           info.kind === "tool" || group.assistants.get(candidate)?.hasVisibleContent === true,
       )
-      .sort(([, left], [, right]) => right.sequence - left.sequence)
-      .slice(0, LIVE_ACTIVITY_LIMIT);
-    return recentComponents.some(([candidate]) => candidate === component);
+      .sort(([, left], [, right]) => right.sequence - left.sequence);
+  }
+
+  private isRecentActivity(group: TurnGroup, component: object): boolean {
+    return this.activityComponents(group)
+      .slice(0, LIVE_ACTIVITY_LIMIT)
+      .some(([candidate]) => candidate === component);
+  }
+
+  private displayAnchor(group: TurnGroup, finalAssistant: object | undefined): object | undefined {
+    if (!group.settled && this.mode === "live") {
+      return this.activityComponents(group).slice(LIVE_ACTIVITY_LIMIT).at(-1)?.[0];
+    }
+    return this.foldAnchor(group, finalAssistant);
   }
 
   private foldAnchor(group: TurnGroup, finalAssistant: object | undefined): object | undefined {

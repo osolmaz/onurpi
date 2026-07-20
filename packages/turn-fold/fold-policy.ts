@@ -11,14 +11,15 @@ export type FoldDisplayInput = {
   settled: boolean;
 };
 
-function runningLiveDisplay(isRecentActivity: boolean): FoldDisplay {
-  return isRecentActivity ? "original" : "hidden";
+function runningLiveDisplay(isRecentActivity: boolean, isAnchor: boolean): FoldDisplay {
+  if (isRecentActivity) return "original";
+  return isAnchor ? "summary" : "hidden";
 }
 
 export function foldDisplay(input: FoldDisplayInput): FoldDisplay {
   if (input.mode === "expanded") return "original";
   if (!input.settled && input.mode === "live") {
-    return runningLiveDisplay(input.isRecentActivity);
+    return runningLiveDisplay(input.isRecentActivity, input.isAnchor);
   }
   if (input.settled && input.isFinalAssistant && !input.aborted) return "original";
   return input.isAnchor ? "summary" : "hidden";

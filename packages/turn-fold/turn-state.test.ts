@@ -482,11 +482,31 @@ describe("live turn folding", () => {
     state.registerToolStart("tool-live", 145);
     state.associateTool(tool, "tool-live");
 
-    expect(state.viewFor(firstAssistant, 150)?.display).toBe("hidden");
+    expect(state.viewFor(firstAssistant, 150)?.display).toBe("summary");
     expect(state.viewFor(secondAssistant, 150)?.display).toBe("original");
     expect(state.viewFor(toolOnlyAssistant, 150)?.display).toBe("hidden");
     expect(state.viewFor(thinkingAssistant, 150)?.display).toBe("original");
     expect(state.viewFor(tool, 150)?.display).toBe("original");
+  });
+
+  it("does not add a working summary until activity exceeds the limit", () => {
+    const state = new TurnFoldState();
+    const components = [{}, {}, {}];
+
+    state.ensureActive(100);
+    components.forEach((component, index) => {
+      const message = assistantMessage(110 + index, [
+        { text: `Message ${String(index + 1)}`, type: "text" },
+      ]);
+      state.registerAssistantMessage(message);
+      state.associateAssistant(component, message);
+    });
+
+    expect(components.map((component) => state.viewFor(component, 150)?.display)).toEqual([
+      "original",
+      "original",
+      "original",
+    ]);
   });
 });
 
