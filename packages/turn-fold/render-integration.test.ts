@@ -5,7 +5,7 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
+import { Container, Spacer, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, expect, it } from "vitest";
 
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
@@ -104,6 +104,22 @@ let restore: RestoreRenderPatches | undefined;
 afterEach(() => {
   restore?.();
   restore = undefined;
+});
+
+it("keeps only the user message's built-in top padding", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  const userSpacer = new Spacer(1);
+  const ordinarySpacer = new Spacer(1);
+  restore = installRenderPatches(state, () => undefined);
+
+  transcript.addChild(userSpacer);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  transcript.addChild(ordinarySpacer);
+  transcript.addChild(new Text("Other", 0, 0));
+
+  expect(userSpacer.render(40)).toEqual([]);
+  expect(ordinarySpacer.render(40)).toEqual([""]);
 });
 
 it("renders local user and completion times in transcript order", () => {

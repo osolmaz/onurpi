@@ -5,7 +5,7 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { Container, Spacer, truncateToWidth } from "@earendil-works/pi-tui";
 
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
@@ -167,10 +167,46 @@ function skillHasUserMessage(component: SkillInvocationMessageComponent): boolea
   return typeof userMessage === "string" && userMessage.trim().length > 0;
 }
 
+function isUserRow(component: object): boolean {
+  return (
+    component instanceof UserMessageComponent ||
+    component instanceof SkillInvocationMessageComponent
+  );
+}
+
+function installUserSpacingPatches(): RestoreRenderPatches {
+  const suppressedSpacers = new WeakSet();
+  const containerPrototype = Container.prototype;
+  const originalAddChild = containerPrototype.addChild;
+  const spacerPrototype = Spacer.prototype;
+  const originalSpacerRender = spacerPrototype.render;
+  type Child = Parameters<Container["addChild"]>[0];
+
+  const patchedAddChild = function (this: Container, component: Child): void {
+    const previous = this.children.at(-1);
+    if (previous instanceof Spacer && isUserRow(component)) suppressedSpacers.add(previous);
+    originalAddChild.call(this, component);
+  };
+  const patchedSpacerRender = function (this: Spacer, width: number): string[] {
+    return suppressedSpacers.has(this) ? [] : originalSpacerRender.call(this, width);
+  };
+
+  containerPrototype.addChild = patchedAddChild;
+  spacerPrototype.render = patchedSpacerRender;
+  return () => {
+    if (containerPrototype.addChild === patchedAddChild) {
+      containerPrototype.addChild = originalAddChild;
+    }
+    if (spacerPrototype.render === patchedSpacerRender)
+      spacerPrototype.render = originalSpacerRender;
+  };
+}
+
 function installUserTimestampPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
 ): RestoreRenderPatches {
+  const restoreUserSpacing = installUserSpacingPatches();
   const userPrototype = UserMessageComponent.prototype;
   const originalUserRender = userPrototype.render;
   const skillPrototype = SkillInvocationMessageComponent.prototype;
@@ -207,6 +243,7 @@ function installUserTimestampPatches(
   userPrototype.render = patchedUserRender;
   skillPrototype.render = patchedSkillRender;
   return () => {
+    restoreUserSpacing();
     if (userPrototype.render === patchedUserRender) userPrototype.render = originalUserRender;
     if (skillPrototype.render === patchedSkillRender) skillPrototype.render = originalSkillRender;
   };

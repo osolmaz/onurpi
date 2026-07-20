@@ -16,7 +16,7 @@ The **final content row** is the one assistant or tool row retained after a comp
 
 ## Display invariants
 
-Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. The retained final content row shows the local completion time beneath its content. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
+Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. The retained final content row shows the local completion time beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
 In compact mode, every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
