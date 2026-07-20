@@ -1,0 +1,26 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - .
+    exclude:
+      - "**/*.test.ts"
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  mutation:
+    targets:
+      - queue-model.ts
+      - history-model.ts
+      - delivery-policy.ts
+      - submit-policy.ts
+      - message-text.ts
+      - widget-lines.ts
+      - window-state.ts
+  dependency_boundaries:
+    - from: .
+      allow: []

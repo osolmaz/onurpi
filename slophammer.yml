@@ -21,6 +21,13 @@ typescript:
       - packages/turn-fold/output-metrics.ts
       - packages/pi-tui-history-replay/history-replay.ts
       - packages/live-stats/live-stats.ts
+      - packages/prompt-queue/queue-model.ts
+      - packages/prompt-queue/history-model.ts
+      - packages/prompt-queue/delivery-policy.ts
+      - packages/prompt-queue/submit-policy.ts
+      - packages/prompt-queue/message-text.ts
+      - packages/prompt-queue/widget-lines.ts
+      - packages/prompt-queue/window-state.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -31,3 +38,6 @@ typescript:
     - from: packages/live-stats
       allow:
         - packages/live-stats
+    - from: packages/prompt-queue
+      allow:
+        - packages/prompt-queue

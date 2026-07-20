@@ -1,32 +1,30 @@
 {
-  "name": "@onurpi/workspace",
+  "name": "@onurpi/prompt-queue",
+  "version": "0.1.0",
   "private": true,
+  "description": "Editable prompt queue, steer control, and history manager for the Pi coding agent",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "pi": {
     "extensions": [
-      "./packages/pi-tui-history-replay/index.ts",
-      "./packages/turn-fold/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/prompt-queue/index.ts"
+      "./index.ts"
     ]
   },
   "scripts": {
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "lint": "eslint .",
+    "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
     "dry": "slophammer-ts dry .",
-    "mutate": "stryker run",
+    "mutate": "stryker run stryker.config.mjs",
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.10"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.80.10",
