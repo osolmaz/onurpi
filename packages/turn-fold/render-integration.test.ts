@@ -4,7 +4,7 @@ import {
   ToolExecutionComponent,
 } from "@earendil-works/pi-coding-agent";
 import { Container, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, expect, it } from "vitest";
 
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
 import { TurnFoldState } from "./turn-state.ts";
@@ -97,129 +97,182 @@ function toolNames(rendered: string): string[] {
 
 initTheme("dark", false);
 
-describe("real Pi component render patches", () => {
-  let restore: RestoreRenderPatches | undefined;
+let restore: RestoreRenderPatches | undefined;
 
-  afterEach(() => {
-    restore?.();
-    restore = undefined;
-  });
+afterEach(() => {
+  restore?.();
+  restore = undefined;
+});
 
-  it("compacts ten sequential tool calls while leaving the working line visible", () => {
-    const state = new TurnFoldState();
-    const transcript = new Container();
-    const workingLine = new Text("◆ Working", 0, 0);
-    const ui = stoppedTui();
-    restore = installRenderPatches(state, () => undefined);
-    state.ensureActive(100);
+it("compacts ten sequential tool calls while leaving the working line visible", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  const workingLine = new Text("◆ Working", 0, 0);
+  const ui = stoppedTui();
+  restore = installRenderPatches(state, () => undefined);
+  state.ensureActive(100);
 
-    for (let index = 1; index <= 10; index += 1) {
-      const toolCallId = `call-${String(index)}`;
-      state.registerToolStart(toolCallId, 100 + index);
-      const component = new ToolExecutionComponent(
-        `tool_${String(index)}`,
-        toolCallId,
-        { index },
-        undefined,
-        undefined,
-        ui,
-        "/tmp",
+  for (let index = 1; index <= 10; index += 1) {
+    const toolCallId = `call-${String(index)}`;
+    state.registerToolStart(toolCallId, 100 + index);
+    const component = new ToolExecutionComponent(
+      `tool_${String(index)}`,
+      toolCallId,
+      { index },
+      undefined,
+      undefined,
+      ui,
+      "/tmp",
+    );
+    component.markExecutionStarted();
+    transcript.addChild(component);
+
+    const rendered = frame(transcript, workingLine);
+    expect(rendered).toContain("◆ Working");
+    expect(toolNames(rendered)).toHaveLength(Math.min(index, 3));
+    if (index > 3) {
+      const hidden = index - 3;
+      expect(rendered).toContain(
+        `${String(hidden)} earlier ${hidden === 1 ? "activity" : "activities"}`,
       );
-      component.markExecutionStarted();
-      transcript.addChild(component);
-
-      const rendered = frame(transcript, workingLine);
-      expect(rendered).toContain("◆ Working");
-      expect(toolNames(rendered)).toHaveLength(Math.min(index, 3));
-      if (index > 3) {
-        const hidden = index - 3;
-        expect(rendered).toContain(
-          `${String(hidden)} earlier ${hidden === 1 ? "activity" : "activities"}`,
-        );
-      }
     }
+  }
 
-    const activeFrame = frame(transcript, workingLine);
-    expect(activeFrame.indexOf("7 earlier activities")).toBeLessThan(activeFrame.indexOf("tool_8"));
-    expect(toolNames(activeFrame)).toEqual(["tool_8", "tool_9", "tool_10"]);
+  const activeFrame = frame(transcript, workingLine);
+  expect(activeFrame.indexOf("7 earlier activities")).toBeLessThan(activeFrame.indexOf("tool_8"));
+  expect(toolNames(activeFrame)).toEqual(["tool_8", "tool_9", "tool_10"]);
 
-    const finalMessage = assistantMessage(200, [{ text: "Final response", type: "text" }]);
-    state.registerAssistantMessage(finalMessage);
-    const finalComponent = new AssistantMessageComponent(
-      finalMessage,
-      false,
-      undefined,
-      undefined,
-      0,
-    );
-    transcript.addChild(finalComponent);
-    state.settleActive(250);
+  const finalMessage = assistantMessage(200, [{ text: "Final response", type: "text" }]);
+  state.registerAssistantMessage(finalMessage);
+  const finalComponent = new AssistantMessageComponent(
+    finalMessage,
+    false,
+    undefined,
+    undefined,
+    0,
+  );
+  transcript.addChild(finalComponent);
+  state.settleActive(250);
 
-    const settledFrame = frame(transcript);
-    expect(toolNames(settledFrame)).toEqual([]);
-    expect(settledFrame).toContain("Final response");
-    expect(settledFrame).toContain("Worked for");
-    expect(settledFrame.indexOf("Final response")).toBeLessThan(settledFrame.indexOf("Worked for"));
+  const settledFrame = frame(transcript);
+  expect(toolNames(settledFrame)).toEqual([]);
+  expect(settledFrame).toContain("Final response");
+  expect(settledFrame).toContain("Worked for");
+  expect(settledFrame.indexOf("Final response")).toBeLessThan(settledFrame.indexOf("Worked for"));
 
-    state.setMode("expanded");
-    expect(toolNames(frame(transcript))).toHaveLength(10);
-  });
+  state.setMode("expanded");
+  expect(toolNames(frame(transcript))).toHaveLength(10);
+});
 
-  it("renders an interruption fallback before the worked line", () => {
-    const state = new TurnFoldState();
-    const transcript = new Container();
-    restore = installRenderPatches(state, () => undefined);
-    state.ensureActive(100);
-
-    const interrupted = assistantMessage(
-      120,
-      [{ arguments: {}, id: "unfinished", name: "tool", type: "toolCall" }],
-      "aborted",
-    );
-    state.registerAssistantMessage(interrupted);
-    transcript.addChild(new AssistantMessageComponent(interrupted, false, undefined, undefined, 0));
-    state.abortActive(150);
-
-    const rendered = frame(transcript);
-    expect(rendered).toContain("Operation interrupted");
-    expect(rendered).toContain("Worked for");
-    expect(rendered.indexOf("Operation interrupted")).toBeLessThan(rendered.indexOf("Worked for"));
-    expect(transcript.render(8).every((line) => visibleWidth(line) <= 8)).toBe(true);
-    expect(transcript.render(0)).toEqual([]);
-  });
-
-  it("keeps a pending tool error visible before the worked line", () => {
-    const state = new TurnFoldState();
-    const transcript = new Container();
-    const ui = stoppedTui();
-    restore = installRenderPatches(state, () => undefined);
-    state.ensureActive(100);
-
-    const failed = assistantMessage(
-      120,
-      [{ arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" }],
-      "error",
-    );
-    state.registerAssistantMessage(failed);
-    transcript.addChild(new AssistantMessageComponent(failed, false, undefined, undefined, 0));
-    state.registerToolStart("failed-tool", 125);
+it("chooses the final historical tool on the first replay frame", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  const ui = stoppedTui();
+  restore = installRenderPatches(state, () => undefined);
+  const toolCallMessage = assistantMessage(
+    110,
+    [1, 2, 3].map((index) => ({
+      arguments: {},
+      id: `historical-${String(index)}`,
+      name: `tool_${String(index)}`,
+      type: "toolCall" as const,
+    })),
+    "toolUse",
+  );
+  state.loadHistory([
+    { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
+    { message: toolCallMessage, timestamp: new Date(120).toISOString(), type: "message" },
+    ...[1, 2, 3].map((index) => ({
+      message: {
+        content: [{ text: `result ${String(index)}`, type: "text" }],
+        isError: false,
+        role: "toolResult",
+        timestamp: 120 + index,
+        toolCallId: `historical-${String(index)}`,
+      },
+      timestamp: new Date(130 + index).toISOString(),
+      type: "message",
+    })),
+  ]);
+  transcript.addChild(
+    new AssistantMessageComponent(toolCallMessage, false, undefined, undefined, 0),
+  );
+  for (let index = 1; index <= 3; index += 1) {
     const tool = new ToolExecutionComponent(
-      "failed_tool",
-      "failed-tool",
+      `tool_${String(index)}`,
+      `historical-${String(index)}`,
       {},
       undefined,
       undefined,
       ui,
       "/tmp",
     );
-    tool.markExecutionStarted();
-    tool.updateResult({ content: [{ text: "Provider failure", type: "text" }], isError: true });
+    tool.updateResult({
+      content: [{ text: `result ${String(index)}`, type: "text" }],
+      isError: false,
+    });
     transcript.addChild(tool);
-    state.settleActive(150);
+  }
 
-    const rendered = frame(transcript);
-    expect(rendered).toContain("Provider failure");
-    expect(rendered.indexOf("Provider failure")).toBeLessThan(rendered.indexOf("Worked for"));
-    expect(rendered).not.toContain("Operation interrupted");
-  });
+  const firstFrame = frame(transcript);
+  expect(toolNames(firstFrame)).toEqual(["tool_3"]);
+  expect(firstFrame.match(/Worked for/gu)).toHaveLength(1);
+});
+
+it("renders an interruption fallback before the worked line", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  state.ensureActive(100);
+
+  const interrupted = assistantMessage(
+    120,
+    [{ arguments: {}, id: "unfinished", name: "tool", type: "toolCall" }],
+    "aborted",
+  );
+  state.registerAssistantMessage(interrupted);
+  transcript.addChild(new AssistantMessageComponent(interrupted, false, undefined, undefined, 0));
+  state.abortActive(150);
+
+  const rendered = frame(transcript);
+  expect(rendered).toContain("Operation interrupted");
+  expect(rendered).toContain("Worked for");
+  expect(rendered.indexOf("Operation interrupted")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(transcript.render(8).every((line) => visibleWidth(line) <= 8)).toBe(true);
+  expect(transcript.render(0)).toEqual([]);
+});
+
+it("keeps a pending tool error visible before the worked line", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  const ui = stoppedTui();
+  restore = installRenderPatches(state, () => undefined);
+  state.ensureActive(100);
+
+  const failed = assistantMessage(
+    120,
+    [{ arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" }],
+    "error",
+  );
+  state.registerAssistantMessage(failed);
+  transcript.addChild(new AssistantMessageComponent(failed, false, undefined, undefined, 0));
+  state.registerToolStart("failed-tool", 125);
+  const tool = new ToolExecutionComponent(
+    "failed_tool",
+    "failed-tool",
+    {},
+    undefined,
+    undefined,
+    ui,
+    "/tmp",
+  );
+  tool.markExecutionStarted();
+  tool.updateResult({ content: [{ text: "Provider failure", type: "text" }], isError: true });
+  transcript.addChild(tool);
+  state.settleActive(150);
+
+  const rendered = frame(transcript);
+  expect(rendered).toContain("Provider failure");
+  expect(rendered.indexOf("Provider failure")).toBeLessThan(rendered.indexOf("Worked for"));
+  expect(rendered).not.toContain("Operation interrupted");
 });

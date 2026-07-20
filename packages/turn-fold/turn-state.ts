@@ -382,7 +382,11 @@ export class TurnFoldState {
   }
 
   private finalAnchor(group: TurnGroup): object | undefined {
-    return this.lastAssistant(group) ?? this.activityComponents(group).at(0)?.[0];
+    const assistant = this.lastAssistant(group);
+    if (assistant) return assistant;
+    const finalToolCallId = [...group.toolCallIds].at(-1);
+    if (!finalToolCallId) return this.activityComponents(group).at(0)?.[0];
+    return [...group.tools].find(([, toolCallId]) => toolCallId === finalToolCallId)?.[0];
   }
 
   private summary(group: TurnGroup, now: number): FoldSummary {
