@@ -2,6 +2,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
+  composeInlineImageLine,
   composeLine,
   fitRunway,
   formatContext,
@@ -30,6 +31,12 @@ describe("footer layout", () => {
       ),
     ).toBeLessThanOrEqual(32);
     expect(fitRunway("left", "right", 5)).toBeUndefined();
+  });
+
+  it("places inline images after drawing their reserved cells", () => {
+    const image = "\x1b_Gi=17;DATA\x1b\\";
+    const line = composeInlineImageLine("left", image, "right", 8);
+    expect(line).toBe(`left ${" ".repeat(8)} right\x1b7\x1b[14D${image}\x1b8`);
   });
 
   it("composes aligned and narrow fallback lines", () => {

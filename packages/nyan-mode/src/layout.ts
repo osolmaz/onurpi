@@ -32,6 +32,18 @@ export function fitRunway(
   return { cells, left: leftPart, right: rightPart, startColumn: leftWidth + 2 };
 }
 
+export function composeInlineImageLine(
+  left: string,
+  imageSequence: string,
+  right: string,
+  cells: number,
+): string {
+  const runwayCells = Math.max(0, Math.floor(cells));
+  const base = `${left} ${" ".repeat(runwayCells)} ${right}`;
+  const rewind = runwayCells + visibleWidth(right) + 1;
+  return `${base}\x1b7\x1b[${String(rewind)}D${imageSequence}\x1b8`;
+}
+
 export function composeLine(left: string, center: string, right: string, width: number): string {
   if (width <= 0) return "";
   const full = joinParts([left, center, right]);

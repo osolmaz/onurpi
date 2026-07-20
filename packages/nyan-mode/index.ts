@@ -11,7 +11,14 @@ import {
   renderAnsiRainbow,
   type NyanRunwayPainter,
 } from "./src/index.ts";
-import { composeLine, fitRunway, formatContext, joinParts, shortModel } from "./src/layout.ts";
+import {
+  composeInlineImageLine,
+  composeLine,
+  fitRunway,
+  formatContext,
+  joinParts,
+  shortModel,
+} from "./src/layout.ts";
 
 export default function nyanMode(pi: ExtensionAPI): void {
   let enabled = true;
@@ -220,8 +227,11 @@ function composeNyanLine(
           cells: layout.cells,
           startColumn: layout.startColumn,
         });
-  const runway = bitmap ?? renderAnsiRainbow(layout.cells);
-  return runway ? `${layout.left} ${runway} ${layout.right}` : undefined;
+  if (bitmap) {
+    return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
+  }
+  const rainbow = renderAnsiRainbow(layout.cells);
+  return rainbow ? `${layout.left} ${rainbow} ${layout.right}` : undefined;
 }
 
 function mutedLabel(theme: Theme, label: string | undefined): string | undefined {

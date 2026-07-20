@@ -58,8 +58,7 @@ export function renderAnimatedNyanRunway(
 
   const layout: NyanRunwayLayout = { cells, startColumn: options.startColumn };
   if (options.percent !== undefined) layout.percent = options.percent;
-  const sequence = painter.render(layout);
-  return sequence ? `${sequence}${" ".repeat(cells)}` : undefined;
+  return painter.render(layout);
 }
 
 class InlineNyanRunwayPainter implements NyanRunwayPainter {

@@ -32,11 +32,11 @@ describe("animated runway rendering", () => {
     tuiMocks.imageProtocol = "kitty";
   });
 
-  it("embeds an image sequence and reserves its terminal cells", () => {
+  it("returns the image sequence for inline footer composition", () => {
     const render = vi.fn(() => "IMAGE");
     const painter = stubPainter(render);
     expect(renderAnimatedNyanRunway(painter, { cells: 8.9, startColumn: 3, percent: 25 })).toBe(
-      "IMAGE        ",
+      "IMAGE",
     );
     expect(render).toHaveBeenCalledWith({ cells: 8, startColumn: 3, percent: 25 });
   });
