@@ -251,7 +251,10 @@ it("keeps a pending tool error visible before the worked line", () => {
 
   const failed = assistantMessage(
     120,
-    [{ arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" }],
+    [
+      { text: "Stale partial response", type: "text" },
+      { arguments: {}, id: "failed-tool", name: "tool", type: "toolCall" },
+    ],
     "error",
   );
   state.registerAssistantMessage(failed);
@@ -273,6 +276,8 @@ it("keeps a pending tool error visible before the worked line", () => {
 
   const rendered = frame(transcript);
   expect(rendered).toContain("Provider failure");
+  expect(rendered).not.toContain("Stale partial response");
+  expect(rendered).toContain("1 failure");
   expect(rendered.indexOf("Provider failure")).toBeLessThan(rendered.indexOf("Worked for"));
   expect(rendered).not.toContain("Operation interrupted");
 });

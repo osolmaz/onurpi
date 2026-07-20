@@ -174,16 +174,24 @@ describe("compact settled turns", () => {
   it("keeps retries in one turn and does not label a successful retry interrupted", () => {
     const state = new TurnFoldState();
     const failed = {};
+    const failedTool = {};
     const succeeded = {};
-    const error = assistantMessage(110, [], "error");
+    const error = assistantMessage(
+      110,
+      [{ id: "retry-tool", name: "read", type: "toolCall" }],
+      "error",
+    );
     const success = assistantMessage(140, [{ text: "Recovered", type: "text" }]);
 
     state.ensureActive(100);
     registerAssistant(state, failed, error);
+    state.registerToolStart("retry-tool", 120);
+    state.associateTool(failedTool, "retry-tool");
     registerAssistant(state, succeeded, success);
     state.settleActive(150);
 
     expect(state.viewFor(failed)?.display).toBe("hidden");
+    expect(state.viewFor(failedTool)?.display).toBe("hidden");
     expect(state.viewFor(succeeded, 150)).toMatchObject({
       display: "settled-final",
       summary: { aborted: false, messages: 2 },

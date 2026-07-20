@@ -10,6 +10,7 @@ type AssistantSnapshot = {
   hasVisibleContent: boolean;
   interrupted: boolean;
   key: string;
+  terminalErrorToolCallId: string | undefined;
   timestamp: number;
   toolCallIds: string[];
 };
@@ -30,6 +31,7 @@ type TurnGroup = {
   settled: boolean;
   startedAt: number;
   startedByUser: boolean;
+  terminalErrorToolCallId: string | undefined;
   toolCallIds: Set<string>;
   tools: Map<object, string>;
 };
@@ -106,6 +108,7 @@ function assistantSnapshot(message: unknown): AssistantSnapshot | undefined {
     hasVisibleContent,
     interrupted: stopReason === "aborted",
     key: String(timestamp),
+    terminalErrorToolCallId: stopReason === "error" ? toolCallIds.at(-1) : undefined,
     timestamp,
     toolCallIds,
   };
@@ -340,6 +343,7 @@ export class TurnFoldState {
     const previousTools = group.toolCallIds.size;
     group.assistantKeys.add(snapshot.key);
     if (snapshot.interrupted) group.aborted = true;
+    group.terminalErrorToolCallId = snapshot.terminalErrorToolCallId;
     this.assistantGroupByKey.set(snapshot.key, groupId);
     for (const toolCallId of snapshot.toolCallIds) {
       group.toolCallIds.add(toolCallId);
@@ -381,11 +385,18 @@ export class TurnFoldState {
   }
 
   private finalAnchor(group: TurnGroup): object | undefined {
+    const terminalErrorTool = this.componentForTool(group, group.terminalErrorToolCallId);
+    if (terminalErrorTool) return terminalErrorTool;
     const assistant = this.lastAssistant(group);
     if (assistant) return assistant;
     const finalToolCallId = [...group.toolCallIds].at(-1);
     if (!finalToolCallId) return this.activityComponents(group).at(0)?.[0];
-    return [...group.tools].find(([, toolCallId]) => toolCallId === finalToolCallId)?.[0];
+    return this.componentForTool(group, finalToolCallId);
+  }
+
+  private componentForTool(group: TurnGroup, toolCallId: string | undefined): object | undefined {
+    if (!toolCallId) return undefined;
+    return [...group.tools].find(([, candidate]) => candidate === toolCallId)?.[0];
   }
 
   private summary(group: TurnGroup, now: number): FoldSummary {
@@ -393,7 +404,12 @@ export class TurnFoldState {
     return {
       aborted: group.aborted,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
-      failedTools: group.failedToolCallIds.size,
+      failedTools:
+        group.failedToolCallIds.size +
+        (group.terminalErrorToolCallId &&
+        !group.failedToolCallIds.has(group.terminalErrorToolCallId)
+          ? 1
+          : 0),
       hiddenActivities: Math.max(0, activityCount - LIVE_ACTIVITY_LIMIT),
       messages: group.assistantKeys.size,
       running: !group.settled,
@@ -422,6 +438,7 @@ export class TurnFoldState {
       settled,
       startedAt,
       startedByUser,
+      terminalErrorToolCallId: undefined,
       toolCallIds: new Set(),
       tools: new Map(),
     };
@@ -458,6 +475,7 @@ export class TurnFoldState {
     if (!snapshot) return;
     group.assistantKeys.add(snapshot.key);
     if (snapshot.interrupted) group.aborted = true;
+    group.terminalErrorToolCallId = snapshot.terminalErrorToolCallId;
     this.assistantGroupByKey.set(snapshot.key, group.id);
     for (const toolCallId of snapshot.toolCallIds) {
       group.toolCallIds.add(toolCallId);
@@ -557,6 +575,7 @@ export class TurnFoldState {
         ...active.failedToolCallIds,
         ...visible.failedToolCallIds,
       ]);
+      active.terminalErrorToolCallId = visible.terminalErrorToolCallId;
       active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
     }
   }
