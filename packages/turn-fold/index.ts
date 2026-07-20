@@ -52,7 +52,7 @@ function applyMode(
   mode: TurnFoldMode,
   persist: boolean,
 ): void {
-  state.setMode(mode);
+  if (state.getMode() !== mode) state.setMode(mode);
   if (persist) pi.appendEntry(CONFIG_ENTRY_TYPE, { mode });
 }
 
