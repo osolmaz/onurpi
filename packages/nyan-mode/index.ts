@@ -8,6 +8,7 @@ import {
   formatApiCost,
   getNyanDebugInfo,
   renderAnimatedNyanRunway,
+  renderAnsiRainbow,
   type NyanRunwayPainter,
 } from "./src/index.ts";
 import { composeLine, fitRunway, formatContext, joinParts, shortModel } from "./src/layout.ts";
@@ -208,7 +209,7 @@ function composeNyanLine(
     painter.clear();
     return undefined;
   }
-  const runway =
+  const bitmap =
     percent === undefined
       ? renderAnimatedNyanRunway(painter, {
           cells: layout.cells,
@@ -219,6 +220,7 @@ function composeNyanLine(
           cells: layout.cells,
           startColumn: layout.startColumn,
         });
+  const runway = bitmap ?? renderAnsiRainbow(layout.cells);
   return runway ? `${layout.left} ${runway} ${layout.right}` : undefined;
 }
 
