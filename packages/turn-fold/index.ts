@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 
 import { installRenderPatches } from "./render-patches.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
@@ -52,7 +52,7 @@ function applyMode(
   mode: TurnFoldMode,
   persist: boolean,
 ): void {
-  state.setMode(mode);
+  if (state.getMode() !== mode) state.setMode(mode);
   if (persist) pi.appendEntry(CONFIG_ENTRY_TYPE, { mode });
 }
 
@@ -113,47 +113,62 @@ function registerCommands(pi: ExtensionAPI, state: TurnFoldState): void {
 
 export default function turnFold(pi: ExtensionAPI): void {
   const state = new TurnFoldState();
-  const restorePatches = installRenderPatches(state);
+  let currentTheme: Theme | undefined;
+  const restorePatches = installRenderPatches(state, () => currentTheme);
   registerCommands(pi, state);
 
   pi.on("session_start", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
     applyMode(pi, state, modeFromBranch(ctx), false);
     loadVisibleHistory(state, ctx);
   });
 
   pi.on("session_compact", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
   pi.on("session_tree", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
-  pi.on("agent_start", () => {
+  pi.on("agent_start", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.ensureActive();
   });
 
-  pi.on("message_start", (event) => {
+  pi.on("message_start", (event, ctx) => {
+    currentTheme = ctx.ui.theme;
     const role = messageRole(event.message);
     if (role === "user") state.startUserTurn(messageTimestamp(event.message));
-    if (role === "assistant") state.registerAssistantMessage(event.message);
+    if (role === "assistant") state.beginAssistantMessage(event.message);
   });
 
-  pi.on("message_update", (event) => {
+  pi.on("message_update", (event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.registerAssistantMessage(event.message);
   });
 
-  pi.on("message_end", (event) => {
+  pi.on("message_end", (event, ctx) => {
+    currentTheme = ctx.ui.theme;
     if (messageRole(event.message) !== "assistant") return;
-    state.registerAssistantMessage(event.message);
+    state.endAssistantMessage(event.message);
     if (messageStopReason(event.message) === "aborted") state.abortActive();
   });
 
-  pi.on("tool_execution_start", (event) => {
+  pi.on("tool_execution_start", (event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.registerToolStart(event.toolCallId);
   });
 
-  pi.on("agent_settled", () => {
+  pi.on("tool_execution_end", (event, ctx) => {
+    currentTheme = ctx.ui.theme;
+    state.registerToolEnd(event.toolCallId, event.isError);
+  });
+
+  pi.on("agent_settled", (_event, ctx) => {
+    currentTheme = ctx.ui.theme;
     state.settleActive();
   });
 

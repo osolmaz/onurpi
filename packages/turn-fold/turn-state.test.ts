@@ -40,11 +40,81 @@ describe("compact streaming", () => {
     });
 
     expect(components.map((component) => state.viewFor(component)?.display)).toEqual([
-      "hidden",
+      "streaming-summary",
       "original",
       "original",
       "original",
     ]);
+  });
+
+  it("invalidates existing rows as new activity changes the compact window", () => {
+    const state = new TurnFoldState();
+    let firstInvalidations = 0;
+    const first = { invalidate: () => (firstInvalidations += 1) };
+    const second = { invalidate: () => undefined };
+
+    state.ensureActive(100);
+    registerAssistant(state, first, assistantMessage(110, [{ text: "First", type: "text" }]));
+    const afterFirst = firstInvalidations;
+    registerAssistant(state, second, assistantMessage(120, [{ text: "Second", type: "text" }]));
+
+    expect(firstInvalidations).toBeGreaterThan(afterFirst);
+    const beforeTokenUpdate = firstInvalidations;
+    state.registerAssistantMessage(
+      assistantMessage(120, [{ text: "Second, still streaming", type: "text" }]),
+    );
+    expect(firstInvalidations).toBe(beforeTokenUpdate);
+    const beforeModeChange = firstInvalidations;
+    state.setMode("expanded");
+    expect(firstInvalidations).toBeGreaterThan(beforeModeChange);
+  });
+
+  it("counts one assistant response across streaming tool-call updates", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const start = assistantMessage(110, []);
+    const updated = {
+      ...assistantMessage(110, [{ id: "tool-live", name: "read", type: "toolCall" }]),
+      responseId: "response-arrived-during-streaming",
+    };
+
+    state.ensureActive(100);
+    state.beginAssistantMessage(start);
+    state.registerAssistantMessage(updated);
+    state.associateAssistant(component, updated);
+    state.endAssistantMessage({ ...updated, stopReason: "toolUse" });
+
+    expect(state.viewFor(component, 120)?.summary.messages).toBe(1);
+  });
+
+  it("distinguishes assistant responses that share a timestamp", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const tool = {};
+    const final = {};
+    const firstMessage = assistantMessage(110, [
+      { text: "Working", type: "text" },
+      { id: "same-ms-tool", name: "read", type: "toolCall" },
+    ]);
+    const finalMessage = assistantMessage(110, [{ text: "Done", type: "text" }]);
+
+    state.ensureActive(100);
+    state.beginAssistantMessage(firstMessage);
+    state.associateAssistant(first, firstMessage);
+    state.endAssistantMessage(firstMessage);
+    state.registerToolStart("same-ms-tool", 110);
+    state.associateTool(tool, "same-ms-tool");
+    state.beginAssistantMessage(finalMessage);
+    state.associateAssistant(final, finalMessage);
+    state.endAssistantMessage(finalMessage);
+    state.settleActive(120);
+
+    expect(state.viewFor(first)?.display).toBe("hidden");
+    expect(state.viewFor(tool)?.display).toBe("hidden");
+    expect(state.viewFor(final, 120)).toMatchObject({
+      display: "settled-final",
+      summary: { messages: 2, tools: 1 },
+    });
   });
 
   it("counts tool rows but not tool-call-only assistant shells", () => {
@@ -66,7 +136,13 @@ describe("compact streaming", () => {
     state.registerToolStart("tool-live", 145);
     state.associateTool(tool, "tool-live");
 
-    expect(state.viewFor(first)?.display).toBe("hidden");
+    expect(state.viewFor(first)?.display).toBe("streaming-summary");
+    expect(state.viewFor(first, 150)?.summary).toMatchObject({
+      hiddenActivities: 1,
+      messages: 4,
+      running: true,
+      tools: 1,
+    });
     expect(state.viewFor(second)?.display).toBe("original");
     expect(state.viewFor(third)?.display).toBe("original");
     expect(state.viewFor(toolOnlyAssistant)?.display).toBe("hidden");
@@ -95,7 +171,18 @@ describe("compact settled turns", () => {
 
     expect(state.viewFor(intermediate)?.display).toBe("hidden");
     expect(state.viewFor(tool)?.display).toBe("hidden");
-    expect(state.viewFor(finalAssistant)?.display).toBe("original");
+    expect(state.viewFor(finalAssistant, 150)).toEqual({
+      display: "settled-final",
+      summary: {
+        aborted: false,
+        durationMs: 50,
+        failedTools: 0,
+        hiddenActivities: 0,
+        messages: 2,
+        running: false,
+        tools: 1,
+      },
+    });
   });
 
   it("keeps an interrupted assistant message visible", () => {
@@ -109,7 +196,37 @@ describe("compact settled turns", () => {
     state.abortActive(130);
 
     expect(state.viewFor(prior)?.display).toBe("hidden");
-    expect(state.viewFor(interrupted)?.display).toBe("original");
+    expect(state.viewFor(interrupted, 130)).toMatchObject({
+      display: "settled-final",
+      summary: { aborted: true, durationMs: 30, running: false },
+    });
+  });
+
+  it("keeps retries in one turn and does not label a successful retry interrupted", () => {
+    const state = new TurnFoldState();
+    const failed = {};
+    const failedTool = {};
+    const succeeded = {};
+    const error = assistantMessage(
+      110,
+      [{ id: "retry-tool", name: "read", type: "toolCall" }],
+      "error",
+    );
+    const success = assistantMessage(140, [{ text: "Recovered", type: "text" }]);
+
+    state.ensureActive(100);
+    registerAssistant(state, failed, error);
+    state.registerToolStart("retry-tool", 120);
+    state.associateTool(failedTool, "retry-tool");
+    registerAssistant(state, succeeded, success);
+    state.settleActive(150);
+
+    expect(state.viewFor(failed)?.display).toBe("hidden");
+    expect(state.viewFor(failedTool)?.display).toBe("hidden");
+    expect(state.viewFor(succeeded, 150)).toMatchObject({
+      display: "settled-final",
+      summary: { aborted: false, messages: 2 },
+    });
   });
 
   it("keeps the latest visible message when a run settles without a final response", () => {
@@ -123,7 +240,7 @@ describe("compact settled turns", () => {
     state.associateTool(tool, "tool-1");
     state.settleActive(130);
 
-    expect(state.viewFor(message)?.display).toBe("original");
+    expect(state.viewFor(message)?.display).toBe("settled-final");
     expect(state.viewFor(tool)?.display).toBe("hidden");
   });
 });
@@ -189,8 +306,22 @@ describe("historical transcript", () => {
 
     expect(state.viewFor(firstIntermediate)?.display).toBe("hidden");
     expect(state.viewFor(firstTool)?.display).toBe("hidden");
-    expect(state.viewFor(firstFinal)?.display).toBe("original");
-    expect(state.viewFor(secondFinal)?.display).toBe("original");
+    expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
+    expect(state.viewFor(secondFinal)?.display).toBe("settled-final");
+  });
+
+  it("uses persisted completion time when restoring worked duration", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    const message = assistantMessage(1_100, [{ text: "Done", type: "text" }]);
+
+    state.loadHistory([
+      { message: { content: "prompt", role: "user", timestamp: 1_000 }, type: "message" },
+      { message, timestamp: new Date(5_000).toISOString(), type: "message" },
+    ]);
+    state.associateAssistant(component, message);
+
+    expect(state.viewFor(component)?.summary.durationMs).toBe(4_000);
   });
 
   it("preserves an active turn through a deferred transcript rebuild", () => {
@@ -211,7 +342,7 @@ describe("historical transcript", () => {
     expect(state.viewFor(original)).toBeUndefined();
     expect(state.viewFor(rebuilt)?.display).toBe("original");
     state.settleActive(120);
-    expect(state.viewFor(rebuilt)?.display).toBe("original");
+    expect(state.viewFor(rebuilt)?.display).toBe("settled-final");
   });
 
   it("ignores malformed and unrelated session data", () => {
@@ -226,8 +357,13 @@ describe("historical transcript", () => {
       { message: { content: "prompt", role: "user" }, type: "message" },
       { message: { role: "toolResult", timestamp: 3 }, type: "message" },
     ]);
+    state.beginAssistantMessage({ role: "assistant" });
+    state.beginAssistantMessage({ role: "user", timestamp: 330 });
     state.registerAssistantMessage({ role: "assistant" });
+    state.endAssistantMessage({ content: [], role: "assistant", timestamp: 330 });
+    state.settleActive();
     state.associateAssistant(unknown, { role: "assistant" });
+    state.associateAssistant(unknown, assistantMessage(340, []));
     state.associateTool(unknown, "missing");
     state.settleActive();
 
