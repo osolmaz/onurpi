@@ -6,10 +6,11 @@
 - Use strict TypeScript. Do not use explicit `any`, unsafe casts, or unchecked external input.
 - Keep only reviewed global settings in `settings.json`. Never copy Pi authentication, sessions,
   trust decisions, or provider state into this repository.
-- Never edit `settings.json` or `~/.pi/agent/settings.json` package entries by hand. Update the
-  tracked copy with `npm run settings:sync` and normalize the live file with
-  `npm run settings:reset`; both replace repo-owned entries (checkout paths, worktree paths, the git
-  source) with canonical per-package paths derived from `pi.extensions` in the root manifest.
+- Never edit the tracked `settings.json` by hand; write it with `npm run settings:sync`. The live
+  `~/.pi/agent/settings.json` may be edited directly when needed (for example to point an entry at a
+  worktree during development); `npm run settings:reset` normalizes it back. Both scripts replace
+  repo-owned entries (checkout paths, worktree paths, the git source) with canonical per-package
+  paths derived from `pi.extensions` in the root manifest.
 - Keep transcript selection and folding policy separate from Pi TUI patching and other runtime
   integration.
 - Add or update tests for every behavior change.
