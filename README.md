@@ -13,22 +13,15 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 
 ## Install
 
-Clone the repository to `~/repos/onurpi`, install development dependencies, and register the local
-extensions:
+The root manifest registers every extension, so one package entry covers the whole workspace:
 
 ```bash
-git clone https://github.com/osolmaz/onurpi.git ~/repos/onurpi
-cd ~/repos/onurpi
-npm ci
-pi install ./packages/turn-fold
-pi install ./packages/pi-tui-history-replay
-pi install ./packages/live-stats
-pi install ./packages/prompt-queue
-pi install git:github.com/osolmaz/pi-must-win
-pi list
+pi install git:github.com/osolmaz/onurpi
 ```
 
-Run `/reload` in an existing Pi session after installation.
+Run `/reload` in an existing Pi session after installation. After new commits land on `main`, run
+`pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to
+pick them up.
 
 ## Global settings
 
@@ -61,15 +54,31 @@ TypeScript quality tooling at the workspace root.
 
 ## Development
 
+Extensions are developed from a live Pi session: edit the working tree, then `/reload`. That only
+works while the installed package points at the working tree instead of the GitHub clone, so the
+workspace has two modes, switched with one command:
+
+```bash
+npm run pi:dev     # settings point at ~/repos/onurpi; /reload picks up local edits
+npm run pi:stable  # settings point at git:github.com/osolmaz/onurpi (pushed code)
+```
+
+Use dev mode while working on an extension. Once the work is merged, switch back to stable mode so
+sessions load pinned, pushed code and are immune to branch switches and uncommitted edits. Both
+modes register the same extensions through the root manifest. Never leave both entries installed
+at once; the extensions would load twice.
+
+Quick-test without touching settings at all:
+
+```bash
+pi -e .
+```
+
+Quality gates:
+
 ```bash
 npm ci
 npm run check
 npm run mutate
 npm run slophammer
-```
-
-Quick-test an extension without installing it permanently:
-
-```bash
-pi -e .
 ```
