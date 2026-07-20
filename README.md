@@ -76,6 +76,11 @@ Quality gates:
 ```bash
 npm ci
 npm run check
-npm run mutate
 npm run slophammer
+```
+
+Mutation testing remains available as an optional manual check:
+
+```bash
+npm run mutate
 ```
