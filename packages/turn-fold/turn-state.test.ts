@@ -40,11 +40,28 @@ describe("compact streaming", () => {
     });
 
     expect(components.map((component) => state.viewFor(component)?.display)).toEqual([
-      "hidden",
+      "streaming-summary",
       "original",
       "original",
       "original",
     ]);
+  });
+
+  it("invalidates existing rows as new activity changes the compact window", () => {
+    const state = new TurnFoldState();
+    let firstInvalidations = 0;
+    const first = { invalidate: () => (firstInvalidations += 1) };
+    const second = { invalidate: () => undefined };
+
+    state.ensureActive(100);
+    registerAssistant(state, first, assistantMessage(110, [{ text: "First", type: "text" }]));
+    const afterFirst = firstInvalidations;
+    registerAssistant(state, second, assistantMessage(120, [{ text: "Second", type: "text" }]));
+
+    expect(firstInvalidations).toBeGreaterThan(afterFirst);
+    const beforeModeChange = firstInvalidations;
+    state.setMode("expanded");
+    expect(firstInvalidations).toBeGreaterThan(beforeModeChange);
   });
 
   it("counts tool rows but not tool-call-only assistant shells", () => {
@@ -66,7 +83,13 @@ describe("compact streaming", () => {
     state.registerToolStart("tool-live", 145);
     state.associateTool(tool, "tool-live");
 
-    expect(state.viewFor(first)?.display).toBe("hidden");
+    expect(state.viewFor(first)?.display).toBe("streaming-summary");
+    expect(state.viewFor(first, 150)?.summary).toMatchObject({
+      hiddenActivities: 1,
+      messages: 4,
+      running: true,
+      tools: 1,
+    });
     expect(state.viewFor(second)?.display).toBe("original");
     expect(state.viewFor(third)?.display).toBe("original");
     expect(state.viewFor(toolOnlyAssistant)?.display).toBe("hidden");
@@ -95,7 +118,18 @@ describe("compact settled turns", () => {
 
     expect(state.viewFor(intermediate)?.display).toBe("hidden");
     expect(state.viewFor(tool)?.display).toBe("hidden");
-    expect(state.viewFor(finalAssistant)?.display).toBe("original");
+    expect(state.viewFor(finalAssistant, 150)).toEqual({
+      display: "settled-final",
+      summary: {
+        aborted: false,
+        durationMs: 50,
+        failedTools: 0,
+        hiddenActivities: 0,
+        messages: 2,
+        running: false,
+        tools: 1,
+      },
+    });
   });
 
   it("keeps an interrupted assistant message visible", () => {
@@ -109,7 +143,10 @@ describe("compact settled turns", () => {
     state.abortActive(130);
 
     expect(state.viewFor(prior)?.display).toBe("hidden");
-    expect(state.viewFor(interrupted)?.display).toBe("original");
+    expect(state.viewFor(interrupted, 130)).toMatchObject({
+      display: "settled-final",
+      summary: { aborted: true, durationMs: 30, running: false },
+    });
   });
 
   it("keeps the latest visible message when a run settles without a final response", () => {
@@ -123,7 +160,7 @@ describe("compact settled turns", () => {
     state.associateTool(tool, "tool-1");
     state.settleActive(130);
 
-    expect(state.viewFor(message)?.display).toBe("original");
+    expect(state.viewFor(message)?.display).toBe("settled-final");
     expect(state.viewFor(tool)?.display).toBe("hidden");
   });
 });
@@ -189,8 +226,8 @@ describe("historical transcript", () => {
 
     expect(state.viewFor(firstIntermediate)?.display).toBe("hidden");
     expect(state.viewFor(firstTool)?.display).toBe("hidden");
-    expect(state.viewFor(firstFinal)?.display).toBe("original");
-    expect(state.viewFor(secondFinal)?.display).toBe("original");
+    expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
+    expect(state.viewFor(secondFinal)?.display).toBe("settled-final");
   });
 
   it("preserves an active turn through a deferred transcript rebuild", () => {
@@ -211,7 +248,7 @@ describe("historical transcript", () => {
     expect(state.viewFor(original)).toBeUndefined();
     expect(state.viewFor(rebuilt)?.display).toBe("original");
     state.settleActive(120);
-    expect(state.viewFor(rebuilt)?.display).toBe("original");
+    expect(state.viewFor(rebuilt)?.display).toBe("settled-final");
   });
 
   it("ignores malformed and unrelated session data", () => {

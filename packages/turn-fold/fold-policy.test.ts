@@ -3,38 +3,51 @@ import { describe, expect, it } from "vitest";
 import { foldDisplay } from "./fold-policy.ts";
 
 describe("fold display policy", () => {
-  it("shows only recent activity while compact mode is running", () => {
+  it("shows the overflow summary and latest activity while compact mode is running", () => {
     expect(
       foldDisplay({
-        isLastAssistant: false,
+        isFinalAnchor: false,
+        isRecentActivity: false,
+        isStreamingSummaryAnchor: true,
+        mode: "compact",
+        settled: false,
+      }),
+    ).toBe("streaming-summary");
+    expect(
+      foldDisplay({
+        isFinalAnchor: false,
         isRecentActivity: true,
+        isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: false,
       }),
     ).toBe("original");
     expect(
       foldDisplay({
-        isLastAssistant: true,
+        isFinalAnchor: false,
         isRecentActivity: false,
+        isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: false,
       }),
     ).toBe("hidden");
   });
 
-  it("shows only the last assistant message after compact activity settles", () => {
+  it("shows only the final anchor after compact activity settles", () => {
     expect(
       foldDisplay({
-        isLastAssistant: true,
+        isFinalAnchor: true,
         isRecentActivity: false,
+        isStreamingSummaryAnchor: false,
         mode: "compact",
         settled: true,
       }),
-    ).toBe("original");
+    ).toBe("settled-final");
     expect(
       foldDisplay({
-        isLastAssistant: false,
+        isFinalAnchor: false,
         isRecentActivity: true,
+        isStreamingSummaryAnchor: true,
         mode: "compact",
         settled: true,
       }),
@@ -44,8 +57,9 @@ describe("fold display policy", () => {
   it("shows every row in expanded mode", () => {
     expect(
       foldDisplay({
-        isLastAssistant: false,
+        isFinalAnchor: false,
         isRecentActivity: false,
+        isStreamingSummaryAnchor: false,
         mode: "expanded",
         settled: true,
       }),
