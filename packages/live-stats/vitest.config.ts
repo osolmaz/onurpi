@@ -6,7 +6,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["live-stats.ts"],
+      include: ["live-stats.ts", "working-phrases.ts"],
       thresholds: {
         statements: 85,
         branches: 85,

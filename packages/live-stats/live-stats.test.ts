@@ -3,10 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   countOutputContentChars,
   formatElapsed,
+  formatShimmeringWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
   LiveStatsTracker,
 } from "./live-stats.ts";
+import {
+  pickWorkingPhrase,
+  TURKISH_WORKING_PHRASES,
+  WorkingPhraseState,
+} from "./working-phrases.ts";
 
 describe("LiveStatsTracker", () => {
   it("rejects invalid estimation settings", () => {
@@ -226,25 +232,80 @@ describe("formatTokenCount", () => {
 });
 
 describe("formatWorkingMessage", () => {
-  it("shows estimated output and a sampled rate", () => {
+  it("shows a Turkish phrase, estimated output, and a sampled rate", () => {
     expect(
-      formatWorkingMessage({
-        elapsedMs: 12_400,
-        outputTokens: 438,
-        outputApproximate: true,
-        tokensPerSecond: 21.74,
-      }),
-    ).toBe("Working (12s · ~438 out · 21.7 tok/s)");
+      formatWorkingMessage(
+        {
+          elapsedMs: 12_400,
+          outputTokens: 438,
+          outputApproximate: true,
+          tokensPerSecond: 21.74,
+        },
+        "Yardırıyorum",
+      ),
+    ).toBe("Yardırıyorum… (12s · ~438 out · 21.7 tok/s)");
   });
 
   it("shows unavailable throughput before sampling begins", () => {
     expect(
-      formatWorkingMessage({
-        elapsedMs: 0,
-        outputTokens: 0,
-        outputApproximate: false,
-        tokensPerSecond: undefined,
-      }),
-    ).toBe("Working (0s · 0 out · — tok/s)");
+      formatWorkingMessage(
+        {
+          elapsedMs: 0,
+          outputTokens: 0,
+          outputApproximate: false,
+          tokensPerSecond: undefined,
+        },
+        "Piston aşağı indi",
+      ),
+    ).toBe("Piston aşağı indi… (0s · 0 out · — tok/s)");
+  });
+
+  it("moves a shimmer across the bold working phrase", () => {
+    const snapshot = {
+      elapsedMs: 1_000,
+      outputTokens: 12,
+      outputApproximate: false,
+      tokensPerSecond: 4,
+    };
+    const styles = {
+      bold: (text: string) => `<b>${text}</b>`,
+      muted: (text: string) => `<muted>${text}</muted>`,
+      accent: (text: string) => `<accent>${text}</accent>`,
+    };
+
+    const firstFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_600, styles);
+    const secondFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_400, styles);
+
+    expect(firstFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><muted>…<\/muted>/u);
+    expect(firstFrame).toContain("<muted> (1s · 12 out · 4.0 tok/s)</muted></b>");
+    expect(secondFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><accent>…<\/accent>/u);
+    expect(secondFrame).not.toBe(firstFrame);
+  });
+});
+
+describe("pickWorkingPhrase", () => {
+  it("selects across the Turkish phrase list", () => {
+    expect(TURKISH_WORKING_PHRASES).toContain("Usta");
+    expect(TURKISH_WORKING_PHRASES).toContain("Yaparım");
+    expect(pickWorkingPhrase(() => 0)).toBe("Yardırıyorum");
+    expect(pickWorkingPhrase(() => 0.999_999)).toBe("Sıçtın mavisini izliyorum");
+  });
+
+  it("falls back to the first phrase if the random source is out of range", () => {
+    expect(pickWorkingPhrase(() => 1)).toBe(TURKISH_WORKING_PHRASES[0]);
+  });
+});
+
+describe("WorkingPhraseState", () => {
+  it("keeps one phrase until the agent settles", () => {
+    const state = new WorkingPhraseState();
+
+    expect(state.current).toBeUndefined();
+    expect(state.start(() => 0)).toBe("Yardırıyorum");
+    expect(state.start(() => 0.999_999)).toBe("Yardırıyorum");
+
+    state.reset();
+    expect(state.current).toBeUndefined();
+    expect(state.start(() => 0.999_999)).toBe("Sıçtın mavisini izliyorum");
   });
 });

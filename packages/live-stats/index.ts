@@ -1,12 +1,28 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { countOutputContentChars, formatWorkingMessage, LiveStatsTracker } from "./live-stats.ts";
+import {
+  countOutputContentChars,
+  formatShimmeringWorkingMessage,
+  LiveStatsTracker,
+  type WorkingMessageStyles,
+} from "./live-stats.ts";
+import { WorkingPhraseState } from "./working-phrases.ts";
 
-const REFRESH_INTERVAL_MS = 250;
+const REFRESH_INTERVAL_MS = 50;
+
+function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
+  return {
+    bold: (text) => ctx.ui.theme.bold(text),
+    muted: (text) => ctx.ui.theme.fg("muted", text),
+    accent: (text) => ctx.ui.theme.fg("accent", text),
+  };
+}
 
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
+  let shimmerStartedAtMs: number | undefined;
+  const workingPhrase = new WorkingPhraseState();
 
   const stopTimer = (): void => {
     if (refreshTimer === undefined) return;
@@ -16,12 +32,24 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   const render = (ctx: ExtensionContext): void => {
     if (ctx.mode !== "tui" || !tracker.active) return;
-    ctx.ui.setWorkingMessage(formatWorkingMessage(tracker.snapshot(Date.now())));
+    const phrase = workingPhrase.current;
+    const startedAtMs = shimmerStartedAtMs;
+    if (phrase === undefined || startedAtMs === undefined) return;
+    const now = Date.now();
+    const message = formatShimmeringWorkingMessage(
+      tracker.snapshot(now),
+      phrase,
+      now - startedAtMs,
+      workingMessageStyles(ctx),
+    );
+    ctx.ui.setWorkingMessage(message);
   };
 
   const reset = (ctx: ExtensionContext): void => {
     stopTimer();
     tracker.reset();
+    workingPhrase.reset();
+    shimmerStartedAtMs = undefined;
     if (ctx.mode === "tui") ctx.ui.setWorkingMessage();
   };
 
@@ -29,7 +57,12 @@ export default function liveStats(pi: ExtensionAPI): void {
     if (ctx.mode !== "tui") return;
 
     stopTimer();
-    tracker.start(Date.now());
+    const now = Date.now();
+    if (workingPhrase.current === undefined) {
+      workingPhrase.start();
+      shimmerStartedAtMs = now;
+    }
+    tracker.start(now);
     render(ctx);
     refreshTimer = setInterval(() => {
       render(ctx);

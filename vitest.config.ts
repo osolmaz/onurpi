@@ -10,6 +10,7 @@ export default defineConfig({
         "packages/turn-fold/tool-padding.ts",
         "packages/pi-tui-history-replay/history-replay.ts",
         "packages/live-stats/live-stats.ts",
+        "packages/live-stats/working-phrases.ts",
         "packages/nyan-mode/src/cost.ts",
         "packages/nyan-mode/src/image.ts",
         "packages/nyan-mode/src/kitty-probe.ts",

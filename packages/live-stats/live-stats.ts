@@ -13,6 +13,12 @@ export type LiveStatsSnapshot = {
   tokensPerSecond: number | undefined;
 };
 
+export type WorkingMessageStyles = {
+  bold: (text: string) => string;
+  muted: (text: string) => string;
+  accent: (text: string) => string;
+};
+
 type OutputContent =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
@@ -162,10 +168,36 @@ export function formatTokenCount(tokens: number): string {
   return formatCompact(value / 1_000_000, "M");
 }
 
-export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
+export function formatWorkingMessage(snapshot: LiveStatsSnapshot, workingPhrase: string): string {
+  return `${workingPhrase}… (${formatWorkingStats(snapshot)})`;
+}
+
+export function formatShimmeringWorkingMessage(
+  snapshot: LiveStatsSnapshot,
+  workingPhrase: string,
+  shimmerElapsedMs: number,
+  styles: WorkingMessageStyles,
+): string {
+  const phrase = `${workingPhrase}…`;
+  const characters = Array.from(phrase);
+  const cycleLength = characters.length + 20;
+  const cyclePosition = Math.floor(Math.max(0, shimmerElapsedMs) / 200) % cycleLength;
+  const center = characters.length + 10 - cyclePosition;
+  const shimmeringPhrase = characters
+    .map((character, index) => {
+      const distance = Math.abs(index - center);
+      if (distance <= 1) return styles.accent(character);
+      return styles.muted(character);
+    })
+    .join("");
+
+  return styles.bold(`${shimmeringPhrase}${styles.muted(` (${formatWorkingStats(snapshot)})`)}`);
+}
+
+function formatWorkingStats(snapshot: LiveStatsSnapshot): string {
   const approximate = snapshot.outputApproximate ? "~" : "";
   const rate = snapshot.tokensPerSecond?.toFixed(1) ?? "—";
-  return `Working (${formatElapsed(snapshot.elapsedMs)} · ${approximate}${formatTokenCount(snapshot.outputTokens)} out · ${rate} tok/s)`;
+  return `${formatElapsed(snapshot.elapsedMs)} · ${approximate}${formatTokenCount(snapshot.outputTokens)} out · ${rate} tok/s`;
 }
 
 function formatCompact(value: number, suffix: string): string {
