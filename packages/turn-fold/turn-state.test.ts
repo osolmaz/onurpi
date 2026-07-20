@@ -109,7 +109,7 @@ describe("compact streaming", () => {
     state.endAssistantMessage(finalMessage);
     state.settleActive(120);
 
-    expect(state.viewFor(first)?.display).toBe("hidden");
+    expect(state.viewFor(first)?.display).toBe("settled-summary");
     expect(state.viewFor(tool)?.display).toBe("hidden");
     expect(state.viewFor(final, 120)).toMatchObject({
       display: "settled-final",
@@ -169,7 +169,7 @@ describe("compact settled turns", () => {
     registerAssistant(state, finalAssistant, final);
     state.settleActive(150);
 
-    expect(state.viewFor(intermediate)?.display).toBe("hidden");
+    expect(state.viewFor(intermediate)?.display).toBe("settled-summary");
     expect(state.viewFor(tool)?.display).toBe("hidden");
     expect(state.viewFor(finalAssistant, 150)).toEqual({
       display: "settled-final",
@@ -195,7 +195,7 @@ describe("compact settled turns", () => {
     registerAssistant(state, interrupted, assistantMessage(120, [], "aborted"));
     state.abortActive(130);
 
-    expect(state.viewFor(prior)?.display).toBe("hidden");
+    expect(state.viewFor(prior)?.display).toBe("settled-summary");
     expect(state.viewFor(interrupted, 130)).toMatchObject({
       display: "settled-final",
       summary: { aborted: true, durationMs: 30, running: false },
@@ -221,7 +221,7 @@ describe("compact settled turns", () => {
     registerAssistant(state, succeeded, success);
     state.settleActive(150);
 
-    expect(state.viewFor(failed)?.display).toBe("hidden");
+    expect(state.viewFor(failed)?.display).toBe("settled-summary");
     expect(state.viewFor(failedTool)?.display).toBe("hidden");
     expect(state.viewFor(succeeded, 150)).toMatchObject({
       display: "settled-final",
@@ -240,7 +240,7 @@ describe("compact settled turns", () => {
     state.associateTool(tool, "tool-1");
     state.settleActive(130);
 
-    expect(state.viewFor(message)?.display).toBe("settled-final");
+    expect(state.viewFor(message)?.display).toBe("settled-summary-final");
     expect(state.viewFor(tool)?.display).toBe("hidden");
   });
 });
@@ -304,10 +304,10 @@ describe("historical transcript", () => {
     state.associateAssistant(firstFinal, firstDone);
     state.associateAssistant(secondFinal, secondDone);
 
-    expect(state.viewFor(firstIntermediate)?.display).toBe("hidden");
+    expect(state.viewFor(firstIntermediate)?.display).toBe("settled-summary");
     expect(state.viewFor(firstTool)?.display).toBe("hidden");
     expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
-    expect(state.viewFor(secondFinal)?.display).toBe("settled-final");
+    expect(state.viewFor(secondFinal)?.display).toBe("settled-summary-final");
   });
 
   it("uses persisted completion time when restoring worked duration", () => {
@@ -342,7 +342,7 @@ describe("historical transcript", () => {
     expect(state.viewFor(original)).toBeUndefined();
     expect(state.viewFor(rebuilt)?.display).toBe("original");
     state.settleActive(120);
-    expect(state.viewFor(rebuilt)?.display).toBe("settled-final");
+    expect(state.viewFor(rebuilt)?.display).toBe("settled-summary-final");
   });
 
   it("ignores malformed and unrelated session data", () => {

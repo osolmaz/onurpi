@@ -3,18 +3,20 @@
 Compact transcript rendering for the Pi coding agent.
 
 `@onurpi/turn-fold` keeps Pi's working line and the latest three activity rows visible during a
-run. Earlier activity is replaced by one summary row. When the run stops, tool rows and intermediate
-assistant messages disappear. The final response stays visible with a `Worked for …` line beneath
-it. If the run is interrupted, the last partial response or activity row stays above that line.
+run. Earlier activity is replaced by one summary row directly below the user message. When the run
+stops, that position holds the `Worked for …` line. Tool rows and intermediate assistant messages
+disappear, leaving the final response below the summary. Interrupted runs retain their last partial
+response or a fallback message.
 
 The extension changes only the display. Pi keeps every underlying session message in model context.
+The normative behavior is defined in [SPEC.md](SPEC.md).
 
 ## Modes
 
-| Mode       | Behavior                                                                        |
-| ---------- | ------------------------------------------------------------------------------- |
-| `compact`  | Shows a summary and the latest three rows, then the final row and elapsed time. |
-| `expanded` | Shows the complete transcript.                                                  |
+| Mode       | Behavior                                                                    |
+| ---------- | --------------------------------------------------------------------------- |
+| `compact`  | Shows a summary below the user message, followed by live or final activity. |
+| `expanded` | Shows the complete transcript.                                              |
 
 `compact` is the default.
 

@@ -6,6 +6,7 @@ import {
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
+import type { FoldDisplay } from "./fold-policy.ts";
 import type { FoldSummary } from "./turn-state.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -81,15 +82,42 @@ function interruptionFallback(theme: Theme | undefined, width: number): string[]
   return ["", theme ? theme.fg("error", text) : text];
 }
 
-function appendSettledSummary(
+function settledFinal(
   original: string[],
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  const visible =
-    original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
-  return [...visible, ...renderSettledSummary(summary, width, theme)];
+  return original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
+}
+
+function settledSummaryAndFinal(
+  original: string[],
+  summary: FoldSummary,
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  return [
+    ...renderSettledSummary(summary, width, theme),
+    ...settledFinal(original, summary, width, theme),
+  ];
+}
+
+function renderFoldView(
+  display: FoldDisplay,
+  original: () => string[],
+  summary: FoldSummary,
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (display === "original") return original();
+  if (display === "hidden") return [];
+  if (display === "streaming-summary") return renderStreamingSummary(summary, width, theme);
+  if (display === "settled-summary") return renderSettledSummary(summary, width, theme);
+  const originalLines = original();
+  return display === "settled-summary-final"
+    ? settledSummaryAndFinal(originalLines, summary, width, theme)
+    : settledFinal(originalLines, summary, width, theme);
 }
 
 export function installRenderPatches(
@@ -121,13 +149,14 @@ export function installRenderPatches(
     const lastMessage: unknown = Reflect.get(this, "lastMessage");
     state.associateAssistant(this, lastMessage);
     const view = state.viewFor(this);
-    if (!view || view.display === "original") return originalAssistantRender.call(this, width);
-    if (view.display === "hidden") return [];
-    if (view.display === "streaming-summary") {
-      return renderStreamingSummary(view.summary, width, getTheme());
-    }
-    const original = originalAssistantRender.call(this, width);
-    return appendSettledSummary(original, view.summary, width, getTheme());
+    if (!view) return originalAssistantRender.call(this, width);
+    return renderFoldView(
+      view.display,
+      () => originalAssistantRender.call(this, width),
+      view.summary,
+      width,
+      getTheme(),
+    );
   };
 
   const patchedToolMarkExecutionStarted = function (this: ToolExecutionComponent): void {
@@ -143,13 +172,14 @@ export function installRenderPatches(
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);
     const view = state.viewFor(this);
-    if (!view || view.display === "original") return originalToolRender.call(this, width);
-    if (view.display === "hidden") return [];
-    if (view.display === "streaming-summary") {
-      return renderStreamingSummary(view.summary, width, getTheme());
-    }
-    const original = originalToolRender.call(this, width);
-    return appendSettledSummary(original, view.summary, width, getTheme());
+    if (!view) return originalToolRender.call(this, width);
+    return renderFoldView(
+      view.display,
+      () => originalToolRender.call(this, width),
+      view.summary,
+      width,
+      getTheme(),
+    );
   };
 
   assistantPrototype.updateContent = patchedAssistantUpdate;
