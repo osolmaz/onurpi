@@ -1,3 +1,4 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -40,6 +41,15 @@ describe("turn fold summary rendering", () => {
     expect(formatSettledSummary(summary({ completedAt }), now)).toBe(
       "▶ Worked for 1m 5s · 18:43 · 10 tools · 4 msgs",
     );
+  });
+
+  it("renders themed summary lines in bold", () => {
+    const testTheme = {
+      bold: (text: string) => `<bold>${text}</bold>`,
+      fg: (_color: string, text: string) => text,
+    } as unknown as Theme;
+    const rendered = renderSettledSummary(summary(), 100, testTheme);
+    expect(rendered[1]).toBe("<bold>▶ Worked for 1m 5s · 10 tools · 4 msgs</bold>");
   });
 
   it("renders summaries with a leading blank row and respects zero width", () => {

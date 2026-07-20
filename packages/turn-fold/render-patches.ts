@@ -62,7 +62,9 @@ function styledSummary(
   if (width <= 0) return [];
   const truncated = truncateToWidth(text, width, "…");
   const styled = theme
-    ? theme.fg(summary.aborted || summary.failedTools > 0 ? "warning" : "muted", truncated)
+    ? theme.bold(
+        theme.fg(summary.aborted || summary.failedTools > 0 ? "warning" : "muted", truncated),
+      )
     : truncated;
   return ["", styled];
 }
