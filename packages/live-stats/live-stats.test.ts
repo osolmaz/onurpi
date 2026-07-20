@@ -276,13 +276,9 @@ describe("formatWorkingMessage", () => {
     const firstFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_600, styles);
     const secondFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_400, styles);
 
-    expect(firstFrame).toMatch(
-      /^<b><accent>A<\/accent><accent>B<\/accent><muted>…<\/muted>/u,
-    );
+    expect(firstFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><muted>…<\/muted>/u);
     expect(firstFrame).toContain("<muted> (1s · 12 out · 4.0 tok/s)</muted></b>");
-    expect(secondFrame).toMatch(
-      /^<b><accent>A<\/accent><accent>B<\/accent><accent>…<\/accent>/u,
-    );
+    expect(secondFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><accent>…<\/accent>/u);
     expect(secondFrame).not.toBe(firstFrame);
   });
 });
