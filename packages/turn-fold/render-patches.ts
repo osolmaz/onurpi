@@ -112,17 +112,37 @@ function settledSummaryAndFinal(
   ];
 }
 
-function appendUserTimestamp(
+const USER_ZONE_END = "\u001b]133;B\u0007\u001b]133;C\u0007";
+type TimestampBackground = "customMessageBg" | "userMessageBg";
+
+function timestampContent(label: string, width: number, theme: Theme | undefined): string {
+  const styled = theme ? theme.fg("dim", label) : label;
+  return " ".repeat(Math.max(0, width - label.length)) + styled;
+}
+
+function timestampBackground(
+  content: string,
+  background: TimestampBackground,
+  theme: Theme | undefined,
+): string {
+  return theme ? theme.bg(background, content) : content;
+}
+
+function timestampOnBottomLine(
   original: string[],
   timestamp: number | undefined,
   width: number,
   theme: Theme | undefined,
+  background: TimestampBackground,
 ): string[] {
-  if (timestamp === undefined || width <= 0) return original;
+  if (timestamp === undefined || width <= 0 || original.length === 0) return original;
   const label = truncateToWidth(formatLocalTimestamp(timestamp), width, "");
   if (!label) return original;
-  const padding = " ".repeat(Math.max(0, width - label.length));
-  return [...original, padding + (theme ? theme.fg("dim", label) : label)];
+  const content = timestampContent(label, width, theme);
+  const lastLine = original.at(-1) ?? "";
+  const prefix = lastLine.startsWith(USER_ZONE_END) ? USER_ZONE_END : "";
+  const timestampLine = timestampBackground(content, background, theme);
+  return [...original.slice(0, -1), prefix + timestampLine];
 }
 
 function skillHasUserMessage(component: SkillInvocationMessageComponent): boolean {
@@ -144,11 +164,12 @@ function installUserTimestampPatches(
   const patchedUserRender = function (this: UserMessageComponent, width: number): string[] {
     state.reloadHistoryForNewComponent(this);
     state.associateUser(this);
-    return appendUserTimestamp(
+    return timestampOnBottomLine(
       originalUserRender.call(this, width),
       state.userTimestampFor(this),
       width,
       getTheme(),
+      "userMessageBg",
     );
   };
   const patchedSkillRender = function (
@@ -159,7 +180,13 @@ function installUserTimestampPatches(
     if (skillHasUserMessage(this)) return original;
     state.reloadHistoryForNewComponent(this);
     state.associateUser(this);
-    return appendUserTimestamp(original, state.userTimestampFor(this), width, getTheme());
+    return timestampOnBottomLine(
+      original,
+      state.userTimestampFor(this),
+      width,
+      getTheme(),
+      "customMessageBg",
+    );
   };
 
   userPrototype.render = patchedUserRender;
