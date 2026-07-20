@@ -247,7 +247,6 @@ it("keeps a pending tool error visible before the worked line", () => {
   const transcript = new Container();
   const ui = stoppedTui();
   restore = installRenderPatches(state, () => undefined);
-  state.ensureActive(100);
 
   const failed = assistantMessage(
     120,
@@ -258,11 +257,13 @@ it("keeps a pending tool error visible before the worked line", () => {
     ],
     "error",
   );
-  state.registerAssistantMessage(failed);
+  state.loadHistory([
+    { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
+    { message: failed, timestamp: new Date(150).toISOString(), type: "message" },
+  ]);
   transcript.addChild(new AssistantMessageComponent(failed, false, undefined, undefined, 0));
   for (const index of [1, 2]) {
     const toolCallId = `failed-tool-${String(index)}`;
-    state.registerToolStart(toolCallId, 124 + index);
     const tool = new ToolExecutionComponent(
       `failed_tool_${String(index)}`,
       toolCallId,
@@ -272,14 +273,12 @@ it("keeps a pending tool error visible before the worked line", () => {
       ui,
       "/tmp",
     );
-    tool.markExecutionStarted();
     tool.updateResult({
       content: [{ text: `Provider failure ${String(index)}`, type: "text" }],
       isError: true,
     });
     transcript.addChild(tool);
   }
-  state.settleActive(150);
 
   const rendered = frame(transcript);
   expect(rendered).not.toContain("Provider failure 1");

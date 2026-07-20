@@ -385,11 +385,10 @@ export class TurnFoldState {
   }
 
   private finalAnchor(group: TurnGroup): object | undefined {
-    const terminalErrorTool = this.componentForTool(
-      group,
-      [...group.terminalErrorToolCallIds].at(-1),
-    );
-    if (terminalErrorTool) return terminalErrorTool;
+    const terminalErrorToolCallId = [...group.terminalErrorToolCallIds].at(-1);
+    if (terminalErrorToolCallId) {
+      return this.componentForTool(group, terminalErrorToolCallId);
+    }
     const assistant = this.lastAssistant(group);
     if (assistant) return assistant;
     const finalToolCallId = [...group.toolCallIds].at(-1);
