@@ -6,6 +6,7 @@
     "../../repos/onurpi/packages/pi-tui-history-replay",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
+    "../../repos/onurpi/packages/nyan-mode",
     "../../repos/onurpi/packages/prompt-queue"
   ],
   "lastChangelogVersion": "0.80.10",

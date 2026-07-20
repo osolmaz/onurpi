@@ -17,6 +17,8 @@
 - Avoid new runtime dependencies when the standard library or Pi APIs suffice.
 - Follow `VENDORING.md` when adopting third-party extensions. Vendor small, low-traction extensions
   before installing them.
-- Before finishing, run `npm run check`, `npm run mutate`, `npm run slophammer`, and
-  `git diff --check`.
+- Before finishing, run `npm run check`, `npm run slophammer`, and `git diff --check`.
+- Keep mutation-testing scripts available, but do not run mutation tests as part of normal checks,
+  CI, review, or task completion. Run them only when a user explicitly requests them or when
+  manually investigating test-suite strength.
 - Slophammer guidance: https://github.com/dutifuldev/slophammer/blob/main/docs/AGENT_ENTRYPOINT.md

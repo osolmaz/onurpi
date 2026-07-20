@@ -1,35 +1,32 @@
 {
-  "name": "@onurpi/workspace",
+  "name": "@onurpi/nyan-mode",
+  "version": "0.1.0",
   "private": true,
+  "description": "Animated bitmap Nyan Cat context runway for Pi",
   "type": "module",
+  "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=22.19.0"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "pi": {
     "extensions": [
-      "./packages/pi-tui-history-replay/index.ts",
-      "./packages/turn-fold/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/nyan-mode/index.ts",
-      "./packages/prompt-queue/index.ts"
+      "./index.ts"
     ]
   },
   "scripts": {
-    "settings:sync": "node scripts/sync-settings.ts sync",
-    "settings:reset": "node scripts/sync-settings.ts reset",
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "lint": "eslint .",
+    "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
     "dry": "slophammer-ts dry .",
-    "mutate": "stryker run",
+    "mutate": "stryker run stryker.config.mjs",
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.10",
+    "@earendil-works/pi-tui": ">=0.80.10"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.80.10",

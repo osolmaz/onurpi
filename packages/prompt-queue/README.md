@@ -71,6 +71,7 @@ interactive editor wiring.
 
 ```bash
 npm run check
-npm run mutate
 npm run slophammer
 ```
+
+Optional manual mutation testing remains available with `npm run mutate`.

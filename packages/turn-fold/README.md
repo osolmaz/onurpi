@@ -60,6 +60,7 @@ newer and must be retested when Pi changes its interactive transcript components
 
 ```bash
 npm run check
-npm run mutate
 npm run slophammer
 ```
+
+Optional manual mutation testing remains available with `npm run mutate`.

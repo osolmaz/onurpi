@@ -21,6 +21,8 @@ typescript:
       - packages/turn-fold/tool-padding.ts
       - packages/pi-tui-history-replay/history-replay.ts
       - packages/live-stats/live-stats.ts
+      - packages/nyan-mode/src/png.ts
+      - packages/nyan-mode/src/progress.ts
       - packages/prompt-queue/queue-model.ts
       - packages/prompt-queue/history-model.ts
       - packages/prompt-queue/delivery-policy.ts
@@ -38,6 +40,9 @@ typescript:
     - from: packages/live-stats
       allow:
         - packages/live-stats
+    - from: packages/nyan-mode
+      allow:
+        - packages/nyan-mode
     - from: packages/prompt-queue
       allow:
         - packages/prompt-queue

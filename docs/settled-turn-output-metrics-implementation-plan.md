@@ -234,7 +234,6 @@ Run the repository-required checks from the workspace root:
 
 ```bash
 npm run check
-npm run mutate
 npm run slophammer
 git diff --check
 ```
@@ -243,9 +242,10 @@ Also run the standalone package checks:
 
 ```bash
 npm --workspace @onurpi/turn-fold run check
-npm --workspace @onurpi/turn-fold run mutate
 npm --workspace @onurpi/turn-fold run slophammer
 ```
+
+Mutation scripts remain available for optional manual investigation; they are not completion gates.
 
 Load the extension through Pi after tests pass and exercise one direct response, one tool-using
 response, and one aborted response. Restart Pi and confirm that the same token totals appear when

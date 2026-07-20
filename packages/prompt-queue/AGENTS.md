@@ -7,4 +7,5 @@
   manager window alone must not resume delivery.
 - Slash commands and bash directives must always pass through Pi's own submission path.
 - Retest the editor subclass against each supported Pi release.
-- Run `npm run check`, `npm run mutate`, and `npm run slophammer` before finishing.
+- Run `npm run check` and `npm run slophammer` before finishing. Mutation testing is optional and
+  manual.
