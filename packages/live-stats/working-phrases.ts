@@ -4,7 +4,7 @@ export const TURKISH_WORKING_PHRASES = [
   "Piston aşağı indi",
   "Motoru ısıtıyorum",
   "Vites yükseltiyorum",
-  "Çarkları döndürüyorum",
+  "İşlem gerçekleştiriyorum",
   "Kazan kaldırıyorum",
   "Harıl harıl çalışıyorum",
   "İnce ayar çekiyorum",
