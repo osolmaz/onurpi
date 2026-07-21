@@ -10,7 +10,7 @@ A **turn** starts with a user message and includes the assistant messages and to
 
 An **activity row** is a visible assistant text or thinking row, or a tool execution row. An assistant shell that contains only tool calls is not an activity row.
 
-An **attached compaction** is an automatic threshold or overflow compaction recorded while a Turn Fold turn is active. It is turn metadata and is not an activity row or final content row. A manual compaction performed while Pi is idle is a **standalone compaction**.
+An **attached compaction** is an automatic threshold or overflow compaction observed while a Turn Fold turn is active. It is ephemeral display state and is not an activity row or final content row. A manual compaction performed while Pi is idle is a **standalone compaction**.
 
 A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for`.
 
@@ -109,9 +109,9 @@ Switching between compact and expanded mode MUST update the existing transcript 
 
 Turn Fold reconstructs turn groups from the active session branch when Pi starts, reloads, switches trees, or rebuilds the transcript after compaction.
 
-After every successful compaction, Turn Fold stores a display-only custom metadata entry keyed by Pi's compaction entry ID. The metadata records the compaction reason and whether the compaction belongs to the active turn. History reconstruction MUST use this stable association instead of inferring intent from nearby messages. Historical compactions without this metadata remain standalone.
+Turn Fold keeps attached compaction entry IDs in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, survives `/reload`, and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
 
-The first rendered frame after reconstruction MUST obey the same compact-mode rules as a live turn. It MUST NOT briefly expose hidden intermediate rows, duplicate summaries, or choose an earlier tool as final output.
+The first rendered frame after reconstruction MUST obey the same compact-mode rules as a live turn when its compaction association remains in the process registry. It MUST NOT briefly expose hidden intermediate rows, duplicate summaries, or choose an earlier tool as final output.
 
 Distinct assistant messages remain distinct even when they share the same millisecond timestamp. Streaming updates for one assistant message still count as one message.
 
@@ -119,9 +119,9 @@ Elapsed time and the final-content timestamp come from persisted turn completion
 
 ## State boundaries
 
-Turn Fold changes rendering only. It MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context.
+Turn Fold changes rendering only. It MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context. Compaction folding MUST NOT append custom entries, custom messages, labels, tool-result metadata, or any other persistent state.
 
-Mode changes are stored as custom session entries. The supported modes are exactly `compact` and `expanded`; unknown historical values resolve to `compact`.
+Mode changes are the existing explicit exception and are stored as custom session entries. The supported modes are exactly `compact` and `expanded`; unknown historical values resolve to `compact`.
 
 ## Controls
 
@@ -150,9 +150,10 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Settlement leaves the summary directly below the user message and one final content row below it.
 - Interruption retains partial output or `Operation interrupted` below an interrupted summary.
 - Terminal tool failures retain the correct failed tool row and failure count.
-- Reload and history reconstruction produce the correct first frame.
+- Reload and history reconstruction produce the correct first frame for process-local associations.
 - Compact mode hides attached automatic compaction rows and reports them in the turn summary.
-- Manual and unannotated compactions remain standalone.
+- Manual, unobserved, and post-restart compactions remain standalone.
+- Compaction handling performs no Pi session or sidecar writes.
 - Expanded mode restores Pi's original compaction rows and spacing.
 - Compact and expanded mode switching updates the existing transcript.
 - Session messages and model context are unchanged.

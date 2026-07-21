@@ -1,6 +1,10 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 
-import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
+import {
+  closeCompactionRegistry,
+  type EphemeralCompactionAssociation,
+  processCompactionRegistry,
+} from "./ephemeral-compactions.ts";
 import { installRenderPatches } from "./render-patches.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
 import { TurnFoldState } from "./turn-state.ts";
@@ -43,8 +47,16 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
-function loadVisibleHistory(state: TurnFoldState, ctx: ExtensionContext): void {
-  state.loadHistory(ctx.sessionManager.buildContextEntries());
+function sessionRegistryKey(ctx: ExtensionContext): string {
+  return ctx.sessionManager.getSessionFile() ?? `session:${ctx.sessionManager.getSessionId()}`;
+}
+
+function loadVisibleHistory(
+  state: TurnFoldState,
+  ctx: ExtensionContext,
+  compactionAssociations: ReadonlyMap<string, EphemeralCompactionAssociation>,
+): void {
+  state.loadHistory(ctx.sessionManager.buildContextEntries(), compactionAssociations);
 }
 
 function applyMode(
@@ -114,6 +126,7 @@ function registerCommands(pi: ExtensionAPI, state: TurnFoldState): void {
 
 export default function turnFold(pi: ExtensionAPI): void {
   const state = new TurnFoldState();
+  const compactionRegistry = processCompactionRegistry();
   let currentTheme: Theme | undefined;
   const restorePatches = installRenderPatches(state, () => currentTheme);
   registerCommands(pi, state);
@@ -121,17 +134,13 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
     applyMode(pi, state, modeFromBranch(ctx), false);
-    loadVisibleHistory(state, ctx);
+    loadVisibleHistory(state, ctx, compactionRegistry.associationsFor(sessionRegistryKey(ctx)));
   });
 
   pi.on("session_compact", (event, ctx) => {
     currentTheme = ctx.ui.theme;
-    const attachedToTurn = state.registerCompaction(event.compactionEntry, event.reason);
-    pi.appendEntry(COMPACTION_METADATA_ENTRY_TYPE, {
-      attachedToTurn,
-      compactionEntryId: event.compactionEntry.id,
-      reason: event.reason,
-    });
+    const association = state.registerCompaction(event.compactionEntry, event.reason);
+    if (association) compactionRegistry.remember(sessionRegistryKey(ctx), association);
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
@@ -179,7 +188,8 @@ export default function turnFold(pi: ExtensionAPI): void {
     state.settleActive();
   });
 
-  pi.on("session_shutdown", () => {
+  pi.on("session_shutdown", (event) => {
+    closeCompactionRegistry(compactionRegistry, event.reason);
     restorePatches();
   });
 }
