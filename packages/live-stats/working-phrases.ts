@@ -14,6 +14,7 @@ export const TURKISH_WORKING_PHRASES = [
   "Sistemsel bir hata tespit edildi",
   "Taşları yerine oturtuyorum",
   "Hallediyorum",
+  "Hakkını veriyorum",
   "Bir işler çeviriyorum",
   "Altından girip üstünden çıkıyorum",
   "Kafa göz dalıyorum",
