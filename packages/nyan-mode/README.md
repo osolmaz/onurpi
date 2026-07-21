@@ -1,13 +1,24 @@
 # Nyan Mode
 
-Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a kaomoji moves from left to right as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
+Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: an animated kaomoji follows a smooth, full-height rainbow as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
 
 ```text
 empty context ─────────────────────────────── full context
 0%                                                     100%
 ```
 
-The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating rainbow trail instead. The kaomoji alternates dance poses while Pi is streaming. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
+The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
+
+## Cat moods
+
+The text cat stays neutral while Pi is idle and moves continuously while Pi is streaming. Its session-local state machine chooses among dancing, thinking, focused, pleased, unimpressed, annoyed, and angry poses:
+
+- active tool calls make it focus;
+- successful tool results briefly make it pleased;
+- recent or repeated tool errors escalate from annoyed to angry;
+- longer runs progress through thinking, focusing, unimpressed, annoyed, and eventually angry moods.
+
+Error history lasts only for the current Pi session. The extension does not persist telemetry or mood state. `/nyan debug` reports the current mood and session error count.
 
 ## Commands
 

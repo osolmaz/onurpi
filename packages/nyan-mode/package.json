@@ -2,7 +2,7 @@
   "name": "@onurpi/nyan-mode",
   "version": "0.1.0",
   "private": true,
-  "description": "Animated bitmap Nyan Cat context runway for Pi",
+  "description": "Animated Nyan Cat context runway for Pi",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "engines": {
