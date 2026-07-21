@@ -26,6 +26,7 @@ export const TURKISH_WORKING_PHRASES = [
   "İt gibi çalışıyorum",
   "Eşşşek gibi çalışıyorum",
   "Hektor'u çağırıyorum",
+  "Memleketi kurtarıyorum",
   "Baltayı taşa vuruyorum",
   "İşi yokuşa sürüyorum",
   "Suyunu çıkarıyorum",
