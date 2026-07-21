@@ -4,6 +4,11 @@ import { installContextWindowPolicy } from "./context-window-policy.ts";
 
 export default function contextWindowPolicy(pi: ExtensionAPI): void {
   installContextWindowPolicy({
+    onAgentSettled: (handler) => {
+      pi.on("agent_settled", (_event, ctx) => {
+        handler(ctx);
+      });
+    },
     onModelSelect: (handler) => {
       pi.on("model_select", (_event, ctx) => {
         handler(ctx);
@@ -17,11 +22,6 @@ export default function contextWindowPolicy(pi: ExtensionAPI): void {
     },
     onSessionStart: (handler) => {
       pi.on("session_start", handler);
-    },
-    onTurnEnd: (handler) => {
-      pi.on("turn_end", (_event, ctx) => {
-        handler(ctx);
-      });
     },
   });
 }

@@ -17,11 +17,11 @@ export type ContextWindowPolicyContext = {
 };
 
 export type ContextWindowPolicyApi = {
+  onAgentSettled(handler: (ctx: ContextWindowPolicyContext) => void): void;
   onModelSelect(handler: (ctx: ContextWindowPolicyContext) => void): void;
   onSessionCompact(handler: () => void): void;
   onSessionShutdown(handler: () => void): void;
   onSessionStart(handler: () => void): void;
-  onTurnEnd(handler: (ctx: ContextWindowPolicyContext) => void): void;
 };
 
 export type PolicyEvaluation = "below-limit" | "pending" | "triggered" | "unavailable";
@@ -101,7 +101,7 @@ export function createContextWindowPolicyController(): ContextWindowPolicyContro
 
 export function installContextWindowPolicy(pi: ContextWindowPolicyApi): void {
   const controller = createContextWindowPolicyController();
-  pi.onTurnEnd((ctx) => {
+  pi.onAgentSettled((ctx) => {
     controller.evaluate(ctx);
   });
   pi.onModelSelect((ctx) => {

@@ -54,17 +54,20 @@ function fail(options: CompactOptions | undefined): void {
 }
 
 type PolicyHarness = {
+  agentSettled: (ctx: ContextWindowPolicyContext) => void;
   api: ContextWindowPolicyApi;
   modelSelect: (ctx: ContextWindowPolicyContext) => void;
   resets: (() => void)[];
-  turnEnd: (ctx: ContextWindowPolicyContext) => void;
 };
 
 function harness(): PolicyHarness {
+  let agentSettled: ((ctx: ContextWindowPolicyContext) => void) | undefined;
   let modelSelect: ((ctx: ContextWindowPolicyContext) => void) | undefined;
-  let turnEnd: ((ctx: ContextWindowPolicyContext) => void) | undefined;
   const resets: (() => void)[] = [];
   const api: ContextWindowPolicyApi = {
+    onAgentSettled: (handler) => {
+      agentSettled = handler;
+    },
     onModelSelect: (handler) => {
       modelSelect = handler;
     },
@@ -77,21 +80,18 @@ function harness(): PolicyHarness {
     onSessionStart: (handler) => {
       resets.push(handler);
     },
-    onTurnEnd: (handler) => {
-      turnEnd = handler;
-    },
   };
   return {
+    agentSettled: (ctx) => {
+      if (!agentSettled) throw new Error("Settled handler was not registered");
+      agentSettled(ctx);
+    },
     api,
     modelSelect: (ctx) => {
       if (!modelSelect) throw new Error("Model handler was not registered");
       modelSelect(ctx);
     },
     resets,
-    turnEnd: (ctx) => {
-      if (!turnEnd) throw new Error("Turn handler was not registered");
-      turnEnd(ctx);
-    },
   };
 }
 
@@ -246,12 +246,12 @@ describe("context-window policy controller", () => {
 });
 
 describe("extension registration", () => {
-  it("evaluates every turn and only idle model selections", () => {
+  it("evaluates settled runs and only idle model selections", () => {
     const state = harness();
     const requests: CompactOptions[] = [];
     installContextWindowPolicy(state.api);
 
-    state.turnEnd(
+    state.agentSettled(
       context({
         contextWindow: 272_000,
         tokens: 244_800,
@@ -292,10 +292,10 @@ describe("extension registration", () => {
     });
 
     expect(state.resets).toHaveLength(3);
-    state.turnEnd(ctx);
+    state.agentSettled(ctx);
     for (const reset of state.resets) {
       reset();
-      state.turnEnd(ctx);
+      state.agentSettled(ctx);
     }
     expect(requests).toHaveLength(4);
   });

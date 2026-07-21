@@ -5,8 +5,9 @@ selected model's context window.
 
 The threshold follows each model instead of using one fixed token reserve. A 272,000-token model
 compacts at 244,800 tokens, a 200,000-token model at 180,000, and a 128,000-token model at 115,200.
-The extension evaluates after every model response and after idle model changes, so tool-use
-continuations and switches to smaller models use the selected model's current limit.
+The extension evaluates after each complete agent run and after idle model changes. Waiting for
+`agent_settled` ensures Pi has finished every tool continuation before its public compaction API
+stops the agent runtime.
 
 Pi still owns compaction. The extension calls Pi's documented `compact()` API and does not replace
 summary generation, retained-history selection, transport policy, overflow recovery, or session
@@ -30,11 +31,17 @@ automatically.
 
 ## Public-API limitation
 
-Pi does not currently expose an awaitable pre-provider compaction barrier. The extension can
-evaluate after provider responses and on idle model changes, but a newly submitted user message that
-alone crosses 90% may reach the provider before the extension can request compaction. Pi's built-in
-pre-prompt and overflow handling remain available as fallbacks. Exact pre-request percentage
-enforcement requires a future public Pi compaction-policy API.
+Pi does not currently expose a non-aborting automatic-compaction request or an awaitable
+pre-provider compaction barrier. The extension therefore waits for the complete agent run to settle
+before calling the public manual compaction API. It cannot compact between a tool result and the
+model continuation, and a newly submitted user message that alone crosses 90% may reach the provider
+before the extension can request compaction. Pi's built-in pre-prompt and overflow handling remain
+available as fallbacks. Exact mid-run and pre-request percentage enforcement requires a future
+public Pi compaction-policy API.
+
+Pi reports extension-triggered compactions as manual because `ctx.compact()` has no automatic reason
+option. Turn Fold consequently leaves their summaries standalone rather than attaching them to the
+preceding turn.
 
 ## Persistence
 
