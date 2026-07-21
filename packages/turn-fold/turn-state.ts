@@ -360,11 +360,9 @@ export class TurnFoldState {
       return false;
     }
     const added = this.indexCompaction(group, entry);
-    if (added) {
-      this.pendingLiveCompactionGroups.push(group.id);
-      this.invalidateGroupComponents(group);
-    }
-    return added;
+    this.pendingLiveCompactionGroups.push(group.id);
+    if (added) this.invalidateGroupComponents(group);
+    return true;
   }
 
   associateCompaction(component: object, message: unknown): void {

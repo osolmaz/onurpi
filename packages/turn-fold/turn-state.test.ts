@@ -285,7 +285,6 @@ describe("compaction metadata", () => {
 
     state.ensureActive(100);
     expect(state.registerCompaction(entry, "overflow")).toBe(true);
-    expect(state.registerCompaction(entry, "overflow")).toBe(false);
     state.associateCompaction(compaction, compactionMessage(125));
     registerAssistant(state, final, message);
     state.settleActive(150);
@@ -298,6 +297,23 @@ describe("compaction metadata", () => {
       display: "settled-final",
       summary: { compactions: 1 },
     });
+  });
+
+  it("keeps duplicate compaction events attached without double counting", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const second = {};
+    const entry = compactionEntry("compact-duplicate", 120);
+
+    state.ensureActive(100);
+    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    state.associateCompaction(first, compactionMessage(125));
+    state.associateCompaction(second, compactionMessage(126));
+    state.settleActive(130);
+
+    expect(state.viewFor(first)?.summary.compactions).toBe(1);
+    expect(state.viewFor(second)?.display).toBe("hidden");
   });
 
   it("consumes the live association when component and entry timestamps match", () => {
