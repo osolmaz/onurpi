@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 function assistantMessage(
@@ -38,15 +37,13 @@ function compactionEntry(id: string, timestamp: number): Record<string, unknown>
   };
 }
 
-function compactionMetadata(
+function compactionAssociation(
   compactionEntryId: string,
-  attachedToTurn: boolean,
-): Record<string, unknown> {
-  return {
-    customType: COMPACTION_METADATA_ENTRY_TYPE,
-    data: { attachedToTurn, compactionEntryId, reason: attachedToTurn ? "overflow" : "manual" },
-    type: "custom",
-  };
+  timestamp: number,
+  turnStartedAt = 100,
+  turnEntryIds: readonly string[] = [],
+) {
+  return { compactionEntryId, timestamp, turnEntryIds, turnStartedAt };
 }
 
 function compactionMessage(timestamp: number): Record<string, unknown> {
@@ -275,7 +272,7 @@ describe("compact settled turns", () => {
   });
 });
 
-describe("compaction metadata", () => {
+describe("ephemeral compactions", () => {
   it("attaches an automatic compaction to the active turn", () => {
     const state = new TurnFoldState();
     const compaction = {};
@@ -284,7 +281,9 @@ describe("compaction metadata", () => {
     const message = assistantMessage(140, [{ text: "Done", type: "text" }]);
 
     state.ensureActive(100);
-    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    expect(state.registerCompaction(entry, "overflow")).toEqual(
+      compactionAssociation("compact-live", 120),
+    );
     state.associateCompaction(compaction, compactionMessage(125));
     registerAssistant(state, final, message);
     state.settleActive(150);
@@ -306,8 +305,12 @@ describe("compaction metadata", () => {
     const entry = compactionEntry("compact-duplicate", 120);
 
     state.ensureActive(100);
-    expect(state.registerCompaction(entry, "overflow")).toBe(true);
-    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    expect(state.registerCompaction(entry, "overflow")).toEqual(
+      compactionAssociation("compact-duplicate", 120),
+    );
+    expect(state.registerCompaction(entry, "overflow")).toEqual(
+      compactionAssociation("compact-duplicate", 120),
+    );
     state.associateCompaction(first, compactionMessage(125));
     state.associateCompaction(second, compactionMessage(126));
     state.settleActive(130);
@@ -316,20 +319,26 @@ describe("compaction metadata", () => {
     expect(state.viewFor(second)?.display).toBe("hidden");
   });
 
-  it("consumes the live association when component and entry timestamps match", () => {
+  it("associates Pi's rebuilt and live rows without leaking into the next compaction", () => {
     const state = new TurnFoldState();
-    const automatic = {};
-    const manual = {};
+    const rebuiltAutomatic = {};
+    const liveAutomatic = {};
+    const rebuiltManual = {};
+    const liveManual = {};
 
     state.ensureActive(100);
     state.registerCompaction(compactionEntry("compact-same-time", 120), "threshold");
-    state.associateCompaction(automatic, compactionMessage(120));
+    state.associateCompaction(rebuiltAutomatic, compactionMessage(120));
+    state.associateCompaction(liveAutomatic, compactionMessage(125));
     state.settleActive(130);
     state.registerCompaction(compactionEntry("compact-after", 140), "manual");
-    state.associateCompaction(manual, compactionMessage(145));
+    state.associateCompaction(rebuiltManual, compactionMessage(140));
+    state.associateCompaction(liveManual, compactionMessage(145));
 
-    expect(state.viewFor(automatic)?.summary.compactions).toBe(1);
-    expect(state.viewFor(manual)).toBeUndefined();
+    expect(state.viewFor(rebuiltAutomatic)?.summary.compactions).toBe(1);
+    expect(state.viewFor(liveAutomatic)?.display).toBe("hidden");
+    expect(state.viewFor(rebuiltManual)).toBeUndefined();
+    expect(state.viewFor(liveManual)).toBeUndefined();
   });
 
   it("leaves a compaction standalone when no turn is active", () => {
@@ -338,7 +347,7 @@ describe("compaction metadata", () => {
     const entry = compactionEntry("compact-manual", 120);
 
     state.ensureActive(100);
-    expect(state.registerCompaction(entry, "manual")).toBe(false);
+    expect(state.registerCompaction(entry, "manual")).toBeUndefined();
     state.associateCompaction(compaction, compactionMessage(120));
 
     expect(state.viewFor(compaction)).toBeUndefined();
@@ -448,12 +457,23 @@ describe("historical compactions", () => {
     const final = {};
     const message = assistantMessage(140, [{ text: "Done", type: "text" }]);
 
-    state.loadHistory([
-      { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
-      compactionEntry("compact-history", 120),
-      { message, type: "message" },
-      compactionMetadata("compact-history", true),
-    ]);
+    state.loadHistory(
+      [
+        compactionEntry("compact-history", 120),
+        {
+          id: "turn-user",
+          message: { content: "prompt", role: "user", timestamp: 100 },
+          type: "message",
+        },
+        { id: "turn-assistant", message, type: "message" },
+      ],
+      new Map([
+        [
+          "compact-history",
+          compactionAssociation("compact-history", 120, 100, ["turn-user", "turn-assistant"]),
+        ],
+      ]),
+    );
     state.associateCompaction(compaction, compactionMessage(120));
     state.associateAssistant(final, message);
 
@@ -467,6 +487,31 @@ describe("historical compactions", () => {
     });
   });
 
+  it("restores a split-turn compaction when the user entry is no longer visible", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+    const final = {};
+    const message = assistantMessage(140, [{ text: "Retained split turn", type: "text" }]);
+
+    state.loadHistory(
+      [compactionEntry("compact-split", 120), { id: "kept-assistant", message, type: "message" }],
+      new Map([
+        [
+          "compact-split",
+          compactionAssociation("compact-split", 120, 100, ["omitted-user", "kept-assistant"]),
+        ],
+      ]),
+    );
+    state.associateCompaction(compaction, compactionMessage(120));
+    state.associateAssistant(final, message);
+
+    expect(state.viewFor(compaction)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 1 },
+    });
+    expect(state.viewFor(final)?.display).toBe("settled-final");
+  });
+
   it("counts multiple automatic compactions without treating them as activity", () => {
     const state = new TurnFoldState();
     const firstCompaction = {};
@@ -474,14 +519,27 @@ describe("historical compactions", () => {
     const final = {};
     const message = assistantMessage(160, [{ text: "Done", type: "text" }]);
 
-    state.loadHistory([
-      { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
-      compactionEntry("compact-first", 120),
-      compactionMetadata("compact-first", true),
-      compactionEntry("compact-second", 140),
-      compactionMetadata("compact-second", true),
-      { message, type: "message" },
-    ]);
+    state.loadHistory(
+      [
+        compactionEntry("compact-second", 140),
+        {
+          id: "turn-user",
+          message: { content: "prompt", role: "user", timestamp: 100 },
+          type: "message",
+        },
+        { id: "turn-assistant", message, type: "message" },
+      ],
+      new Map([
+        [
+          "compact-first",
+          compactionAssociation("compact-first", 120, 100, ["turn-user", "turn-assistant"]),
+        ],
+        [
+          "compact-second",
+          compactionAssociation("compact-second", 140, 100, ["turn-user", "turn-assistant"]),
+        ],
+      ]),
+    );
     state.associateCompaction(firstCompaction, compactionMessage(120));
     state.associateCompaction(secondCompaction, compactionMessage(140));
     state.associateAssistant(final, message);
@@ -494,7 +552,7 @@ describe("historical compactions", () => {
     expect(state.viewFor(final)?.display).toBe("settled-final");
   });
 
-  it("keeps manual and unannotated historical compactions standalone", () => {
+  it("keeps compactions outside the process registry standalone", () => {
     const state = new TurnFoldState();
     const manual = {};
     const unannotated = {};
@@ -502,7 +560,6 @@ describe("historical compactions", () => {
     state.loadHistory([
       { message: { content: "first", role: "user", timestamp: 100 }, type: "message" },
       compactionEntry("compact-manual", 120),
-      compactionMetadata("compact-manual", false),
       { message: assistantMessage(140, [{ text: "Done", type: "text" }]), type: "message" },
       { message: { content: "second", role: "user", timestamp: 200 }, type: "message" },
       compactionEntry("compact-old", 220),
@@ -526,7 +583,6 @@ describe("historical compactions", () => {
     state.deferHistoryReload(() => [
       { message: { content: "old", role: "user", timestamp: 10 }, type: "message" },
       compactionEntry("compact-old-manual", 30),
-      compactionMetadata("compact-old-manual", false),
       { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
     ]);
     state.reloadHistoryForNewComponent(oldStandaloneCompaction);
@@ -599,10 +655,10 @@ describe("historical transcript timing and reload", () => {
     state.associateAssistant(unknown, assistantMessage(340, []));
     state.associateTool(unknown, "missing");
     state.ensureActive(350);
-    expect(state.registerCompaction({}, "overflow")).toBe(false);
-    expect(state.registerCompaction({ id: "bad-time", timestamp: "invalid" }, "threshold")).toBe(
-      false,
-    );
+    expect(state.registerCompaction({}, "overflow")).toBeUndefined();
+    expect(
+      state.registerCompaction({ id: "bad-time", timestamp: "invalid" }, "threshold"),
+    ).toBeUndefined();
     state.associateCompaction(unknown, { role: "compactionSummary" });
     state.settleActive();
 

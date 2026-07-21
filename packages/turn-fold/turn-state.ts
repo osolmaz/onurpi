@@ -1,8 +1,4 @@
-import {
-  compactionMetadataById,
-  type CompactionMetadata,
-  type CompactionReason,
-} from "./compaction-metadata.ts";
+import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
 import { nextTurnFoldMode, type TurnFoldMode } from "./mode.ts";
 
@@ -171,6 +167,7 @@ function assistantDisplayClassChanged(
 }
 
 export class TurnFoldState {
+  private compactionAssociations = new Map<string, EphemeralCompactionAssociation>();
   private activeAssistantKey: string | undefined;
   private activeAssistantTimestamp: number | undefined;
   private activeGroupId: string | undefined;
@@ -183,6 +180,7 @@ export class TurnFoldState {
   private compactionGroupByTimestamp = new Map<number, string | null>();
   private groupCounter = 0;
   private groups = new Map<string, TurnGroup>();
+  private historicalGroupByEntryId = new Map<string, string>();
   private historyReload: (() => readonly unknown[]) | undefined;
   private latestAssistantKeyByTimestamp = new Map<number, string>();
   private mode: TurnFoldMode = "compact";
@@ -207,12 +205,15 @@ export class TurnFoldState {
     return this.mode;
   }
 
-  loadHistory(entries: readonly unknown[]): void {
+  loadHistory(
+    entries: readonly unknown[],
+    compactionAssociations: ReadonlyMap<string, EphemeralCompactionAssociation> = new Map(),
+  ): void {
     this.resetGroups();
-    const compactionMetadata = compactionMetadataById(entries);
+    this.compactionAssociations = new Map(compactionAssociations);
     let currentGroup: TurnGroup | undefined;
     for (const entry of entries) {
-      if (this.indexHistoricalCompactionEntry(currentGroup, entry, compactionMetadata)) continue;
+      if (this.indexHistoricalCompactionEntry(entry)) continue;
 
       const message = messageFromEntry(entry);
       const role = stringField(message, "role");
@@ -228,7 +229,16 @@ export class TurnFoldState {
           this.indexHistoricalMessage(currentGroup, message, entryTimestamp(entry));
         }
       }
+      this.rememberHistoricalEntryGroup(entry, currentGroup);
     }
+    this.restoreCompactionAssociations();
+  }
+
+  replaceCompactionAssociations(
+    compactionAssociations: ReadonlyMap<string, EphemeralCompactionAssociation>,
+  ): void {
+    this.compactionAssociations = new Map(compactionAssociations);
+    this.pendingLiveCompactionGroups = [];
   }
 
   deferHistoryReload(entries: () => readonly unknown[]): void {
@@ -350,19 +360,30 @@ export class TurnFoldState {
     if (added) this.invalidateGroupComponents(group);
   }
 
-  registerCompaction(entry: unknown, reason: CompactionReason): boolean {
-    const id = stringField(entry, "id");
+  registerCompaction(
+    entry: unknown,
+    reason: CompactionReason,
+    turnEntryIds: readonly string[] = [],
+  ): EphemeralCompactionAssociation | undefined {
+    const compactionEntryId = stringField(entry, "id");
     const timestamp = entryTimestamp(entry);
-    if (!id || timestamp === undefined) return false;
+    if (!compactionEntryId || timestamp === undefined) return undefined;
     const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : undefined;
     if (reason === "manual" || !group) {
-      this.pendingLiveCompactionGroups.push(null);
-      return false;
+      this.queueLiveCompactionComponents(null);
+      return undefined;
     }
-    const added = this.indexCompaction(group, entry);
-    this.pendingLiveCompactionGroups.push(group.id);
+    const association = {
+      compactionEntryId,
+      timestamp,
+      turnEntryIds: [...turnEntryIds],
+      turnStartedAt: group.startedAt,
+    };
+    this.compactionAssociations.set(compactionEntryId, association);
+    const added = this.indexCompactionAssociation(group, association);
+    this.queueLiveCompactionComponents(group.id);
     if (added) this.invalidateGroupComponents(group);
-    return true;
+    return association;
   }
 
   associateCompaction(component: object, message: unknown): void {
@@ -407,6 +428,11 @@ export class TurnFoldState {
       settled: group.settled,
     });
     return { display, summary: this.summary(group, now) };
+  }
+
+  private queueLiveCompactionComponents(groupId: string | null): void {
+    // Pi rebuilds the stored compaction row, then appends a second live row.
+    this.pendingLiveCompactionGroups.push(groupId, groupId);
   }
 
   private compactionGroupForTimestamp(timestamp: number | undefined): string | null {
@@ -575,20 +601,30 @@ export class TurnFoldState {
     return group;
   }
 
-  private indexHistoricalCompactionEntry(
-    currentGroup: TurnGroup | undefined,
-    entry: unknown,
-    metadata: ReadonlyMap<string, CompactionMetadata>,
-  ): boolean {
+  private indexHistoricalCompactionEntry(entry: unknown): boolean {
     if (stringField(entry, "type") !== "compaction") return false;
-    const id = stringField(entry, "id");
     const timestamp = entryTimestamp(entry);
-    if (currentGroup && id && metadata.get(id)?.attachedToTurn === true) {
-      this.indexCompaction(currentGroup, entry);
-    } else if (timestamp !== undefined) {
-      this.compactionGroupByTimestamp.set(timestamp, null);
-    }
+    if (timestamp !== undefined) this.compactionGroupByTimestamp.set(timestamp, null);
     return true;
+  }
+
+  private restoreCompactionAssociations(): void {
+    for (const association of this.compactionAssociations.values()) {
+      const groupFromEntry = association.turnEntryIds
+        .map((entryId) => this.historicalGroupByEntryId.get(entryId))
+        .find((groupId) => groupId !== undefined);
+      const group = groupFromEntry
+        ? this.groups.get(groupFromEntry)
+        : [...this.groups.values()].find(
+            (candidate) => candidate.startedAt === association.turnStartedAt,
+          );
+      if (group) this.indexCompactionAssociation(group, association);
+    }
+  }
+
+  private rememberHistoricalEntryGroup(entry: unknown, group: TurnGroup | undefined): void {
+    const entryId = stringField(entry, "id");
+    if (group && entryId) this.historicalGroupByEntryId.set(entryId, group.id);
   }
 
   private historicalGroup(
@@ -611,13 +647,14 @@ export class TurnFoldState {
     if (role === "toolResult") this.indexHistoricalToolResult(group, message, completedAt);
   }
 
-  private indexCompaction(group: TurnGroup, entry: unknown): boolean {
-    const id = stringField(entry, "id");
-    const timestamp = entryTimestamp(entry);
-    if (!id || timestamp === undefined || group.compactionIds.has(id)) return false;
-    group.compactionIds.add(id);
-    group.compactionTimestamps.add(timestamp);
-    this.compactionGroupByTimestamp.set(timestamp, group.id);
+  private indexCompactionAssociation(
+    group: TurnGroup,
+    association: EphemeralCompactionAssociation,
+  ): boolean {
+    if (group.compactionIds.has(association.compactionEntryId)) return false;
+    group.compactionIds.add(association.compactionEntryId);
+    group.compactionTimestamps.add(association.timestamp);
+    this.compactionGroupByTimestamp.set(association.timestamp, group.id);
     return true;
   }
 
@@ -695,6 +732,7 @@ export class TurnFoldState {
     this.compactionGroupByTimestamp = new Map();
     this.groups = new Map();
     this.groupCounter = 0;
+    this.historicalGroupByEntryId = new Map();
     this.historyReload = undefined;
     this.latestAssistantKeyByTimestamp = new Map();
     this.pendingLiveCompactionGroups = [];
@@ -709,7 +747,8 @@ export class TurnFoldState {
     const activeGroupId = this.activeGroupId;
     const activeGroup = activeGroupId ? this.groups.get(activeGroupId) : undefined;
     const pendingLiveCompactionGroups = [...this.pendingLiveCompactionGroups];
-    this.loadHistory(entries);
+    const compactionAssociations = new Map(this.compactionAssociations);
+    this.loadHistory(entries, compactionAssociations);
     this.pendingLiveCompactionGroups = pendingLiveCompactionGroups;
     if (!activeGroupId || !activeGroup) return;
 

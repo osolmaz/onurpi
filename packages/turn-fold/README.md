@@ -49,9 +49,12 @@ The package is private and is not published yet.
 summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
 Mode changes are stored as custom session entries, so each session restores its latest supported
-choice. Turn Fold also stores display-only metadata that links automatic compactions to their active
-turn. Historical turns are reconstructed from the active session branch when Pi starts or reloads.
-Older `live` and `final-only` values are no longer modes and resolve to the compact default.
+choice. Automatic compaction associations live only in process memory and survive `/reload` without
+writing to Pi's session. They use exact compaction and active-turn entry IDs and are limited to the
+active branch. After a full Pi restart, earlier compactions remain standalone because Pi's stored
+compaction entries do not identify their trigger. Historical turns are reconstructed from the active
+session branch. Older `live` and `final-only` values are no longer modes and resolve to the compact
+default.
 
 ## Current implementation boundary
 

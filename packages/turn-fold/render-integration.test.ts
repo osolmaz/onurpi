@@ -9,7 +9,6 @@ import {
 import { Container, Spacer, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, expect, it } from "vitest";
 
-import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -83,27 +82,16 @@ function assistantMessage(
   };
 }
 
-function compactionEntry(id: string, timestamp: number, attachedToTurn: boolean) {
-  return [
-    {
-      firstKeptEntryId: "kept",
-      id,
-      parentId: null,
-      summary: "Preserved summary",
-      timestamp: new Date(timestamp).toISOString(),
-      tokensBefore: 12_345,
-      type: "compaction",
-    },
-    {
-      customType: COMPACTION_METADATA_ENTRY_TYPE,
-      data: {
-        attachedToTurn,
-        compactionEntryId: id,
-        reason: attachedToTurn ? "overflow" : "manual",
-      },
-      type: "custom",
-    },
-  ];
+function compactionEntry(id: string, timestamp: number) {
+  return {
+    firstKeptEntryId: "kept",
+    id,
+    parentId: null,
+    summary: "Preserved summary",
+    timestamp: new Date(timestamp).toISOString(),
+    tokensBefore: 12_345,
+    type: "compaction",
+  };
 }
 
 function compactionComponent(timestamp: number): CompactionSummaryMessageComponent {
@@ -205,11 +193,33 @@ it("folds an automatic compaction into the turn summary", () => {
   restore = installRenderPatches(state, () => undefined);
   const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
 
-  state.loadHistory([
-    { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
-    ...compactionEntry("compact-auto", 120, true),
-    { message: final, timestamp: new Date(150).toISOString(), type: "message" },
-  ]);
+  state.loadHistory(
+    [
+      compactionEntry("compact-auto", 120),
+      {
+        id: "turn-user",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      {
+        id: "turn-assistant",
+        message: final,
+        timestamp: new Date(150).toISOString(),
+        type: "message",
+      },
+    ],
+    new Map([
+      [
+        "compact-auto",
+        {
+          compactionEntryId: "compact-auto",
+          timestamp: 120,
+          turnEntryIds: ["turn-user", "turn-assistant"],
+          turnStartedAt: 100,
+        },
+      ],
+    ]),
+  );
   transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
   const compactionSpacer = new Spacer(1);
   transcript.addChild(compactionSpacer);
@@ -230,6 +240,36 @@ it("folds an automatic compaction into the turn summary", () => {
   expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
+it("folds both compaction rows emitted after a live automatic compaction", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
+
+  state.ensureActive(100);
+  state.registerCompaction(compactionEntry("compact-live", 120), "threshold");
+  const rebuiltSpacer = new Spacer(1);
+  const liveSpacer = new Spacer(1);
+  transcript.addChild(rebuiltSpacer);
+  transcript.addChild(compactionComponent(120));
+  transcript.addChild(liveSpacer);
+  transcript.addChild(compactionComponent(125));
+  state.registerAssistantMessage(final);
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+  state.settleActive(150);
+
+  const compact = frame(transcript);
+  expect(compact).toContain("Worked for <1s · 1 msg · compacted");
+  expect(compact).not.toContain("[compaction]");
+  expect(rebuiltSpacer.render(120)).toEqual([]);
+  expect(liveSpacer.render(120)).toEqual([]);
+
+  state.setMode("expanded");
+  expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(2);
+  expect(rebuiltSpacer.render(120)).toEqual([""]);
+  expect(liveSpacer.render(120)).toEqual([""]);
+});
+
 it("keeps a manual idle compaction as a standalone row", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
@@ -239,7 +279,7 @@ it("keeps a manual idle compaction as a standalone row", () => {
   state.loadHistory([
     { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
     { message: final, timestamp: new Date(150).toISOString(), type: "message" },
-    ...compactionEntry("compact-manual", 160, false),
+    compactionEntry("compact-manual", 160),
   ]);
   transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
   transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
