@@ -22,7 +22,6 @@ export const TURKISH_WORKING_PHRASES = [
   "Eşek gibi çalışıyorum",
   "Usta",
   "Yaparım",
-  "Kayış koptu kopacak",
   "Sıçtın mavisini izliyorum",
 ] as const;
 
