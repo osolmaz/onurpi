@@ -21,6 +21,7 @@ export const TURKISH_WORKING_PHRASES = [
   "Kalkışıyorum",
   "Yan gelip yatıyorum",
   "Sana hesap vermiyorum",
+  "Bana mısın demiyorum",
   "İt gibi çalışıyorum",
   "Eşek gibi çalışıyorum",
   "Usta",
