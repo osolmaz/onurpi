@@ -30,6 +30,7 @@ typescript:
       - packages/prompt-queue/message-text.ts
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
+      - packages/context-window-policy/context-window-policy.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -46,3 +47,6 @@ typescript:
     - from: packages/prompt-queue
       allow:
         - packages/prompt-queue
+    - from: packages/context-window-policy
+      allow:
+        - packages/context-window-policy

@@ -3,12 +3,15 @@
     "git:github.com/osolmaz/pi-workflows",
     "npm:pi-web-access@0.13.0",
     "git:github.com/osolmaz/pi-must-win",
+    "npm:@narumitw/pi-codex-usage@0.20.0",
+    "git:github.com/Michaelliv/pi-goal@3f100be5434454d3388755a119d01caca9127c16",
     "../../repos/onurpi/packages/pi-tui-history-replay",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
     "../../repos/onurpi/packages/prompt-queue",
-    "../../repos/onurpi/packages/reliable-compaction"
+    "../../repos/onurpi/packages/reliable-compaction",
+    "../../repos/onurpi/packages/context-window-policy"
   ],
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",

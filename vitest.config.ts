@@ -31,6 +31,7 @@ export default defineConfig({
         "packages/prompt-queue/widget-lines.ts",
         "packages/prompt-queue/window-state.ts",
         "packages/reliable-compaction/reliable-compaction.ts",
+        "packages/context-window-policy/context-window-policy.ts",
       ],
       provider: "v8",
       reporter: ["text", "json", "json-summary"],
