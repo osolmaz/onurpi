@@ -308,6 +308,28 @@ describe("session_before_compact handler", () => {
     expect(state.unregistered).toEqual(["openai-codex"]);
   });
 
+  it("unregisters the copied provider config returned by Pi", async () => {
+    const state = harness();
+    const source = createAssistantMessageEventStream();
+    const registryState: { current?: unknown } = {};
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => source,
+    });
+
+    await handler(
+      event(),
+      context(model(), undefined, () => registryState.current),
+    );
+    const config = state.registered();
+    if (!config) throw new Error("Expected a provider override");
+    registryState.current = { ...config };
+    requireStream(config)(model(), { messages: [] });
+    source.end(assistant());
+    await source.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual(["openai-codex"]);
+  });
+
   it("does not unregister a provider that replaced its temporary override", async () => {
     const state = harness();
     const source = createAssistantMessageEventStream();

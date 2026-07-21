@@ -57,6 +57,11 @@ type ActiveOverride = {
   remainingCalls: number;
 };
 
+function isOwnedOverride(value: unknown, expected: ProviderConfig): boolean {
+  if (typeof value !== "object" || value === null || !("streamSimple" in value)) return false;
+  return value.streamSimple === expected.streamSimple;
+}
+
 export function policyForModel(model: Model<Api>): CompactionPolicy | undefined {
   if (model.api !== "openai-codex-responses") return undefined;
   return { maxAttempts: MAX_ATTEMPTS, transport: "sse" };
@@ -113,7 +118,7 @@ function createReliableCompactionController(
     if (active !== expected) return;
     active = undefined;
     const registered = expected.registry.getRegisteredProviderConfig(expected.provider);
-    if (registered === undefined || registered === expected.config) {
+    if (registered === undefined || isOwnedOverride(registered, expected.config)) {
       pi.unregisterProvider(expected.provider);
     }
   };
