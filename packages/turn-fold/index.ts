@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import {
   closeCompactionRegistry,
   type EphemeralCompactionAssociation,
+  type EphemeralCompactionRegistry,
   processCompactionRegistry,
 } from "./ephemeral-compactions.ts";
 import { installRenderPatches } from "./render-patches.ts";
@@ -49,6 +50,36 @@ function messageStopReason(message: unknown): string | undefined {
 
 function sessionRegistryKey(ctx: ExtensionContext): string {
   return ctx.sessionManager.getSessionFile() ?? `session:${ctx.sessionManager.getSessionId()}`;
+}
+
+function compactionAssociationsForBranch(
+  ctx: ExtensionContext,
+  registry: EphemeralCompactionRegistry,
+): ReadonlyMap<string, EphemeralCompactionAssociation> {
+  const compactionIds = new Set(
+    ctx.sessionManager
+      .getBranch()
+      .filter((entry) => entry.type === "compaction")
+      .map((entry) => entry.id),
+  );
+  return new Map(
+    [...registry.associationsFor(sessionRegistryKey(ctx))].filter(([entryId]) =>
+      compactionIds.has(entryId),
+    ),
+  );
+}
+
+function turnEntryIds(ctx: ExtensionContext, compactionEntryId: string): readonly string[] {
+  const branch = ctx.sessionManager.getBranch();
+  const compactionIndex = branch.findIndex((entry) => entry.id === compactionEntryId);
+  if (compactionIndex < 0) return [];
+  for (let index = compactionIndex - 1; index >= 0; index -= 1) {
+    const entry = branch[index];
+    if (entry?.type === "message" && entry.message.role === "user") {
+      return branch.slice(index, compactionIndex).map((turnEntry) => turnEntry.id);
+    }
+  }
+  return [];
 }
 
 function loadVisibleHistory(
@@ -134,18 +165,23 @@ export default function turnFold(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
     applyMode(pi, state, modeFromBranch(ctx), false);
-    loadVisibleHistory(state, ctx, compactionRegistry.associationsFor(sessionRegistryKey(ctx)));
+    loadVisibleHistory(state, ctx, compactionAssociationsForBranch(ctx, compactionRegistry));
   });
 
   pi.on("session_compact", (event, ctx) => {
     currentTheme = ctx.ui.theme;
-    const association = state.registerCompaction(event.compactionEntry, event.reason);
+    const association = state.registerCompaction(
+      event.compactionEntry,
+      event.reason,
+      turnEntryIds(ctx, event.compactionEntry.id),
+    );
     if (association) compactionRegistry.remember(sessionRegistryKey(ctx), association);
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 
   pi.on("session_tree", (_event, ctx) => {
     currentTheme = ctx.ui.theme;
+    state.replaceCompactionAssociations(compactionAssociationsForBranch(ctx, compactionRegistry));
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 

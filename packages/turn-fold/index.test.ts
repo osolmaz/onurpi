@@ -31,11 +31,15 @@ function extensionHarness(): {
   return { appendEntry, handlers, pi };
 }
 
-function context(entries: readonly unknown[] = [], sessionFile = "/tmp/turn-fold-session.jsonl") {
+function context(
+  entries: readonly unknown[] = [],
+  branch: readonly unknown[] = entries,
+  sessionFile = "/tmp/turn-fold-session.jsonl",
+) {
   return {
     sessionManager: {
       buildContextEntries: () => entries,
-      getBranch: () => [],
+      getBranch: () => branch,
       getSessionFile: () => sessionFile,
       getSessionId: () => "session-id",
     },
@@ -60,7 +64,17 @@ afterEach(() => {
 describe("Turn Fold extension compaction state", () => {
   it("does not append Pi session entries for automatic compactions", async () => {
     const { appendEntry, handlers, pi } = extensionHarness();
-    const ctx = context();
+    const ctx = context(
+      [],
+      [
+        {
+          id: "turn-user",
+          message: { content: "Prompt", role: "user", timestamp: 100 },
+          type: "message",
+        },
+        { id: "compact-1", type: "compaction" },
+      ],
+    );
     turnFold(pi);
 
     await emit(handlers, "session_start", { reason: "startup", type: "session_start" }, ctx);
@@ -89,10 +103,107 @@ describe("Turn Fold extension compaction state", () => {
     expect(appendEntry).not.toHaveBeenCalled();
     await emit(handlers, "session_shutdown", { reason: "quit", type: "session_shutdown" }, ctx);
   });
+});
 
+describe("Turn Fold ephemeral compaction lifecycle", () => {
+  it("drops an association when tree navigation leaves its compaction branch", async () => {
+    const extension = extensionHarness();
+    const branchWithCompaction = [
+      {
+        id: "turn-user",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      { id: "compact-branch", type: "compaction" },
+    ];
+    const firstContext = context([], branchWithCompaction);
+    turnFold(extension.pi);
+    await emit(
+      extension.handlers,
+      "session_start",
+      { reason: "startup", type: "session_start" },
+      firstContext,
+    );
+    await emit(extension.handlers, "agent_start", { type: "agent_start" }, firstContext);
+    await emit(
+      extension.handlers,
+      "message_start",
+      { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message_start" },
+      firstContext,
+    );
+    await emit(
+      extension.handlers,
+      "session_compact",
+      {
+        compactionEntry: {
+          id: "compact-branch",
+          timestamp: new Date(120).toISOString(),
+          type: "compaction",
+        },
+        reason: "threshold",
+        type: "session_compact",
+      },
+      firstContext,
+    );
+    await emit(extension.handlers, "agent_settled", { type: "agent_settled" }, firstContext);
+
+    const otherBranch = [
+      {
+        id: "turn-user",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      {
+        id: "other-assistant",
+        message: {
+          content: [{ text: "Other branch", type: "text" }],
+          role: "assistant",
+          timestamp: 140,
+        },
+        type: "message",
+      },
+    ];
+    const secondContext = context(otherBranch, otherBranch);
+    await emit(extension.handlers, "session_tree", { type: "session_tree" }, secondContext);
+
+    const state = renderPatchMock.states.at(-1);
+    expect(state).toBeInstanceOf(TurnFoldState);
+    if (!(state instanceof TurnFoldState)) throw new Error("Turn Fold state was not installed");
+    const staleCompaction = {};
+    state.reloadHistoryForNewComponent(staleCompaction);
+    state.associateCompaction(staleCompaction, {
+      role: "compactionSummary",
+      timestamp: 120,
+    });
+    expect(state.viewFor(staleCompaction)).toBeUndefined();
+
+    await emit(
+      extension.handlers,
+      "session_shutdown",
+      { reason: "quit", type: "session_shutdown" },
+      secondContext,
+    );
+  });
+});
+
+describe("Turn Fold extension reload", () => {
   it("restores an automatic compaction association after extension reload", async () => {
     const first = extensionHarness();
-    const firstContext = context();
+    const finalMessage = {
+      content: [{ text: "Done", type: "text" }],
+      role: "assistant",
+      timestamp: 140,
+    };
+    const branch = [
+      {
+        id: "turn-user",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      { id: "kept-assistant", message: finalMessage, type: "message" },
+      { id: "compact-reload", type: "compaction" },
+    ];
+    const firstContext = context([], branch);
     turnFold(first.pi);
     await emit(
       first.handlers,
@@ -128,20 +239,17 @@ describe("Turn Fold extension compaction state", () => {
       firstContext,
     );
 
-    const finalMessage = {
-      content: [{ text: "Done", type: "text" }],
-      role: "assistant",
-      timestamp: 140,
-    };
-    const secondContext = context([
-      {
-        id: "compact-reload",
-        timestamp: new Date(120).toISOString(),
-        type: "compaction",
-      },
-      { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
-      { message: finalMessage, type: "message" },
-    ]);
+    const secondContext = context(
+      [
+        {
+          id: "compact-reload",
+          timestamp: new Date(120).toISOString(),
+          type: "compaction",
+        },
+        { id: "kept-assistant", message: finalMessage, type: "message" },
+      ],
+      branch,
+    );
     const second = extensionHarness();
     turnFold(second.pi);
     await emit(

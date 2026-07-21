@@ -3,6 +3,7 @@ export type CompactionReason = "manual" | "overflow" | "threshold";
 export type EphemeralCompactionAssociation = Readonly<{
   compactionEntryId: string;
   timestamp: number;
+  turnEntryIds: readonly string[];
   turnStartedAt: number;
 }>;
 
@@ -19,6 +20,8 @@ function validAssociation(association: EphemeralCompactionAssociation): boolean 
   return (
     association.compactionEntryId.length > 0 &&
     Number.isFinite(association.timestamp) &&
+    association.turnEntryIds.length > 0 &&
+    association.turnEntryIds.every((entryId) => entryId.length > 0) &&
     Number.isFinite(association.turnStartedAt)
   );
 }

@@ -109,7 +109,7 @@ Switching between compact and expanded mode MUST update the existing transcript 
 
 Turn Fold reconstructs turn groups from the active session branch when Pi starts, reloads, switches trees, or rebuilds the transcript after compaction.
 
-Turn Fold keeps attached compaction entry IDs in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, survives `/reload`, and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
+Turn Fold keeps attached compaction associations in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, and it retains the active turn's existing entry IDs so split turns can be restored without guessing. Associations are limited to compactions on the active branch. The registry survives `/reload` and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
 
 The first rendered frame after reconstruction MUST obey the same compact-mode rules as a live turn when its compaction association remains in the process registry. It MUST NOT briefly expose hidden intermediate rows, duplicate summaries, or choose an earlier tool as final output.
 

@@ -12,7 +12,7 @@ function association(
   timestamp = 120,
   turnStartedAt = 100,
 ): EphemeralCompactionAssociation {
-  return { compactionEntryId, timestamp, turnStartedAt };
+  return { compactionEntryId, timestamp, turnEntryIds: ["turn-entry"], turnStartedAt };
 }
 
 describe("ephemeral compaction registry", () => {
@@ -37,6 +37,7 @@ describe("ephemeral compaction registry", () => {
     registry.remember("", association("compact-invalid"));
     registry.remember("session-a", association(""));
     registry.remember("session-a", association("bad-time", Number.NaN));
+    registry.remember("session-a", { ...association("missing-turn"), turnEntryIds: [] });
 
     expect([...registry.associationsFor("session-a")]).toEqual([
       ["compact-a", association("compact-a")],

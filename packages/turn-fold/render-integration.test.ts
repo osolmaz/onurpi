@@ -196,11 +196,28 @@ it("folds an automatic compaction into the turn summary", () => {
   state.loadHistory(
     [
       compactionEntry("compact-auto", 120),
-      { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
-      { message: final, timestamp: new Date(150).toISOString(), type: "message" },
+      {
+        id: "turn-user",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      {
+        id: "turn-assistant",
+        message: final,
+        timestamp: new Date(150).toISOString(),
+        type: "message",
+      },
     ],
     new Map([
-      ["compact-auto", { compactionEntryId: "compact-auto", timestamp: 120, turnStartedAt: 100 }],
+      [
+        "compact-auto",
+        {
+          compactionEntryId: "compact-auto",
+          timestamp: 120,
+          turnEntryIds: ["turn-user", "turn-assistant"],
+          turnStartedAt: 100,
+        },
+      ],
     ]),
   );
   transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));

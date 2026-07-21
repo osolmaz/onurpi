@@ -37,8 +37,13 @@ function compactionEntry(id: string, timestamp: number): Record<string, unknown>
   };
 }
 
-function compactionAssociation(compactionEntryId: string, timestamp: number, turnStartedAt = 100) {
-  return { compactionEntryId, timestamp, turnStartedAt };
+function compactionAssociation(
+  compactionEntryId: string,
+  timestamp: number,
+  turnStartedAt = 100,
+  turnEntryIds: readonly string[] = [],
+) {
+  return { compactionEntryId, timestamp, turnEntryIds, turnStartedAt };
 }
 
 function compactionMessage(timestamp: number): Record<string, unknown> {
@@ -455,10 +460,19 @@ describe("historical compactions", () => {
     state.loadHistory(
       [
         compactionEntry("compact-history", 120),
-        { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
-        { message, type: "message" },
+        {
+          id: "turn-user",
+          message: { content: "prompt", role: "user", timestamp: 100 },
+          type: "message",
+        },
+        { id: "turn-assistant", message, type: "message" },
       ],
-      new Map([["compact-history", compactionAssociation("compact-history", 120)]]),
+      new Map([
+        [
+          "compact-history",
+          compactionAssociation("compact-history", 120, 100, ["turn-user", "turn-assistant"]),
+        ],
+      ]),
     );
     state.associateCompaction(compaction, compactionMessage(120));
     state.associateAssistant(final, message);
@@ -473,6 +487,31 @@ describe("historical compactions", () => {
     });
   });
 
+  it("restores a split-turn compaction when the user entry is no longer visible", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+    const final = {};
+    const message = assistantMessage(140, [{ text: "Retained split turn", type: "text" }]);
+
+    state.loadHistory(
+      [compactionEntry("compact-split", 120), { id: "kept-assistant", message, type: "message" }],
+      new Map([
+        [
+          "compact-split",
+          compactionAssociation("compact-split", 120, 100, ["omitted-user", "kept-assistant"]),
+        ],
+      ]),
+    );
+    state.associateCompaction(compaction, compactionMessage(120));
+    state.associateAssistant(final, message);
+
+    expect(state.viewFor(compaction)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 1 },
+    });
+    expect(state.viewFor(final)?.display).toBe("settled-final");
+  });
+
   it("counts multiple automatic compactions without treating them as activity", () => {
     const state = new TurnFoldState();
     const firstCompaction = {};
@@ -483,12 +522,22 @@ describe("historical compactions", () => {
     state.loadHistory(
       [
         compactionEntry("compact-second", 140),
-        { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
-        { message, type: "message" },
+        {
+          id: "turn-user",
+          message: { content: "prompt", role: "user", timestamp: 100 },
+          type: "message",
+        },
+        { id: "turn-assistant", message, type: "message" },
       ],
       new Map([
-        ["compact-first", compactionAssociation("compact-first", 120)],
-        ["compact-second", compactionAssociation("compact-second", 140)],
+        [
+          "compact-first",
+          compactionAssociation("compact-first", 120, 100, ["turn-user", "turn-assistant"]),
+        ],
+        [
+          "compact-second",
+          compactionAssociation("compact-second", 140, 100, ["turn-user", "turn-assistant"]),
+        ],
       ]),
     );
     state.associateCompaction(firstCompaction, compactionMessage(120));
