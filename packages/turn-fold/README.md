@@ -7,8 +7,10 @@ run. Earlier activity is replaced by one summary row directly below the user mes
 stops, that position holds the `Worked for …` line. User messages show their local timestamp on the
 bottom line, and the retained final response shows its completion time below the content. Turn Fold
 keeps one padding line before the next user message instead of Pi's usual two. Tool rows and
-intermediate assistant messages disappear, leaving the final response below the summary. Interrupted
-runs retain their last partial response or a fallback message.
+intermediate assistant messages disappear, leaving the final response below the summary. Automatic
+compactions during a turn appear as `compacted` in the summary instead of a separate transcript row.
+Manual compactions performed while Pi is idle keep Pi's original row. Interrupted runs retain their
+last partial response or a fallback message.
 
 The extension changes only the display. Pi keeps every underlying session message in model context.
 The normative behavior is defined in [SPEC.md](SPEC.md).
@@ -47,14 +49,15 @@ The package is private and is not published yet.
 summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
 Mode changes are stored as custom session entries, so each session restores its latest supported
-choice. Historical turns are reconstructed from the active session branch when Pi starts or
-reloads. Older `live` and `final-only` values are no longer modes and resolve to the compact default.
+choice. Turn Fold also stores display-only metadata that links automatic compactions to their active
+turn. Historical turns are reconstructed from the active session branch when Pi starts or reloads.
+Older `live` and `final-only` values are no longer modes and resolve to the compact default.
 
 ## Current implementation boundary
 
 Pi does not expose a public whole-turn transcript renderer. This extension uses Pi's exported
-assistant and tool component classes but patches their rendering methods. It targets Pi 0.80.10 or
-newer and must be retested when Pi changes its interactive transcript components.
+assistant, tool, and compaction component classes but patches their rendering methods. It targets Pi
+0.80.10 or newer and must be retested when Pi changes its interactive transcript components.
 
 ## Quality checks
 

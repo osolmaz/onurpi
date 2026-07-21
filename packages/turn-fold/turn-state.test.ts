@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 function assistantMessage(
@@ -23,6 +24,33 @@ function registerAssistant(
 ): void {
   state.registerAssistantMessage(message);
   state.associateAssistant(component, message);
+}
+
+function compactionEntry(id: string, timestamp: number): Record<string, unknown> {
+  return {
+    firstKeptEntryId: "kept",
+    id,
+    parentId: null,
+    summary: "summary",
+    timestamp: new Date(timestamp).toISOString(),
+    tokensBefore: 10_000,
+    type: "compaction",
+  };
+}
+
+function compactionMetadata(
+  compactionEntryId: string,
+  attachedToTurn: boolean,
+): Record<string, unknown> {
+  return {
+    customType: COMPACTION_METADATA_ENTRY_TYPE,
+    data: { attachedToTurn, compactionEntryId, reason: attachedToTurn ? "overflow" : "manual" },
+    type: "custom",
+  };
+}
+
+function compactionMessage(timestamp: number): Record<string, unknown> {
+  return { role: "compactionSummary", summary: "summary", timestamp, tokensBefore: 10_000 };
 }
 
 describe("compact streaming", () => {
@@ -175,6 +203,7 @@ describe("compact settled turns", () => {
       display: "settled-final",
       summary: {
         aborted: false,
+        compactions: 0,
         completedAt: 150,
         durationMs: 50,
         failedTools: 0,
@@ -246,6 +275,76 @@ describe("compact settled turns", () => {
   });
 });
 
+describe("compaction metadata", () => {
+  it("attaches an automatic compaction to the active turn", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+    const final = {};
+    const entry = compactionEntry("compact-live", 120);
+    const message = assistantMessage(140, [{ text: "Done", type: "text" }]);
+
+    state.ensureActive(100);
+    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    state.associateCompaction(compaction, compactionMessage(125));
+    registerAssistant(state, final, message);
+    state.settleActive(150);
+
+    expect(state.viewFor(compaction, 150)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 1 },
+    });
+    expect(state.viewFor(final, 150)).toMatchObject({
+      display: "settled-final",
+      summary: { compactions: 1 },
+    });
+  });
+
+  it("keeps duplicate compaction events attached without double counting", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const second = {};
+    const entry = compactionEntry("compact-duplicate", 120);
+
+    state.ensureActive(100);
+    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    expect(state.registerCompaction(entry, "overflow")).toBe(true);
+    state.associateCompaction(first, compactionMessage(125));
+    state.associateCompaction(second, compactionMessage(126));
+    state.settleActive(130);
+
+    expect(state.viewFor(first)?.summary.compactions).toBe(1);
+    expect(state.viewFor(second)?.display).toBe("hidden");
+  });
+
+  it("consumes the live association when component and entry timestamps match", () => {
+    const state = new TurnFoldState();
+    const automatic = {};
+    const manual = {};
+
+    state.ensureActive(100);
+    state.registerCompaction(compactionEntry("compact-same-time", 120), "threshold");
+    state.associateCompaction(automatic, compactionMessage(120));
+    state.settleActive(130);
+    state.registerCompaction(compactionEntry("compact-after", 140), "manual");
+    state.associateCompaction(manual, compactionMessage(145));
+
+    expect(state.viewFor(automatic)?.summary.compactions).toBe(1);
+    expect(state.viewFor(manual)).toBeUndefined();
+  });
+
+  it("leaves a compaction standalone when no turn is active", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+    const entry = compactionEntry("compact-manual", 120);
+
+    state.ensureActive(100);
+    expect(state.registerCompaction(entry, "manual")).toBe(false);
+    state.associateCompaction(compaction, compactionMessage(120));
+
+    expect(state.viewFor(compaction)).toBeUndefined();
+  });
+});
+
 describe("expanded transcript", () => {
   it("shows every associated row before and after settlement", () => {
     const state = new TurnFoldState();
@@ -261,6 +360,18 @@ describe("expanded transcript", () => {
     state.settleActive(130);
     expect(state.viewFor(first)?.display).toBe("original");
     expect(state.viewFor(second)?.display).toBe("original");
+  });
+
+  it("shows an attached compaction with Pi's original row", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+
+    state.setMode("expanded");
+    state.ensureActive(100);
+    state.registerCompaction(compactionEntry("compact-expanded", 120), "threshold");
+    state.associateCompaction(compaction, compactionMessage(120));
+
+    expect(state.viewFor(compaction)?.display).toBe("original");
   });
 
   it("toggles back to compact mode", () => {
@@ -328,7 +439,110 @@ describe("historical transcript", () => {
     expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
     expect(state.viewFor(secondFinal)?.display).toBe("settled-summary-final");
   });
+});
 
+describe("historical compactions", () => {
+  it("restores an explicitly attached automatic compaction", () => {
+    const state = new TurnFoldState();
+    const compaction = {};
+    const final = {};
+    const message = assistantMessage(140, [{ text: "Done", type: "text" }]);
+
+    state.loadHistory([
+      { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
+      compactionEntry("compact-history", 120),
+      { message, type: "message" },
+      compactionMetadata("compact-history", true),
+    ]);
+    state.associateCompaction(compaction, compactionMessage(120));
+    state.associateAssistant(final, message);
+
+    expect(state.viewFor(compaction)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 1 },
+    });
+    expect(state.viewFor(final)).toMatchObject({
+      display: "settled-final",
+      summary: { compactions: 1 },
+    });
+  });
+
+  it("counts multiple automatic compactions without treating them as activity", () => {
+    const state = new TurnFoldState();
+    const firstCompaction = {};
+    const secondCompaction = {};
+    const final = {};
+    const message = assistantMessage(160, [{ text: "Done", type: "text" }]);
+
+    state.loadHistory([
+      { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
+      compactionEntry("compact-first", 120),
+      compactionMetadata("compact-first", true),
+      compactionEntry("compact-second", 140),
+      compactionMetadata("compact-second", true),
+      { message, type: "message" },
+    ]);
+    state.associateCompaction(firstCompaction, compactionMessage(120));
+    state.associateCompaction(secondCompaction, compactionMessage(140));
+    state.associateAssistant(final, message);
+
+    expect(state.viewFor(firstCompaction)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 2, hiddenActivities: 0 },
+    });
+    expect(state.viewFor(secondCompaction)?.display).toBe("hidden");
+    expect(state.viewFor(final)?.display).toBe("settled-final");
+  });
+
+  it("keeps manual and unannotated historical compactions standalone", () => {
+    const state = new TurnFoldState();
+    const manual = {};
+    const unannotated = {};
+
+    state.loadHistory([
+      { message: { content: "first", role: "user", timestamp: 100 }, type: "message" },
+      compactionEntry("compact-manual", 120),
+      compactionMetadata("compact-manual", false),
+      { message: assistantMessage(140, [{ text: "Done", type: "text" }]), type: "message" },
+      { message: { content: "second", role: "user", timestamp: 200 }, type: "message" },
+      compactionEntry("compact-old", 220),
+      { message: assistantMessage(240, [{ text: "Done", type: "text" }]), type: "message" },
+    ]);
+    state.associateCompaction(manual, compactionMessage(120));
+    state.associateCompaction(unannotated, compactionMessage(220));
+
+    expect(state.viewFor(manual)).toBeUndefined();
+    expect(state.viewFor(unannotated)).toBeUndefined();
+  });
+
+  it("preserves a live compaction through a deferred transcript rebuild", () => {
+    const state = new TurnFoldState();
+    const oldStandaloneCompaction = {};
+    const compaction = {};
+    const entry = compactionEntry("compact-rebuild", 120);
+
+    state.ensureActive(100);
+    state.registerCompaction(entry, "overflow");
+    state.deferHistoryReload(() => [
+      { message: { content: "old", role: "user", timestamp: 10 }, type: "message" },
+      compactionEntry("compact-old-manual", 30),
+      compactionMetadata("compact-old-manual", false),
+      { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
+    ]);
+    state.reloadHistoryForNewComponent(oldStandaloneCompaction);
+    state.associateCompaction(oldStandaloneCompaction, compactionMessage(30));
+    state.associateCompaction(compaction, compactionMessage(999));
+    state.settleActive(150);
+
+    expect(state.viewFor(oldStandaloneCompaction)).toBeUndefined();
+    expect(state.viewFor(compaction, 150)).toMatchObject({
+      display: "settled-summary",
+      summary: { compactions: 1 },
+    });
+  });
+});
+
+describe("historical transcript timing and reload", () => {
   it("uses persisted completion time when restoring worked duration", () => {
     const state = new TurnFoldState();
     const component = {};
@@ -384,6 +598,12 @@ describe("historical transcript", () => {
     state.associateAssistant(unknown, { role: "assistant" });
     state.associateAssistant(unknown, assistantMessage(340, []));
     state.associateTool(unknown, "missing");
+    state.ensureActive(350);
+    expect(state.registerCompaction({}, "overflow")).toBe(false);
+    expect(state.registerCompaction({ id: "bad-time", timestamp: "invalid" }, "threshold")).toBe(
+      false,
+    );
+    state.associateCompaction(unknown, { role: "compactionSummary" });
     state.settleActive();
 
     expect(state.viewFor(unknown)).toBeUndefined();

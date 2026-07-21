@@ -1,5 +1,6 @@
 import {
   AssistantMessageComponent,
+  CompactionSummaryMessageComponent,
   SkillInvocationMessageComponent,
   type Theme,
   ToolExecutionComponent,
@@ -24,6 +25,10 @@ function countLabel(count: number, singular: string, plural = `${singular}s`): s
   return `${String(count)} ${count === 1 ? singular : plural}`;
 }
 
+function compactionLabel(count: number): string {
+  return count === 1 ? "compacted" : countLabel(count, "compaction");
+}
+
 function formatDuration(durationMs: number): string {
   if (durationMs < 1_000) return "<1s";
   const totalSeconds = Math.round(durationMs / 1_000);
@@ -37,6 +42,7 @@ export function formatStreamingSummary(summary: FoldSummary): string {
   const parts = [countLabel(summary.hiddenActivities, "earlier activity", "earlier activities")];
   if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
+  if (summary.compactions > 0) parts.push(compactionLabel(summary.compactions));
   return `▶ ${parts.join(" · ")}`;
 }
 
@@ -45,6 +51,7 @@ export function formatSettledSummary(summary: FoldSummary): string {
   if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
   if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
+  if (summary.compactions > 0) parts.push(compactionLabel(summary.compactions));
   if (summary.aborted) parts.push("interrupted");
   return `▶ ${parts.join(" · ")}`;
 }
@@ -174,8 +181,9 @@ function isUserRow(component: object): boolean {
   );
 }
 
-function installUserSpacingPatches(): RestoreRenderPatches {
+function installUserSpacingPatches(state: TurnFoldState): RestoreRenderPatches {
   const suppressedSpacers = new WeakSet();
+  const compactionBySpacer = new WeakMap<Spacer, CompactionSummaryMessageComponent>();
   const containerPrototype = Container.prototype;
   const originalAddChild = containerPrototype.addChild;
   const spacerPrototype = Spacer.prototype;
@@ -185,10 +193,21 @@ function installUserSpacingPatches(): RestoreRenderPatches {
   const patchedAddChild = function (this: Container, component: Child): void {
     const previous = this.children.at(-1);
     if (previous instanceof Spacer && isUserRow(component)) suppressedSpacers.add(previous);
+    if (previous instanceof Spacer && component instanceof CompactionSummaryMessageComponent) {
+      state.reloadHistoryForNewComponent(component);
+      const message: unknown = Reflect.get(component, "message");
+      state.associateCompaction(component, message);
+      compactionBySpacer.set(previous, component);
+    }
     originalAddChild.call(this, component);
   };
   const patchedSpacerRender = function (this: Spacer, width: number): string[] {
-    return suppressedSpacers.has(this) ? [] : originalSpacerRender.call(this, width);
+    if (suppressedSpacers.has(this)) return [];
+    const compaction = compactionBySpacer.get(this);
+    const compactionDisplay = compaction ? state.viewFor(compaction)?.display : undefined;
+    return compactionDisplay && compactionDisplay !== "original"
+      ? []
+      : originalSpacerRender.call(this, width);
   };
 
   containerPrototype.addChild = patchedAddChild;
@@ -206,7 +225,7 @@ function installUserTimestampPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
 ): RestoreRenderPatches {
-  const restoreUserSpacing = installUserSpacingPatches();
+  const restoreUserSpacing = installUserSpacingPatches(state);
   const userPrototype = UserMessageComponent.prototype;
   const originalUserRender = userPrototype.render;
   const skillPrototype = SkillInvocationMessageComponent.prototype;
@@ -266,11 +285,45 @@ function renderFoldView(
     : settledFinal(originalLines, summary, width, theme);
 }
 
+function installCompactionRenderPatch(
+  state: TurnFoldState,
+  getTheme: () => Theme | undefined,
+): RestoreRenderPatches {
+  const prototype = CompactionSummaryMessageComponent.prototype;
+  const hadOwnRender = Object.prototype.hasOwnProperty.call(prototype, "render");
+  const originalRender = prototype.render;
+  const patchedRender = function (
+    this: CompactionSummaryMessageComponent,
+    width: number,
+  ): string[] {
+    state.reloadHistoryForNewComponent(this);
+    const message: unknown = Reflect.get(this, "message");
+    state.associateCompaction(this, message);
+    const view = state.viewFor(this);
+    if (!view) return originalRender.call(this, width);
+    return renderFoldView(
+      view.display,
+      () => originalRender.call(this, width),
+      view.summary,
+      width,
+      getTheme(),
+    );
+  };
+
+  prototype.render = patchedRender;
+  return () => {
+    if (prototype.render !== patchedRender) return;
+    if (hadOwnRender) prototype.render = originalRender;
+    else Reflect.deleteProperty(prototype, "render");
+  };
+}
+
 export function installRenderPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
 ): RestoreRenderPatches {
   const restoreUserTimestamps = installUserTimestampPatches(state, getTheme);
+  const restoreCompactionRender = installCompactionRenderPatch(state, getTheme);
   const assistantPrototype = AssistantMessageComponent.prototype;
   const originalAssistantUpdate = assistantPrototype.updateContent;
   const originalAssistantRender = assistantPrototype.render;
@@ -336,6 +389,7 @@ export function installRenderPatches(
 
   return () => {
     restoreUserTimestamps();
+    restoreCompactionRender();
     if (assistantPrototype.updateContent === patchedAssistantUpdate) {
       assistantPrototype.updateContent = originalAssistantUpdate;
     }

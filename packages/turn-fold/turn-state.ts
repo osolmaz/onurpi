@@ -1,9 +1,14 @@
+import {
+  compactionMetadataById,
+  type CompactionMetadata,
+  type CompactionReason,
+} from "./compaction-metadata.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
 import { nextTurnFoldMode, type TurnFoldMode } from "./mode.ts";
 
 const LIVE_ACTIVITY_LIMIT = 3;
 
-type ComponentKind = "assistant" | "tool";
+type ComponentKind = "assistant" | "compaction" | "tool";
 
 type AssistantSnapshot = {
   hasTerminalNotice: boolean;
@@ -24,6 +29,8 @@ type TurnGroup = {
   aborted: boolean;
   assistantKeys: Set<string>;
   assistants: Map<object, AssistantSnapshot>;
+  compactionIds: Set<string>;
+  compactionTimestamps: Set<number>;
   components: Map<object, ComponentInfo>;
   endedAt?: number;
   failedToolCallIds: Set<string>;
@@ -38,6 +45,7 @@ type TurnGroup = {
 
 export type FoldSummary = {
   aborted: boolean;
+  compactions: number;
   completedAt: number | undefined;
   durationMs: number;
   failedTools: number;
@@ -171,11 +179,14 @@ export class TurnFoldState {
   private assistantKeyByMessage = new WeakMap<object, string>();
   private assistantOrdinalByTimestamp = new Map<number, number>();
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
+  private compactionComponentGroup = new WeakMap<object, string | null>();
+  private compactionGroupByTimestamp = new Map<number, string | null>();
   private groupCounter = 0;
   private groups = new Map<string, TurnGroup>();
   private historyReload: (() => readonly unknown[]) | undefined;
   private latestAssistantKeyByTimestamp = new Map<number, string>();
   private mode: TurnFoldMode = "compact";
+  private pendingLiveCompactionGroups: (string | null)[] = [];
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
   private userComponentGroup = new WeakMap<object, string>();
@@ -198,8 +209,11 @@ export class TurnFoldState {
 
   loadHistory(entries: readonly unknown[]): void {
     this.resetGroups();
+    const compactionMetadata = compactionMetadataById(entries);
     let currentGroup: TurnGroup | undefined;
     for (const entry of entries) {
+      if (this.indexHistoricalCompactionEntry(currentGroup, entry, compactionMetadata)) continue;
+
       const message = messageFromEntry(entry);
       const role = stringField(message, "role");
       if (role === "user") {
@@ -336,6 +350,32 @@ export class TurnFoldState {
     if (added) this.invalidateGroupComponents(group);
   }
 
+  registerCompaction(entry: unknown, reason: CompactionReason): boolean {
+    const id = stringField(entry, "id");
+    const timestamp = entryTimestamp(entry);
+    if (!id || timestamp === undefined) return false;
+    const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : undefined;
+    if (reason === "manual" || !group) {
+      this.pendingLiveCompactionGroups.push(null);
+      return false;
+    }
+    const added = this.indexCompaction(group, entry);
+    this.pendingLiveCompactionGroups.push(group.id);
+    if (added) this.invalidateGroupComponents(group);
+    return true;
+  }
+
+  associateCompaction(component: object, message: unknown): void {
+    if (this.compactionComponentGroup.has(component)) return;
+    const groupId = this.compactionGroupForTimestamp(numberField(message, "timestamp"));
+    this.compactionComponentGroup.set(component, groupId);
+    const group = groupId ? this.groups.get(groupId) : undefined;
+    if (!group) return;
+    if (this.associateComponent(component, group, "compaction")) {
+      this.invalidateGroupComponents(group);
+    }
+  }
+
   settleActive(endedAt = Date.now()): void {
     if (!this.activeGroupId) return;
     const group = this.groups.get(this.activeGroupId);
@@ -367,6 +407,17 @@ export class TurnFoldState {
       settled: group.settled,
     });
     return { display, summary: this.summary(group, now) };
+  }
+
+  private compactionGroupForTimestamp(timestamp: number | undefined): string | null {
+    if (timestamp !== undefined && this.compactionGroupByTimestamp.has(timestamp)) {
+      const groupId = this.compactionGroupByTimestamp.get(timestamp) ?? null;
+      if (this.pendingLiveCompactionGroups[0] === groupId) {
+        this.pendingLiveCompactionGroups.shift();
+      }
+      return groupId;
+    }
+    return this.pendingLiveCompactionGroups.shift() ?? null;
   }
 
   private messageAssistantKey(message: unknown): string | undefined {
@@ -481,6 +532,7 @@ export class TurnFoldState {
     const activityCount = this.activityComponents(group).length;
     return {
       aborted: group.aborted,
+      compactions: group.compactionIds.size,
       completedAt: group.endedAt,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
       failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
@@ -506,6 +558,8 @@ export class TurnFoldState {
       aborted: false,
       assistantKeys: new Set(),
       assistants: new Map(),
+      compactionIds: new Set(),
+      compactionTimestamps: new Set(),
       components: new Map(),
       failedToolCallIds: new Set(),
       id: `turn-${String(this.groupCounter)}`,
@@ -519,6 +573,22 @@ export class TurnFoldState {
     this.groups.set(group.id, group);
     if (startedByUser) this.userGroupIds.push(group.id);
     return group;
+  }
+
+  private indexHistoricalCompactionEntry(
+    currentGroup: TurnGroup | undefined,
+    entry: unknown,
+    metadata: ReadonlyMap<string, CompactionMetadata>,
+  ): boolean {
+    if (stringField(entry, "type") !== "compaction") return false;
+    const id = stringField(entry, "id");
+    const timestamp = entryTimestamp(entry);
+    if (currentGroup && id && metadata.get(id)?.attachedToTurn === true) {
+      this.indexCompaction(currentGroup, entry);
+    } else if (timestamp !== undefined) {
+      this.compactionGroupByTimestamp.set(timestamp, null);
+    }
+    return true;
   }
 
   private historicalGroup(
@@ -539,6 +609,16 @@ export class TurnFoldState {
     const role = stringField(message, "role");
     if (role === "assistant") this.indexHistoricalAssistant(group, message, completedAt);
     if (role === "toolResult") this.indexHistoricalToolResult(group, message, completedAt);
+  }
+
+  private indexCompaction(group: TurnGroup, entry: unknown): boolean {
+    const id = stringField(entry, "id");
+    const timestamp = entryTimestamp(entry);
+    if (!id || timestamp === undefined || group.compactionIds.has(id)) return false;
+    group.compactionIds.add(id);
+    group.compactionTimestamps.add(timestamp);
+    this.compactionGroupByTimestamp.set(timestamp, group.id);
+    return true;
   }
 
   private indexHistoricalAssistant(
@@ -590,6 +670,7 @@ export class TurnFoldState {
 
   private resetComponentAssociations(): void {
     this.assistantComponentByKey = new Map();
+    this.compactionComponentGroup = new WeakMap();
     this.componentInfo = new WeakMap();
     this.sequence = 0;
     this.userComponentGroup = new WeakMap();
@@ -610,10 +691,13 @@ export class TurnFoldState {
     this.assistantKeyByMessage = new WeakMap();
     this.assistantOrdinalByTimestamp = new Map();
     this.componentInfo = new WeakMap();
+    this.compactionComponentGroup = new WeakMap();
+    this.compactionGroupByTimestamp = new Map();
     this.groups = new Map();
     this.groupCounter = 0;
     this.historyReload = undefined;
     this.latestAssistantKeyByTimestamp = new Map();
+    this.pendingLiveCompactionGroups = [];
     this.sequence = 0;
     this.toolGroupById = new Map();
     this.userComponentGroup = new WeakMap();
@@ -624,7 +708,9 @@ export class TurnFoldState {
   private reloadHistory(entries: readonly unknown[]): void {
     const activeGroupId = this.activeGroupId;
     const activeGroup = activeGroupId ? this.groups.get(activeGroupId) : undefined;
+    const pendingLiveCompactionGroups = [...this.pendingLiveCompactionGroups];
     this.loadHistory(entries);
+    this.pendingLiveCompactionGroups = pendingLiveCompactionGroups;
     if (!activeGroupId || !activeGroup) return;
 
     const visibleGroups = [...this.groups.values()];
@@ -634,6 +720,7 @@ export class TurnFoldState {
     for (const group of activeGroups) this.groups.delete(group.id);
     this.groups.set(activeGroup.id, activeGroup);
     this.reassignGroupIds(activeGroupIds, activeGroup.id);
+    this.rebuildCompactionGroupIndex();
     this.groupCounter = Math.max(this.groupCounter, groupNumber(activeGroup.id));
     this.activeGroupId = activeGroup.id;
   }
@@ -660,6 +747,11 @@ export class TurnFoldState {
     for (const visible of visibleGroups) {
       active.aborted ||= visible.aborted;
       active.assistantKeys = new Set([...active.assistantKeys, ...visible.assistantKeys]);
+      active.compactionIds = new Set([...active.compactionIds, ...visible.compactionIds]);
+      active.compactionTimestamps = new Set([
+        ...active.compactionTimestamps,
+        ...visible.compactionTimestamps,
+      ]);
       active.failedToolCallIds = new Set([
         ...active.failedToolCallIds,
         ...visible.failedToolCallIds,
@@ -679,5 +771,13 @@ export class TurnFoldState {
     this.userGroupIds = this.userGroupIds.map((groupId) =>
       fromGroupIds.has(groupId) ? toGroupId : groupId,
     );
+  }
+
+  private rebuildCompactionGroupIndex(): void {
+    for (const group of this.groups.values()) {
+      for (const timestamp of group.compactionTimestamps) {
+        this.compactionGroupByTimestamp.set(timestamp, group.id);
+      }
+    }
   }
 }

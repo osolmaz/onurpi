@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     coverage: {
       include: [
+        "packages/turn-fold/compaction-metadata.ts",
         "packages/turn-fold/fold-policy.ts",
         "packages/turn-fold/mode.ts",
         "packages/turn-fold/turn-state.ts",
