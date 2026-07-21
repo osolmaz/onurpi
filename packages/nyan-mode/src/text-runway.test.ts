@@ -1,44 +1,64 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
-import { renderTextNyan } from "./text-runway.ts";
+import type { CatMood } from "./cat-state.ts";
+import { renderCat, renderTextNyan } from "./text-runway.ts";
 
 const ESCAPE = String.fromCharCode(27);
-const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;5;\\d+|39|90)m`, "gu");
-const RAINBOW_GLYPH = new RegExp(`${ESCAPE}\\[38;5;(\\d+)m━`, "gu");
+const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;2;\\d+;\\d+;\\d+|39|90)m`, "gu");
+const RGB_BLOCK = new RegExp(`${ESCAPE}\\[38;2;(\\d+);(\\d+);(\\d+)m█`, "gu");
+const STREAMING_MOODS: readonly CatMood[] = [
+  "dancing",
+  "thinking",
+  "focused",
+  "pleased",
+  "unimpressed",
+  "annoyed",
+  "angry",
+];
 
 function plain(text: string): string {
   return text.replace(ANSI_FOREGROUND, "");
 }
 
-function trailColors(text: string): number[] {
-  return [...text.matchAll(RAINBOW_GLYPH)].map((match) => Number(match[1] ?? -1));
+function trailColors(text: string): string[] {
+  return [...text.matchAll(RGB_BLOCK)].map((match) => [match[1], match[2], match[3]].join(","));
 }
 
 describe("ANSI Nyan runway", () => {
-  it("elongates contiguous rainbow bands behind a normally colored cat", () => {
+  it("draws a smooth full-height rainbow behind a normally colored cat", () => {
     const runway = renderTextNyan(80, 100);
+    const colors = trailColors(runway);
     expect(visibleWidth(runway)).toBe(80);
-    expect(plain(runway).endsWith(" (=^･ω･^=)")).toBe(true);
+    expect(plain(runway)).toBe(`${"█".repeat(70)} (=^･ω･^=)`);
     expect(runway).toContain(`${ESCAPE}[39m (=^･ω･^=)`);
-    expect(trailColors(runway)).toEqual(
-      [196, 208, 226, 46, 51, 21, 201].flatMap((color) => Array<number>(10).fill(color)),
-    );
+    expect(colors).toHaveLength(70);
+    expect(new Set(colors).size).toBeGreaterThan(60);
+    expect(colors[0]).toBe("255,45,85");
+    expect(colors.at(-1)).toBe("240,65,180");
   });
 
-  it("alternates fixed-width dance poses", () => {
-    const leftPaw = renderTextNyan(30, 50, true, 0);
-    const rightPaw = renderTextNyan(30, 50, true, 1);
-    expect(visibleWidth(leftPaw)).toBe(30);
-    expect(visibleWidth(rightPaw)).toBe(30);
-    expect(plain(leftPaw)).toContain("/(=^･ω･^=)");
-    expect(plain(rightPaw)).toContain("(=^･ω･^=)\\");
+  it("keeps every streaming mood animated at a fixed width", () => {
+    for (const mood of STREAMING_MOODS) {
+      const first = renderCat(mood, 0);
+      const second = renderCat(mood, 1);
+      expect(visibleWidth(first), mood).toBe(10);
+      expect(visibleWidth(second), mood).toBe(10);
+      expect(second, mood).not.toBe(first);
+    }
+    expect(renderCat("neutral", Number.NaN)).toBe(renderCat("neutral", -1));
   });
 
-  it("uses a rainbow bar when the runway is too narrow for the cat", () => {
+  it("renders the selected mood on the context runway", () => {
+    const runway = renderTextNyan(40, 50, { mood: "angry", animationFrame: 1 });
+    expect(visibleWidth(runway)).toBe(40);
+    expect(plain(runway)).toContain("/(=ಠ益ಠ=)\\");
+  });
+
+  it("uses a full-height rainbow bar when the runway is too narrow for the cat", () => {
     const runway = renderTextNyan(4.9, undefined);
     expect(visibleWidth(runway)).toBe(4);
-    expect(plain(runway)).toBe("━━━━");
+    expect(plain(runway)).toBe("████");
     expect(renderTextNyan(0)).toBe("");
     expect(renderTextNyan(-2)).toBe("");
   });

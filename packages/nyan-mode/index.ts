@@ -2,14 +2,21 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import { basename } from "node:path";
 
 import {
+  createCatState,
   createNyanRunwayPainter,
+  createTextNyanPainter,
   cumulativeApiCost,
   ensureKittyGraphics,
   formatApiCost,
   getNyanDebugInfo,
+  reduceCatState,
   renderAnimatedNyanRunway,
-  renderTextNyan,
+  selectCatMood,
+  type CatEvent,
+  type CatMood,
+  type CatState,
   type NyanRunwayPainter,
+  type TextNyanPainter,
 } from "./src/index.ts";
 import {
   composeInlineImageLine,
@@ -21,20 +28,32 @@ import {
   type FittedRunway,
 } from "./src/layout.ts";
 
-const TEXT_ANIMATION_INTERVAL_MS = 500;
+type NyanDisplayMode = "auto" | "bitmap" | "text";
+
+type ActiveFooter = {
+  bitmapPainter: NyanRunwayPainter;
+  requestRender: () => void;
+  textPainter: TextNyanPainter;
+};
 
 export default function nyanMode(pi: ExtensionAPI): void {
   let enabled = true;
   let displayMode: NyanDisplayMode = "text";
-  let renderFooter: (() => void) | undefined;
-  let activePainter: NyanRunwayPainter | undefined;
+  let catState = createCatState();
+  let activeFooter: ActiveFooter | undefined;
+
+  const applyCatEvent = (event: CatEvent): void => {
+    catState = reduceCatState(catState, event);
+    syncActiveFooter(activeFooter, enabled, displayMode, catState);
+  };
+  registerCatEventHandlers(pi, applyCatEvent);
 
   pi.registerCommand("nyan", {
     description: "Toggle Nyan Mode footer",
     handler: (args, ctx) => {
       const value = args.trim().toLowerCase();
       if (value === "debug") {
-        ctx.ui.notify(debugMessage(enabled, displayMode, activePainter), "info");
+        ctx.ui.notify(debugMessage(enabled, displayMode, catState, activeFooter), "info");
         return Promise.resolve();
       }
       const notify = (message: string): void => {
@@ -44,65 +63,134 @@ export default function nyanMode(pi: ExtensionAPI): void {
       if (requestedMode) {
         enabled = true;
         displayMode = requestedMode;
-        activateDisplayMode(displayMode, activePainter, renderFooter, notify);
+        activateDisplayMode(displayMode, catState, activeFooter, notify);
         return Promise.resolve();
       }
 
       enabled = nextEnabled(value, enabled);
-      applyEnabled(enabled, activePainter, renderFooter, notify);
+      applyEnabled(enabled, displayMode, catState, activeFooter, notify);
       return Promise.resolve();
     },
   });
 
   pi.on("session_start", (_event, ctx) => {
-    ctx.ui.setFooter((tui, theme, footerData) => {
-      const requestRender = (): void => {
-        tui.requestRender();
-      };
-      const painter = createNyanRunwayPainter(tui);
-      let disposed = false;
-      renderFooter = requestRender;
-      activePainter = painter;
-      const unsubscribeBranch = footerData.onBranchChange(requestRender);
-      void ensureKittyGraphics(tui).then(() => {
-        if (!disposed) requestRender();
-      });
-
-      return {
-        dispose(): void {
-          disposed = true;
-          unsubscribeBranch();
-          painter.dispose();
-          if (renderFooter === requestRender) renderFooter = undefined;
-          if (activePainter === painter) activePainter = undefined;
-        },
-        invalidate(): void {
-          painter.clear();
-        },
-        render(width: number): string[] {
-          return [
-            renderFooterLine({
-              ...footerSnapshot(ctx),
-              branch: footerData.getGitBranch(),
-              displayMode,
-              enabled,
-              painter,
-              theme,
-              thinkingLevel: pi.getThinkingLevel(),
-              width,
-            }),
-          ];
-        },
-      };
+    catState = createCatState();
+    installNyanFooter(pi, ctx, {
+      activate: (footer) => {
+        activeFooter = footer;
+      },
+      deactivate: (footer) => {
+        if (activeFooter === footer) activeFooter = undefined;
+      },
+      getCatState: () => catState,
+      getDisplayMode: () => displayMode,
+      getEnabled: () => enabled,
     });
   });
 
   pi.on("session_shutdown", () => {
-    activePainter?.clear();
+    activeFooter?.bitmapPainter.clear();
+    activeFooter?.textPainter.clear();
   });
 }
 
-type NyanDisplayMode = "auto" | "bitmap" | "text";
+type FooterLifecycle = {
+  activate: (footer: ActiveFooter) => void;
+  deactivate: (footer: ActiveFooter) => void;
+  getCatState: () => CatState;
+  getDisplayMode: () => NyanDisplayMode;
+  getEnabled: () => boolean;
+};
+
+function installNyanFooter(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  lifecycle: FooterLifecycle,
+): void {
+  ctx.ui.setFooter((tui, theme, footerData) => {
+    const requestRender = (): void => {
+      tui.requestRender();
+    };
+    const footer: ActiveFooter = {
+      bitmapPainter: createNyanRunwayPainter(tui),
+      requestRender,
+      textPainter: createTextNyanPainter(requestRender),
+    };
+    let disposed = false;
+    lifecycle.activate(footer);
+    syncActiveFooter(
+      footer,
+      lifecycle.getEnabled(),
+      lifecycle.getDisplayMode(),
+      lifecycle.getCatState(),
+    );
+    const unsubscribeBranch = footerData.onBranchChange(requestRender);
+    void ensureKittyGraphics(tui).then(() => {
+      if (!disposed) requestRender();
+    });
+
+    return {
+      dispose(): void {
+        disposed = true;
+        unsubscribeBranch();
+        footer.bitmapPainter.dispose();
+        footer.textPainter.dispose();
+        lifecycle.deactivate(footer);
+      },
+      invalidate(): void {
+        footer.bitmapPainter.clear();
+      },
+      render(width: number): string[] {
+        const catState = lifecycle.getCatState();
+        const mood = selectCatMood(catState, Date.now());
+        return [
+          renderFooterLine({
+            ...footerSnapshot(ctx, mood),
+            bitmapPainter: footer.bitmapPainter,
+            branch: footerData.getGitBranch(),
+            displayMode: lifecycle.getDisplayMode(),
+            enabled: lifecycle.getEnabled(),
+            textPainter: footer.textPainter,
+            theme,
+            thinkingLevel: pi.getThinkingLevel(),
+            width,
+          }),
+        ];
+      },
+    };
+  });
+}
+
+function registerCatEventHandlers(pi: ExtensionAPI, apply: (event: CatEvent) => void): void {
+  pi.on("agent_start", () => {
+    apply({ type: "stream_started", nowMs: Date.now() });
+  });
+  pi.on("agent_end", () => {
+    apply({ type: "stream_stopped" });
+  });
+  pi.on("tool_execution_start", (event) => {
+    apply({ type: "tool_started", toolCallId: event.toolCallId });
+  });
+  pi.on("tool_execution_end", (event) => {
+    apply({
+      type: "tool_finished",
+      toolCallId: event.toolCallId,
+      isError: event.isError,
+      nowMs: Date.now(),
+    });
+  });
+}
+
+function syncActiveFooter(
+  footer: ActiveFooter | undefined,
+  enabled: boolean,
+  displayMode: NyanDisplayMode,
+  catState: CatState,
+): void {
+  if (!footer) return;
+  footer.textPainter.setStreaming(enabled && catState.streaming && displayMode !== "bitmap");
+  footer.requestRender();
+}
 
 function nyanDisplayMode(value: string): NyanDisplayMode | undefined {
   return value === "auto" || value === "bitmap" || value === "text" ? value : undefined;
@@ -116,49 +204,57 @@ function nextEnabled(value: string, enabled: boolean): boolean {
 
 function activateDisplayMode(
   displayMode: NyanDisplayMode,
-  painter: NyanRunwayPainter | undefined,
-  renderFooter: (() => void) | undefined,
+  catState: CatState,
+  footer: ActiveFooter | undefined,
   notify: (message: string) => void,
 ): void {
-  if (displayMode === "text") painter?.clear();
+  if (displayMode === "text") footer?.bitmapPainter.clear();
+  if (displayMode === "bitmap") footer?.textPainter.clear();
   notify(`Nyan Mode ${displayMode}`);
-  renderFooter?.();
+  syncActiveFooter(footer, true, displayMode, catState);
 }
 
 function applyEnabled(
   enabled: boolean,
-  painter: NyanRunwayPainter | undefined,
-  renderFooter: (() => void) | undefined,
+  displayMode: NyanDisplayMode,
+  catState: CatState,
+  footer: ActiveFooter | undefined,
   notify: (message: string) => void,
 ): void {
-  if (!enabled) painter?.clear();
+  if (!enabled) {
+    footer?.bitmapPainter.clear();
+    footer?.textPainter.clear();
+  }
   notify(`Nyan Mode ${enabled ? "enabled" : "disabled"}`);
-  renderFooter?.();
+  syncActiveFooter(footer, enabled, displayMode, catState);
 }
 
 function debugMessage(
   enabled: boolean,
   displayMode: NyanDisplayMode,
-  painter: NyanRunwayPainter | undefined,
+  catState: CatState,
+  footer: ActiveFooter | undefined,
 ): string {
   const info = getNyanDebugInfo();
   return joinParts([
     "Nyan:",
     `enabled=${String(enabled)}`,
     `mode=${displayMode}`,
+    `mood=${selectCatMood(catState, Date.now())}`,
+    `errors=${String(catState.errorCount)}`,
     `supported=${String(info.supported)}`,
     `imageProtocol=${info.imageProtocol ?? "none"}`,
     `assets=${String(info.assetsAvailable)}`,
-    `painter=${painter?.debugInfo() ?? "none"}`,
+    `bitmap=${footer?.bitmapPainter.debugInfo() ?? "none"}`,
+    `text=${footer?.textPainter.debugInfo() ?? "none"}`,
   ]);
 }
 
 type FooterSnapshot = {
-  animationFrame: number;
   contextWindow: number | undefined;
   cumulativeCost: number;
-  dancing: boolean;
   modelId: string | undefined;
+  mood: CatMood;
   percent: number | undefined;
   project: string;
   reasoning: boolean | undefined;
@@ -166,23 +262,23 @@ type FooterSnapshot = {
 };
 
 type FooterLineOptions = FooterSnapshot & {
+  bitmapPainter: NyanRunwayPainter;
   branch: string | null;
   displayMode: NyanDisplayMode;
   enabled: boolean;
-  painter: NyanRunwayPainter;
+  textPainter: TextNyanPainter;
   theme: Theme;
   thinkingLevel: string;
   width: number;
 };
 
-function footerSnapshot(ctx: ExtensionContext): FooterSnapshot {
+function footerSnapshot(ctx: ExtensionContext, mood: CatMood): FooterSnapshot {
   const project = basename(ctx.cwd);
   return {
     ...usageSnapshot(ctx),
     ...modelSnapshot(ctx),
-    animationFrame: Math.floor(Date.now() / TEXT_ANIMATION_INTERVAL_MS),
     cumulativeCost: cumulativeApiCost(ctx.sessionManager.getEntries()),
-    dancing: !ctx.isIdle(),
+    mood,
     project: project || ctx.cwd,
     usingSubscription: usingSubscription(ctx),
   };
@@ -221,9 +317,9 @@ function renderFooterLine(options: FooterLineOptions): string {
   );
   const nyanLine = options.enabled
     ? composeNyanLine(
-        options.painter,
-        options.animationFrame,
-        options.dancing,
+        options.bitmapPainter,
+        options.textPainter,
+        options.mood,
         left,
         right,
         options.percent,
@@ -260,9 +356,9 @@ function rightFooter(
 }
 
 function composeNyanLine(
-  painter: NyanRunwayPainter,
-  animationFrame: number,
-  dancing: boolean,
+  bitmapPainter: NyanRunwayPainter,
+  textPainter: TextNyanPainter,
+  mood: CatMood,
   left: string,
   right: string,
   percent: number | undefined,
@@ -271,13 +367,13 @@ function composeNyanLine(
 ): string | undefined {
   const layout = fitRunway(left, right, width);
   if (!layout) {
-    painter.clear();
+    bitmapPainter.clear();
     return undefined;
   }
-  const bitmap = renderBitmapRunway(painter, layout, percent, displayMode);
+  const bitmap = renderBitmapRunway(bitmapPainter, layout, percent, displayMode);
   if (bitmap) return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
   if (displayMode === "bitmap") return undefined;
-  const text = renderTextNyan(layout.cells, percent, dancing, animationFrame);
+  const text = textPainter.render(layout.cells, percent, mood);
   return text ? `${layout.left} ${text} ${layout.right}` : undefined;
 }
 

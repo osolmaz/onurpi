@@ -7,6 +7,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       include: [
+        "src/cat-state.ts",
         "src/cost.ts",
         "src/image.ts",
         "src/kitty-probe.ts",
@@ -14,6 +15,7 @@ export default defineConfig({
         "src/painter.ts",
         "src/png.ts",
         "src/progress.ts",
+        "src/text-painter.ts",
         "src/text-runway.ts",
         "src/xpm.ts",
       ],
