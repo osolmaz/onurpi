@@ -176,18 +176,18 @@ describe("provider stream policy", () => {
         transport: "websocket",
       },
     );
-    expect(returned).toBe(source);
+    expect(returned).not.toBe(source);
     expect(observed).toMatchObject({
       apiKey: "token",
       headers: { trace: "kept" },
       maxTokens: 4_096,
-      maxRetries: 1,
+      maxRetries: 0,
       timeoutMs: 123,
       transport: "sse",
     });
 
     source.end(assistant());
-    await source.result();
+    await returned.result();
     await Promise.resolve();
     expect(failures).toEqual([false]);
   });
@@ -196,30 +196,69 @@ describe("provider stream policy", () => {
     for (const reason of ["error", "aborted"] as const) {
       const source = createAssistantMessageEventStream();
       const failures: boolean[] = [];
+      let calls = 0;
       const stream = withCompactionPolicy(
-        () => source,
+        () => {
+          calls += 1;
+          return source;
+        },
         { maxAttempts: 2, transport: "sse" },
         (failed) => failures.push(failed),
       );
-      stream(model(), { messages: [] });
+      const returned = stream(model(), { messages: [] });
       source.end(assistant(reason));
-      await source.result();
+      await returned.result();
       await Promise.resolve();
+      expect(calls).toBe(reason === "error" ? 2 : 1);
       expect(failures).toEqual([true]);
     }
   });
 
-  it("releases the override when the provider throws synchronously", () => {
+  it("retries a stream that fails after the response starts", async () => {
+    const sources = [createAssistantMessageEventStream(), createAssistantMessageEventStream()];
+    const observed: SimpleStreamOptions[] = [];
+    let call = 0;
+    const stream = withCompactionPolicy(
+      (_model, _context, options) => {
+        observed.push(options ?? {});
+        const source = sources[call];
+        call += 1;
+        if (!source) throw new Error("Unexpected retry");
+        return source;
+      },
+      { maxAttempts: 2, transport: "sse" },
+      () => undefined,
+    );
+
+    const returned = stream(model(), { messages: [] });
+    sources[0]?.end(assistant("error"));
+    await sources[0]?.result();
+    await Promise.resolve();
+    expect(call).toBe(2);
+    sources[1]?.end(assistant());
+    await returned.result();
+    expect(observed).toEqual([
+      { maxRetries: 0, transport: "sse" },
+      { maxRetries: 0, transport: "sse" },
+    ]);
+  });
+
+  it("releases the override after both provider starts throw", async () => {
     const failures: boolean[] = [];
+    let calls = 0;
     const stream = withCompactionPolicy(
       () => {
+        calls += 1;
         throw new Error("offline");
       },
       { maxAttempts: 2, transport: "sse" },
       (failed) => failures.push(failed),
     );
 
-    expect(() => stream(model(), { messages: [] })).toThrow("offline");
+    const result = await stream(model(), { messages: [] }).result();
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("offline");
+    expect(calls).toBe(2);
     expect(failures).toEqual([true]);
   });
 });
@@ -258,9 +297,9 @@ describe("session_before_compact handler", () => {
     expect(handler(event(), context())).toBeUndefined();
     const config = state.registered();
     expect(config?.api).toBe("openai-codex-responses");
-    requireStream(config)(model(), { messages: [] });
+    const returned = requireStream(config)(model(), { messages: [] });
     source.end(assistant());
-    await source.result();
+    await returned.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual(["openai-codex"]);
   });
@@ -280,15 +319,15 @@ describe("session_before_compact handler", () => {
 
     await handler(event({ split: true, history: true }), context());
     const stream = requireStream(state.registered());
-    stream(model(), { messages: [] });
+    const first = stream(model(), { messages: [] });
     sources[0]?.end(assistant());
-    await sources[0]?.result();
+    await first.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual([]);
 
-    stream(model(), { messages: [] });
+    const second = stream(model(), { messages: [] });
     sources[1]?.end(assistant());
-    await sources[1]?.result();
+    await second.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual(["openai-codex"]);
   });
@@ -301,9 +340,9 @@ describe("session_before_compact handler", () => {
     });
 
     await handler(event({ split: true, history: true }), context());
-    requireStream(state.registered())(model(), { messages: [] });
+    const returned = requireStream(state.registered())(model(), { messages: [] });
     source.end(assistant("error"));
-    await source.result();
+    await returned.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual(["openai-codex"]);
   });
@@ -323,9 +362,9 @@ describe("session_before_compact handler", () => {
     const config = state.registered();
     if (!config) throw new Error("Expected a provider override");
     registryState.current = { ...config };
-    requireStream(config)(model(), { messages: [] });
+    const returned = requireStream(config)(model(), { messages: [] });
     source.end(assistant());
-    await source.result();
+    await returned.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual(["openai-codex"]);
   });
@@ -343,9 +382,9 @@ describe("session_before_compact handler", () => {
       context(model(), undefined, () => registryState.current),
     );
     registryState.current = { streamSimple: "replacement" };
-    requireStream(state.registered())(model(), { messages: [] });
+    const returned = requireStream(state.registered())(model(), { messages: [] });
     source.end(assistant());
-    await source.result();
+    await returned.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual([]);
   });

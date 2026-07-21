@@ -1,3 +1,4 @@
+import { lazyStream } from "@earendil-works/pi-ai";
 import type {
   Api,
   AssistantMessageEventStream,
@@ -73,23 +74,45 @@ export function expectedSummaryCalls(event: HookEvent): number {
   return messagesToSummarize.length > 0 ? 2 : 1;
 }
 
+function isAborted(options: SimpleStreamOptions | undefined): boolean {
+  return options?.signal?.aborted === true;
+}
+
+async function selectCompactionStream(
+  streamSimple: ApiStreamSimpleFunction,
+  model: Model<Api>,
+  context: Context,
+  options: SimpleStreamOptions | undefined,
+  policy: CompactionPolicy,
+): Promise<AssistantMessageEventStream> {
+  let lastStream: AssistantMessageEventStream | undefined;
+  for (let attempt = 1; attempt <= policy.maxAttempts; attempt += 1) {
+    try {
+      lastStream = streamSimple(model, context, {
+        ...options,
+        maxRetries: 0,
+        transport: policy.transport,
+      });
+      const message = await lastStream.result();
+      if (message.stopReason !== "error" || isAborted(options)) return lastStream;
+    } catch (error: unknown) {
+      if (isAborted(options)) throw error;
+      if (attempt === policy.maxAttempts) throw error;
+    }
+  }
+  if (lastStream) return lastStream;
+  throw new Error("Reliable compaction did not start");
+}
+
 export function withCompactionPolicy(
   streamSimple: ApiStreamSimpleFunction,
   policy: CompactionPolicy,
   settled: (failed: boolean) => void,
 ): ApiStreamSimpleFunction {
   return (model, context, options) => {
-    let stream: AssistantMessageEventStream;
-    try {
-      stream = streamSimple(model, context, {
-        ...options,
-        maxRetries: policy.maxAttempts - 1,
-        transport: policy.transport,
-      });
-    } catch (error: unknown) {
-      settled(true);
-      throw error;
-    }
+    const stream = lazyStream(model, () =>
+      selectCompactionStream(streamSimple, model, context, options, policy),
+    );
 
     void stream.result().then(
       (message) => {
