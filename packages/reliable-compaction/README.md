@@ -33,5 +33,5 @@ a model with a configured reliability policy.
 ## Persistence
 
 The extension stores no state. It arms a temporary provider override through documented extension
-APIs, then lets Pi create its normal compaction entry. The override is removed as soon as the
-summary succeeds, fails, or is cancelled.
+APIs, then lets Pi create its normal compaction entry. The override is removed when the summary
+settles, when Pi records compaction, before later agent work, or when the session shuts down.

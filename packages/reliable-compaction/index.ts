@@ -6,8 +6,17 @@ import { installReliableCompaction } from "./reliable-compaction.ts";
 export default function reliableCompaction(pi: ExtensionAPI): void {
   installReliableCompaction(
     {
+      onBeforeAgentStart: (handler) => {
+        pi.on("before_agent_start", handler);
+      },
       onSessionBeforeCompact: (handler) => {
         pi.on("session_before_compact", handler);
+      },
+      onSessionCompact: (handler) => {
+        pi.on("session_compact", handler);
+      },
+      onSessionShutdown: (handler) => {
+        pi.on("session_shutdown", handler);
       },
       registerProvider: (name, config) => {
         pi.registerProvider(name, config);

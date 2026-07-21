@@ -31,7 +31,10 @@ export type SessionBeforeCompactHandler = (
 ) => Promise<void> | void;
 
 export type ReliableCompactionApi = {
+  onBeforeAgentStart(handler: () => void): void;
   onSessionBeforeCompact(handler: SessionBeforeCompactHandler): void;
+  onSessionCompact(handler: () => void): void;
+  onSessionShutdown(handler: () => void): void;
   registerProvider(name: string, config: ProviderConfig): void;
   unregisterProvider(name: string): void;
 };
@@ -95,10 +98,15 @@ export function withCompactionPolicy(
   };
 }
 
-export function createSessionBeforeCompactHandler(
+type ReliableCompactionController = {
+  cleanup: () => void;
+  handleBeforeCompact: SessionBeforeCompactHandler;
+};
+
+function createReliableCompactionController(
   pi: Pick<ReliableCompactionApi, "registerProvider" | "unregisterProvider">,
   dependencies: ReliableCompactionDependencies,
-): SessionBeforeCompactHandler {
+): ReliableCompactionController {
   let active: ActiveOverride | undefined;
 
   const restoreProvider = (expected: ActiveOverride): void => {
@@ -110,37 +118,53 @@ export function createSessionBeforeCompactHandler(
     }
   };
 
-  return (event, ctx) => {
-    const model = ctx.model;
-    if (!model) return;
-    const policy = policyForModel(model);
-    if (!policy) return;
+  return {
+    cleanup: () => {
+      if (active) restoreProvider(active);
+    },
+    handleBeforeCompact: (event, ctx) => {
+      const model = ctx.model;
+      if (!model) return;
+      const policy = policyForModel(model);
+      if (!policy) return;
 
-    if (active) restoreProvider(active);
+      if (active) restoreProvider(active);
 
-    // Do not replace a stream handler supplied by another extension.
-    if (ctx.modelRegistry.getRegisteredProviderConfig(model.provider) !== undefined) return;
+      // Do not replace a stream handler supplied by another extension.
+      if (ctx.modelRegistry.getRegisteredProviderConfig(model.provider) !== undefined) return;
 
-    const override: ActiveOverride = {
-      config: {},
-      provider: model.provider,
-      registry: ctx.modelRegistry,
-      remainingCalls: expectedSummaryCalls(event),
-    };
-    const streamSimple = withCompactionPolicy(dependencies.streamSimple, policy, (failed) => {
-      override.remainingCalls -= 1;
-      if (failed || override.remainingCalls === 0) restoreProvider(override);
-    });
-    override.config = { api: model.api, streamSimple };
-    active = override;
+      const override: ActiveOverride = {
+        config: {},
+        provider: model.provider,
+        registry: ctx.modelRegistry,
+        remainingCalls: expectedSummaryCalls(event),
+      };
+      const streamSimple = withCompactionPolicy(dependencies.streamSimple, policy, (failed) => {
+        override.remainingCalls -= 1;
+        if (failed || override.remainingCalls === 0) restoreProvider(override);
+      });
+      override.config = { api: model.api, streamSimple };
+      active = override;
 
-    pi.registerProvider(model.provider, override.config);
+      pi.registerProvider(model.provider, override.config);
+    },
   };
+}
+
+export function createSessionBeforeCompactHandler(
+  pi: Pick<ReliableCompactionApi, "registerProvider" | "unregisterProvider">,
+  dependencies: ReliableCompactionDependencies,
+): SessionBeforeCompactHandler {
+  return createReliableCompactionController(pi, dependencies).handleBeforeCompact;
 }
 
 export function installReliableCompaction(
   pi: ReliableCompactionApi,
   dependencies: ReliableCompactionDependencies,
 ): void {
-  pi.onSessionBeforeCompact(createSessionBeforeCompactHandler(pi, dependencies));
+  const controller = createReliableCompactionController(pi, dependencies);
+  pi.onSessionBeforeCompact(controller.handleBeforeCompact);
+  pi.onSessionCompact(controller.cleanup);
+  pi.onBeforeAgentStart(controller.cleanup);
+  pi.onSessionShutdown(controller.cleanup);
 }

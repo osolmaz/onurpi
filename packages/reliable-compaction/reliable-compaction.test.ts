@@ -74,17 +74,28 @@ function assistant(stopReason: AssistantMessage["stopReason"] = "stop"): Assista
 
 function harness(): {
   pi: ReliableCompactionApi;
+  cleanupHandlers: (() => void)[];
   registered: () => ProviderConfig | undefined;
   unregistered: string[];
   handler: () => SessionBeforeCompactHandler | undefined;
 } {
   let config: ProviderConfig | undefined;
   let handler: SessionBeforeCompactHandler | undefined;
+  const cleanupHandlers: (() => void)[] = [];
   const unregistered: string[] = [];
   return {
     pi: {
+      onBeforeAgentStart: (value) => {
+        cleanupHandlers.push(value);
+      },
       onSessionBeforeCompact: (value) => {
         handler = value;
+      },
+      onSessionCompact: (value) => {
+        cleanupHandlers.push(value);
+      },
+      onSessionShutdown: (value) => {
+        cleanupHandlers.push(value);
       },
       registerProvider: (_name, value) => {
         config = value;
@@ -94,6 +105,7 @@ function harness(): {
         config = undefined;
       },
     },
+    cleanupHandlers,
     registered: () => config,
     unregistered,
     handler: () => handler,
@@ -330,11 +342,18 @@ describe("session_before_compact handler", () => {
 });
 
 describe("extension registration", () => {
-  it("registers one compaction handler", () => {
+  it("registers compaction and cleanup handlers", async () => {
     const state = harness();
     installReliableCompaction(state.pi, {
       streamSimple: () => createAssistantMessageEventStream(),
     });
-    expect(state.handler()).toBeTypeOf("function");
+    const handler = state.handler();
+    expect(handler).toBeTypeOf("function");
+    expect(state.cleanupHandlers).toHaveLength(3);
+    if (!handler) throw new Error("Expected a compaction handler");
+
+    await handler(event(), context());
+    state.cleanupHandlers[0]?.();
+    expect(state.unregistered).toEqual(["openai-codex"]);
   });
 });
