@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTextNyanPainter } from "./text-painter.ts";
 
 const ESCAPE = String.fromCharCode(27);
-const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;2;\\d+;\\d+;\\d+|39|90)m`, "gu");
+const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;2;\\d+;\\d+;\\d+|1|22|39|90)m`, "gu");
 
 function plain(text: string): string {
   return text.replace(ANSI_FOREGROUND, "");

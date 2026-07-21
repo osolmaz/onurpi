@@ -24,6 +24,8 @@ const RAINBOW_STOPS: readonly Rgb[] = [
 ];
 const CAT_CELLS = 10;
 const RESET_FOREGROUND = "\x1b[39m";
+const BOLD = "\x1b[1m";
+const RESET_INTENSITY = "\x1b[22m";
 const AHEAD_FOREGROUND = "\x1b[90m";
 const CAT_POSES: Readonly<Record<CatMood, readonly string[]>> = {
   neutral: [" (=^･ω･^=)"],
@@ -50,7 +52,7 @@ export function renderTextNyan(
   const position = Math.round(normalizeProgress(percent) * (width - CAT_CELLS));
   const trail = rainbowTrail(position);
   const ahead = "·".repeat(width - position - CAT_CELLS);
-  return `${trail}${RESET_FOREGROUND}${cat}${AHEAD_FOREGROUND}${ahead}${RESET_FOREGROUND}`;
+  return `${trail}${RESET_FOREGROUND}${BOLD}${cat}${RESET_INTENSITY}${AHEAD_FOREGROUND}${ahead}${RESET_FOREGROUND}`;
 }
 
 export function renderCat(mood: CatMood, animationFrame: number): string {

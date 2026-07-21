@@ -1,6 +1,6 @@
 # Nyan Mode
 
-Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: an animated kaomoji follows a smooth, full-height rainbow as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
+Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a bold animated kaomoji follows a smooth, full-height rainbow as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
 
 ```text
 empty context ─────────────────────────────── full context
