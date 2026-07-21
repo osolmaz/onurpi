@@ -17,6 +17,7 @@ export default {
     "packages/prompt-queue/message-text.ts",
     "packages/prompt-queue/widget-lines.ts",
     "packages/prompt-queue/window-state.ts",
+    "packages/reliable-compaction/reliable-compaction.ts",
   ],
   reporters: ["clear-text", "progress"],
   testRunner: "vitest",

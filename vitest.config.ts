@@ -30,6 +30,7 @@ export default defineConfig({
         "packages/prompt-queue/message-text.ts",
         "packages/prompt-queue/widget-lines.ts",
         "packages/prompt-queue/window-state.ts",
+        "packages/reliable-compaction/reliable-compaction.ts",
       ],
       provider: "v8",
       reporter: ["text", "json", "json-summary"],

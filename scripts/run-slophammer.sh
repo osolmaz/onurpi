@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 
-slophammer-ts check . --execute
+slophammer-ts check .

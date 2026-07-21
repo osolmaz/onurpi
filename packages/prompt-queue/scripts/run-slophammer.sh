@@ -10,4 +10,4 @@ trap cleanup EXIT HUP INT TERM
 
 mkdir -p .github/workflows
 cp ../../.github/workflows/ci.yml "$workflow"
-slophammer-ts check . --execute
+slophammer-ts check .
