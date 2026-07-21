@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 
+import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
 import { installRenderPatches } from "./render-patches.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
 import { TurnFoldState } from "./turn-state.ts";
@@ -123,8 +124,14 @@ export default function turnFold(pi: ExtensionAPI): void {
     loadVisibleHistory(state, ctx);
   });
 
-  pi.on("session_compact", (_event, ctx) => {
+  pi.on("session_compact", (event, ctx) => {
     currentTheme = ctx.ui.theme;
+    const attachedToTurn = state.registerCompaction(event.compactionEntry, event.reason);
+    pi.appendEntry(COMPACTION_METADATA_ENTRY_TYPE, {
+      attachedToTurn,
+      compactionEntryId: event.compactionEntry.id,
+      reason: event.reason,
+    });
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
 

@@ -1,5 +1,6 @@
 import {
   AssistantMessageComponent,
+  CompactionSummaryMessageComponent,
   initTheme,
   SkillInvocationMessageComponent,
   ToolExecutionComponent,
@@ -8,6 +9,7 @@ import {
 import { Container, Spacer, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
 import { afterEach, expect, it } from "vitest";
 
+import { COMPACTION_METADATA_ENTRY_TYPE } from "./compaction-metadata.ts";
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -81,6 +83,38 @@ function assistantMessage(
   };
 }
 
+function compactionEntry(id: string, timestamp: number, attachedToTurn: boolean) {
+  return [
+    {
+      firstKeptEntryId: "kept",
+      id,
+      parentId: null,
+      summary: "Preserved summary",
+      timestamp: new Date(timestamp).toISOString(),
+      tokensBefore: 12_345,
+      type: "compaction",
+    },
+    {
+      customType: COMPACTION_METADATA_ENTRY_TYPE,
+      data: {
+        attachedToTurn,
+        compactionEntryId: id,
+        reason: attachedToTurn ? "overflow" : "manual",
+      },
+      type: "custom",
+    },
+  ];
+}
+
+function compactionComponent(timestamp: number): CompactionSummaryMessageComponent {
+  return new CompactionSummaryMessageComponent({
+    role: "compactionSummary",
+    summary: "Preserved summary",
+    timestamp,
+    tokensBefore: 12_345,
+  });
+}
+
 function stoppedTui(): TUI {
   const tui = new TUI(new MockTerminal());
   tui.stop();
@@ -104,6 +138,20 @@ let restore: RestoreRenderPatches | undefined;
 afterEach(() => {
   restore?.();
   restore = undefined;
+});
+
+it("restores the compaction component prototype exactly", () => {
+  const prototype = CompactionSummaryMessageComponent.prototype;
+  const originalRender: unknown = Reflect.get(prototype, "render");
+  const hadOwnRender = Object.prototype.hasOwnProperty.call(prototype, "render");
+
+  restore = installRenderPatches(new TurnFoldState(), () => undefined);
+  expect(Object.prototype.hasOwnProperty.call(prototype, "render")).toBe(true);
+  restore();
+  restore = undefined;
+
+  expect(Reflect.get(prototype, "render")).toBe(originalRender);
+  expect(Object.prototype.hasOwnProperty.call(prototype, "render")).toBe(hadOwnRender);
 });
 
 it("keeps only the user message's built-in top padding", () => {
@@ -149,6 +197,62 @@ it("renders local user and completion times in transcript order", () => {
   expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Final response"));
   expect(rendered.indexOf("Final response")).toBeLessThan(rendered.indexOf("08:06"));
   expect(rendered).not.toContain("Ctrl+Shift+O");
+});
+
+it("folds an automatic compaction into the turn summary", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
+
+  state.loadHistory([
+    { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
+    ...compactionEntry("compact-auto", 120, true),
+    { message: final, timestamp: new Date(150).toISOString(), type: "message" },
+  ]);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  const compactionSpacer = new Spacer(1);
+  transcript.addChild(compactionSpacer);
+  transcript.addChild(compactionComponent(120));
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+
+  const compact = frame(transcript);
+  expect(compact).toContain("Worked for <1s · 1 msg · compacted");
+  expect(compact).toContain("Final response");
+  expect(compact).not.toContain("[compaction]");
+  expect(compact).not.toContain("Compacted from 12,345 tokens");
+  expect(compactionSpacer.render(120)).toEqual([]);
+
+  state.setMode("expanded");
+  const expanded = frame(transcript);
+  expect(expanded).toContain("[compaction]");
+  expect(expanded).toContain("Compacted from 12,345 tokens");
+  expect(compactionSpacer.render(120)).toEqual([""]);
+});
+
+it("keeps a manual idle compaction as a standalone row", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
+
+  state.loadHistory([
+    { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
+    { message: final, timestamp: new Date(150).toISOString(), type: "message" },
+    ...compactionEntry("compact-manual", 160, false),
+  ]);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+  const compactionSpacer = new Spacer(1);
+  transcript.addChild(compactionSpacer);
+  transcript.addChild(compactionComponent(160));
+
+  const rendered = frame(transcript);
+  expect(rendered).toContain("Worked for <1s · 1 msg");
+  expect(rendered).not.toContain("compacted");
+  expect(rendered).toContain("[compaction]");
+  expect(rendered).toContain("Compacted from 12,345 tokens");
+  expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
 it("timestamps skill-only user rows without duplicating timestamps", () => {
