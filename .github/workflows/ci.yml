@@ -19,7 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npx --no-install slophammer-ts check . --execute
+      - run: npx --no-install slophammer-ts check .
       - name: Check @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run check
@@ -50,6 +50,12 @@ jobs:
       - name: Check @onurpi/prompt-queue package with Slophammer
         working-directory: packages/prompt-queue
         run: npm run slophammer
+      - name: Check @onurpi/reliable-compaction package
+        working-directory: packages/reliable-compaction
+        run: npm run check
+      - name: Check @onurpi/reliable-compaction package with Slophammer
+        working-directory: packages/reliable-compaction
+        run: npm run slophammer
 
   mutation:
     if: github.event_name == 'workflow_dispatch'
@@ -76,4 +82,7 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/prompt-queue package
         working-directory: packages/prompt-queue
+        run: npm run mutate
+      - name: Mutate @onurpi/reliable-compaction package
+        working-directory: packages/reliable-compaction
         run: npm run mutate
