@@ -53,8 +53,8 @@ describe("footer layout", () => {
 
 describe("footer labels", () => {
   it("formats context windows and compact counts", () => {
-    expect(formatContext(undefined, undefined)).toBe("ctx ?/?");
-    expect(formatContext(34.4, 128_000)).toBe("ctx 34%/128k");
+    expect(formatContext(undefined, undefined)).toBe("?/?");
+    expect(formatContext(34.4, 128_000)).toBe("34%/128k");
     expect([999, 1_250, 12_500, 1_250_000].map(formatCount)).toEqual([
       "999",
       "1.3k",

@@ -71,7 +71,7 @@ export function formatContext(
   contextWindow: number | undefined,
 ): string {
   const window = contextWindow ? formatCount(contextWindow) : "?";
-  return percent === undefined ? `ctx ?/${window}` : `ctx ${percent.toFixed(0)}%/${window}`;
+  return percent === undefined ? `?/${window}` : `${percent.toFixed(0)}%/${window}`;
 }
 
 export function formatCount(value: number): string {

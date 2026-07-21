@@ -348,8 +348,8 @@ function rightFooter(
   thinkingLevel: string,
 ): string {
   return joinParts([
-    mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
     colorContext(theme, percent, formatContext(percent, contextWindow)),
+    mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
     reasoning ? theme.fg("muted", `think ${thinkingLevel}`) : undefined,
     theme.fg("accent", model),
   ]);
