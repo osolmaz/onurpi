@@ -1,30 +1,25 @@
-import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
-import type { ApiStreamSimpleFunction } from "@earendil-works/pi-ai/compat";
+import {
+  createAssistantMessageEventStream,
+  type Api,
+  type AssistantMessage,
+  type Model,
+  type SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
+import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 
 import {
-  type CompactionFunction,
   createSessionBeforeCompactHandler,
-  forceTransport,
+  expectedSummaryCalls,
   installReliableCompaction,
   policyForModel,
-  type ReliableCompactionDependencies,
-  type ReliableCompactionOutcome,
-  runReliableCompaction,
+  type ReliableCompactionApi,
   type SessionBeforeCompactHandler,
+  withCompactionPolicy,
 } from "./reliable-compaction.ts";
 
-type Preparation = Parameters<CompactionFunction>[0];
 type HookEvent = Parameters<SessionBeforeCompactHandler>[0];
 type HookContext = Parameters<SessionBeforeCompactHandler>[1];
-type AuthResult = Awaited<ReturnType<HookContext["modelRegistry"]["getApiKeyAndHeaders"]>>;
-
-const COMPACTION = {
-  summary: "summary",
-  firstKeptEntryId: "kept-entry",
-  tokensBefore: 250_000,
-  details: { readFiles: [], modifiedFiles: [] },
-};
 
 function model(api: Api = "openai-codex-responses"): Model<Api> {
   return {
@@ -32,7 +27,7 @@ function model(api: Api = "openai-codex-responses"): Model<Api> {
     name: "Test model",
     api,
     provider: "openai-codex",
-    baseUrl: "https://example.test",
+    baseUrl: "https://proxy.example.test",
     reasoning: true,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -41,69 +36,94 @@ function model(api: Api = "openai-codex-responses"): Model<Api> {
   };
 }
 
-function preparation(): Preparation {
+function event(options: { split?: boolean; history?: boolean } = {}): HookEvent {
   return {
-    firstKeptEntryId: "kept-entry",
-    messagesToSummarize: [],
-    turnPrefixMessages: [],
-    isSplitTurn: false,
-    tokensBefore: 250_000,
-    fileOps: { read: new Set(), written: new Set(), edited: new Set() },
-    settings: { enabled: true, reserveTokens: 16_384, keepRecentTokens: 20_000 },
+    preparation: {
+      firstKeptEntryId: "kept-entry",
+      messagesToSummarize: options.history
+        ? [{ role: "user", content: "history", timestamp: 1 }]
+        : [],
+      turnPrefixMessages: options.split ? [{ role: "user", content: "prefix", timestamp: 2 }] : [],
+      isSplitTurn: options.split ?? false,
+      tokensBefore: 250_000,
+      fileOps: { read: new Set(), written: new Set(), edited: new Set() },
+      settings: { enabled: true, reserveTokens: 16_384, keepRecentTokens: 20_000 },
+    },
   };
 }
 
-function event(controller = new AbortController()): HookEvent {
+function assistant(stopReason: AssistantMessage["stopReason"] = "stop"): AssistantMessage {
   return {
-    preparation: preparation(),
-    customInstructions: "Keep exact paths",
-    signal: controller.signal,
+    role: "assistant",
+    content: [{ type: "text", text: "summary" }],
+    api: "openai-codex-responses",
+    provider: "openai-codex",
+    model: "test-model",
+    usage: {
+      input: 1,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 2,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason,
+    timestamp: 1,
   };
 }
 
-function unusedStream(): ApiStreamSimpleFunction {
-  return () => {
-    throw new Error("The compact test double should not call the stream");
+function harness(): {
+  pi: ReliableCompactionApi;
+  registered: () => ProviderConfig | undefined;
+  unregistered: string[];
+  handler: () => SessionBeforeCompactHandler | undefined;
+} {
+  let config: ProviderConfig | undefined;
+  let handler: SessionBeforeCompactHandler | undefined;
+  const unregistered: string[] = [];
+  return {
+    pi: {
+      onSessionBeforeCompact: (value) => {
+        handler = value;
+      },
+      registerProvider: (_name, value) => {
+        config = value;
+      },
+      unregisterProvider: (name) => {
+        unregistered.push(name);
+        config = undefined;
+      },
+    },
+    registered: () => config,
+    unregistered,
+    handler: () => handler,
   };
-}
-
-function dependencies(compact: CompactionFunction): ReliableCompactionDependencies {
-  return { compact, streamSimple: unusedStream() };
 }
 
 function context(
   selectedModel: Model<Api> | undefined = model(),
-  auth: AuthResult = { ok: true, apiKey: "token", headers: { test: "header" } },
-): { ctx: HookContext; notifications: string[] } {
-  const notifications: string[] = [];
+  registered?: unknown,
+  registeredReader?: () => unknown,
+): HookContext {
   return {
-    ctx: {
-      model: selectedModel,
-      modelRegistry: { getApiKeyAndHeaders: () => Promise.resolve(auth) },
-      hasUI: true,
-      ui: {
-        notify: (message) => {
-          notifications.push(message);
-        },
-      },
+    model: selectedModel,
+    modelRegistry: {
+      getRegisteredProviderConfig: () =>
+        registeredReader === undefined ? registered : registeredReader(),
     },
-    notifications,
   };
 }
 
-function successfulCompact(): CompactionFunction {
-  return () => Promise.resolve(COMPACTION);
+function requireStream(
+  config: ProviderConfig | undefined,
+): NonNullable<ProviderConfig["streamSimple"]> {
+  expect(config?.streamSimple).toBeTypeOf("function");
+  if (!config?.streamSimple) throw new Error("Expected a provider stream override");
+  return config.streamSimple;
 }
 
-function expectFailure(
-  outcome: ReliableCompactionOutcome,
-): asserts outcome is Extract<ReliableCompactionOutcome, { kind: "failure" }> {
-  expect(outcome.kind).toBe("failure");
-  if (outcome.kind !== "failure") throw new Error("Expected compaction failure");
-}
-
-describe("reliable compaction transport policy", () => {
-  it("selects SSE with two attempts for Codex Responses models", () => {
+describe("reliable compaction policy", () => {
+  it("selects SSE with one retry for Codex Responses models", () => {
     expect(policyForModel(model())).toEqual({ maxAttempts: 2, transport: "sse" });
   });
 
@@ -111,259 +131,210 @@ describe("reliable compaction transport policy", () => {
     expect(policyForModel(model("anthropic-messages"))).toBeUndefined();
   });
 
-  it("overrides an existing transport while preserving other stream options", () => {
-    let observed: SimpleStreamOptions | undefined;
-    const base: ApiStreamSimpleFunction = (_model, _context, options) => {
-      observed = options;
-      throw new Error("observed");
-    };
-    const stream = forceTransport(base, "sse");
-
-    expect(() =>
-      stream(model(), { messages: [] }, { maxTokens: 4_096, transport: "websocket" }),
-    ).toThrow("observed");
-    expect(observed).toMatchObject({ maxTokens: 4_096, transport: "sse" });
+  it("counts one or two summary calls from Pi's public preparation", () => {
+    expect(expectedSummaryCalls(event())).toBe(1);
+    expect(expectedSummaryCalls(event({ split: true }))).toBe(1);
+    expect(expectedSummaryCalls(event({ split: true, history: true }))).toBe(2);
   });
 });
 
-describe("runReliableCompaction", () => {
-  it("forwards preparation, auth, instructions, signal, thinking, and environment", async () => {
-    const calls: Parameters<CompactionFunction>[] = [];
-    const compact: CompactionFunction = (...arguments_) => {
-      calls.push(arguments_);
-      return Promise.resolve(COMPACTION);
-    };
-    const controller = new AbortController();
-    const requestEvent = event(controller);
-    const selectedModel = model();
-    const outcome = await runReliableCompaction(
-      {
-        auth: {
-          ok: true,
-          apiKey: "token",
-          headers: { header: "value" },
-          env: { HTTPS_PROXY: "proxy" },
-        },
-        event: requestEvent,
-        model: selectedModel,
-        thinkingLevel: "high",
+describe("provider stream policy", () => {
+  it("forces SSE and one retry while preserving Pi's prepared request options", async () => {
+    let observed: SimpleStreamOptions | undefined;
+    const source = createAssistantMessageEventStream();
+    const failures: boolean[] = [];
+    const stream = withCompactionPolicy(
+      (_model, _context, options) => {
+        observed = options;
+        return source;
       },
       { maxAttempts: 2, transport: "sse" },
-      dependencies(compact),
+      (failed) => failures.push(failed),
     );
 
-    expect(outcome).toEqual({ kind: "compaction", compaction: COMPACTION, attempts: 1 });
-    expect(calls).toHaveLength(1);
-    const call = calls[0];
-    expect(call).toBeDefined();
-    if (!call) throw new Error("Expected one compaction call");
-    expect(call[0]).toBe(requestEvent.preparation);
-    expect(call[1]).toBe(selectedModel);
-    expect(call[2]).toBe("token");
-    expect(call[3]).toEqual({ header: "value" });
-    expect(call[4]).toBe("Keep exact paths");
-    expect(call[5]).toBe(controller.signal);
-    expect(call[6]).toBe("high");
-    expect(call[7]).toBeTypeOf("function");
-    expect(call[8]).toEqual({ HTTPS_PROXY: "proxy" });
+    const returned = stream(
+      model(),
+      { messages: [] },
+      {
+        apiKey: "token",
+        headers: { trace: "kept" },
+        maxTokens: 4_096,
+        maxRetries: 9,
+        timeoutMs: 123,
+        transport: "websocket",
+      },
+    );
+    expect(returned).toBe(source);
+    expect(observed).toMatchObject({
+      apiKey: "token",
+      headers: { trace: "kept" },
+      maxTokens: 4_096,
+      maxRetries: 1,
+      timeoutMs: 123,
+      transport: "sse",
+    });
+
+    source.end(assistant());
+    await source.result();
+    await Promise.resolve();
+    expect(failures).toEqual([false]);
   });
 
-  it("retries one uncommitted failure", async () => {
-    let attempts = 0;
-    const compact: CompactionFunction = () => {
-      attempts += 1;
-      if (attempts === 1) throw new Error("connection reset");
-      return Promise.resolve(COMPACTION);
-    };
-
-    const outcome = await runReliableCompaction(
-      {
-        auth: { ok: true, apiKey: "token" },
-        event: event(),
-        model: model(),
-        thinkingLevel: "low",
-      },
-      { maxAttempts: 2, transport: "sse" },
-      dependencies(compact),
-    );
-
-    expect(outcome).toEqual({ kind: "compaction", compaction: COMPACTION, attempts: 2 });
-    expect(attempts).toBe(2);
+  it("reports failed and aborted streams", async () => {
+    for (const reason of ["error", "aborted"] as const) {
+      const source = createAssistantMessageEventStream();
+      const failures: boolean[] = [];
+      const stream = withCompactionPolicy(
+        () => source,
+        { maxAttempts: 2, transport: "sse" },
+        (failed) => failures.push(failed),
+      );
+      stream(model(), { messages: [] });
+      source.end(assistant(reason));
+      await source.result();
+      await Promise.resolve();
+      expect(failures).toEqual([true]);
+    }
   });
 
-  it("does not start after cancellation", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    let attempts = 0;
-    const compact: CompactionFunction = () => {
-      attempts += 1;
-      return Promise.resolve(COMPACTION);
-    };
-
-    const outcome = await runReliableCompaction(
-      {
-        auth: { ok: true, apiKey: "token" },
-        event: event(controller),
-        model: model(),
-        thinkingLevel: "low",
+  it("releases the override when the provider throws synchronously", () => {
+    const failures: boolean[] = [];
+    const stream = withCompactionPolicy(
+      () => {
+        throw new Error("offline");
       },
       { maxAttempts: 2, transport: "sse" },
-      dependencies(compact),
+      (failed) => failures.push(failed),
     );
 
-    expectFailure(outcome);
-    expect(outcome.aborted).toBe(true);
-    expect(outcome.attempts).toBe(0);
-    expect(attempts).toBe(0);
-  });
-
-  it("does not retry cancellation", async () => {
-    const controller = new AbortController();
-    let attempts = 0;
-    const compact: CompactionFunction = () => {
-      attempts += 1;
-      controller.abort();
-      throw new DOMException("Cancelled", "AbortError");
-    };
-
-    const outcome = await runReliableCompaction(
-      {
-        auth: { ok: true, apiKey: "token" },
-        event: event(controller),
-        model: model(),
-        thinkingLevel: "low",
-      },
-      { maxAttempts: 2, transport: "sse" },
-      dependencies(compact),
-    );
-
-    expectFailure(outcome);
-    expect(outcome.aborted).toBe(true);
-    expect(outcome.attempts).toBe(1);
-    expect(attempts).toBe(1);
-  });
-
-  it("returns the final error after the bounded attempts", async () => {
-    let attempts = 0;
-    const compact: CompactionFunction = () => {
-      attempts += 1;
-      throw new Error(`failure ${String(attempts)}`);
-    };
-
-    const outcome = await runReliableCompaction(
-      {
-        auth: { ok: true, apiKey: "token" },
-        event: event(),
-        model: model(),
-        thinkingLevel: "low",
-      },
-      { maxAttempts: 2, transport: "sse" },
-      dependencies(compact),
-    );
-
-    expectFailure(outcome);
-    expect(outcome.aborted).toBe(false);
-    expect(outcome.attempts).toBe(2);
-    expect(outcome.error.message).toBe("failure 2");
+    expect(() => stream(model(), { messages: [] })).toThrow("offline");
+    expect(failures).toEqual([true]);
   });
 });
 
 describe("session_before_compact handler", () => {
-  it("passes through when there is no selected model", async () => {
-    const handler = createSessionBeforeCompactHandler(
-      dependencies(successfulCompact()),
-      () => "high",
+  it("passes through without a selected model or policy", () => {
+    const state = harness();
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => createAssistantMessageEventStream(),
+    });
+
+    const noModel = context();
+    noModel.model = undefined;
+    expect(handler(event(), noModel)).toBeUndefined();
+    expect(handler(event(), context(model("anthropic-messages")))).toBeUndefined();
+    expect(state.registered()).toBeUndefined();
+  });
+
+  it("does not replace another extension's provider stream", () => {
+    const state = harness();
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => createAssistantMessageEventStream(),
+    });
+
+    expect(handler(event(), context(model(), { streamSimple: "custom" }))).toBeUndefined();
+    expect(state.registered()).toBeUndefined();
+  });
+
+  it("registers a temporary provider override and lets Pi compact normally", async () => {
+    const state = harness();
+    const source = createAssistantMessageEventStream();
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => source,
+    });
+
+    expect(handler(event(), context())).toBeUndefined();
+    const config = state.registered();
+    expect(config?.api).toBe("openai-codex-responses");
+    requireStream(config)(model(), { messages: [] });
+    source.end(assistant());
+    await source.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual(["openai-codex"]);
+  });
+
+  it("keeps the override for both parts of a split-turn summary", async () => {
+    const state = harness();
+    const sources = [createAssistantMessageEventStream(), createAssistantMessageEventStream()];
+    let call = 0;
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => {
+        const source = sources[call];
+        call += 1;
+        if (!source) throw new Error("Unexpected summary call");
+        return source;
+      },
+    });
+
+    await handler(event({ split: true, history: true }), context());
+    const stream = requireStream(state.registered());
+    stream(model(), { messages: [] });
+    sources[0]?.end(assistant());
+    await sources[0]?.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual([]);
+
+    stream(model(), { messages: [] });
+    sources[1]?.end(assistant());
+    await sources[1]?.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual(["openai-codex"]);
+  });
+
+  it("removes a split-turn override immediately after failure", async () => {
+    const state = harness();
+    const source = createAssistantMessageEventStream();
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => source,
+    });
+
+    await handler(event({ split: true, history: true }), context());
+    requireStream(state.registered())(model(), { messages: [] });
+    source.end(assistant("error"));
+    await source.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual(["openai-codex"]);
+  });
+
+  it("does not unregister a provider that replaced its temporary override", async () => {
+    const state = harness();
+    const source = createAssistantMessageEventStream();
+    const registryState: { current?: unknown } = {};
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => source,
+    });
+
+    await handler(
+      event(),
+      context(model(), undefined, () => registryState.current),
     );
-    const { ctx } = context();
-    ctx.model = undefined;
-
-    await expect(handler(event(), ctx)).resolves.toBeUndefined();
+    registryState.current = { streamSimple: "replacement" };
+    requireStream(state.registered())(model(), { messages: [] });
+    source.end(assistant());
+    await source.result();
+    await Promise.resolve();
+    expect(state.unregistered).toEqual([]);
   });
 
-  it("passes through providers without a policy", async () => {
-    const handler = createSessionBeforeCompactHandler(
-      dependencies(successfulCompact()),
-      () => "high",
-    );
-    const { ctx } = context(model("anthropic-messages"));
+  it("restores an unfinished override before arming another one", async () => {
+    const state = harness();
+    const handler = createSessionBeforeCompactHandler(state.pi, {
+      streamSimple: () => createAssistantMessageEventStream(),
+    });
 
-    await expect(handler(event(), ctx)).resolves.toBeUndefined();
-  });
-
-  it("returns the extension compaction for an affected model", async () => {
-    const handler = createSessionBeforeCompactHandler(
-      dependencies(successfulCompact()),
-      () => "high",
-    );
-    const { ctx, notifications } = context();
-
-    await expect(handler(event(), ctx)).resolves.toEqual({ compaction: COMPACTION });
-    expect(notifications).toEqual([]);
-  });
-
-  it("cancels instead of falling back when authentication fails", async () => {
-    const handler = createSessionBeforeCompactHandler(
-      dependencies(successfulCompact()),
-      () => "high",
-    );
-    const { ctx, notifications } = context(model(), { ok: false, error: "expired" });
-
-    await expect(handler(event(), ctx)).resolves.toEqual({ cancel: true });
-    expect(notifications).toEqual(["Reliable compaction authentication failed: expired"]);
-  });
-
-  it("cancels when resolved authentication has no credentials", async () => {
-    const handler = createSessionBeforeCompactHandler(
-      dependencies(successfulCompact()),
-      () => "high",
-    );
-    const { ctx, notifications } = context(model(), { ok: true });
-
-    await expect(handler(event(), ctx)).resolves.toEqual({ cancel: true });
-    expect(notifications[0]).toContain("has no credentials");
-  });
-
-  it("cancels without default fallback after both attempts fail", async () => {
-    const compact: CompactionFunction = () => {
-      throw new Error("offline");
-    };
-    const handler = createSessionBeforeCompactHandler(dependencies(compact), () => "high");
-    const { ctx, notifications } = context();
-
-    await expect(handler(event(), ctx)).resolves.toEqual({ cancel: true });
-    expect(notifications).toEqual(["Reliable compaction failed after 2 attempts: offline"]);
-  });
-
-  it("does not report user cancellation as an error", async () => {
-    const controller = new AbortController();
-    const compact: CompactionFunction = () => {
-      controller.abort();
-      throw new DOMException("Cancelled", "AbortError");
-    };
-    const handler = createSessionBeforeCompactHandler(dependencies(compact), () => "high");
-    const { ctx, notifications } = context();
-
-    await expect(handler(event(controller), ctx)).resolves.toEqual({ cancel: true });
-    expect(notifications).toEqual([]);
+    await handler(event(), context());
+    await handler(event(), context());
+    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.registered()).toBeDefined();
   });
 });
 
 describe("extension registration", () => {
-  it("registers one compaction handler with the current thinking level", async () => {
-    let registered: SessionBeforeCompactHandler | undefined;
-    installReliableCompaction(
-      {
-        getThinkingLevel: () => "medium",
-        onSessionBeforeCompact: (handler) => {
-          registered = handler;
-        },
-      },
-      dependencies(successfulCompact()),
-    );
-    expect(registered).toBeDefined();
-    if (!registered) throw new Error("Compaction handler was not registered");
-    const { ctx } = context();
-
-    await expect(registered(event(), ctx)).resolves.toEqual({ compaction: COMPACTION });
+  it("registers one compaction handler", () => {
+    const state = harness();
+    installReliableCompaction(state.pi, {
+      streamSimple: () => createAssistantMessageEventStream(),
+    });
+    expect(state.handler()).toBeTypeOf("function");
   });
 });

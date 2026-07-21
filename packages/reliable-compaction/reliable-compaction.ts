@@ -1,52 +1,43 @@
-import type { Api, Model, Transport } from "@earendil-works/pi-ai";
-import type { ApiStreamSimpleFunction } from "@earendil-works/pi-ai/compat";
 import type {
-  CompactionResult,
-  SessionBeforeCompactEvent,
-  compact,
-} from "@earendil-works/pi-coding-agent";
+  Api,
+  AssistantMessageEventStream,
+  Context,
+  Model,
+  SimpleStreamOptions,
+  Transport,
+} from "@earendil-works/pi-ai";
+import type { ProviderConfig, SessionBeforeCompactEvent } from "@earendil-works/pi-coding-agent";
 
 const MAX_ATTEMPTS = 2;
 
-export type CompactionFunction = typeof compact;
-type CompactionThinkingLevel = NonNullable<Parameters<CompactionFunction>[6]>;
+type ApiStreamSimpleFunction = (
+  model: Model<Api>,
+  context: Context,
+  options?: SimpleStreamOptions,
+) => AssistantMessageEventStream;
 
-export type ReliableCompactionDependencies = {
-  compact: CompactionFunction;
-  streamSimple: ApiStreamSimpleFunction;
-};
-
-type SuccessfulAuth = {
-  ok: true;
-  apiKey?: string;
-  headers?: Record<string, string>;
-  env?: Record<string, string>;
-};
-
-type FailedAuth = { ok: false; error: string };
+type HookEvent = Pick<SessionBeforeCompactEvent, "preparation">;
 
 type HookContext = {
   model: Model<Api> | undefined;
   modelRegistry: {
-    getApiKeyAndHeaders(model: Model<Api>): Promise<SuccessfulAuth | FailedAuth>;
-  };
-  hasUI: boolean;
-  ui: {
-    notify(message: string, type: "info" | "warning" | "error"): void;
+    getRegisteredProviderConfig(provider: string): unknown;
   };
 };
-
-type HookResult = { cancel?: boolean; compaction?: CompactionResult };
-type HookEvent = Pick<SessionBeforeCompactEvent, "preparation" | "customInstructions" | "signal">;
 
 export type SessionBeforeCompactHandler = (
   event: HookEvent,
   ctx: HookContext,
-) => Promise<HookResult | undefined>;
+) => Promise<void> | void;
 
 export type ReliableCompactionApi = {
-  getThinkingLevel(): CompactionThinkingLevel;
   onSessionBeforeCompact(handler: SessionBeforeCompactHandler): void;
+  registerProvider(name: string, config: ProviderConfig): void;
+  unregisterProvider(name: string): void;
+};
+
+export type ReliableCompactionDependencies = {
+  streamSimple: ApiStreamSimpleFunction;
 };
 
 export type CompactionPolicy = {
@@ -54,115 +45,96 @@ export type CompactionPolicy = {
   transport: Transport;
 };
 
-type CompactionRequest = {
-  auth: SuccessfulAuth;
-  event: HookEvent;
-  model: Model<Api>;
-  thinkingLevel: CompactionThinkingLevel;
-};
+type RegisteredProviderReader = HookContext["modelRegistry"];
 
-export type ReliableCompactionOutcome =
-  | { kind: "compaction"; compaction: CompactionResult; attempts: number }
-  | { kind: "failure"; error: Error; attempts: number; aborted: boolean };
+type ActiveOverride = {
+  config: ProviderConfig;
+  provider: string;
+  registry: RegisteredProviderReader;
+  remainingCalls: number;
+};
 
 export function policyForModel(model: Model<Api>): CompactionPolicy | undefined {
   if (model.api !== "openai-codex-responses") return undefined;
   return { maxAttempts: MAX_ATTEMPTS, transport: "sse" };
 }
 
-export function forceTransport(
+export function expectedSummaryCalls(event: HookEvent): number {
+  const { isSplitTurn, messagesToSummarize, turnPrefixMessages } = event.preparation;
+  if (!isSplitTurn || turnPrefixMessages.length === 0) return 1;
+  return messagesToSummarize.length > 0 ? 2 : 1;
+}
+
+export function withCompactionPolicy(
   streamSimple: ApiStreamSimpleFunction,
-  transport: Transport,
-): ApiStreamSimpleFunction {
-  return (model, context, options) => streamSimple(model, context, { ...options, transport });
-}
-
-function normalizeError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
-function wasAborted(signal: AbortSignal, error: Error): boolean {
-  return signal.aborted || error.name === "AbortError";
-}
-
-export async function runReliableCompaction(
-  request: CompactionRequest,
   policy: CompactionPolicy,
-  dependencies: ReliableCompactionDependencies,
-): Promise<ReliableCompactionOutcome> {
-  const stream = forceTransport(dependencies.streamSimple, policy.transport);
-  let lastError = new Error("Compaction did not run");
-
-  for (let attempt = 1; attempt <= policy.maxAttempts; attempt += 1) {
-    if (request.event.signal.aborted) {
-      return { kind: "failure", error: lastError, attempts: attempt - 1, aborted: true };
-    }
+  settled: (failed: boolean) => void,
+): ApiStreamSimpleFunction {
+  return (model, context, options) => {
+    let stream: AssistantMessageEventStream;
     try {
-      const compaction = await dependencies.compact(
-        request.event.preparation,
-        request.model,
-        request.auth.apiKey,
-        request.auth.headers,
-        request.event.customInstructions,
-        request.event.signal,
-        request.thinkingLevel,
-        stream,
-        request.auth.env,
-      );
-      return { kind: "compaction", compaction, attempts: attempt };
+      stream = streamSimple(model, context, {
+        ...options,
+        maxRetries: policy.maxAttempts - 1,
+        transport: policy.transport,
+      });
     } catch (error: unknown) {
-      lastError = normalizeError(error);
-      if (wasAborted(request.event.signal, lastError)) {
-        return { kind: "failure", error: lastError, attempts: attempt, aborted: true };
-      }
+      settled(true);
+      throw error;
     }
-  }
 
-  return {
-    kind: "failure",
-    error: lastError,
-    attempts: policy.maxAttempts,
-    aborted: false,
+    void stream.result().then(
+      (message) => {
+        settled(message.stopReason === "error" || message.stopReason === "aborted");
+      },
+      () => {
+        settled(true);
+      },
+    );
+    return stream;
   };
 }
 
-function notifyFailure(ctx: HookContext, message: string): void {
-  if (ctx.hasUI) ctx.ui.notify(message, "error");
-}
-
 export function createSessionBeforeCompactHandler(
+  pi: Pick<ReliableCompactionApi, "registerProvider" | "unregisterProvider">,
   dependencies: ReliableCompactionDependencies,
-  getThinkingLevel: () => CompactionThinkingLevel,
 ): SessionBeforeCompactHandler {
-  return async (event, ctx) => {
+  let active: ActiveOverride | undefined;
+
+  const restoreProvider = (expected: ActiveOverride): void => {
+    if (active !== expected) return;
+    active = undefined;
+    const registered = expected.registry.getRegisteredProviderConfig(expected.provider);
+    if (registered === undefined || registered === expected.config) {
+      pi.unregisterProvider(expected.provider);
+    }
+  };
+
+  return (event, ctx) => {
     const model = ctx.model;
-    if (!model) return undefined;
+    if (!model) return;
     const policy = policyForModel(model);
-    if (!policy) return undefined;
+    if (!policy) return;
 
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok) {
-      notifyFailure(ctx, `Reliable compaction authentication failed: ${auth.error}`);
-      return { cancel: true };
-    }
-    if (!auth.apiKey) {
-      notifyFailure(ctx, `Reliable compaction has no credentials for ${model.provider}.`);
-      return { cancel: true };
-    }
+    if (active) restoreProvider(active);
 
-    const outcome = await runReliableCompaction(
-      { auth, event, model, thinkingLevel: getThinkingLevel() },
-      policy,
-      dependencies,
-    );
-    if (outcome.kind === "compaction") return { compaction: outcome.compaction };
-    if (!outcome.aborted) {
-      notifyFailure(
-        ctx,
-        `Reliable compaction failed after ${String(outcome.attempts)} attempts: ${outcome.error.message}`,
-      );
-    }
-    return { cancel: true };
+    // Do not replace a stream handler supplied by another extension.
+    if (ctx.modelRegistry.getRegisteredProviderConfig(model.provider) !== undefined) return;
+
+    const override: ActiveOverride = {
+      config: {},
+      provider: model.provider,
+      registry: ctx.modelRegistry,
+      remainingCalls: expectedSummaryCalls(event),
+    };
+    const streamSimple = withCompactionPolicy(dependencies.streamSimple, policy, (failed) => {
+      override.remainingCalls -= 1;
+      if (failed || override.remainingCalls === 0) restoreProvider(override);
+    });
+    override.config = { api: model.api, streamSimple };
+    active = override;
+
+    pi.registerProvider(model.provider, override.config);
   };
 }
 
@@ -170,7 +142,5 @@ export function installReliableCompaction(
   pi: ReliableCompactionApi,
   dependencies: ReliableCompactionDependencies,
 ): void {
-  pi.onSessionBeforeCompact(
-    createSessionBeforeCompactHandler(dependencies, () => pi.getThinkingLevel()),
-  );
+  pi.onSessionBeforeCompact(createSessionBeforeCompactHandler(pi, dependencies));
 }
