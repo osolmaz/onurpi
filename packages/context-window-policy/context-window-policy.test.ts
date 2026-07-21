@@ -261,6 +261,16 @@ describe("extension registration", () => {
     expect(requests).toHaveLength(1);
     complete(requests[0]);
 
+    state.agentSettled(
+      context({
+        contextWindow: 272_000,
+        tokens: 244_800,
+        idle: false,
+        compact: (value) => requests.push(value),
+      }),
+    );
+    expect(requests).toHaveLength(1);
+
     state.modelSelect(
       context({
         contextWindow: 128_000,

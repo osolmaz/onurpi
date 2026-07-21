@@ -4,15 +4,17 @@
 selected model's context window.
 
 The threshold follows each model instead of using one fixed token reserve. A 272,000-token model
-compacts at 244,800 tokens, a 200,000-token model at 180,000, and a 128,000-token model at 115,200.
-The extension evaluates after each complete agent run and after idle model changes. Waiting for
+requests compaction at 244,800 tokens, and a 200,000-token model requests it at 180,000. The
+extension evaluates after each complete agent run and after idle model changes. Waiting for
 `agent_settled` ensures Pi has finished every tool continuation before its public compaction API
 stops the agent runtime.
 
 Pi still owns compaction. The extension calls Pi's documented `compact()` API and does not replace
 summary generation, retained-history selection, transport policy, overflow recovery, or session
-persistence. Pi's built-in threshold remains enabled as a fallback. `@onurpi/reliable-compaction`
-can independently select a stable transport after this extension requests compaction.
+persistence. Pi's built-in threshold remains enabled as a fallback. With Pi's default 16,384-token
+reserve, this extension reaches 90% first for context windows of at least 163,840 tokens. On smaller
+windows, Pi's fixed reserve can compact earlier. `@onurpi/reliable-compaction` can independently
+select a stable transport after this extension requests compaction.
 
 ## Install
 

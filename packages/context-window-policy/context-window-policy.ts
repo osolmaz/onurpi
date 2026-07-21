@@ -102,7 +102,7 @@ export function createContextWindowPolicyController(): ContextWindowPolicyContro
 export function installContextWindowPolicy(pi: ContextWindowPolicyApi): void {
   const controller = createContextWindowPolicyController();
   pi.onAgentSettled((ctx) => {
-    controller.evaluate(ctx);
+    if (ctx.isIdle()) controller.evaluate(ctx);
   });
   pi.onModelSelect((ctx) => {
     if (ctx.isIdle()) controller.evaluate(ctx);
