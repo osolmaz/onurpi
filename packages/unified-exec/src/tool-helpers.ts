@@ -66,7 +66,8 @@ export function resolveWriteInput(args: WriteStdinArgs): Uint8Array | undefined 
   }
   if (hasBase64 && args.chars_b64) {
     const value = args.chars_b64.replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
+    const completeBase64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+    if (!value || !completeBase64.test(value)) {
       throw new Error("write_stdin: `chars_b64` is not valid base64.");
     }
     return new Uint8Array(Buffer.from(value, "base64"));
