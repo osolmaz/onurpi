@@ -53,7 +53,6 @@ export default defineConfig({
         "packages/unified-exec/src/tool-helpers.ts",
         "packages/unified-exec/src/unescape.ts",
         "packages/unified-exec/src/write-stdin.ts",
-        "packages/shell-execution-policy/shell-execution-policy.ts",
       ],
       provider: "v8",
       reporter: ["text", "json", "json-summary"],

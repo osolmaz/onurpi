@@ -10,8 +10,7 @@
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
     "../../repos/onurpi/packages/plan-checklist",
-    "../../repos/onurpi/packages/unified-exec",
-    "../../repos/onurpi/packages/shell-execution-policy"
+    "../../repos/onurpi/packages/unified-exec"
   ],
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",

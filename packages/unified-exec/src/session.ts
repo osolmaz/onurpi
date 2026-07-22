@@ -110,9 +110,14 @@ export class ExecSession {
     // even before the child writes anything (and before the lazy stream
     // opens the fd on its first buffered write). Then open a stream in
     // append mode for the actual writes.
+    let logFd: number | undefined;
     try {
-      closeSync(openSync(self.logPath, "w"));
-      self.logStream = createWriteStream(self.logPath, { flags: "a" });
+      logFd = openSync(self.logPath, "ax", 0o600);
+      self.logStream = createWriteStream(self.logPath, {
+        fd: logFd,
+        flags: "a",
+        autoClose: true,
+      });
       self.logStream.on("error", (err) => {
         // Log-stream error (disk full, permissions, etc.). The child is
         // still running: record the failure and stop mirroring writes, but
@@ -122,6 +127,7 @@ export class ExecSession {
         self.logStream = undefined;
       });
     } catch (error: unknown) {
+      if (logFd !== undefined) closeSync(logFd);
       self.markFailure(`failed to open log file ${self.logPath}: ${errorMessage(error)}`);
       self.exitedAc.abort();
       self.outputClosed.close();

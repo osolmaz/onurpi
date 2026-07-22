@@ -188,6 +188,7 @@ describe("collectOutputUntilDeadline", () => {
     const dt = Date.now() - t0;
     assert.equal(text(out), "");
     assert.ok(dt < 200, `dt=${dt}`);
+    assert.equal(h.outputNotify.waiterCount, 0);
   });
 
   it("handles the case of pre-closed stream", async () => {
@@ -221,6 +222,18 @@ describe("collectOutputUntilDeadline", () => {
     const dt = Date.now() - t0;
     assert.equal(text(out), "");
     assert.ok(dt >= 70 && dt < 250, `dt=${dt}`);
+    assert.equal(h.outputNotify.waiterCount, 0);
+
+    for (let index = 0; index < 20; index++) {
+      await collectOutputUntilDeadline({
+        buffer: h.buffer,
+        outputNotify: h.outputNotify,
+        outputClosed: h.outputClosed,
+        exited: h.exited,
+        deadlineMs: Date.now() + 1,
+      });
+    }
+    assert.equal(h.outputNotify.waiterCount, 0);
   });
 
   it("drops empty pushes cleanly", async () => {

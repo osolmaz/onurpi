@@ -17,8 +17,7 @@
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
       "./packages/plan-checklist/index.ts",
-      "./packages/unified-exec/index.ts",
-      "./packages/shell-execution-policy/index.ts"
+      "./packages/unified-exec/index.ts"
     ]
   },
   "scripts": {

@@ -95,23 +95,25 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
           graceP ??= timeoutPromise(graceDeadline - now, cleanups).then(() => "timeout" as const);
           if (Date.now() >= graceDeadline) break;
           closedP ??= outputClosed.closed().then(() => "closed" as const);
+          const outputWait = outputNotify.wait();
           const which = await Promise.race([
-            outputNotify.notified().then(() => "output" as const),
+            outputWait.promise.then(() => "output" as const),
             closedP,
             graceP,
             externalP,
-          ]);
+          ]).finally(outputWait.cancel);
           if (which === "timeout" || which === "external") break;
           continue;
         }
 
         // Still running — wait for next event.
+        const outputWait = outputNotify.wait();
         const which = await Promise.race([
-          outputNotify.notified().then(() => "output" as const),
+          outputWait.promise.then(() => "output" as const),
           exitedP,
           deadlineP,
           externalP,
-        ]);
+        ]).finally(outputWait.cancel);
         if (which === "timeout" || which === "external") break;
         if (which === "exit") exitSignalReceived = true;
         continue;

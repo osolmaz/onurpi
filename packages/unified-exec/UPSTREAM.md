@@ -90,7 +90,7 @@ native module cannot load.
 - Ported the 12 upstream unit suites directly to Vitest. The four upstream extension-API harness
   suites (`chars-encoding`, `e2e`, `e2e-pty`, and `wake-e2e`) used unchecked `any` stubs, so their
   applicable process, byte-input, PTY, waiting, kill, and wake scenarios were consolidated into a
-  strict typed runtime integration suite. The package currently runs 185 tests, plus a platform skip
+  strict typed runtime integration suite. The package currently runs 186 tests, plus a platform skip
   when PTY is unavailable.
 - Retained strict TypeScript, unsafe-operation linting, and the repository's complexity limit.
   Audited upstream lifecycle and rendering routines use narrow, justified line-level complexity
@@ -98,5 +98,9 @@ native module cannot load.
 - Deferred synthetic completion delivery while an agent run is active. This lets a finalized
   terminal `write_stdin` result consume the wake before `agent_settled`; truly unobserved
   completions still deliver one follow-up after settlement.
+- Create POSIX session logs exclusively with mode `0600` instead of inheriting an umask that may
+  expose complete command output to other local users.
+- Added cancellable output waits so quiet timed-out polls and stopped absolute-wait renderers do not
+  retain notification closures until future process output.
 - Kept upstream v0.7.3's `set_on_exit` tool and human-explicit wake guidance.
 - Removed upstream publishing and repository-maintenance machinery from the vendored package.

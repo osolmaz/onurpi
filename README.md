@@ -4,17 +4,16 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 
 ## Packages
 
-| Package                                                              | Purpose                                                          |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`@onurpi/turn-fold`](packages/turn-fold/)                           | Bounded transcript replay and turn-level folding                 |
-| [`@onurpi/live-stats`](packages/live-stats/)                         | Shimmering Turkish working messages with live response metrics   |
-| [`@onurpi/nyan-mode`](packages/nyan-mode/)                           | Animated bitmap Nyan Cat context runway                          |
-| [`@onurpi/prompt-queue`](packages/prompt-queue/)                     | Editable prompt queue, steer control, and history manager        |
-| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)       | Stable transport policy for context compaction                   |
-| [`@onurpi/context-window-policy`](packages/context-window-policy/)   | Model-relative context compaction threshold                      |
-| [`@onurpi/plan-checklist`](packages/plan-checklist/)                 | Branch-aware model task plan with live progress                  |
-| [`@onurpi/unified-exec`](packages/unified-exec/)                     | Persistent shell and PTY sessions with race-free completion wake |
-| [`@onurpi/shell-execution-policy`](packages/shell-execution-policy/) | Default and maximum timeouts for model-initiated shell commands  |
+| Package                                                            | Purpose                                                          |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and turn-level folding                 |
+| [`@onurpi/live-stats`](packages/live-stats/)                       | Shimmering Turkish working messages with live response metrics   |
+| [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                          |
+| [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
+| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
+| [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
+| [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
+| [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 
 ## Install
 
@@ -49,8 +48,15 @@ An entry counts as belonging to this repo when it points into the main checkout,
 `npm:pi-unified-exec` source is also treated as repo-owned so it cannot coexist with the vendored
 package. Those entries are replaced with one canonical `../../repos/onurpi/packages/<name>` entry
 per registered package. External entries (npm packages, other git repos) and all other settings pass
-through untouched. During development the live file may point anywhere, including a worktree or a
-dev-only package, and `sync` still writes the correct canonical values to the tracked copy.
+through untouched.
+
+Unified Exec replaces Pi's built-in `bash` tool and the old `shell-execution-policy` package. Its
+attachment windows stay bounded, while the underlying session remains alive until it exits, is
+killed, reaches the session cap, or Pi shuts down. That long-lived process model is required for
+servers, interactive programs, and finite jobs that take more than two minutes.
+
+During development the live file may point anywhere, including a worktree or a dev-only package, and
+`sync` still writes the correct canonical values to the tracked copy.
 
 ## Structure
 

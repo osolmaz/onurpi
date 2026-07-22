@@ -198,8 +198,10 @@ describe("startRateLimitedStream", () => {
     });
     await new Promise((r) => setTimeout(r, 100)); // 100ms of silence
     assert.equal(emits, 1, "only the initial update — no timer-driven heartbeat");
+    assert.equal(notify.waiterCount, 1);
     stream.stop();
     assert.equal(emits, 2);
+    assert.equal(notify.waiterCount, 0);
   });
 
   it("emits again once the rate-limit interval has elapsed with new output", async () => {

@@ -277,6 +277,11 @@ start so the LLM is steered toward `exec_command` / `write_stdin`.
 - `--keep-builtin-bash` — preserve the built-in `bash` alongside the unified-exec tools. Useful if
   you've got skills or prompts that explicitly expect `bash(cmd, timeout)`.
 
+OnurPi retired its old `shell-execution-policy` package with this replacement because that policy
+only modified the built-in `bash` tool. Unified Exec bounds each attached tool call, while the
+underlying process intentionally remains alive for later polls or input. Live processes are capped
+by the session store and terminated when Pi shuts down.
+
 ## TUI rendering
 
 Custom `renderCall` and `renderResult` mirror pi's built-in `bash` tool styling and add
@@ -588,6 +593,13 @@ and in tool-call details), plus in `list_sessions` per-entry and in `kill_sessio
 Log files live in `/tmp/` and are never auto-deleted (they're just regular files; `/tmp` cleanup is
 the OS's problem). If you run the same session to completion and never revisit the log, it'll linger
 until your next reboot.
+
+## Session logs
+
+Each session writes complete output to a randomly named file under the operating system temporary
+directory. On POSIX systems the file is created exclusively with mode `0600`, so only the owning
+user can read it. The npm version inherited the process umask and could create a group- or
+world-readable log on multi-user hosts.
 
 ## Other pi-flavor additions
 

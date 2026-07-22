@@ -31,7 +31,6 @@ export default {
     "packages/unified-exec/src/head-tail-buffer.ts",
     "packages/unified-exec/src/time.ts",
     "packages/unified-exec/src/unescape.ts",
-    "packages/shell-execution-policy/shell-execution-policy.ts",
   ],
   reporters: ["clear-text", "progress"],
   testRunner: "vitest",

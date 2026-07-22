@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 import { afterEach, describe, it } from "vitest";
 
@@ -84,6 +84,11 @@ describe("runtime integration", () => {
     assert.equal(result.exit_code, 0);
     assert.match(result.output, /quick/);
     assert.equal(runtime.store.size, 0);
+    assert.ok(result.log_path);
+    if (process.platform !== "win32") {
+      const metadata = await stat(result.log_path);
+      assert.equal(metadata.mode & 0o777, 0o600);
+    }
   });
 
   it("backgrounds a long process and observes its final result directly", async () => {

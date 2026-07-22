@@ -43,7 +43,6 @@ typescript:
       - packages/unified-exec/src/head-tail-buffer.ts
       - packages/unified-exec/src/time.ts
       - packages/unified-exec/src/unescape.ts
-      - packages/shell-execution-policy/shell-execution-policy.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -66,6 +65,3 @@ typescript:
     - from: packages/unified-exec
       allow:
         - packages/unified-exec
-    - from: packages/shell-execution-policy
-      allow:
-        - packages/shell-execution-policy

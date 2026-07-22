@@ -31,6 +31,17 @@ describe("Notify", () => {
     assert.equal(resolved, true);
   });
 
+  it("cancels and releases a parked waiter", async () => {
+    const n = new Notify();
+    const wait = n.wait();
+    assert.equal(n.waiterCount, 1);
+    wait.cancel();
+    await wait.promise;
+    assert.equal(n.waiterCount, 0);
+    wait.cancel();
+    assert.equal(n.waiterCount, 0);
+  });
+
   it("only wakes waiters created before notifyAll", async () => {
     const n = new Notify();
     const pre = n.notified();

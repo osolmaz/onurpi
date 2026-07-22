@@ -15,6 +15,8 @@
  *     lengthen or shorten an in-progress wait.
  */
 
+import type { NotificationWait, Notify } from "./notify.ts";
+
 export type LongWaitOutcome = "exit" | "deadline" | "cancelled";
 
 /**
@@ -123,14 +125,9 @@ export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<Lon
 
 // ---------------- Rate-limited streaming for absolute waits ----------------
 
-/** Minimal Notify surface (src/notify.ts) needed by the rate-limited streamer. */
-interface NotifyLike {
-  notified(): Promise<void>;
-}
-
 export interface RateLimitedStreamOptions {
   /** Fired whenever new output arrives (session.outputNotify). */
-  outputNotify: NotifyLike;
+  outputNotify: Pick<Notify, "wait">;
   /** Emit one non-destructive tail-snapshot update. */
   emit: () => void;
   /** Minimum interval between output-driven updates (ms). */
@@ -158,6 +155,7 @@ export function startRateLimitedStream(opts: RateLimitedStreamOptions): { stop: 
   let stopped = false;
   let lastEmitAt = monotonicNow();
   let trailingTimer: unknown;
+  let parkedWait: NotificationWait | undefined;
 
   const safeEmit = () => {
     lastEmitAt = monotonicNow();
@@ -176,7 +174,9 @@ export function startRateLimitedStream(opts: RateLimitedStreamOptions): { stop: 
   // (exit always notifies) and then no-ops.
   void (async () => {
     while (!stopped) {
-      await opts.outputNotify.notified();
+      parkedWait = opts.outputNotify.wait();
+      await parkedWait.promise;
+      parkedWait = undefined;
       if (stopped) return;
       const since = monotonicNow() - lastEmitAt;
       if (since >= opts.minIntervalMs) {
@@ -195,6 +195,8 @@ export function startRateLimitedStream(opts: RateLimitedStreamOptions): { stop: 
     stop: () => {
       if (stopped) return;
       stopped = true;
+      parkedWait?.cancel();
+      parkedWait = undefined;
       if (trailingTimer !== undefined) {
         clearTimeoutFn(trailingTimer);
         trailingTimer = undefined;
