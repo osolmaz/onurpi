@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   countOutputContentChars,
   formatElapsed,
-  formatShimmeringWorkingMessage,
+  formatStyledTransitionSpinnerFrames,
+  formatStyledWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
+  getTransitionSpinnerCharacters,
+  getTransitionSpinnerFrames,
   LiveStatsTracker,
+  TRANSITION_SPINNER_INTERVAL_MS,
 } from "./live-stats.ts";
 import {
   pickWorkingPhrase,
@@ -231,6 +235,67 @@ describe("formatTokenCount", () => {
   });
 });
 
+describe("transition spinner", () => {
+  it("matches Claude Code's platform-specific character sequences", () => {
+    expect(getTransitionSpinnerCharacters(undefined, "linux")).toEqual([
+      "·",
+      "✢",
+      "*",
+      "✶",
+      "✻",
+      "✽",
+    ]);
+    expect(getTransitionSpinnerCharacters(undefined, "darwin")).toEqual([
+      "·",
+      "✢",
+      "✳",
+      "✶",
+      "✻",
+      "✽",
+    ]);
+    expect(getTransitionSpinnerCharacters("xterm-ghostty", "darwin")).toEqual([
+      "·",
+      "✢",
+      "✳",
+      "✶",
+      "✻",
+      "*",
+    ]);
+  });
+
+  it("moves forward and backward at Claude Code's 120 ms interval", () => {
+    expect(TRANSITION_SPINNER_INTERVAL_MS).toBe(120);
+    expect(getTransitionSpinnerFrames(undefined, "linux")).toEqual([
+      "·",
+      "✢",
+      "*",
+      "✶",
+      "✻",
+      "✽",
+      "✽",
+      "✻",
+      "✶",
+      "*",
+      "✢",
+      "·",
+    ]);
+    expect(getTransitionSpinnerFrames()).toHaveLength(12);
+  });
+
+  it("renders every frame in bold warning color", () => {
+    const styles = {
+      bold: (text: string) => `<b>${text}</b>`,
+      warning: (text: string) => `<warning>${text}</warning>`,
+    };
+
+    expect(formatStyledTransitionSpinnerFrames(styles, undefined, "linux")).toEqual(
+      getTransitionSpinnerFrames(undefined, "linux").map(
+        (frame) => `<b><warning>${frame}</warning></b>`,
+      ),
+    );
+  });
+});
+
 describe("formatWorkingMessage", () => {
   it("shows a Turkish phrase, estimated output, and a sampled rate", () => {
     expect(
@@ -260,7 +325,7 @@ describe("formatWorkingMessage", () => {
     ).toBe("Piston aşağı indi… (0s · 0 out · — tok/s)");
   });
 
-  it("moves a shimmer across the bold working phrase", () => {
+  it("renders the complete working line in bold warning color", () => {
     const snapshot = {
       elapsedMs: 1_000,
       outputTokens: 12,
@@ -269,17 +334,12 @@ describe("formatWorkingMessage", () => {
     };
     const styles = {
       bold: (text: string) => `<b>${text}</b>`,
-      muted: (text: string) => `<muted>${text}</muted>`,
-      accent: (text: string) => `<accent>${text}</accent>`,
+      warning: (text: string) => `<warning>${text}</warning>`,
     };
 
-    const firstFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_600, styles);
-    const secondFrame = formatShimmeringWorkingMessage(snapshot, "AB", 2_400, styles);
-
-    expect(firstFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><muted>…<\/muted>/u);
-    expect(firstFrame).toContain("<muted> (1s · 12 out · 4.0 tok/s)</muted></b>");
-    expect(secondFrame).toMatch(/^<b><accent>A<\/accent><accent>B<\/accent><accent>…<\/accent>/u);
-    expect(secondFrame).not.toBe(firstFrame);
+    expect(formatStyledWorkingMessage(snapshot, "AB", styles)).toBe(
+      "<b><warning>AB… (1s · 12 out · 4.0 tok/s)</warning></b>",
+    );
   });
 });
 

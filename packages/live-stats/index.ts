@@ -2,8 +2,10 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 import {
   countOutputContentChars,
-  formatShimmeringWorkingMessage,
+  formatStyledTransitionSpinnerFrames,
+  formatStyledWorkingMessage,
   LiveStatsTracker,
+  TRANSITION_SPINNER_INTERVAL_MS,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
 import { WorkingPhraseState } from "./working-phrases.ts";
@@ -13,15 +15,13 @@ const REFRESH_INTERVAL_MS = 50;
 function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   return {
     bold: (text) => ctx.ui.theme.bold(text),
-    muted: (text) => ctx.ui.theme.fg("muted", text),
-    accent: (text) => ctx.ui.theme.fg("accent", text),
+    warning: (text) => ctx.ui.theme.fg("warning", text),
   };
 }
 
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
-  let shimmerStartedAtMs: number | undefined;
   const workingPhrase = new WorkingPhraseState();
 
   const stopTimer = (): void => {
@@ -33,13 +33,10 @@ export default function liveStats(pi: ExtensionAPI): void {
   const render = (ctx: ExtensionContext): void => {
     if (ctx.mode !== "tui" || !tracker.active) return;
     const phrase = workingPhrase.current;
-    const startedAtMs = shimmerStartedAtMs;
-    if (phrase === undefined || startedAtMs === undefined) return;
-    const now = Date.now();
-    const message = formatShimmeringWorkingMessage(
-      tracker.snapshot(now),
+    if (phrase === undefined) return;
+    const message = formatStyledWorkingMessage(
+      tracker.snapshot(Date.now()),
       phrase,
-      now - startedAtMs,
       workingMessageStyles(ctx),
     );
     ctx.ui.setWorkingMessage(message);
@@ -49,19 +46,23 @@ export default function liveStats(pi: ExtensionAPI): void {
     stopTimer();
     tracker.reset();
     workingPhrase.reset();
-    shimmerStartedAtMs = undefined;
     if (ctx.mode === "tui") ctx.ui.setWorkingMessage();
   };
+
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    ctx.ui.setWorkingIndicator({
+      frames: formatStyledTransitionSpinnerFrames(workingMessageStyles(ctx)),
+      intervalMs: TRANSITION_SPINNER_INTERVAL_MS,
+    });
+  });
 
   pi.on("agent_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
 
     stopTimer();
     const now = Date.now();
-    if (workingPhrase.current === undefined) {
-      workingPhrase.start();
-      shimmerStartedAtMs = now;
-    }
+    if (workingPhrase.current === undefined) workingPhrase.start();
     tracker.start(now);
     render(ctx);
     refreshTimer = setInterval(() => {

@@ -1,5 +1,10 @@
 const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
+export const TRANSITION_SPINNER_INTERVAL_MS = 120;
+
+const DEFAULT_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "*", "✶", "✻", "✽"] as const;
+const DARWIN_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "✳", "✶", "✻", "✽"] as const;
+const GHOSTTY_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "✳", "✶", "✻", "*"] as const;
 
 type TokenSample = {
   atMs: number;
@@ -15,9 +20,36 @@ export type LiveStatsSnapshot = {
 
 export type WorkingMessageStyles = {
   bold: (text: string) => string;
-  muted: (text: string) => string;
-  accent: (text: string) => string;
+  warning: (text: string) => string;
 };
+
+export function getTransitionSpinnerCharacters(
+  term: string | undefined = process.env["TERM"],
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] {
+  if (term === "xterm-ghostty") return GHOSTTY_TRANSITION_SPINNER_CHARACTERS;
+  return platform === "darwin"
+    ? DARWIN_TRANSITION_SPINNER_CHARACTERS
+    : DEFAULT_TRANSITION_SPINNER_CHARACTERS;
+}
+
+export function getTransitionSpinnerFrames(
+  term: string | undefined = process.env["TERM"],
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  const characters = getTransitionSpinnerCharacters(term, platform);
+  return [...characters, ...[...characters].reverse()];
+}
+
+export function formatStyledTransitionSpinnerFrames(
+  styles: WorkingMessageStyles,
+  term: string | undefined = process.env["TERM"],
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  return getTransitionSpinnerFrames(term, platform).map((frame) =>
+    styles.bold(styles.warning(frame)),
+  );
+}
 
 type OutputContent =
   | { type: "text"; text: string }
@@ -172,26 +204,12 @@ export function formatWorkingMessage(snapshot: LiveStatsSnapshot, workingPhrase:
   return `${workingPhrase}… (${formatWorkingStats(snapshot)})`;
 }
 
-export function formatShimmeringWorkingMessage(
+export function formatStyledWorkingMessage(
   snapshot: LiveStatsSnapshot,
   workingPhrase: string,
-  shimmerElapsedMs: number,
   styles: WorkingMessageStyles,
 ): string {
-  const phrase = `${workingPhrase}…`;
-  const characters = Array.from(phrase);
-  const cycleLength = characters.length + 20;
-  const cyclePosition = Math.floor(Math.max(0, shimmerElapsedMs) / 200) % cycleLength;
-  const center = characters.length + 10 - cyclePosition;
-  const shimmeringPhrase = characters
-    .map((character, index) => {
-      const distance = Math.abs(index - center);
-      if (distance <= 1) return styles.accent(character);
-      return styles.muted(character);
-    })
-    .join("");
-
-  return styles.bold(`${shimmeringPhrase}${styles.muted(` (${formatWorkingStats(snapshot)})`)}`);
+  return styles.bold(styles.warning(formatWorkingMessage(snapshot, workingPhrase)));
 }
 
 function formatWorkingStats(snapshot: LiveStatsSnapshot): string {
