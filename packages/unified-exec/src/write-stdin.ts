@@ -1,4 +1,8 @@
-import { collectOutputUntilDeadline } from "./collect.ts";
+import {
+  type CollectedOutput,
+  collectedOutputFromBytes,
+  collectOutputUntilDeadline,
+} from "./collect.ts";
 import { DEFAULT_WRITE_STDIN_YIELD_MS, LONG_WAIT_UPDATE_INTERVAL_MS } from "./constants.ts";
 import {
   type LongWaitOutcome,
@@ -48,7 +52,7 @@ function terminalExtra(waitMode: WaitMode | undefined, wakeWasArmed: boolean): U
 async function collectTerminalOutput(
   session: ExecSession,
   deadlineMs = Date.now() + 1000,
-): Promise<Uint8Array> {
+): Promise<CollectedOutput> {
   return collectOutputUntilDeadline({
     buffer: session.outputBuffer,
     outputNotify: session.outputNotify,
@@ -63,7 +67,7 @@ function finalizeTerminal(
   session: ExecSession,
   toolCallId: string,
   startedAt: number,
-  collected: Uint8Array,
+  collected: CollectedOutput,
   options: Readonly<{
     waitMode?: WaitMode | undefined;
     writeFailure?: string | undefined;
@@ -163,7 +167,7 @@ function finalizeRelativeRunning(
   session: ExecSession,
   toolCallId: string,
   startedAt: number,
-  collected: Uint8Array,
+  collected: CollectedOutput,
   options: Readonly<{
     isEmptyPoll: boolean;
     signal: AbortSignal | undefined;
@@ -263,7 +267,7 @@ async function finalizeAbsoluteNonExit(
   runtime.coordinator.releaseObservation(session.id, toolCallId);
   const cancelled = outcome === "cancelled";
   const collected = cancelled
-    ? new Uint8Array()
+    ? collectedOutputFromBytes(new Uint8Array())
     : await collectOutputUntilDeadline({
         buffer: session.outputBuffer,
         outputNotify: session.outputNotify,

@@ -221,6 +221,14 @@ describe("probeWindowsDefaultShell", () => {
     });
   });
 
+  it("ignores unspawnable PowerShell command wrappers", () => {
+    const wrappers = makePathDir("ps-wrappers", ["powershell.cmd", "powershell.bat"]);
+    const result = probeWindowsDefaultShell({ PATH: wrappers });
+    assert.equal(result.fellBack, true);
+    assert.notEqual(result.shell, join(wrappers, "powershell.cmd"));
+    assert.notEqual(result.shell, join(wrappers, "powershell.bat"));
+  });
+
   it("falls back to the canonical absolute powershell path when nothing is on PATH", () => {
     // Never a bare name: Windows' cwd-first lookup could execute a
     // planted powershell.exe from an untrusted workdir.
@@ -234,6 +242,12 @@ describe("resolveWindowsShell", () => {
   it("resolves bare names to absolute .exe paths", () => {
     const dir = makePathDir("ws", ["myshell.exe"]);
     assert.equal(resolveWindowsShell("myshell", { PATH: dir }), join(dir, "myshell.exe"));
+  });
+
+  it("accepts bare shell names that already include executable extensions", () => {
+    const dir = makePathDir("ws-ext", ["cmd.exe", "powershell.exe"]);
+    assert.equal(resolveWindowsShell("cmd.exe", { PATH: dir }), join(dir, "cmd.exe"));
+    assert.equal(resolveWindowsShell("powershell.exe", { PATH: dir }), join(dir, "powershell.exe"));
   });
 
   it("fails closed on unresolvable bare names (no cwd-first spawn)", () => {

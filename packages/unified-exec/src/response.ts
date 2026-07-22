@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { randomBytes } from "node:crypto";
 
+import type { CollectedOutput } from "./collect.ts";
 import type { FinalResponseDetails, UnifiedExecDetails } from "./tool-types.ts";
 
 const textDecoder = new TextDecoder("utf-8", { fatal: false });
@@ -64,13 +65,12 @@ export function renderResponseText(shape: FinalResponseDetails): string {
   lines.push(`chunk_id: ${shape.chunk_id}`);
   lines.push(`original_token_count: ${String(shape.original_token_count)}`);
   lines.push(`tty: ${String(shape.tty)}`);
-  const marker = shape.truncation ? truncationMarker(shape.truncation, shape.log_path) : undefined;
-  return `${lines.join("\n")}\n---\n${shape.output || "(no output)"}${marker ? `\n\n${marker}` : ""}`;
+  return `${lines.join("\n")}\n---\n${renderResponseOutput(shape)}`;
 }
 
 export type FinalizeInput = Readonly<{
   wallTimeSec: number;
-  collected: Uint8Array;
+  collected: CollectedOutput;
   sessionId?: number | undefined;
   exitCode?: number | null | undefined;
   signal: NodeJS.Signals | null;
@@ -83,19 +83,34 @@ export type FinalizeInput = Readonly<{
   extra?: UnifiedExecDetails | undefined;
 }>;
 
+export function renderResponseOutput(
+  shape: Pick<FinalResponseDetails, "log_path" | "output" | "truncation">,
+): string {
+  const marker = shape.truncation ? truncationMarker(shape.truncation, shape.log_path) : undefined;
+  return `${shape.output || "(no output)"}${marker ? `\n\n${marker}` : ""}`;
+}
+
 // eslint-disable-next-line complexity -- Preserve omission semantics for optional response fields.
 export function finalizeResponse(input: FinalizeInput): FinalResponseDetails {
-  const rawText = decode(input.collected);
-  const truncation = truncateTail(rawText, {
+  const rawText = decode(input.collected.bytes);
+  const retainedTruncation = truncateTail(rawText, {
     maxBytes: DEFAULT_MAX_BYTES,
     maxLines: DEFAULT_MAX_LINES,
   });
+  const wasPreTruncated = input.collected.totalBytes > input.collected.bytes.length;
+  const truncation: TruncationResult = {
+    ...retainedTruncation,
+    truncated: retainedTruncation.truncated || wasPreTruncated,
+    truncatedBy: retainedTruncation.truncatedBy ?? (wasPreTruncated ? ("bytes" as const) : null),
+    totalBytes: input.collected.totalBytes,
+    totalLines: input.collected.totalLines,
+  };
   return {
     ...input.extra,
     chunk_id: generateChunkId(),
     wall_time_seconds: input.wallTimeSec,
     output: truncation.content,
-    original_token_count: Math.ceil(input.collected.length / 4),
+    original_token_count: Math.ceil(input.collected.totalBytes / 4),
     tty: input.tty,
     ...(input.sessionId === undefined ? {} : { session_id: input.sessionId }),
     ...(input.exitCode === undefined ? {} : { exit_code: input.exitCode }),

@@ -236,6 +236,30 @@ describe("runtime integration", () => {
     assert.equal(messages.length, 0);
   });
 
+  it("bounds streamed and killed output while preserving the full log", async () => {
+    const { runtime } = makeRuntime();
+    const command =
+      "node -e \"setTimeout(()=>process.stdout.write('x'.repeat(200000)),400);setTimeout(()=>{},5000)\"";
+    const sessionId = requireSessionId(await start(runtime, command));
+    const session = runtime.store.get(sessionId);
+    assert.ok(session);
+    for (let attempt = 0; attempt < 20 && session.totalBytesSeen < 200000; attempt++) {
+      await sleep(100);
+    }
+    assert.equal(session.totalBytesSeen, 200000);
+    const streamTail = session.snapshotStreamTail();
+    assert.ok(
+      streamTail.length <= 32 * 1024,
+      `stream tail retained ${String(streamTail.length)} bytes`,
+    );
+    const outcome = await terminateSessionById(runtime, sessionId, "SIGTERM");
+    assert.ok(outcome);
+    assert.ok(Buffer.byteLength(outcome.finalOutput) < 52 * 1024);
+    assert.match(outcome.finalOutput, /Showing/);
+    const fullLog = await readFile(outcome.session.logPath, "utf8");
+    assert.equal(fullLog.length, 200000);
+  });
+
   it("returns at an absolute deadline while the process keeps running", async () => {
     const { runtime } = makeRuntime();
     const sessionId = requireSessionId(await start(runtime, delayedOutput(2000)));

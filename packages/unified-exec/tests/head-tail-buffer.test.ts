@@ -43,6 +43,15 @@ describe("HeadTailBuffer", () => {
     assert.deepEqual(buf.snapshotChunks(), []);
   });
 
+  it("tracks newline bytes omitted from the middle", () => {
+    const buf = new HeadTailBuffer(4);
+    buf.pushChunk(s("a\nb\nc\n"));
+    assert.equal(buf.omittedBytes, 2);
+    assert.equal(buf.omittedNewlines, 1);
+    buf.drainChunks();
+    assert.equal(buf.omittedNewlines, 0);
+  });
+
   it("head budget zero keeps only last byte in tail", () => {
     const buf = new HeadTailBuffer(1);
     buf.pushChunk(s("abc"));

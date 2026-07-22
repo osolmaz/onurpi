@@ -12,7 +12,11 @@
 import { strict as assert } from "node:assert";
 import { getEventListeners } from "node:events";
 import { describe, it } from "vitest";
-import { COLLECTED_OUTPUT_MAX_BYTES, collectOutputUntilDeadline } from "../src/collect.ts";
+import {
+  type CollectedOutput,
+  COLLECTED_OUTPUT_MAX_BYTES,
+  collectOutputUntilDeadline,
+} from "../src/collect.ts";
 import { HeadTailBuffer } from "../src/head-tail-buffer.ts";
 import { Gate, Notify } from "../src/notify.ts";
 
@@ -20,7 +24,8 @@ function s(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
-function text(bytes: Uint8Array): string {
+function text(output: Uint8Array | CollectedOutput): string {
+  const bytes = output instanceof Uint8Array ? output : output.bytes;
   return new TextDecoder("utf-8").decode(bytes);
 }
 
@@ -73,7 +78,7 @@ describe("collectOutputUntilDeadline", () => {
         deadlineMs: Date.now() + 400,
         externalAbort: h.external,
       });
-      assert.ok(out.length >= 15, `expected many chunks; got ${out.length}`);
+      assert.ok(out.bytes.length >= 15, `expected many chunks; got ${String(out.bytes.length)}`);
     } finally {
       clearInterval(interval);
     }
@@ -84,8 +89,8 @@ describe("collectOutputUntilDeadline", () => {
 
   it("bounds bytes retained across a noisy attached wait", async () => {
     const h = makeHarness(COLLECTED_OUTPUT_MAX_BYTES * 4);
-    h.push("A".repeat(1024 * 1024));
-    h.push("Z".repeat(1024 * 1024));
+    h.push("A\n".repeat(512 * 1024));
+    h.push("Z\n".repeat(512 * 1024));
     const out = await collectOutputUntilDeadline({
       buffer: h.buffer,
       outputNotify: h.outputNotify,
@@ -93,9 +98,12 @@ describe("collectOutputUntilDeadline", () => {
       exited: h.exited,
       deadlineMs: Date.now() + 1,
     });
-    assert.equal(out.length, COLLECTED_OUTPUT_MAX_BYTES);
-    assert.equal(out[0], "A".charCodeAt(0));
-    assert.equal(out.at(-1), "Z".charCodeAt(0));
+    assert.equal(out.bytes.length, COLLECTED_OUTPUT_MAX_BYTES);
+    assert.equal(out.bytes[0], "A".charCodeAt(0));
+    assert.equal(out.bytes.at(-2), "Z".charCodeAt(0));
+    assert.equal(out.bytes.at(-1), "\n".charCodeAt(0));
+    assert.equal(out.totalBytes, 2 * 1024 * 1024);
+    assert.equal(out.totalLines, 1024 * 1024);
   });
 
   it("returns buffered bytes and honors deadline", async () => {

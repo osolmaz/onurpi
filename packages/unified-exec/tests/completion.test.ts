@@ -69,6 +69,7 @@ function makeCoordinator(opts: { failSends?: number } = {}) {
       sent.push(m);
     },
     debounceMs: 5,
+    retryMs: 5,
     onSendError: (e) => errors.push(e),
   });
   return { coordinator, sent, errors };
@@ -335,18 +336,36 @@ describe("CompletionCoordinator", () => {
     assert.match(firstMessage(sent).content, /log_path: \/tmp\/pi-unified-exec-fake\.log/);
   });
 
-  it("a failed send is retried at the next flush trigger, still exactly once", async () => {
+  it("a failed send retries automatically while idle, still exactly once", async () => {
     const { coordinator, sent, errors } = makeCoordinator({ failSends: 1 });
     const s = new FakeSession(1);
     coordinator.register(s);
     s.exit(0);
     await settle();
-    assert.equal(sent.length, 0);
     assert.equal(errors.length, 1);
-    coordinator.flushPending(); // e.g. agent_settled
-    await settle();
     assert.equal(sent.length, 1);
     coordinator.flushPending();
+    assert.equal(sent.length, 1);
+  });
+
+  it("automatically retries a rejected asynchronous send", async () => {
+    const sent: WakeMessage[] = [];
+    let attempts = 0;
+    const coordinator = new CompletionCoordinator({
+      debounceMs: 5,
+      retryMs: 5,
+      send: (message) => {
+        attempts++;
+        if (attempts === 1) return Promise.reject(new Error("send failed"));
+        sent.push(message);
+        return Promise.resolve();
+      },
+    });
+    const session = new FakeSession(1);
+    coordinator.register(session);
+    session.exit(0);
+    await settle();
+    assert.equal(attempts, 2);
     assert.equal(sent.length, 1);
   });
 

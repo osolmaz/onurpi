@@ -1,4 +1,8 @@
-import { collectOutputUntilDeadline } from "./collect.ts";
+import {
+  type CollectedOutput,
+  collectedOutputFromBytes,
+  collectOutputUntilDeadline,
+} from "./collect.ts";
 import {
   DEFAULT_EXEC_YIELD_MS,
   EARLY_EXIT_GRACE_PERIOD_MS,
@@ -156,7 +160,7 @@ async function collectInitialWindow(
   command: RunningCommand,
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
-): Promise<Uint8Array> {
+): Promise<CollectedOutput> {
   const deadlineMs = command.startedAt + command.yieldTimeMs;
   const stream = startStreaming(command.session, onUpdate, deadlineMs, signal);
   const collected = await collectOutputUntilDeadline({
@@ -176,7 +180,7 @@ function finalizeRunning(
   runtime: ExtensionRuntime,
   command: RunningCommand,
   args: ExecCommandArgs,
-  collected: Uint8Array,
+  collected: CollectedOutput,
 ): FinalResponseDetails {
   const wantsWake = args.on_exit === "wake";
   if (wantsWake) runtime.coordinator.register(command.session);
@@ -242,7 +246,7 @@ export async function runExecCommand(
   if (session.failureMessage) {
     return finalizeResponse({
       wallTimeSec: 0,
-      collected: new Uint8Array(),
+      collected: collectedOutputFromBytes(new Uint8Array()),
       exitCode: -1,
       signal: null,
       failure: session.failureMessage,

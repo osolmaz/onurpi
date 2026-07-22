@@ -109,9 +109,13 @@ export function findOnPath(
 ): string | undefined {
   const pathVar = env["PATH"] ?? env["Path"] ?? "";
   const exts = opts.exts ?? (IS_WINDOWS ? WINDOWS_EXEC_EXTS : [""]);
+  const hasKnownExtension = exts.some(
+    (ext) => ext.length > 0 && bin.toLowerCase().endsWith(ext.toLowerCase()),
+  );
+  const candidateExts = hasKnownExtension ? [""] : exts;
   for (const dir of pathVar.split(delimiter)) {
     if (!dir) continue;
-    for (const ext of exts) {
+    for (const ext of candidateExts) {
       // resolve() (not join): a relative PATH entry must not yield a
       // cwd-dependent result that breaks when spawned from another cwd.
       const full = resolve(dir, bin + ext);
@@ -208,7 +212,7 @@ export function findWindowsBash(env: NodeJS.ProcessEnv): WindowsBash | undefined
  */
 export function probeWindowsDefaultShell(
   env: NodeJS.ProcessEnv,
-  exts: string[] = WINDOWS_EXEC_EXTS,
+  exts: string[] = WINDOWS_SHELL_EXTS,
 ): DefaultShell {
   const bash = findWindowsBash(env);
   if (bash) return { shell: bash.path, fellBack: false, bashSource: bash.source };

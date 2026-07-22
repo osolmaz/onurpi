@@ -14,6 +14,7 @@ export class HeadTailBuffer {
   private headBytesInternal = 0;
   private tailBytesInternal = 0;
   private omittedBytesInternal = 0;
+  private omittedNewlinesInternal = 0;
 
   /**
    * Create a new buffer that retains at most `maxBytes` of output.
@@ -40,6 +41,11 @@ export class HeadTailBuffer {
     return this.omittedBytesInternal;
   }
 
+  /** Newline bytes dropped with the omitted middle. */
+  get omittedNewlines(): number {
+    return this.omittedNewlinesInternal;
+  }
+
   /**
    * Append a chunk of bytes to the buffer.
    *
@@ -49,7 +55,7 @@ export class HeadTailBuffer {
    */
   pushChunk(chunk: Uint8Array): void {
     if (this.maxBytes === 0) {
-      this.omittedBytesInternal += chunk.length;
+      this.recordOmitted(chunk);
       return;
     }
     if (chunk.length === 0) return;
@@ -117,12 +123,13 @@ export class HeadTailBuffer {
     this.headBytesInternal = 0;
     this.tailBytesInternal = 0;
     this.omittedBytesInternal = 0;
+    this.omittedNewlinesInternal = 0;
     return out;
   }
 
   private pushToTail(chunk: Uint8Array): void {
     if (this.tailBudget === 0) {
-      this.omittedBytesInternal += chunk.length;
+      this.recordOmitted(chunk);
       return;
     }
 
@@ -131,8 +138,8 @@ export class HeadTailBuffer {
       // tailBudget bytes and drop everything else.
       const start = chunk.length - this.tailBudget;
       const kept = copyOf(chunk.subarray(start));
-      const dropped = chunk.length - kept.length;
-      this.omittedBytesInternal += this.tailBytesInternal + dropped;
+      for (const previous of this.tail) this.recordOmitted(previous);
+      this.recordOmitted(chunk.subarray(0, start));
       this.tail = [];
       this.tailBytesInternal = kept.length;
       this.tail.push(kept);
@@ -152,15 +159,22 @@ export class HeadTailBuffer {
       if (excess >= front.length) {
         excess -= front.length;
         this.tailBytesInternal -= front.length;
-        this.omittedBytesInternal += front.length;
+        this.recordOmitted(front);
         this.tail.shift();
       } else {
         // Drop `excess` bytes from the start of the front chunk.
         this.tail[0] = copyOf(front.subarray(excess));
         this.tailBytesInternal -= excess;
-        this.omittedBytesInternal += excess;
+        this.recordOmitted(front.subarray(0, excess));
         break;
       }
+    }
+  }
+
+  private recordOmitted(chunk: Uint8Array): void {
+    this.omittedBytesInternal += chunk.length;
+    for (const byte of chunk) {
+      if (byte === 0x0a) this.omittedNewlinesInternal++;
     }
   }
 }

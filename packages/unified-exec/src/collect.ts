@@ -29,6 +29,24 @@ const POST_EXIT_CLOSE_WAIT_MS = 50;
  */
 export const COLLECTED_OUTPUT_MAX_BYTES = DEFAULT_MAX_BYTES * 2;
 
+export interface CollectedOutput {
+  bytes: Uint8Array;
+  totalBytes: number;
+  totalLines: number;
+}
+
+export function collectedOutputFromBytes(bytes: Uint8Array): CollectedOutput {
+  let newlines = 0;
+  for (const byte of bytes) {
+    if (byte === 0x0a) newlines++;
+  }
+  return {
+    bytes,
+    totalBytes: bytes.length,
+    totalLines: newlines + (bytes.length > 0 && bytes.at(-1) !== 0x0a ? 1 : 0),
+  };
+}
+
 export interface CollectInputs {
   /** Buffer to drain. Chunks removed from it are returned to the caller. */
   buffer: HeadTailBuffer;
@@ -48,17 +66,21 @@ export interface CollectInputs {
 
 /**
  * Collect all currently-buffered bytes, then keep waiting for more until the
- * deadline or a break condition. Returns the concatenated byte payload.
+ * deadline or a break condition. Returns a bounded payload with full byte and
+ * line totals for response metadata.
  *
  * The buffer is drained non-destructively to the process output pipe — new
  * output arriving after we return stays in the buffer for the next collect().
  */
 // eslint-disable-next-line complexity -- Preserve audited upstream event-race cleanup in one routine.
-export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise<Uint8Array> {
+export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise<CollectedOutput> {
   const { buffer, outputNotify, outputClosed, exited, deadlineMs, externalAbort } = inputs;
   const postExitCloseWaitCap = inputs.postExitCloseWaitMs ?? POST_EXIT_CLOSE_WAIT_MS;
 
   const collected = new HeadTailBuffer(COLLECTED_OUTPUT_MAX_BYTES);
+  let totalBytes = 0;
+  let newlineBytes = 0;
+  let finalByte: number | undefined;
   let exitSignalReceived = exited.aborted;
   let postExitDeadline: number | undefined;
 
@@ -85,7 +107,10 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
     for (;;) {
       if (externalAbort?.aborted) break;
 
-      // 1) Drain whatever is currently buffered.
+      // 1) Drain whatever is currently buffered. Account for bytes the
+      // session buffer dropped from its middle before this drain as well.
+      totalBytes += buffer.omittedBytes;
+      newlineBytes += buffer.omittedNewlines;
       const drained = buffer.drainChunks();
 
       if (drained.length === 0) {
@@ -127,8 +152,15 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
         continue;
       }
 
-      // 2) Collected some bytes — keep them and loop.
-      for (const chunk of drained) collected.pushChunk(chunk);
+      // 2) Collected some bytes — keep a bounded payload and exact metadata.
+      for (const chunk of drained) {
+        totalBytes += chunk.length;
+        for (const byte of chunk) {
+          if (byte === 0x0a) newlineBytes++;
+        }
+        if (chunk.length > 0) finalByte = chunk.at(-1);
+        collected.pushChunk(chunk);
+      }
 
       if (exited.aborted) exitSignalReceived = true;
       if (Date.now() >= deadlineMs) break;
@@ -137,7 +169,11 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
     for (const cleanup of cleanups) cleanup();
   }
 
-  return collected.toBytes();
+  return {
+    bytes: collected.toBytes(),
+    totalBytes,
+    totalLines: newlineBytes + (totalBytes > 0 && finalByte !== 0x0a ? 1 : 0),
+  };
 }
 
 /**

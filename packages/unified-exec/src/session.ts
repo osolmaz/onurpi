@@ -205,6 +205,12 @@ export class ExecSession {
   }
 
   private appendStreamTail(chunk: Uint8Array): void {
+    if (chunk.length >= this.streamTailCap) {
+      this.streamTail =
+        this.streamTailCap === 0 ? [] : [chunk.subarray(chunk.length - this.streamTailCap)];
+      this.streamTailBytes = this.streamTailCap;
+      return;
+    }
     this.streamTail.push(chunk);
     this.streamTailBytes += chunk.length;
     while (this.streamTailBytes > this.streamTailCap && this.streamTail.length > 1) {

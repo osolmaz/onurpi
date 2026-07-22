@@ -531,7 +531,7 @@ From the repo root:
 
 ```bash
 npm install
-npx tsx --test tests/*.test.ts
+npm test --workspace=@onurpi/unified-exec
 ```
 
 Tests cover yield_until timestamp validation (strict RFC 3339 UTC subset, impossible-date rejection,
@@ -539,21 +539,12 @@ far-future acceptance, `tool_time_utc` on errors), event-driven long-wait behavi
 re-arm, multi-day timer chunking, cancellation, timer/listener cleanup, rate-limited streaming with
 no idle heartbeat), the CompletionCoordinator (exactly-once invariant, observation leases,
 `setOnExit` disarm/re-arm including tombstones, kill/eviction/shutdown suppression, batching,
-bounded sanitized wake content), wake + yield_until + `set_on_exit` + `wake_armed` listing
-integration through the real tools, plus the pre-existing coverage: HeadTailBuffer (direct port of
-codex's unit tests), Notify/Gate/sleep, collectOutputUntilDeadline (10 scenarios incl.
-abort-listener/timer cleanup), SessionStore LRU (10 scenarios), truncateTail (ported from pi, 13
-scenarios), unescapeChars (14 scenarios for `\xHH`/`\uHHHH`/`\u{…}`/unknown escapes/Windows path
-footguns), chars-encoding end-to-end (13 scenarios covering raw bytes, escape decoding, chars_b64
-binary-safety, and mutual-exclusion errors), signal-name mapping, full e2e pipes (35+ scenarios
-incl. log-file retention, byte/line truncation, spawn-failure diagnostics, EPIPE safety,
-exited-session reporting, shutdown SIGKILL escalation, onUpdate streaming, and the
-`/unified-exec-sessions` command), PTY mode (3 scenarios: simple command, Python REPL drive, Ctrl-C
-injection, cmd.exe verbatim payload), shell selection (per-shell argv construction, PATH lookup with
-synthetic PATH fixtures, Windows bash→powershell fallback both branches, WSL-stub exclusion, binary
-resolution caching), PTY loader guard (EXPECT_PTY assertion so a prebuild load failure is a red
-build, ConPTY disposal mock), and cmd.exe quoting e2e (operators, embedded quotes, %VAR%,
-parentheses, pipes).
+automatic send retries, and bounded sanitized wake content), wake + yield_until + `set_on_exit` +
+`wake_armed` listing integration through the real tools, plus HeadTailBuffer, Notify/Gate/sleep,
+collectOutputUntilDeadline (including bounded payloads with full metadata), SessionStore LRU,
+truncateTail, unescapeChars, raw byte input, signal-name mapping, pipe and PTY execution, log
+retention, spawn-failure diagnostics, EPIPE safety, shutdown escalation, streamed previews, Windows
+shell resolution and quoting, PTY loading, and the `/unified-exec-sessions` command.
 
 CI runs the suite on ubuntu, macos, and windows runners.
 

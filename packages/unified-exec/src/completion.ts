@@ -24,7 +24,7 @@ import { formatElapsedShort } from "./format-time.ts";
  *     keeps the completion wake-eligible.
  *   - Wake records are RESERVED (wakeQueued=true) before sending, so
  *     concurrent flush triggers can never double-send; a failed send un-reserves
- *     and is retried at the next flush trigger.
+ *     and schedules a delayed retry.
  *   - Kill paths suppress the wake BEFORE signaling the process; a failed kill
  *     restores the prior eligibility.
  */
@@ -84,6 +84,8 @@ export interface CompletionCoordinatorOptions {
   send: (message: WakeMessage) => void | Promise<void>;
   /** Debounce so naturally simultaneous completions batch into one prompt. */
   debounceMs?: number;
+  /** Delay before retrying a failed send. */
+  retryMs?: number;
   /** Whether delivery is currently safe. Active agent runs defer until settlement. */
   canSend?: () => boolean;
   /** Optional error sink for failed sends (ui.notify wrapper). */
@@ -95,6 +97,7 @@ export interface CompletionCoordinatorOptions {
 }
 
 const DEFAULT_DEBOUNCE_MS = 250;
+const DEFAULT_RETRY_MS = 1000;
 const MAX_COMMAND_CHARS = 160;
 const MAX_FAILURE_CHARS = 200;
 const MAX_SESSIONS_PER_WAKE = 16;
@@ -132,13 +135,15 @@ function oneLine(raw: string, max: number): string {
 
 export class CompletionCoordinator {
   private readonly records = new Map<number, CompletionRecord>();
-  private readonly opts: Required<Pick<CompletionCoordinatorOptions, "send" | "debounceMs">> &
+  private readonly opts: Required<
+    Pick<CompletionCoordinatorOptions, "send" | "debounceMs" | "retryMs">
+  > &
     CompletionCoordinatorOptions;
   private debounceHandle: unknown;
   private stopped = false;
 
   constructor(options: CompletionCoordinatorOptions) {
-    this.opts = { debounceMs: DEFAULT_DEBOUNCE_MS, ...options };
+    this.opts = { debounceMs: DEFAULT_DEBOUNCE_MS, retryMs: DEFAULT_RETRY_MS, ...options };
   }
 
   private now(): number {
@@ -400,13 +405,13 @@ export class CompletionCoordinator {
 
   // ---------------- Wake delivery ----------------
 
-  private scheduleFlush(): void {
+  private scheduleFlush(delayMs = this.opts.debounceMs): void {
     if (this.stopped) return;
     if (this.debounceHandle !== undefined) return;
     this.debounceHandle = this.setTimer(() => {
       this.debounceHandle = undefined;
       this.flushPending();
-    }, this.opts.debounceMs);
+    }, delayMs);
   }
 
   /**
@@ -470,15 +475,16 @@ export class CompletionCoordinator {
   }
 
   private recoverFailedSend(records: CompletionRecord[], err: unknown): void {
-    // Un-reserve so the wake is retried at the next flush trigger
-    // (new exit, tool_execution_end, agent_settled) — no self-rescheduling
-    // tight loop.
+    // Un-reserve and schedule a delayed retry. Relying only on a later tool
+    // or agent event can lose an idle completion permanently after a
+    // transient send failure.
     for (const r of records) r.wakeQueued = false;
     try {
       this.opts.onSendError?.(err);
     } catch {
       // ignore
     }
+    this.scheduleFlush(this.opts.retryMs);
   }
 }
 

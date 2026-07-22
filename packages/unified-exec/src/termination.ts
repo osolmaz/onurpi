@@ -1,6 +1,6 @@
 import { collectOutputUntilDeadline } from "./collect.ts";
 import { sleep } from "./notify.ts";
-import { decode } from "./response.ts";
+import { finalizeResponse, renderResponseOutput } from "./response.ts";
 import { removeSession } from "./session-ui.ts";
 import type { ExecSession } from "./session.ts";
 import { IS_WINDOWS } from "./shell.ts";
@@ -30,7 +30,16 @@ async function drain(session: ExecSession): Promise<string> {
     exited: session.exited,
     deadlineMs: Date.now() + 100,
   });
-  return decode(collected);
+  return renderResponseOutput(
+    finalizeResponse({
+      wallTimeSec: 0,
+      collected,
+      signal: session.signal,
+      failure: session.failureMessage,
+      tty: session.tty,
+      logPath: session.logPath,
+    }),
+  );
 }
 
 export async function terminateSessionById(
