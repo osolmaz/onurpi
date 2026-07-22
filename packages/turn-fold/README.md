@@ -48,6 +48,17 @@ The package is private and is not published yet.
 `Ctrl+Shift+O` switches between compact and expanded rendering without adding a shortcut hint to
 summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
+## Planned transcript windows
+
+Long sessions can make Pi redraw too much transcript content while the user types. The approved next
+step is to load three compaction windows into the main transcript by default and make Turn Fold's
+component decisions constant-time. `/turn-fold windows <value>` will accept an exact count, a
+relative change such as `+2` or `-1`, `all`, or `reset`, then rebuild the main transcript immediately.
+The selected range will begin with the user message that led into its oldest compaction window. Pi's stored messages and model context will remain unchanged.
+
+The command is not implemented yet. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design
+and implementation order.
+
 Mode changes are stored as custom session entries, so each session restores its latest supported
 choice. Automatic compaction associations live only in process memory and survive `/reload` without
 writing to Pi's session. They use exact compaction and active-turn entry IDs and are limited to the

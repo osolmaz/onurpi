@@ -141,6 +141,13 @@ The extension provides these commands:
 
 Turn Fold patches Pi's exported `AssistantMessageComponent`, `ToolExecutionComponent`, and `CompactionSummaryMessageComponent` because Pi 0.80.10 does not expose a whole-turn transcript renderer. Each supported Pi release requires component-level integration testing.
 
+## Planned transcript-window work
+
+[TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records the approved design for bounded, user-anchored
+compaction windows in the main transcript and constant-time component decisions. That design remains
+non-normative until its implementation and acceptance tests land. The behavior specified above
+continues to define the current package.
+
 ## Acceptance tests
 
 A release is conforming only when automated or PTY tests verify all of the following:
