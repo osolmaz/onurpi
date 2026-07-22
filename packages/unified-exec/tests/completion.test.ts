@@ -77,6 +77,11 @@ function makeCoordinator(opts: { failSends?: number } = {}) {
 
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
+async function settleUntil(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) await settle(10);
+}
+
 describe("CompletionCoordinator", () => {
   it("unregistered sessions (on_exit omitted/none) never wake", async () => {
     const { coordinator, sent } = makeCoordinator();
@@ -341,7 +346,7 @@ describe("CompletionCoordinator", () => {
     const s = new FakeSession(1);
     coordinator.register(s);
     s.exit(0);
-    await settle();
+    await settleUntil(() => sent.length === 1);
     assert.equal(errors.length, 1);
     assert.equal(sent.length, 1);
     coordinator.flushPending();
@@ -364,7 +369,7 @@ describe("CompletionCoordinator", () => {
     const session = new FakeSession(1);
     coordinator.register(session);
     session.exit(0);
-    await settle();
+    await settleUntil(() => sent.length === 1);
     assert.equal(attempts, 2);
     assert.equal(sent.length, 1);
   });
