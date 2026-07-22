@@ -2,7 +2,7 @@
   "name": "@onurpi/live-stats",
   "version": "0.1.0",
   "private": true,
-  "description": "Transition spinner and Turkish working messages with live response metrics for Pi",
+  "description": "Weather spinner and Turkish working messages with live response metrics for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

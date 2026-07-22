@@ -2,10 +2,10 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 import {
   countOutputContentChars,
-  formatStyledTransitionSpinnerFrames,
+  formatStyledWeatherSpinnerFrames,
   formatStyledWorkingMessage,
   LiveStatsTracker,
-  TRANSITION_SPINNER_INTERVAL_MS,
+  WEATHER_SPINNER_INTERVAL_MS,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
 import { WorkingPhraseState } from "./working-phrases.ts";
@@ -52,8 +52,8 @@ export default function liveStats(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
     ctx.ui.setWorkingIndicator({
-      frames: formatStyledTransitionSpinnerFrames(workingMessageStyles(ctx)),
-      intervalMs: TRANSITION_SPINNER_INTERVAL_MS,
+      frames: formatStyledWeatherSpinnerFrames(workingMessageStyles(ctx)),
+      intervalMs: WEATHER_SPINNER_INTERVAL_MS,
     });
   });
 

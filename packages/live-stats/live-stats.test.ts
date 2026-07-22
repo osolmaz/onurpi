@@ -1,16 +1,16 @@
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
   countOutputContentChars,
   formatElapsed,
-  formatStyledTransitionSpinnerFrames,
+  formatStyledWeatherSpinnerFrames,
   formatStyledWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
-  getTransitionSpinnerCharacters,
-  getTransitionSpinnerFrames,
+  getWeatherSpinnerFrames,
   LiveStatsTracker,
-  TRANSITION_SPINNER_INTERVAL_MS,
+  WEATHER_SPINNER_INTERVAL_MS,
 } from "./live-stats.ts";
 import {
   pickWorkingPhrase,
@@ -235,51 +235,47 @@ describe("formatTokenCount", () => {
   });
 });
 
-describe("transition spinner", () => {
-  it("matches Claude Code's platform-specific character sequences", () => {
-    expect(getTransitionSpinnerCharacters(undefined, "linux")).toEqual([
-      "·",
-      "✢",
-      "*",
-      "✶",
-      "✻",
-      "✽",
-    ]);
-    expect(getTransitionSpinnerCharacters(undefined, "darwin")).toEqual([
-      "·",
-      "✢",
-      "✳",
-      "✶",
-      "✻",
-      "✽",
-    ]);
-    expect(getTransitionSpinnerCharacters("xterm-ghostty", "darwin")).toEqual([
-      "·",
-      "✢",
-      "✳",
-      "✶",
-      "✻",
-      "*",
+describe("weather spinner", () => {
+  it("matches the cli-spinners weather variant at its 100 ms interval", () => {
+    expect(WEATHER_SPINNER_INTERVAL_MS).toBe(100);
+    expect(getWeatherSpinnerFrames()).toEqual([
+      "☀️ ",
+      "☀️ ",
+      "☀️ ",
+      "🌤️ ",
+      "⛅️ ",
+      "🌥️ ",
+      "☁️ ",
+      "🌧️ ",
+      "🌨️ ",
+      "🌧️ ",
+      "🌨️ ",
+      "🌧️ ",
+      "🌨️ ",
+      "⛈️ ",
+      "🌨️ ",
+      "🌧️ ",
+      "🌨️ ",
+      "☁️ ",
+      "🌥️ ",
+      "⛅️ ",
+      "🌤️ ",
+      "☀️ ",
+      "☀️ ",
     ]);
   });
 
-  it("moves forward and backward at Claude Code's 120 ms interval", () => {
-    expect(TRANSITION_SPINNER_INTERVAL_MS).toBe(120);
-    expect(getTransitionSpinnerFrames(undefined, "linux")).toEqual([
-      "·",
-      "✢",
-      "*",
-      "✶",
-      "✻",
-      "✽",
-      "✽",
-      "✻",
-      "✶",
-      "*",
-      "✢",
-      "·",
-    ]);
-    expect(getTransitionSpinnerFrames()).toHaveLength(12);
+  it("keeps every frame at the same terminal width", () => {
+    const widths = getWeatherSpinnerFrames().map((frame) => visibleWidth(frame));
+
+    expect(new Set(widths)).toEqual(new Set([3]));
+  });
+
+  it("returns a fresh frame array", () => {
+    const frames = getWeatherSpinnerFrames();
+    frames.pop();
+
+    expect(getWeatherSpinnerFrames()).toHaveLength(23);
   });
 
   it("renders every frame in bold warning color", () => {
@@ -288,10 +284,8 @@ describe("transition spinner", () => {
       warning: (text: string) => `<warning>${text}</warning>`,
     };
 
-    expect(formatStyledTransitionSpinnerFrames(styles, undefined, "linux")).toEqual(
-      getTransitionSpinnerFrames(undefined, "linux").map(
-        (frame) => `<b><warning>${frame}</warning></b>`,
-      ),
+    expect(formatStyledWeatherSpinnerFrames(styles)).toEqual(
+      getWeatherSpinnerFrames().map((frame) => `<b><warning>${frame}</warning></b>`),
     );
   });
 });

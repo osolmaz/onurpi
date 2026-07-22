@@ -1,10 +1,32 @@
 const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
-export const TRANSITION_SPINNER_INTERVAL_MS = 120;
+export const WEATHER_SPINNER_INTERVAL_MS = 100;
 
-const DEFAULT_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "*", "✶", "✻", "✽"] as const;
-const DARWIN_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "✳", "✶", "✻", "✽"] as const;
-const GHOSTTY_TRANSITION_SPINNER_CHARACTERS = ["·", "✢", "✳", "✶", "✻", "*"] as const;
+const WEATHER_SPINNER_FRAMES = [
+  "☀️ ",
+  "☀️ ",
+  "☀️ ",
+  "🌤️ ",
+  "⛅️ ",
+  "🌥️ ",
+  "☁️ ",
+  "🌧️ ",
+  "🌨️ ",
+  "🌧️ ",
+  "🌨️ ",
+  "🌧️ ",
+  "🌨️ ",
+  "⛈️ ",
+  "🌨️ ",
+  "🌧️ ",
+  "🌨️ ",
+  "☁️ ",
+  "🌥️ ",
+  "⛅️ ",
+  "🌤️ ",
+  "☀️ ",
+  "☀️ ",
+] as const;
 
 type TokenSample = {
   atMs: number;
@@ -23,32 +45,12 @@ export type WorkingMessageStyles = {
   warning: (text: string) => string;
 };
 
-export function getTransitionSpinnerCharacters(
-  term: string | undefined = process.env["TERM"],
-  platform: NodeJS.Platform = process.platform,
-): readonly string[] {
-  if (term === "xterm-ghostty") return GHOSTTY_TRANSITION_SPINNER_CHARACTERS;
-  return platform === "darwin"
-    ? DARWIN_TRANSITION_SPINNER_CHARACTERS
-    : DEFAULT_TRANSITION_SPINNER_CHARACTERS;
+export function getWeatherSpinnerFrames(): string[] {
+  return [...WEATHER_SPINNER_FRAMES];
 }
 
-export function getTransitionSpinnerFrames(
-  term: string | undefined = process.env["TERM"],
-  platform: NodeJS.Platform = process.platform,
-): string[] {
-  const characters = getTransitionSpinnerCharacters(term, platform);
-  return [...characters, ...[...characters].reverse()];
-}
-
-export function formatStyledTransitionSpinnerFrames(
-  styles: WorkingMessageStyles,
-  term: string | undefined = process.env["TERM"],
-  platform: NodeJS.Platform = process.platform,
-): string[] {
-  return getTransitionSpinnerFrames(term, platform).map((frame) =>
-    styles.bold(styles.warning(frame)),
-  );
+export function formatStyledWeatherSpinnerFrames(styles: WorkingMessageStyles): string[] {
+  return getWeatherSpinnerFrames().map((frame) => styles.bold(styles.warning(frame)));
 }
 
 type OutputContent =
