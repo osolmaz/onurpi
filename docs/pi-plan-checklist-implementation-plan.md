@@ -147,16 +147,17 @@ No new runtime dependency is needed.
 
 ### Baseline and package scaffold
 
-- [ ] Fetch `origin` and rebase the feature branch onto the latest `origin/main` before changing
+- [x] Fetch `origin` and rebase the feature branch onto the latest `origin/main` before changing
       implementation files.
-- [ ] Confirm the installed Pi version and compare it with the workspace development dependency.
-      Update the workspace's Pi packages if the latest main branch is still pinned below 0.81.1.
-- [ ] Add `packages/plan-checklist/package.json` with the strict TypeScript and test setup used by
+- [x] Confirm the installed Pi version and compare it with the workspace development dependency.
+      Keep the existing 0.80.10 development floor because every required public API is present, then
+      smoke-test against the installed Pi 0.81.1.
+- [x] Add `packages/plan-checklist/package.json` with the strict TypeScript and test setup used by
       the other OnurPi packages. Include coverage and Slophammer. Keep mutation scripts optional.
-- [ ] Add the package-local `AGENTS.md` and the standard quality configuration files.
-- [ ] Register `./packages/plan-checklist/index.ts` in the root Pi manifest.
-- [ ] Add the package's pure source files to root coverage collection.
-- [ ] Add package checks to `.github/workflows/ci.yml`. Keep mutation checks limited to manual
+- [x] Add the package-local `AGENTS.md` and the standard quality configuration files.
+- [x] Register `./packages/plan-checklist/index.ts` in the root Pi manifest.
+- [x] Add the package's pure source files to root coverage collection.
+- [x] Add package checks to `.github/workflows/ci.yml`. Keep mutation checks limited to manual
       `workflow_dispatch` runs.
 
 The first slice is complete when an empty extension loads through Pi and all package and workspace
@@ -164,31 +165,31 @@ quality commands discover the new package.
 
 ### Schema and normalization
 
-- [ ] Define `PlanStatus` and `PlanStep` in `plan-schema.ts`, along with `UpdatePlanInput` and
+- [x] Define `PlanStatus` and `PlanStep` in `plan-schema.ts`, along with `UpdatePlanInput` and
       `PlanSnapshot`.
-- [ ] Build the tool schema with `Type.Object` and `Type.Array`, applying length bounds and
+- [x] Build the tool schema with `Type.Object` and `Type.Array`, applying length bounds and
       `StringEnum` where appropriate.
-- [ ] Set `additionalProperties: false` on the request and step objects.
-- [ ] Implement one normalization function for live tool input. It trims text, omits a blank
+- [x] Set `additionalProperties: false` on the request and step objects.
+- [x] Implement one normalization function for live tool input. It trims text, omits a blank
       explanation, copies every array and object, and rejects more than one active step.
-- [ ] Implement a separate strict decoder for persisted `details: unknown`. It must return a new
+- [x] Implement a separate strict decoder for persisted `details: unknown`. It must return a new
       immutable snapshot or `undefined` and must never use an unchecked cast.
-- [ ] Add equality and completed-count helpers over normalized snapshots.
+- [x] Add equality and completed-count helpers over normalized snapshots.
 
 Tests will cover each boundary value, unknown keys, every status, blank text, empty plans, duplicate
 steps, maximum lengths, maximum item count, and multiple active items.
 
 ### Branch replay and state cache
 
-- [ ] Implement `replayPlanSnapshot(entries)` in `plan-replay.ts`.
-- [ ] Walk the active branch in order and accept only successful `toolResult` messages whose
+- [x] Implement `replayPlanSnapshot(entries)` in `plan-replay.ts`.
+- [x] Walk the active branch in order and accept only successful `toolResult` messages whose
       `toolName` is `update_plan` and whose details pass the strict decoder.
-- [ ] Let each accepted result replace the previous snapshot. An accepted empty plan clears state.
-- [ ] Keep a small state controller in `plan-state.ts` with the current immutable snapshot and a
+- [x] Let each accepted result replace the previous snapshot. An accepted empty plan clears state.
+- [x] Keep a small state controller in `plan-state.ts` with the current immutable snapshot and a
       monotonically increasing in-memory revision.
-- [ ] Rebuild the state controller from `ctx.sessionManager.getBranch()` on the
+- [x] Rebuild the state controller from `ctx.sessionManager.getBranch()` on the
       `session_start`/`session_tree`/`session_compact` hooks.
-- [ ] Clear the controller and widget during `session_shutdown`.
+- [x] Clear the controller and widget during `session_shutdown`.
 
 Replay must preserve Pi's branch semantics. Navigating to a point before an update restores the
 older snapshot or no snapshot. Returning to a later branch restores that branch's last valid update.
@@ -200,17 +201,17 @@ scan session history.
 
 ### Tool registration
 
-- [ ] Register `update_plan` with label `Update Plan` and `executionMode: "sequential"`.
-- [ ] Describe full-snapshot replacement in the tool description.
-- [ ] Add a short `promptSnippet` so the tool appears in Pi's available-tools section.
-- [ ] Add guidelines that name `update_plan` explicitly. They should tell the model to use it for
+- [x] Register `update_plan` with label `Update Plan` and `executionMode: "sequential"`.
+- [x] Describe full-snapshot replacement in the tool description.
+- [x] Add a short `promptSnippet` so the tool appears in Pi's available-tools section.
+- [x] Add guidelines that name `update_plan` explicitly. They should tell the model to use it for
       meaningful multi-step work, avoid one-step plans, keep one active step, publish complete
       snapshots, and update the checklist after verified progress.
-- [ ] Normalize and validate parameters before changing the state cache.
-- [ ] Return `Plan updated` with `details: { plan }` after a successful call.
-- [ ] Throw on semantic validation failure so Pi persists an error result with `isError: true` and
+- [x] Normalize and validate parameters before changing the state cache.
+- [x] Return `Plan updated` with `details: { plan }` after a successful call.
+- [x] Throw on semantic validation failure so Pi persists an error result with `isError: true` and
       leaves the previous snapshot unchanged.
-- [ ] Refresh the widget immediately after a successful call.
+- [x] Refresh the widget immediately after a successful call.
 
 Sequential execution ensures sibling `update_plan` calls from one assistant message apply in source
 order. The tool will not infer progress from shell commands, file changes, test output, or assistant
@@ -218,16 +219,16 @@ prose.
 
 ### Context continuity
 
-- [ ] Implement a pure detector that finds successful `update_plan` call/result pairs in a copied
+- [x] Implement a pure detector that finds successful `update_plan` call/result pairs in a copied
       model-context message array.
-- [ ] Compare the latest visible successful plan with the branch-replayed snapshot.
-- [ ] Return the context unchanged when the current snapshot is already represented.
-- [ ] When a non-empty current snapshot has fallen out of compacted context, append one transient
+- [x] Compare the latest visible successful plan with the branch-replayed snapshot.
+- [x] Return the context unchanged when the current snapshot is already represented.
+- [x] When a non-empty current snapshot has fallen out of compacted context, append one transient
       hidden `CustomMessage` that lists the current steps and asks the model to keep `update_plan`
       current.
-- [ ] Reuse a stable timestamp stored in the in-memory state so repeated provider requests produce
+- [x] Reuse a stable timestamp stored in the in-memory state so repeated provider requests produce
       stable bridge content.
-- [ ] Return no bridge for an empty plan.
+- [x] Return no bridge for an empty plan.
 
 The detector must not treat a valid-looking assistant call followed by an error result as current
 state. The bridge message will be created only in the `context` event's deep-copied array and will
@@ -238,17 +239,17 @@ update, a failed update, an empty plan, and repeated calls with unchanged state.
 
 ### Transcript rendering
 
-- [ ] Implement custom `renderCall` and `renderResult` functions with Pi's default tool shell.
-- [ ] Render the title `Updated Plan` and trim blank explanations from `context.args`.
-- [ ] Use the Codex markers and styles. Pending steps use dim `□`. Active steps use bold accent `□`.
+- [x] Implement custom `renderCall` and `renderResult` functions with Pi's default tool shell.
+- [x] Render the title `Updated Plan` and trim blank explanations from `context.args`.
+- [x] Use the Codex markers and styles. Pending steps use dim `□`. Active steps use bold accent `□`.
       Completed steps use dim crossed-out `✔`.
-- [ ] Show the complete bounded snapshot when tool output is expanded.
-- [ ] Keep collapsed output compact by showing completed/total progress, the active step, and a
+- [x] Show the complete bounded snapshot when tool output is expanded.
+- [x] Keep collapsed output compact by showing completed/total progress, the active step, and a
       count of hidden steps.
-- [ ] Use ANSI-aware wrapping and truncation. Every rendered line must fit the width supplied by Pi.
-- [ ] Reuse `context.lastComponent` or cache by width and snapshot revision where this reduces work.
-- [ ] Rebuild themed strings from the callback theme after `invalidate()`.
-- [ ] Fall back to Pi's raw tool content if stored details are absent or malformed.
+- [x] Use ANSI-aware wrapping and truncation. Every rendered line must fit the width supplied by Pi.
+- [x] Reuse `context.lastComponent` or cache by width and snapshot revision where this reduces work.
+- [x] Rebuild themed strings from the callback theme after `invalidate()`.
+- [x] Fall back to Pi's raw tool content if stored details are absent or malformed.
 
 Rendering tests will check widths from narrow terminals through normal layouts, all statuses,
 Unicode text, long explanations, long steps, empty plans, expanded and collapsed modes, malformed
@@ -256,15 +257,15 @@ legacy rows, and theme invalidation.
 
 ### Current-plan widget
 
-- [ ] Install an `aboveEditor` widget only when `ctx.mode === "tui"` and the current plan is
+- [x] Install an `aboveEditor` widget only when `ctx.mode === "tui"` and the current plan is
       non-empty.
-- [ ] Derive the widget from the same immutable state used by replay and tool rendering.
-- [ ] Show `Plan <completed>/<total>` followed by a bounded selection of steps.
-- [ ] Prefer the active step, nearby pending work, and the most recently completed step when more
+- [x] Derive the widget from the same immutable state used by replay and tool rendering.
+- [x] Show `Plan <completed>/<total>` followed by a bounded selection of steps.
+- [x] Prefer the active step, nearby pending work, and the most recently completed step when more
       items exist than fit the widget budget.
-- [ ] End a truncated widget with `+N more`.
-- [ ] Cache rendered lines by width, theme invalidation, and state revision.
-- [ ] Clear the widget when the plan is empty, the active branch has no plan, or the session shuts
+- [x] End a truncated widget with `+N more`.
+- [x] Cache rendered lines by width, theme invalidation, and state revision.
+- [x] Clear the widget when the plan is empty, the active branch has no plan, or the session shuts
       down.
 
 The widget will not set a footer status, terminal title, custom editor, timer, or overlay. It
@@ -272,14 +273,14 @@ remains independent from Nyan Mode and other OnurPi UI extensions.
 
 ### Repository integration and documentation
 
-- [ ] Add `@onurpi/plan-checklist` to the root README package list.
-- [ ] Write the package README with behavior and schema details. Cover lifecycle, persistence, the
+- [x] Add `@onurpi/plan-checklist` to the root README package list.
+- [x] Write the package README with behavior and schema details. Cover lifecycle, persistence, the
       validation differences from Codex, installation steps, and public-API boundaries.
-- [ ] Link the Codex behavior specification from the package README.
-- [ ] Update `package-lock.json` through `npm install` or `npm ci` as appropriate.
-- [ ] Run `npm run settings:sync` if tracked settings must be regenerated. Do not edit tracked
+- [x] Link the Codex behavior specification from the package README.
+- [x] Update `package-lock.json` through `npm install` or `npm ci` as appropriate.
+- [x] Run `npm run settings:sync` if tracked settings must be regenerated. Do not edit tracked
       `settings.json` by hand.
-- [ ] Confirm the settings normalizer derives the new canonical package path from the root manifest.
+- [x] Confirm the settings normalizer derives the new canonical package path from the root manifest.
 
 The package README must state that plan completion is model-authored and does not prove that tests
 or other checks passed.
@@ -307,18 +308,18 @@ Mutation scripts remain available but will not run during normal completion or C
 
 ### Extension smoke tests
 
-- [ ] Load the worktree package with `pi -e ./packages/plan-checklist/index.ts` and confirm that Pi
+- [x] Load the worktree package with `pi -e ./packages/plan-checklist/index.ts` and confirm that Pi
       reports no extension error.
-- [ ] Use RPC or an extension harness to confirm that `update_plan` is registered and active across
+- [x] Use RPC or an extension harness to confirm that `update_plan` is registered and active across
       TUI/RPC/JSON/print modes and `--no-session` configurations.
-- [ ] Execute a valid snapshot and verify the exact tool result, durable details, transcript
+- [x] Execute a valid snapshot and verify the exact tool result, durable details, transcript
       rendering, and widget update.
-- [ ] Execute an invalid multiple-active snapshot and verify `isError: true` with no state change.
-- [ ] Execute an empty snapshot and verify that state and the widget clear.
-- [ ] Reload the extension and verify that the current plan is reconstructed.
-- [ ] Navigate between synthetic or temporary session branches and verify branch-specific state.
-- [ ] Compact a temporary session and verify both branch replay and the transient context bridge.
-- [ ] Confirm that no custom session entries, custom message entries, settings files, or sidecar
+- [x] Execute an invalid multiple-active snapshot and verify `isError: true` with no state change.
+- [x] Execute an empty snapshot and verify that state and the widget clear.
+- [x] Reload the extension and verify that the current plan is reconstructed.
+- [x] Navigate between synthetic or temporary session branches and verify branch-specific state.
+- [x] Compact a temporary session and verify both branch replay and the transient context bridge.
+- [x] Confirm that no custom session entries, custom message entries, settings files, or sidecar
       files were created.
 
 Use disposable sessions for smoke tests. Do not expose existing session contents or credentials in
@@ -326,12 +327,12 @@ test logs.
 
 ### Performance checks
 
-- [ ] Benchmark replay on a synthetic long branch. It may be linear in branch entries but must run
+- [x] Benchmark replay on a synthetic long branch. It may be linear in branch entries but must run
       only on lifecycle changes.
-- [ ] Benchmark repeated widget and transcript renders with the maximum 64-step plan.
-- [ ] Confirm steady-state rendering does not scan the session branch or sort the full plan on each
+- [x] Benchmark repeated widget and transcript renders with the maximum 64-step plan.
+- [x] Confirm steady-state rendering does not scan the session branch or sort the full plan on each
       keypress.
-- [ ] Confirm every component caches by width and invalidates correctly after state or theme
+- [x] Confirm every component caches by width and invalidates correctly after state or theme
       changes.
 
 ## Acceptance criteria
