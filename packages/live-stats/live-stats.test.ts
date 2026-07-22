@@ -236,7 +236,7 @@ describe("formatTokenCount", () => {
 });
 
 describe("emoji spinners", () => {
-  it("includes the curated single-emoji cli-spinners variants", () => {
+  it("includes the curated single-emoji variants", () => {
     expect(getEmojiSpinnerVariants().map(({ name, intervalMs }) => ({ name, intervalMs }))).toEqual(
       [
         { name: "weather", intervalMs: 100 },
@@ -247,6 +247,8 @@ describe("emoji spinners", () => {
         { name: "runner", intervalMs: 140 },
         { name: "fingerDance", intervalMs: 160 },
         { name: "speaker", intervalMs: 160 },
+        { name: "manLifecycle", intervalMs: 220 },
+        { name: "womanLifecycle", intervalMs: 220 },
       ],
     );
   });
@@ -291,9 +293,37 @@ describe("emoji spinners", () => {
     ]);
   });
 
+  it("animates birth, aging, death, and reincarnation", () => {
+    const variants = getEmojiSpinnerVariants();
+
+    expect(variants.find(({ name }) => name === "manLifecycle")?.frames).toEqual([
+      "🤰",
+      "👶",
+      "👦",
+      "🧑",
+      "👨",
+      "🥸",
+      "👴",
+      "🪦",
+      "👻",
+      "✨",
+    ]);
+    expect(variants.find(({ name }) => name === "womanLifecycle")?.frames).toEqual([
+      "🤰",
+      "👶",
+      "👧",
+      "🧑",
+      "👩",
+      "👵",
+      "🪦",
+      "👻",
+      "✨",
+    ]);
+  });
+
   it("picks across the collection and falls back safely", () => {
     expect(pickEmojiSpinnerVariant(() => 0).name).toBe("weather");
-    expect(pickEmojiSpinnerVariant(() => 0.999_999).name).toBe("speaker");
+    expect(pickEmojiSpinnerVariant(() => 0.999_999).name).toBe("womanLifecycle");
     expect(pickEmojiSpinnerVariant(() => 1).name).toBe("weather");
   });
 

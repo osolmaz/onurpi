@@ -71,6 +71,16 @@ const EMOJI_SPINNER_VARIANTS = [
     intervalMs: 160,
     frames: ["🔈", "🔉", "🔊", "🔉"],
   },
+  {
+    name: "manLifecycle",
+    intervalMs: 220,
+    frames: ["🤰", "👶", "👦", "🧑", "👨", "🥸", "👴", "🪦", "👻", "✨"],
+  },
+  {
+    name: "womanLifecycle",
+    intervalMs: 220,
+    frames: ["🤰", "👶", "👧", "🧑", "👩", "👵", "🪦", "👻", "✨"],
+  },
 ] as const satisfies readonly EmojiSpinnerVariant[];
 
 type TokenSample = {
