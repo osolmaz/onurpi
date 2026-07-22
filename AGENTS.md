@@ -21,4 +21,4 @@
 - Keep mutation-testing scripts available, but do not run mutation tests as part of normal checks,
   CI, review, or task completion. Run them only when a user explicitly requests them or when
   manually investigating test-suite strength.
-- Slophammer guidance: https://github.com/dutifuldev/slophammer/blob/main/docs/AGENT_ENTRYPOINT.md
+- Slophammer guidance: https://github.com/osolmaz/slophammer/blob/main/docs/AGENT_ENTRYPOINT.md
