@@ -164,6 +164,7 @@ async function applyWindowArgument(
   configuration: TurnFoldConfiguration,
   applyConfiguration: ApplyConfiguration,
 ): Promise<void> {
+  await ctx.waitForIdle();
   const branch = ctx.sessionManager.getBranch();
   const resolved = resolveWindowArgument(
     argument,
@@ -182,6 +183,7 @@ async function applyWindowArgument(
     return;
   }
   if (resolved.value === "all" && !(await confirmAllWindows(ctx, branch))) return;
+  await ctx.waitForIdle();
   applyConfiguration({ ...configuration, windows: resolved.value }, true);
   await ctx.reload();
 }

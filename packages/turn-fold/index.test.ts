@@ -58,6 +58,7 @@ function context(
       select: vi.fn(() => Promise.resolve(undefined)),
       theme: undefined,
     },
+    waitForIdle: vi.fn(() => Promise.resolve()),
   };
 }
 
@@ -226,6 +227,7 @@ describe("Turn Fold window commands", () => {
       mode: "compact",
       windows: 5,
     });
+    expect(ctx.waitForIdle).toHaveBeenCalledTimes(2);
     expect(ctx.reload).toHaveBeenCalledOnce();
   });
 

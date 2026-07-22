@@ -16,7 +16,7 @@ One command handles exact limits, relative changes, full history, and reset:
 /turn-fold windows reset  return to the default of 3
 ```
 
-Every successful change persists the complete Turn Fold configuration and reloads the main transcript. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
+After Pi becomes idle, every successful change persists the complete Turn Fold configuration before reloading the main transcript. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
 
 `all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports both the display mode and window value.
 

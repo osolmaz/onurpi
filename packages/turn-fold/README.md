@@ -56,7 +56,7 @@ summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 ## Transcript windows
 
 Turn Fold loads three compaction windows into the main transcript by default. Changing the window
-value rebuilds that transcript immediately. The selected range begins with the user message that led
+value waits for Pi to become idle, then rebuilds that transcript. The selected range begins with the user message that led
 into its oldest compaction window and continues through the active leaf. `all` warns before replaying
 the full branch because a large transcript can slow editor input.
 
