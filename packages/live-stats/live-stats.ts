@@ -2,6 +2,7 @@ const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
 export type EmojiSpinnerVariant = {
   name: string;
+  label: string;
   intervalMs: number;
   frames: readonly string[];
 };
@@ -9,6 +10,7 @@ export type EmojiSpinnerVariant = {
 const EMOJI_SPINNER_VARIANTS = [
   {
     name: "weather",
+    label: "Weather",
     intervalMs: 100,
     frames: [
       "☀️",
@@ -38,46 +40,55 @@ const EMOJI_SPINNER_VARIANTS = [
   },
   {
     name: "moon",
+    label: "Moon phases",
     intervalMs: 80,
     frames: ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"],
   },
   {
     name: "clock",
+    label: "Clock",
     intervalMs: 100,
     frames: ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"],
   },
   {
     name: "earth",
+    label: "Rotating Earth",
     intervalMs: 180,
     frames: ["🌍", "🌎", "🌏"],
   },
   {
     name: "monkey",
+    label: "Monkeys",
     intervalMs: 300,
     frames: ["🙈", "🙈", "🙉", "🙊"],
   },
   {
     name: "runner",
+    label: "Runner",
     intervalMs: 140,
     frames: ["🚶", "🏃"],
   },
   {
-    name: "fingerDance",
+    name: "finger-dance",
+    label: "Finger dance",
     intervalMs: 160,
     frames: ["🤘", "🤟", "🖖", "✋", "🤚", "👆"],
   },
   {
     name: "speaker",
+    label: "Speaker volume",
     intervalMs: 160,
     frames: ["🔈", "🔉", "🔊", "🔉"],
   },
   {
-    name: "manLifecycle",
+    name: "man-lifecycle",
+    label: "Man lifecycle",
     intervalMs: 220,
     frames: ["🤰", "👶", "👦", "🧑", "👨", "🥸", "👴", "🪦", "👻", "✨"],
   },
   {
-    name: "womanLifecycle",
+    name: "woman-lifecycle",
+    label: "Woman lifecycle",
     intervalMs: 220,
     frames: ["🤰", "👶", "👧", "🧑", "👩", "👵", "🪦", "👻", "✨"],
   },
@@ -100,12 +111,25 @@ export type WorkingMessageStyles = {
   warning: (text: string) => string;
 };
 
-export function getEmojiSpinnerVariants(): EmojiSpinnerVariant[] {
-  return EMOJI_SPINNER_VARIANTS.map((variant) => ({
+function cloneEmojiSpinnerVariant(variant: EmojiSpinnerVariant): EmojiSpinnerVariant {
+  return {
     name: variant.name,
+    label: variant.label,
     intervalMs: variant.intervalMs,
     frames: [...variant.frames],
-  }));
+  };
+}
+
+export function getEmojiSpinnerVariants(): EmojiSpinnerVariant[] {
+  return EMOJI_SPINNER_VARIANTS.map(cloneEmojiSpinnerVariant);
+}
+
+export function findEmojiSpinnerVariant(name: string): EmojiSpinnerVariant | undefined {
+  const normalizedName = name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+  return getEmojiSpinnerVariants().find((variant) => variant.name === normalizedName);
 }
 
 export function pickEmojiSpinnerVariant(random: () => number = Math.random): EmojiSpinnerVariant {
@@ -113,6 +137,29 @@ export function pickEmojiSpinnerVariant(random: () => number = Math.random): Emo
   const fallback = variants[0];
   if (fallback === undefined) throw new Error("missing emoji spinner variants");
   return variants[Math.floor(random() * variants.length)] ?? fallback;
+}
+
+export class EmojiSpinnerState {
+  private selected: EmojiSpinnerVariant;
+
+  public constructor(random: () => number = Math.random) {
+    this.selected = pickEmojiSpinnerVariant(random);
+  }
+
+  public get current(): EmojiSpinnerVariant {
+    return cloneEmojiSpinnerVariant(this.selected);
+  }
+
+  public select(name: string): boolean {
+    const spinner = findEmojiSpinnerVariant(name);
+    if (spinner === undefined) return false;
+    this.selected = spinner;
+    return true;
+  }
+
+  public randomize(random: () => number = Math.random): void {
+    this.selected = pickEmojiSpinnerVariant(random);
+  }
 }
 
 export function formatStyledEmojiSpinnerFrames(

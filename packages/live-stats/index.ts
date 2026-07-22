@@ -2,12 +2,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 import {
   countOutputContentChars,
-  formatStyledEmojiSpinnerFrames,
+  EmojiSpinnerState,
   formatStyledWorkingMessage,
   LiveStatsTracker,
-  pickEmojiSpinnerVariant,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
+import { applySpinner, registerSpinnerCommand } from "./spinner-command.ts";
 import { WorkingPhraseState } from "./working-phrases.ts";
 
 const REFRESH_INTERVAL_MS = 50;
@@ -23,6 +23,7 @@ export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
   const workingPhrase = new WorkingPhraseState();
+  const spinnerState = new EmojiSpinnerState();
 
   const stopTimer = (): void => {
     if (refreshTimer === undefined) return;
@@ -50,13 +51,10 @@ export default function liveStats(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
-    const spinner = pickEmojiSpinnerVariant();
-    ctx.ui.setWorkingIndicator({
-      frames: formatStyledEmojiSpinnerFrames(spinner, workingMessageStyles(ctx)),
-      intervalMs: spinner.intervalMs,
-    });
+    applySpinner(ctx, spinnerState);
   });
+
+  registerSpinnerCommand(pi, spinnerState);
 
   pi.on("agent_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
