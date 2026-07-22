@@ -16,6 +16,7 @@
       "./packages/prompt-queue/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
+      "./packages/plan-checklist/index.ts",
       "./packages/shell-execution-policy/index.ts"
     ]
   },

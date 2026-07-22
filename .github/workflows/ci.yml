@@ -57,6 +57,12 @@ jobs:
       - name: Check @onurpi/context-window-policy package with Slophammer
         working-directory: packages/context-window-policy
         run: npm run slophammer
+      - name: Check @onurpi/plan-checklist package
+        working-directory: packages/plan-checklist
+        run: npm run check
+      - name: Check @onurpi/plan-checklist package with Slophammer
+        working-directory: packages/plan-checklist
+        run: npm run slophammer
       - name: Check @onurpi/shell-execution-policy package
         working-directory: packages/shell-execution-policy
         run: npm run check
@@ -92,6 +98,9 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/context-window-policy package
         working-directory: packages/context-window-policy
+        run: npm run mutate
+      - name: Mutate @onurpi/plan-checklist package
+        working-directory: packages/plan-checklist
         run: npm run mutate
       - name: Mutate @onurpi/shell-execution-policy package
         working-directory: packages/shell-execution-policy
