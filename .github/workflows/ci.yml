@@ -19,6 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: KEEP_SLOPHAMMER_WORKFLOWS=1 npm run slophammer
       - run: npx --no-install slophammer-ts check .
       - name: Check @onurpi/turn-fold package
         working-directory: packages/turn-fold
@@ -62,6 +63,12 @@ jobs:
       - name: Check @onurpi/context-window-policy package with Slophammer
         working-directory: packages/context-window-policy
         run: npm run slophammer
+      - name: Check @onurpi/shell-execution-policy package
+        working-directory: packages/shell-execution-policy
+        run: npm run check
+      - name: Check @onurpi/shell-execution-policy package with Slophammer
+        working-directory: packages/shell-execution-policy
+        run: npm run slophammer
 
   mutation:
     if: github.event_name == 'workflow_dispatch'
@@ -94,4 +101,7 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/context-window-policy package
         working-directory: packages/context-window-policy
+        run: npm run mutate
+      - name: Mutate @onurpi/shell-execution-policy package
+        working-directory: packages/shell-execution-policy
         run: npm run mutate

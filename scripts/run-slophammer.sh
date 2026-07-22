@@ -8,7 +8,9 @@ cleanup() {
     rmdir "$(dirname "$workflow")" "$(dirname "$(dirname "$workflow")")" 2>/dev/null || true
   done
 }
-trap cleanup EXIT HUP INT TERM
+if [ "${KEEP_SLOPHAMMER_WORKFLOWS:-0}" != "1" ]; then
+  trap cleanup EXIT HUP INT TERM
+fi
 
 for package in packages/*; do
   [ -f "$package/tsconfig.json" ] || continue
