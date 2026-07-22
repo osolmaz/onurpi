@@ -18,6 +18,7 @@ export default {
     "packages/prompt-queue/widget-lines.ts",
     "packages/prompt-queue/window-state.ts",
     "packages/reliable-compaction/reliable-compaction.ts",
+    "packages/context-window-policy/context-window-policy.ts",
   ],
   reporters: ["clear-text", "progress"],
   testRunner: "vitest",

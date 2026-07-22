@@ -19,7 +19,8 @@ const liveSettingsPath = join(homedir(), ".pi", "agent", "settings.json");
 const trackedSettingsPath = join(repoRoot, "settings.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
-const WORKTREES_ROOT = resolve(repoRoot, "..", "onurpi-worktrees");
+const CANONICAL_REPO_ROOT = resolve(dirname(liveSettingsPath), "..", "..", "repos", "onurpi");
+const WORKTREES_ROOT = resolve(CANONICAL_REPO_ROOT, "..", "onurpi-worktrees");
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -54,8 +55,8 @@ function isOurs(entry: string): boolean {
   if (entry.startsWith("npm:") || entry.startsWith("git:") || entry.includes("://")) return false;
   const absolute = resolve(dirname(liveSettingsPath), entry);
   return (
-    absolute === repoRoot ||
-    absolute.startsWith(`${repoRoot}/`) ||
+    absolute === CANONICAL_REPO_ROOT ||
+    absolute.startsWith(`${CANONICAL_REPO_ROOT}/`) ||
     absolute.startsWith(`${WORKTREES_ROOT}/`)
   );
 }

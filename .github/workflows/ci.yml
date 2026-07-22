@@ -56,6 +56,12 @@ jobs:
       - name: Check @onurpi/reliable-compaction package with Slophammer
         working-directory: packages/reliable-compaction
         run: npm run slophammer
+      - name: Check @onurpi/context-window-policy package
+        working-directory: packages/context-window-policy
+        run: npm run check
+      - name: Check @onurpi/context-window-policy package with Slophammer
+        working-directory: packages/context-window-policy
+        run: npm run slophammer
 
   mutation:
     if: github.event_name == 'workflow_dispatch'
@@ -85,4 +91,7 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/reliable-compaction package
         working-directory: packages/reliable-compaction
+        run: npm run mutate
+      - name: Mutate @onurpi/context-window-policy package
+        working-directory: packages/context-window-policy
         run: npm run mutate
