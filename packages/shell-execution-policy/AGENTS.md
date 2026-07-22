@@ -1,4 +1,4 @@
-# @onurpi/bash-timeout-policy
+# @onurpi/shell-execution-policy
 
 - Use only the documented mutable `tool_call` hook and exported Pi type guards.
 - Keep execution delegated to Pi's built-in bash tool.

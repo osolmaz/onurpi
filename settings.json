@@ -10,7 +10,7 @@
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
-    "../../repos/onurpi/packages/bash-timeout-policy"
+    "../../repos/onurpi/packages/shell-execution-policy"
   ],
   "lastChangelogVersion": "0.80.10",
   "defaultProvider": "openai-codex",

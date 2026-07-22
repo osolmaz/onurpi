@@ -14,7 +14,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
-      - bash-timeout-policy.ts
+      - shell-execution-policy.ts
   dependency_boundaries:
     - from: .
       allow: []

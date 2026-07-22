@@ -1,5 +1,5 @@
 export default {
-  mutate: ["bash-timeout-policy.ts"],
+  mutate: ["shell-execution-policy.ts"],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

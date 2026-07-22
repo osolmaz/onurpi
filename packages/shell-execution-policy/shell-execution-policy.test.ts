@@ -6,7 +6,7 @@ import {
   DEFAULT_BASH_TIMEOUT_SECONDS,
   enforceBashToolCallTimeout,
   MAX_BASH_TIMEOUT_SECONDS,
-} from "./bash-timeout-policy.ts";
+} from "./shell-execution-policy.ts";
 
 function bashEvent(timeout?: number): ToolCallEvent {
   return {
@@ -20,7 +20,7 @@ function bashEvent(timeout?: number): ToolCallEvent {
   };
 }
 
-describe("bash timeout policy", () => {
+describe("shell execution policy", () => {
   it("injects the Codex-compatible default when timeout is omitted", () => {
     const event = bashEvent();
 

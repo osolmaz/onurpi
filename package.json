@@ -17,7 +17,7 @@
       "./packages/prompt-queue/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
-      "./packages/bash-timeout-policy/index.ts"
+      "./packages/shell-execution-policy/index.ts"
     ]
   },
   "scripts": {

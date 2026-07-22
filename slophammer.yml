@@ -31,7 +31,7 @@ typescript:
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
       - packages/context-window-policy/context-window-policy.ts
-      - packages/bash-timeout-policy/bash-timeout-policy.ts
+      - packages/shell-execution-policy/shell-execution-policy.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -51,6 +51,6 @@ typescript:
     - from: packages/context-window-policy
       allow:
         - packages/context-window-policy
-    - from: packages/bash-timeout-policy
+    - from: packages/shell-execution-policy
       allow:
-        - packages/bash-timeout-policy
+        - packages/shell-execution-policy

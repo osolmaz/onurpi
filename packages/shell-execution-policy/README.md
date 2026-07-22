@@ -1,6 +1,7 @@
-# @onurpi/bash-timeout-policy
+# @onurpi/shell-execution-policy
 
-`@onurpi/bash-timeout-policy` prevents model-initiated Pi `bash` calls from running indefinitely.
+`@onurpi/shell-execution-policy` applies bounded execution policies to model-initiated shell
+commands. Its first policy prevents Pi `bash` calls from running indefinitely.
 
 The extension applies two limits before Pi executes the command:
 
@@ -28,7 +29,7 @@ built-in validator rejects them normally.
 From the OnurPi repository root, install the local package and reload Pi:
 
 ```bash
-pi install ./packages/bash-timeout-policy
+pi install ./packages/shell-execution-policy
 ```
 
 ```text

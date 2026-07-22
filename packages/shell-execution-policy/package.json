@@ -1,8 +1,8 @@
 {
-  "name": "@onurpi/bash-timeout-policy",
+  "name": "@onurpi/shell-execution-policy",
   "version": "0.1.0",
   "private": true,
-  "description": "Bounded model-initiated bash timeouts for Pi",
+  "description": "Bounded model-initiated shell execution for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

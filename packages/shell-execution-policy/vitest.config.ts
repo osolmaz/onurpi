@@ -6,7 +6,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["bash-timeout-policy.ts"],
+      include: ["shell-execution-policy.ts"],
       thresholds: {
         statements: 85,
         branches: 85,
