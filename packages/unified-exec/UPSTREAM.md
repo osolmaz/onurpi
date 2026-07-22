@@ -90,7 +90,7 @@ native module cannot load.
 - Ported the 12 upstream unit suites directly to Vitest. The four upstream extension-API harness
   suites (`chars-encoding`, `e2e`, `e2e-pty`, and `wake-e2e`) used unchecked `any` stubs, so their
   applicable process, byte-input, PTY, waiting, kill, and wake scenarios were consolidated into a
-  strict typed runtime integration suite. The package currently runs 199 tests, plus a platform skip
+  strict typed runtime integration suite. The package currently runs 200 tests, plus a platform skip
   when PTY is unavailable.
 - Retained strict TypeScript, unsafe-operation linting, and the repository's complexity limit.
   Audited upstream lifecycle and rendering routines use narrow, justified line-level complexity
@@ -112,6 +112,7 @@ native module cannot load.
 - Accept extension-bearing Windows shell names, including `.com`, and exclude unspawnable command
   wrappers from the default shell probe.
 - Remove unnecessary reserved-ID tracking while keeping session IDs monotonic.
+- Deduplicate stored and in-flight sessions before shutdown termination and accounting.
 - Invalidate collapsed TUI preview lines when a streamed result body changes.
 - Kept upstream v0.7.3's `set_on_exit` tool and human-explicit wake guidance.
 - Removed upstream publishing and repository-maintenance machinery from the vendored package.

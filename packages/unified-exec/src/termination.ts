@@ -69,17 +69,22 @@ export async function terminateSessionById(
   return { session, escalated, finalOutput, killed };
 }
 
-// eslint-disable-next-line complexity -- Keep bounded shutdown escalation in one lifecycle routine.
+export function untrackedLiveSessions<T extends { hasExited: boolean }>(
+  tracked: readonly T[],
+  pending: Iterable<T>,
+): T[] {
+  const known = new Set(tracked);
+  return Array.from(pending).filter((session) => !known.has(session) && !session.hasExited);
+}
+
 export async function shutdownSessions(runtime: ExtensionRuntime): Promise<void> {
   runtime.shuttingDown = true;
   runtime.agentActivity.active = false;
   runtime.coordinator.shutdown();
   const drained = runtime.store.terminateAll();
-  for (const session of runtime.pendingSessions) {
-    if (!session.hasExited) {
-      session.terminate();
-      drained.push(session);
-    }
+  for (const session of untrackedLiveSessions(drained, runtime.pendingSessions)) {
+    session.terminate();
+    drained.push(session);
   }
   await waitForAll(drained, 1000);
   if (!IS_WINDOWS) {
