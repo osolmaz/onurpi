@@ -79,7 +79,9 @@ afterEach(async () => {
 describe("runtime integration", () => {
   it("returns a terminal result without registering a quick process", async () => {
     const { runtime } = makeRuntime();
-    const result = await start(runtime, "node -e \"console.log('quick')\"");
+    const result = await start(runtime, "node -e \"console.log('quick')\"", {
+      yieldMs: 30_000,
+    });
     assert.equal(result.session_id, undefined);
     assert.equal(result.exit_code, 0);
     assert.match(result.output, /quick/);
