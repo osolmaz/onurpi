@@ -6,12 +6,9 @@ export default tseslint.config(
     ignores: [
       ".stryker-tmp/**",
       "coverage/**",
-      "dist/**",
-      "node_modules/**",
       "eslint.config.mjs",
-      "packages/**/eslint.config.mjs",
-      "packages/**/stryker.config.mjs",
       "stryker.config.mjs",
+      "vitest.config.ts",
     ],
   },
   js.configs.recommended,
@@ -40,13 +37,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/turn-fold/render-patches.ts"],
-    rules: {
-      "@typescript-eslint/unbound-method": "off",
-    },
-  },
-  {
-    files: ["packages/unified-exec/**/*.ts"],
+    files: ["**/*.ts"],
     rules: {
       "@typescript-eslint/array-type": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
@@ -67,16 +58,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/unified-exec/tests/**/*.test.ts"],
+    files: ["tests/**/*.test.ts"],
     rules: {
       "max-lines-per-function": "off",
-    },
-  },
-  {
-    files: ["packages/**/*.test.ts"],
-    ignores: ["packages/unified-exec/tests/**/*.test.ts"],
-    rules: {
-      "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],
     },
   },
 );

@@ -1,41 +1,39 @@
 {
-  "name": "@onurpi/workspace",
+  "name": "@onurpi/unified-exec",
+  "version": "0.1.0",
   "private": true,
+  "description": "Persistent Codex-style command sessions for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "pi": {
     "extensions": [
-      "./packages/turn-fold/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/nyan-mode/index.ts",
-      "./packages/prompt-queue/index.ts",
-      "./packages/reliable-compaction/index.ts",
-      "./packages/context-window-policy/index.ts",
-      "./packages/plan-checklist/index.ts",
-      "./packages/unified-exec/index.ts",
-      "./packages/shell-execution-policy/index.ts"
+      "./index.ts"
     ]
   },
   "scripts": {
-    "settings:sync": "node scripts/sync-settings.ts sync",
-    "settings:reset": "node scripts/sync-settings.ts reset",
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "lint": "eslint .",
+    "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
     "dry": "slophammer-ts dry .",
-    "mutate": "stryker run",
+    "mutate": "stryker run stryker.config.mjs",
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": ">=0.80.5",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "optionalDependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "0.13.1"
+  },
   "devDependencies": {
+    "@earendil-works/pi-ai": "0.80.10",
     "@earendil-works/pi-coding-agent": "0.80.10",
     "@earendil-works/pi-tui": "0.80.10",
     "@eslint/js": "9.39.2",
@@ -47,6 +45,7 @@
     "eslint": "9.39.2",
     "prettier": "3.8.1",
     "slophammer-ts": "0.4.0",
+    "typebox": "1.1.38",
     "typescript": "5.9.3",
     "typescript-eslint": "8.53.1",
     "vitest": "3.2.7"
