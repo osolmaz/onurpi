@@ -19,6 +19,7 @@ const liveSettingsPath = join(homedir(), ".pi", "agent", "settings.json");
 const trackedSettingsPath = join(repoRoot, "settings.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
+const REPLACED_PACKAGE_SOURCES = [/^npm:pi-unified-exec(?:@.*)?$/];
 const CANONICAL_REPO_ROOT = resolve(dirname(liveSettingsPath), "..", "..", "repos", "onurpi");
 const WORKTREES_ROOT = resolve(CANONICAL_REPO_ROOT, "..", "onurpi-worktrees");
 
@@ -51,7 +52,9 @@ function canonicalEntries(): string[] {
 }
 
 function isOurs(entry: string): boolean {
-  if (entry === GIT_SOURCE) return true;
+  if (entry === GIT_SOURCE || REPLACED_PACKAGE_SOURCES.some((pattern) => pattern.test(entry))) {
+    return true;
+  }
   if (entry.startsWith("npm:") || entry.startsWith("git:") || entry.includes("://")) return false;
   const absolute = resolve(dirname(liveSettingsPath), entry);
   return (

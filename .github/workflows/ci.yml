@@ -63,12 +63,33 @@ jobs:
       - name: Check @onurpi/plan-checklist package with Slophammer
         working-directory: packages/plan-checklist
         run: npm run slophammer
-      - name: Check @onurpi/shell-execution-policy package
-        working-directory: packages/shell-execution-policy
+      - name: Check @onurpi/unified-exec package
+        working-directory: packages/unified-exec
         run: npm run check
-      - name: Check @onurpi/shell-execution-policy package with Slophammer
-        working-directory: packages/shell-execution-policy
+      - name: Check @onurpi/unified-exec package with Slophammer
+        working-directory: packages/unified-exec
         run: npm run slophammer
+  unified-exec-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: npm
+      - run: npm ci
+      - name: Typecheck @onurpi/unified-exec
+        working-directory: packages/unified-exec
+        run: npm run typecheck
+      - name: Test @onurpi/unified-exec with PTY
+        working-directory: packages/unified-exec
+        env:
+          EXPECT_PTY: "1"
+        run: npm test
 
   mutation:
     if: github.event_name == 'workflow_dispatch'
@@ -102,6 +123,6 @@ jobs:
       - name: Mutate @onurpi/plan-checklist package
         working-directory: packages/plan-checklist
         run: npm run mutate
-      - name: Mutate @onurpi/shell-execution-policy package
-        working-directory: packages/shell-execution-policy
+      - name: Mutate @onurpi/unified-exec package
+        working-directory: packages/unified-exec
         run: npm run mutate

@@ -14,7 +14,11 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
-      - shell-execution-policy.ts
+      - src/completion.ts
+      - src/format-time.ts
+      - src/head-tail-buffer.ts
+      - src/time.ts
+      - src/unescape.ts
   dependency_boundaries:
     - from: .
       allow: []

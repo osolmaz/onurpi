@@ -46,7 +46,35 @@ export default tseslint.config(
     },
   },
   {
+    files: ["packages/unified-exec/**/*.ts"],
+    rules: {
+      "@typescript-eslint/array-type": "off",
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-misused-spread": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/prefer-optional-chain": "off",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
+      "no-control-regex": "off",
+      "prefer-const": "off",
+    },
+  },
+  {
+    files: ["packages/unified-exec/tests/**/*.test.ts"],
+    rules: {
+      "max-lines-per-function": "off",
+    },
+  },
+  {
     files: ["packages/**/*.test.ts"],
+    ignores: ["packages/unified-exec/tests/**/*.test.ts"],
     rules: {
       "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],
     },

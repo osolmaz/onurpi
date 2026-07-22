@@ -38,7 +38,11 @@ typescript:
       - packages/plan-checklist/plan-replay.ts
       - packages/plan-checklist/plan-schema.ts
       - packages/plan-checklist/plan-state.ts
-      - packages/shell-execution-policy/shell-execution-policy.ts
+      - packages/unified-exec/src/completion.ts
+      - packages/unified-exec/src/format-time.ts
+      - packages/unified-exec/src/head-tail-buffer.ts
+      - packages/unified-exec/src/time.ts
+      - packages/unified-exec/src/unescape.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -58,6 +62,6 @@ typescript:
     - from: packages/plan-checklist
       allow:
         - packages/plan-checklist
-    - from: packages/shell-execution-policy
+    - from: packages/unified-exec
       allow:
-        - packages/shell-execution-policy
+        - packages/unified-exec
