@@ -7,7 +7,7 @@ empty context ──────────────────────
 0%                                                     100%
 ```
 
-The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
+Extensions can still publish status text below the runway, so compact information such as Codex subscription usage remains visible. The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
 
 ## Cat moods
 
