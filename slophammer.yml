@@ -16,10 +16,12 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
       - packages/turn-fold/mode.ts
+      - packages/turn-fold/transcript-window-adapter.ts
+      - packages/turn-fold/transcript-windows.ts
       - packages/turn-fold/tool-padding.ts
-      - packages/pi-tui-history-replay/history-replay.ts
       - packages/live-stats/live-stats.ts
       - packages/nyan-mode/src/png.ts
       - packages/nyan-mode/src/progress.ts
@@ -36,9 +38,6 @@ typescript:
     - from: packages/turn-fold
       allow:
         - packages/turn-fold
-    - from: packages/pi-tui-history-replay
-      allow:
-        - packages/pi-tui-history-replay
     - from: packages/live-stats
       allow:
         - packages/live-stats

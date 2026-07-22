@@ -12,15 +12,15 @@ compactions during a turn appear as `compacted` in the summary instead of a sepa
 Manual compactions performed while Pi is idle keep Pi's original row. Interrupted runs retain their
 last partial response or a fallback message.
 
-The extension changes only the display. Pi keeps every underlying session message in model context.
-The normative behavior is defined in [SPEC.md](SPEC.md).
+The extension changes only the display. Pi keeps every stored session message, while compaction still
+controls what reaches the model. The normative behavior is defined in [SPEC.md](SPEC.md).
 
 ## Modes
 
 | Mode       | Behavior                                                                    |
 | ---------- | --------------------------------------------------------------------------- |
 | `compact`  | Shows a summary below the user message, followed by live or final activity. |
-| `expanded` | Shows the complete transcript.                                              |
+| `expanded` | Shows Pi's original rows within the loaded transcript range.                |
 
 `compact` is the default.
 
@@ -42,25 +42,30 @@ The package is private and is not published yet.
 /turn-fold compact          use the compact transcript
 /turn-fold expanded         show the complete transcript
 /turn-fold toggle           switch between compact and expanded
-/turn-fold status           show the current mode
+/turn-fold status           show the current mode and window value
+/turn-fold windows 5        load exactly 5 compaction windows
+/turn-fold windows +2       load 2 more windows
+/turn-fold windows -1       unload 1 window
+/turn-fold windows all      load the full active branch after confirmation
+/turn-fold windows reset    return to the default of 3
 ```
 
 `Ctrl+Shift+O` switches between compact and expanded rendering without adding a shortcut hint to
 summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
-## Planned transcript windows
+## Transcript windows
 
-Long sessions can make Pi redraw too much transcript content while the user types. The approved next
-step is to load three compaction windows into the main transcript by default and make Turn Fold's
-component decisions constant-time. `/turn-fold windows <value>` will accept an exact count, a
-relative change such as `+2` or `-1`, `all`, or `reset`, then rebuild the main transcript immediately.
-The selected range will begin with the user message that led into its oldest compaction window. Pi's stored messages and model context will remain unchanged.
+Turn Fold loads three compaction windows into the main transcript by default. Changing the window
+value rebuilds that transcript immediately. The selected range begins with the user message that led
+into its oldest compaction window and continues through the active leaf. `all` warns before replaying
+the full branch because a large transcript can slow editor input.
 
-The command is not implemented yet. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design
-and implementation order.
+Window selection changes only the TUI path. Pi's model context remains compacted. Turn Fold also
+caches the component layout and its counts so unchanged redraws avoid rescanning or sorting turn
+activity. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design.
 
-Mode changes are stored as custom session entries, so each session restores its latest supported
-choice. Automatic compaction associations live only in process memory and survive `/reload` without
+Mode and window changes are stored as custom session entries, so each session restores its latest
+supported configuration. Automatic compaction associations live only in process memory and survive `/reload` without
 writing to Pi's session. They use exact compaction and active-turn entry IDs and are limited to the
 active branch. After a full Pi restart, earlier compactions remain standalone because Pi's stored
 compaction entries do not identify their trigger. Historical turns are reconstructed from the active
@@ -69,9 +74,10 @@ default.
 
 ## Current implementation boundary
 
-Pi does not expose a public whole-turn transcript renderer. This extension uses Pi's exported
-assistant, tool, and compaction component classes but patches their rendering methods. It targets Pi
-0.80.10 or newer and must be retested when Pi changes its interactive transcript components.
+Pi does not expose a public whole-turn renderer or transcript-range API. Turn Fold patches Pi's
+built-in transcript component renderers and replaces the TUI-only `buildContextEntries()`
+projection. It does not replace `buildSessionContext()`. The package targets
+Pi 0.80.10 or newer and must be retested when Pi changes these interactive paths.
 
 ## Quality checks
 

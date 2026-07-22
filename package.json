@@ -10,7 +10,6 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/pi-tui-history-replay/index.ts",
       "./packages/turn-fold/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",

@@ -15,20 +15,27 @@ vi.mock("./render-patches.ts", () => ({
 
 type Handler = (...arguments_: unknown[]) => unknown;
 
+function entryId(entry: unknown): unknown {
+  return typeof entry === "object" && entry !== null ? Reflect.get(entry, "id") : undefined;
+}
+
 function extensionHarness(): {
   appendEntry: ReturnType<typeof vi.fn>;
+  commands: ReadonlyMap<string, Handler>;
   handlers: ReadonlyMap<string, Handler>;
   pi: ExtensionAPI;
 } {
+  const commands = new Map<string, Handler>();
   const handlers = new Map<string, Handler>();
   const appendEntry = vi.fn();
   const pi = {
     appendEntry,
     on: (event: string, handler: Handler) => handlers.set(event, handler),
-    registerCommand: () => undefined,
+    registerCommand: (name: string, definition: { handler: Handler }) =>
+      commands.set(name, definition.handler),
     registerShortcut: () => undefined,
   } as unknown as ExtensionAPI;
-  return { appendEntry, handlers, pi };
+  return { appendEntry, commands, handlers, pi };
 }
 
 function context(
@@ -37,13 +44,20 @@ function context(
   sessionFile = "/tmp/turn-fold-session.jsonl",
 ) {
   return {
+    hasUI: true,
+    reload: vi.fn(() => Promise.resolve()),
     sessionManager: {
       buildContextEntries: () => entries,
       getBranch: () => branch,
       getSessionFile: () => sessionFile,
       getSessionId: () => "session-id",
     },
-    ui: { theme: undefined },
+    ui: {
+      confirm: vi.fn(() => Promise.resolve(true)),
+      notify: vi.fn(),
+      select: vi.fn(() => Promise.resolve(undefined)),
+      theme: undefined,
+    },
   };
 }
 
@@ -54,6 +68,16 @@ async function emit(
   ctx: object,
 ): Promise<void> {
   await handlers.get(event)?.(payload, ctx);
+}
+
+async function runTurnFoldCommand(
+  commands: ReadonlyMap<string, Handler>,
+  argument: string,
+  ctx: object,
+): Promise<void> {
+  const handler = commands.get("turn-fold");
+  if (!handler) throw new Error("Turn Fold command was not registered");
+  await handler(argument, ctx);
 }
 
 afterEach(() => {
@@ -183,6 +207,103 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
       { reason: "quit", type: "session_shutdown" },
       secondContext,
     );
+  });
+});
+
+describe("Turn Fold window commands", () => {
+  it("persists relative changes and reloads the main transcript", async () => {
+    const extension = extensionHarness();
+    const ctx = context([
+      { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
+      { id: "compact", type: "compaction" },
+    ]);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "windows +2", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      mode: "compact",
+      windows: 5,
+    });
+    expect(ctx.reload).toHaveBeenCalledOnce();
+  });
+
+  it("confirms full replay and leaves state unchanged when cancelled", async () => {
+    const extension = extensionHarness();
+    const ctx = context([{ id: "user", message: { role: "user" }, type: "message" }]);
+    ctx.ui.confirm.mockResolvedValue(false);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "windows all", ctx);
+
+    expect(ctx.ui.confirm).toHaveBeenCalledWith(
+      "Load full transcript?",
+      expect.stringContaining("1 active-branch entries"),
+    );
+    expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(ctx.reload).not.toHaveBeenCalled();
+  });
+
+  it("persists confirmed full replay and reloads", async () => {
+    const extension = extensionHarness();
+    const ctx = context([{ id: "user", message: { role: "user" }, type: "message" }]);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "windows all", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      mode: "compact",
+      windows: "all",
+    });
+    expect(ctx.reload).toHaveBeenCalledOnce();
+  });
+
+  it("reports status and invalid window values without reloading", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "status", ctx);
+    await runTurnFoldCommand(extension.commands, "windows nope", ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Turn fold: compact, windows 3", "info");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Use a positive number, +N, -N, all, or reset.",
+      "warning",
+    );
+    expect(ctx.reload).not.toHaveBeenCalled();
+  });
+
+  it("loads the default bounded range into Pi's main transcript", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "u0", message: { role: "user" }, type: "message" },
+      { id: "c1", type: "compaction" },
+      { id: "u1", message: { role: "user" }, type: "message" },
+      { id: "c2", type: "compaction" },
+      { id: "u2", message: { role: "user" }, type: "message" },
+      { id: "c3", type: "compaction" },
+      { id: "u3", message: { role: "user" }, type: "message" },
+      { id: "c4", type: "compaction" },
+      { id: "now", type: "custom" },
+    ];
+    const ctx = context([], branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    expect(ctx.sessionManager.buildContextEntries().map(entryId)).toEqual([
+      "u1",
+      "c2",
+      "u2",
+      "c3",
+      "u3",
+      "c4",
+      "now",
+    ]);
   });
 });
 

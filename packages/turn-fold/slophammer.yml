@@ -14,8 +14,11 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - configuration.ts
       - fold-policy.ts
       - mode.ts
+      - transcript-window-adapter.ts
+      - transcript-windows.ts
       - tool-padding.ts
   dependency_boundaries:
     - from: .
