@@ -12,7 +12,7 @@
 import { strict as assert } from "node:assert";
 import { getEventListeners } from "node:events";
 import { describe, it } from "vitest";
-import { collectOutputUntilDeadline } from "../src/collect.ts";
+import { COLLECTED_OUTPUT_MAX_BYTES, collectOutputUntilDeadline } from "../src/collect.ts";
 import { HeadTailBuffer } from "../src/head-tail-buffer.ts";
 import { Gate, Notify } from "../src/notify.ts";
 
@@ -24,8 +24,8 @@ function text(bytes: Uint8Array): string {
   return new TextDecoder("utf-8").decode(bytes);
 }
 
-function makeHarness() {
-  const buffer = new HeadTailBuffer(64 * 1024);
+function makeHarness(maxBytes = 64 * 1024) {
+  const buffer = new HeadTailBuffer(maxBytes);
   const outputNotify = new Notify();
   const outputClosed = new Gate();
   const exitedAc = new AbortController();
@@ -80,6 +80,22 @@ describe("collectOutputUntilDeadline", () => {
     // All listeners must be released once the call returns.
     assert.equal(getEventListeners(h.exited, "abort").length, 0);
     assert.equal(getEventListeners(h.external, "abort").length, 0);
+  });
+
+  it("bounds bytes retained across a noisy attached wait", async () => {
+    const h = makeHarness(COLLECTED_OUTPUT_MAX_BYTES * 4);
+    h.push("A".repeat(1024 * 1024));
+    h.push("Z".repeat(1024 * 1024));
+    const out = await collectOutputUntilDeadline({
+      buffer: h.buffer,
+      outputNotify: h.outputNotify,
+      outputClosed: h.outputClosed,
+      exited: h.exited,
+      deadlineMs: Date.now() + 1,
+    });
+    assert.equal(out.length, COLLECTED_OUTPUT_MAX_BYTES);
+    assert.equal(out[0], "A".charCodeAt(0));
+    assert.equal(out.at(-1), "Z".charCodeAt(0));
   });
 
   it("returns buffered bytes and honors deadline", async () => {

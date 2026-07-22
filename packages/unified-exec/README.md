@@ -16,9 +16,9 @@ Mirrors codex's `exec_command` + `write_stdin` tool surface, with small pi-flavo
 
 - **Session-oriented, two-way I/O.** `exec_command` opens a long-lived session; the LLM keeps the
   `session_id` and drives the same process across turns by interleaving `write_stdin` writes and
-  polls. Every byte the child prints is mirrored to an on-disk log file in parallel with the
-  in-memory buffer, so the full history is recoverable via `read(log_path)` even after the
-  LLM-visible tail truncates.
+  polls. Session retention and attached per-call collection are both memory-bounded. Every byte the
+  child prints is mirrored to an on-disk log file, so the full history is recoverable via
+  `read(log_path)` even after the LLM-visible tail truncates.
 - **Bounded waits — the agent never stalls.** Every tool call returns within a hard ceiling: 30 s
   for `exec_command` and interactive `write_stdin`, 290 s for pure background polls
   (`yield_time_ms`). For a human-requested long attached wait, `yield_until` stays attached until an

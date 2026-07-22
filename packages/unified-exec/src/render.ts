@@ -188,6 +188,14 @@ export function renderResult<TArgs>(
   return container;
 }
 
+export function refreshPreviewBody(state: RenderState, body: string): void {
+  if (state.cachedBody === body) return;
+  state.cachedBody = body;
+  state.cachedWidth = undefined;
+  state.cachedLines = undefined;
+  state.cachedSkipped = undefined;
+}
+
 // eslint-disable-next-line complexity -- Preserve upstream response-body rendering branches.
 function rebuildResultBody(
   container: ResultContainer,
@@ -202,6 +210,7 @@ function rebuildResultBody(
   // completion is the structured text — in that case we'd rather show the
   // body, but details.output is always populated, so this fallback is rare).
   const body = details.output ?? getContentText(result);
+  refreshPreviewBody(state, body);
 
   if (body) {
     const styled = body

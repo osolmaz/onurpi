@@ -16,10 +16,18 @@
  *   - Uses `AbortSignal` instead of tokio `CancellationToken`.
  */
 
-import type { HeadTailBuffer } from "./head-tail-buffer.ts";
+import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
+
+import { HeadTailBuffer } from "./head-tail-buffer.ts";
 import type { Gate, Notify } from "./notify.ts";
 
 const POST_EXIT_CLOSE_WAIT_MS = 50;
+
+/**
+ * Keep two response-sized windows so final tail truncation can return the true
+ * latest output while collection memory stays bounded during noisy waits.
+ */
+export const COLLECTED_OUTPUT_MAX_BYTES = DEFAULT_MAX_BYTES * 2;
 
 export interface CollectInputs {
   /** Buffer to drain. Chunks removed from it are returned to the caller. */
@@ -50,7 +58,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
   const { buffer, outputNotify, outputClosed, exited, deadlineMs, externalAbort } = inputs;
   const postExitCloseWaitCap = inputs.postExitCloseWaitMs ?? POST_EXIT_CLOSE_WAIT_MS;
 
-  const collected: Uint8Array[] = [];
+  const collected = new HeadTailBuffer(COLLECTED_OUTPUT_MAX_BYTES);
   let exitSignalReceived = exited.aborted;
   let postExitDeadline: number | undefined;
 
@@ -120,7 +128,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
       }
 
       // 2) Collected some bytes — keep them and loop.
-      for (const chunk of drained) collected.push(chunk);
+      for (const chunk of drained) collected.pushChunk(chunk);
 
       if (exited.aborted) exitSignalReceived = true;
       if (Date.now() >= deadlineMs) break;
@@ -129,7 +137,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
     for (const cleanup of cleanups) cleanup();
   }
 
-  return concat(collected);
+  return collected.toBytes();
 }
 
 /**
@@ -152,16 +160,4 @@ function timeoutPromise(ms: number, cleanups: Array<() => void>): Promise<void> 
     const timer = setTimeout(resolve, ms);
     cleanups.push(() => clearTimeout(timer));
   });
-}
-
-function concat(chunks: Uint8Array[]): Uint8Array {
-  let total = 0;
-  for (const c of chunks) total += c.length;
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    out.set(c, offset);
-    offset += c.length;
-  }
-  return out;
 }
