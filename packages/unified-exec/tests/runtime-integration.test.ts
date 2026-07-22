@@ -36,6 +36,11 @@ function requireSessionId(result: FinalResponseDetails): number {
   return sessionId;
 }
 
+async function waitUntil(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) await sleep(25);
+}
+
 async function start(
   runtime: ExtensionRuntime,
   command: string,
@@ -163,7 +168,7 @@ describe("runtime integration", () => {
   it("sends an idle wake exactly once", async () => {
     const { runtime, messages } = makeRuntime();
     requireSessionId(await start(runtime, delayedOutput(450), { onExit: "wake" }));
-    await sleep(500);
+    await waitUntil(() => messages.length === 1);
     assert.equal(messages.length, 1);
     assert.equal(messages[0]?.details.sessions.length, 1);
     assert.match(messages[0]?.content ?? "", /\[unified-exec\]/);
@@ -172,8 +177,10 @@ describe("runtime integration", () => {
   it("defers active-run wakes until agent_settled", async () => {
     const { runtime, messages } = makeRuntime();
     runtime.agentActivity.active = true;
-    requireSessionId(await start(runtime, delayedOutput(450), { onExit: "wake" }));
-    await sleep(500);
+    const sessionId = requireSessionId(
+      await start(runtime, delayedOutput(450), { onExit: "wake" }),
+    );
+    await waitUntil(() => runtime.store.get(sessionId)?.hasExited === true);
     assert.equal(messages.length, 0);
     runtime.agentActivity.active = false;
     runtime.coordinator.flushPending();
@@ -187,7 +194,7 @@ describe("runtime integration", () => {
     const sessionId = requireSessionId(
       await start(runtime, delayedOutput(450), { onExit: "wake" }),
     );
-    await sleep(500);
+    await waitUntil(() => runtime.store.get(sessionId)?.hasExited === true);
     assert.equal(messages.length, 0);
     const result = await poll(runtime, sessionId, "race-observer");
     assert.equal(result.on_exit_wake, "consumed");
@@ -203,7 +210,7 @@ describe("runtime integration", () => {
     const sessionId = requireSessionId(
       await start(runtime, delayedOutput(450), { onExit: "wake" }),
     );
-    await sleep(500);
+    await waitUntil(() => runtime.store.get(sessionId)?.hasExited === true);
     const result = await runWriteStdin(
       runtime,
       { session_id: sessionId, yield_time_ms: 1000 },
@@ -226,7 +233,7 @@ describe("runtime integration", () => {
     );
     assert.equal(runtime.coordinator.setOnExit(sessionId, "none"), "disarmed");
     assert.equal(runtime.store.get(sessionId)?.hasExited, false);
-    await sleep(500);
+    await waitUntil(() => runtime.store.get(sessionId)?.hasExited === true);
     assert.equal(messages.length, 0);
   });
 
