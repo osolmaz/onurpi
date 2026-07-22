@@ -56,19 +56,10 @@ export function formatSettledSummary(summary: FoldSummary): string {
   return `▶ ${parts.join(" · ")}`;
 }
 
-function styledSummary(
-  text: string,
-  summary: FoldSummary,
-  width: number,
-  theme: Theme | undefined,
-): string[] {
+function styledSummary(text: string, width: number, theme: Theme | undefined): string[] {
   if (width <= 0) return [];
   const truncated = truncateToWidth(text, width, "…");
-  const styled = theme
-    ? theme.bold(
-        theme.fg(summary.aborted || summary.failedTools > 0 ? "warning" : "muted", truncated),
-      )
-    : truncated;
+  const styled = theme ? theme.bold(theme.fg("warning", truncated)) : truncated;
   return ["", styled];
 }
 
@@ -77,7 +68,7 @@ export function renderStreamingSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(formatStreamingSummary(summary), summary, width, theme);
+  return styledSummary(formatStreamingSummary(summary), width, theme);
 }
 
 export function renderSettledSummary(
@@ -85,7 +76,7 @@ export function renderSettledSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(formatSettledSummary(summary), summary, width, theme);
+  return styledSummary(formatSettledSummary(summary), width, theme);
 }
 
 function interruptionFallback(theme: Theme | undefined, width: number): string[] {

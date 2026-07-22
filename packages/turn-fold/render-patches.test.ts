@@ -52,13 +52,21 @@ describe("turn fold summary rendering", () => {
     );
   });
 
-  it("renders themed summary lines in bold", () => {
+  it("renders every themed summary line in bold warning color", () => {
     const testTheme = {
       bold: (text: string) => `<bold>${text}</bold>`,
-      fg: (_color: string, text: string) => text,
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
     } as unknown as Theme;
-    const rendered = renderSettledSummary(summary(), 100, testTheme);
-    expect(rendered[1]).toBe("<bold>▶ Worked for 1m 5s · 10 tools · 4 msgs</bold>");
+
+    expect(renderStreamingSummary(summary({ running: true }), 100, testTheme)[1]).toBe(
+      "<bold><warning>▶ 7 earlier activities · 10 tools · 4 msgs</warning></bold>",
+    );
+    expect(renderSettledSummary(summary(), 100, testTheme)[1]).toBe(
+      "<bold><warning>▶ Worked for 1m 5s · 10 tools · 4 msgs</warning></bold>",
+    );
+    expect(
+      renderSettledSummary(summary({ aborted: true, failedTools: 1 }), 100, testTheme)[1],
+    ).toContain("<warning>");
   });
 
   it("renders summaries with a leading blank row and respects zero width", () => {

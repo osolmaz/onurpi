@@ -24,7 +24,7 @@ In compact mode, every summary line MUST occupy the first Turn Fold-managed posi
 
 Turn Fold MUST leave Pi's working and compaction status indicators under Pi's control. The working indicator remains visible while Pi is running and does not count toward the three-row activity limit.
 
-A summary line MUST fit the available terminal width. Turn Fold may truncate it with an ellipsis. Interrupted and failed summaries use the theme's warning color; normal summaries use the muted color.
+A summary line MUST fit the available terminal width. Turn Fold may truncate it with an ellipsis. Every summary line uses the theme's warning color.
 
 ## Compact mode while streaming
 
