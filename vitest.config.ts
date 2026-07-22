@@ -32,6 +32,7 @@ export default defineConfig({
         "packages/prompt-queue/window-state.ts",
         "packages/reliable-compaction/reliable-compaction.ts",
         "packages/context-window-policy/context-window-policy.ts",
+        "packages/bash-timeout-policy/bash-timeout-policy.ts",
       ],
       provider: "v8",
       reporter: ["text", "json", "json-summary"],

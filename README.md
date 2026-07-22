@@ -13,6 +13,7 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager       |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                  |
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                     |
+| [`@onurpi/bash-timeout-policy`](packages/bash-timeout-policy/)     | Default and maximum timeouts for model-initiated shell commands |
 
 ## Install
 

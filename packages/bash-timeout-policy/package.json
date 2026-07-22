@@ -1,42 +1,33 @@
 {
-  "name": "@onurpi/workspace",
+  "name": "@onurpi/bash-timeout-policy",
+  "version": "0.1.0",
   "private": true,
+  "description": "Bounded model-initiated bash timeouts for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "pi": {
     "extensions": [
-      "./packages/pi-tui-history-replay/index.ts",
-      "./packages/turn-fold/index.ts",
-      "./packages/live-stats/index.ts",
-      "./packages/nyan-mode/index.ts",
-      "./packages/prompt-queue/index.ts",
-      "./packages/reliable-compaction/index.ts",
-      "./packages/context-window-policy/index.ts",
-      "./packages/bash-timeout-policy/index.ts"
+      "./index.ts"
     ]
   },
   "scripts": {
-    "settings:sync": "node scripts/sync-settings.ts sync",
-    "settings:reset": "node scripts/sync-settings.ts reset",
     "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "lint": "eslint .",
+    "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
     "dry": "slophammer-ts dry .",
-    "mutate": "stryker run",
+    "mutate": "stryker run stryker.config.mjs",
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.80.10",
-    "@earendil-works/pi-tui": "0.80.10",
     "@eslint/js": "9.39.2",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
