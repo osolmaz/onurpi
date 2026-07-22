@@ -1,32 +1,77 @@
 const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
-export const WEATHER_SPINNER_INTERVAL_MS = 100;
+export type EmojiSpinnerVariant = {
+  name: string;
+  intervalMs: number;
+  frames: readonly string[];
+};
 
-const WEATHER_SPINNER_FRAMES = [
-  "☀️",
-  "☀️",
-  "☀️",
-  "🌤️",
-  "⛅️",
-  "🌥️",
-  "☁️",
-  "🌧️",
-  "🌨️",
-  "🌧️",
-  "🌨️",
-  "🌧️",
-  "🌨️",
-  "⛈️",
-  "🌨️",
-  "🌧️",
-  "🌨️",
-  "☁️",
-  "🌥️",
-  "⛅️",
-  "🌤️",
-  "☀️",
-  "☀️",
-] as const;
+const EMOJI_SPINNER_VARIANTS = [
+  {
+    name: "weather",
+    intervalMs: 100,
+    frames: [
+      "☀️",
+      "☀️",
+      "☀️",
+      "🌤️",
+      "⛅️",
+      "🌥️",
+      "☁️",
+      "🌧️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "⛈️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "☁️",
+      "🌥️",
+      "⛅️",
+      "🌤️",
+      "☀️",
+      "☀️",
+    ],
+  },
+  {
+    name: "moon",
+    intervalMs: 80,
+    frames: ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"],
+  },
+  {
+    name: "clock",
+    intervalMs: 100,
+    frames: ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"],
+  },
+  {
+    name: "earth",
+    intervalMs: 180,
+    frames: ["🌍", "🌎", "🌏"],
+  },
+  {
+    name: "monkey",
+    intervalMs: 300,
+    frames: ["🙈", "🙈", "🙉", "🙊"],
+  },
+  {
+    name: "runner",
+    intervalMs: 140,
+    frames: ["🚶", "🏃"],
+  },
+  {
+    name: "fingerDance",
+    intervalMs: 160,
+    frames: ["🤘", "🤟", "🖖", "✋", "🤚", "👆"],
+  },
+  {
+    name: "speaker",
+    intervalMs: 160,
+    frames: ["🔈", "🔉", "🔊", "🔉"],
+  },
+] as const satisfies readonly EmojiSpinnerVariant[];
 
 type TokenSample = {
   atMs: number;
@@ -45,12 +90,26 @@ export type WorkingMessageStyles = {
   warning: (text: string) => string;
 };
 
-export function getWeatherSpinnerFrames(): string[] {
-  return [...WEATHER_SPINNER_FRAMES];
+export function getEmojiSpinnerVariants(): EmojiSpinnerVariant[] {
+  return EMOJI_SPINNER_VARIANTS.map((variant) => ({
+    name: variant.name,
+    intervalMs: variant.intervalMs,
+    frames: [...variant.frames],
+  }));
 }
 
-export function formatStyledWeatherSpinnerFrames(styles: WorkingMessageStyles): string[] {
-  return getWeatherSpinnerFrames().map((frame) => styles.bold(styles.warning(frame)));
+export function pickEmojiSpinnerVariant(random: () => number = Math.random): EmojiSpinnerVariant {
+  const variants = getEmojiSpinnerVariants();
+  const fallback = variants[0];
+  if (fallback === undefined) throw new Error("missing emoji spinner variants");
+  return variants[Math.floor(random() * variants.length)] ?? fallback;
+}
+
+export function formatStyledEmojiSpinnerFrames(
+  variant: EmojiSpinnerVariant,
+  styles: WorkingMessageStyles,
+): string[] {
+  return variant.frames.map((frame) => styles.bold(styles.warning(frame)));
 }
 
 type OutputContent =

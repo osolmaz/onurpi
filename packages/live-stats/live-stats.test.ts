@@ -4,13 +4,13 @@ import { describe, expect, it } from "vitest";
 import {
   countOutputContentChars,
   formatElapsed,
-  formatStyledWeatherSpinnerFrames,
+  formatStyledEmojiSpinnerFrames,
   formatStyledWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
-  getWeatherSpinnerFrames,
+  getEmojiSpinnerVariants,
   LiveStatsTracker,
-  WEATHER_SPINNER_INTERVAL_MS,
+  pickEmojiSpinnerVariant,
 } from "./live-stats.ts";
 import {
   pickWorkingPhrase,
@@ -235,10 +235,36 @@ describe("formatTokenCount", () => {
   });
 });
 
-describe("weather spinner", () => {
-  it("matches the cli-spinners weather variant at its 100 ms interval", () => {
-    expect(WEATHER_SPINNER_INTERVAL_MS).toBe(100);
-    expect(getWeatherSpinnerFrames()).toEqual([
+describe("emoji spinners", () => {
+  it("includes the curated single-emoji cli-spinners variants", () => {
+    expect(getEmojiSpinnerVariants().map(({ name, intervalMs }) => ({ name, intervalMs }))).toEqual(
+      [
+        { name: "weather", intervalMs: 100 },
+        { name: "moon", intervalMs: 80 },
+        { name: "clock", intervalMs: 100 },
+        { name: "earth", intervalMs: 180 },
+        { name: "monkey", intervalMs: 300 },
+        { name: "runner", intervalMs: 140 },
+        { name: "fingerDance", intervalMs: 160 },
+        { name: "speaker", intervalMs: 160 },
+      ],
+    );
+  });
+
+  it("keeps every frame to one emoji and the same terminal width", () => {
+    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+    for (const variant of getEmojiSpinnerVariants()) {
+      expect(variant.frames.every((frame) => [...segmenter.segment(frame)].length === 1)).toBe(
+        true,
+      );
+      expect(new Set(variant.frames.map((frame) => visibleWidth(frame)))).toEqual(new Set([2]));
+      expect(variant.frames.every((frame) => frame.trimEnd() === frame)).toBe(true);
+    }
+  });
+
+  it("preserves the full weather progression", () => {
+    expect(getEmojiSpinnerVariants()[0]?.frames).toEqual([
       "☀️",
       "☀️",
       "☀️",
@@ -265,17 +291,18 @@ describe("weather spinner", () => {
     ]);
   });
 
-  it("keeps every frame at the same terminal width", () => {
-    const widths = getWeatherSpinnerFrames().map((frame) => visibleWidth(frame));
-
-    expect(new Set(widths)).toEqual(new Set([2]));
+  it("picks across the collection and falls back safely", () => {
+    expect(pickEmojiSpinnerVariant(() => 0).name).toBe("weather");
+    expect(pickEmojiSpinnerVariant(() => 0.999_999).name).toBe("speaker");
+    expect(pickEmojiSpinnerVariant(() => 1).name).toBe("weather");
   });
 
-  it("returns a fresh frame array", () => {
-    const frames = getWeatherSpinnerFrames();
-    frames.pop();
+  it("returns independent frame arrays", () => {
+    const first = getEmojiSpinnerVariants();
+    const second = getEmojiSpinnerVariants();
 
-    expect(getWeatherSpinnerFrames()).toHaveLength(23);
+    expect(first[0]?.frames).not.toBe(second[0]?.frames);
+    expect(second[0]?.frames).toHaveLength(23);
   });
 
   it("renders every frame in bold warning color", () => {
@@ -283,9 +310,10 @@ describe("weather spinner", () => {
       bold: (text: string) => `<b>${text}</b>`,
       warning: (text: string) => `<warning>${text}</warning>`,
     };
+    const spinner = pickEmojiSpinnerVariant(() => 0.5);
 
-    expect(formatStyledWeatherSpinnerFrames(styles)).toEqual(
-      getWeatherSpinnerFrames().map((frame) => `<b><warning>${frame}</warning></b>`),
+    expect(formatStyledEmojiSpinnerFrames(spinner, styles)).toEqual(
+      spinner.frames.map((frame) => `<b><warning>${frame}</warning></b>`),
     );
   });
 });
