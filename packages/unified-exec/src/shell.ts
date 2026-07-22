@@ -50,7 +50,7 @@ export interface ShellCommand {
 /** Basename without a Windows executable extension, lowercased. */
 function shellBase(shellBin: string): string {
   const base = shellBin.split(/[\\/]/).pop() ?? shellBin;
-  return base.replace(/\.(exe|cmd|bat)$/i, "").toLowerCase();
+  return base.replace(/\.(com|exe|cmd|bat)$/i, "").toLowerCase();
 }
 
 /**

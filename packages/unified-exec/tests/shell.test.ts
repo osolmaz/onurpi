@@ -79,6 +79,8 @@ describe("buildShellCommand", () => {
     assert.equal(r.windowsVerbatimArguments, true);
     const r2 = buildShellCommand("cmd.exe", "echo hi", true);
     assert.deepEqual(r2.command, ["cmd.exe", "/d", "/s", "/c", '"echo hi"']);
+    const r3 = buildShellCommand("cmd.com", "echo hi", true);
+    assert.deepEqual(r3.command, ["cmd.com", "/d", "/s", "/c", '"echo hi"']);
   });
 
   it("a POSIX binary that happens to be named cmd gets plain -c", () => {

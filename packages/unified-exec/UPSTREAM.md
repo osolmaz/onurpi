@@ -106,10 +106,12 @@ native module cannot load.
   empty write that behaves like a poll.
 - Bound output accumulated during each attached wait to two response windows while preserving full
   byte and line metadata; the complete stream continues to the private log file.
-- Bound rolling stream previews and `kill_session` output even when a child emits oversized chunks.
+- Bound rolling stream previews and `kill_session` output even when a child emits oversized chunks,
+  and pause pipe or PTY output while the complete-log writer is backpressured.
 - Retry transient completion-message send failures automatically while the session remains alive.
-- Accept extension-bearing Windows shell names and exclude unspawnable command wrappers from the
-  default shell probe.
+- Accept extension-bearing Windows shell names, including `.com`, and exclude unspawnable command
+  wrappers from the default shell probe.
+- Remove unnecessary reserved-ID tracking while keeping session IDs monotonic.
 - Invalidate collapsed TUI preview lines when a streamed result body changes.
 - Kept upstream v0.7.3's `set_on_exit` tool and human-explicit wake guidance.
 - Removed upstream publishing and repository-maintenance machinery from the vendored package.

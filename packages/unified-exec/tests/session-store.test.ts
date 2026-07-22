@@ -155,12 +155,11 @@ describe("SessionStore", () => {
     assert.deepEqual(reasons, ["shutdown", "shutdown"]);
   });
 
-  it("releaseId allows the id to remain unused", () => {
+  it("allocates monotonic ids without retaining unused reservations", () => {
     const store = new SessionStore<StubSession>({ maxSessions: 5, lruProtectedCount: 1 });
-    const id = store.allocateId();
-    store.releaseId(id);
-    // next allocation should still be monotonic (released ids are not reused)
-    const next = store.allocateId();
-    assert.ok(next > id);
+    const first = store.allocateId();
+    const second = store.allocateId();
+    assert.equal(second, first + 1);
+    assert.equal(store.size, 0);
   });
 });

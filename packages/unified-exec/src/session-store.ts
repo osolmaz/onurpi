@@ -22,7 +22,6 @@ export interface SessionStoreOptions<TSession extends StoredSession> {
 
 export class SessionStore<TSession extends StoredSession = ExecSession> {
   private readonly sessions = new Map<number, TSession>();
-  private readonly reservedIds = new Set<number>();
   private nextId = 1;
   readonly maxSessions: number;
   readonly lruProtectedCount: number;
@@ -35,13 +34,7 @@ export class SessionStore<TSession extends StoredSession = ExecSession> {
   }
 
   allocateId(): number {
-    const id = this.nextId++;
-    this.reservedIds.add(id);
-    return id;
-  }
-
-  releaseId(id: number): void {
-    this.reservedIds.delete(id);
+    return this.nextId++;
   }
 
   get(id: number): TSession | undefined {
@@ -60,7 +53,6 @@ export class SessionStore<TSession extends StoredSession = ExecSession> {
     const pruned =
       this.sessions.size >= this.maxSessions ? (this.pruneLru() ?? undefined) : undefined;
     this.sessions.set(session.id, session);
-    this.reservedIds.delete(session.id);
     return {
       ...(pruned === undefined ? {} : { pruned }),
       count: this.sessions.size,
@@ -68,7 +60,6 @@ export class SessionStore<TSession extends StoredSession = ExecSession> {
   }
 
   remove(id: number): TSession | undefined {
-    this.reservedIds.delete(id);
     const entry = this.sessions.get(id);
     if (!entry) return undefined;
     this.sessions.delete(id);
@@ -78,7 +69,6 @@ export class SessionStore<TSession extends StoredSession = ExecSession> {
   terminateAll(): TSession[] {
     const drained = Array.from(this.sessions.values());
     this.sessions.clear();
-    this.reservedIds.clear();
     for (const session of drained) {
       try {
         session.terminate();
@@ -103,7 +93,6 @@ export class SessionStore<TSession extends StoredSession = ExecSession> {
       byOldest.find((entry) => !protectedIds.has(entry.id));
     if (!victim) return null;
     this.sessions.delete(victim.id);
-    this.reservedIds.delete(victim.id);
     try {
       victim.terminate();
     } catch {

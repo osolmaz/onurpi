@@ -60,6 +60,7 @@ export class ExecSession {
   /** Path to a log file that receives the full stdout+stderr stream. */
   readonly logPath: string;
   private logStream: WriteStream | undefined;
+  private logDrain: { stream: WriteStream; listener: () => void } | undefined;
 
   /** Head+tail buffer drained by each collectOutputUntilDeadline() call. */
   readonly outputBuffer: HeadTailBuffer;
@@ -125,6 +126,7 @@ export class ExecSession {
         // (kill() no-ops once hasExited) and orphan the process.
         self.recordFailure(`log stream error: ${err?.message ?? err}`);
         self.logStream = undefined;
+        self.clearLogBackpressure(true);
       });
     } catch (error: unknown) {
       if (logFd !== undefined) closeSync(logFd);
@@ -160,9 +162,13 @@ export class ExecSession {
       self.totalOutputBytes += chunk.length;
       self.outputBuffer.pushChunk(chunk);
       self.appendStreamTail(chunk);
-      // Mirror every byte to the log file. Errors are handled by the
-      // 'error' listener on the stream, which nulls `logStream` out.
-      self.logStream?.write(Buffer.from(chunk));
+      // Mirror every byte to the log file. Pause child output when the
+      // filesystem stream applies backpressure so its internal queue remains
+      // bounded; the stream's drain event resumes both pipe and PTY sources.
+      const stream = self.logStream;
+      if (stream && !stream.write(Buffer.from(chunk)) && !self.logDrain) {
+        self.pauseForLogDrain(stream);
+      }
       self.outputNotify.notifyAll();
     });
 
@@ -202,6 +208,21 @@ export class ExecSession {
     });
 
     return self;
+  }
+
+  private pauseForLogDrain(stream: WriteStream): void {
+    const listener = () => this.clearLogBackpressure(true);
+    this.logDrain = { stream, listener };
+    stream.once("drain", listener);
+    this.child.pauseOutput();
+  }
+
+  private clearLogBackpressure(resumeOutput: boolean): void {
+    const pending = this.logDrain;
+    if (!pending) return;
+    this.logDrain = undefined;
+    pending.stream.off("drain", pending.listener);
+    if (resumeOutput) this.child?.resumeOutput();
   }
 
   private appendStreamTail(chunk: Uint8Array): void {

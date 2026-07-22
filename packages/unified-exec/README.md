@@ -556,7 +556,9 @@ that codex itself treats as unsolved:
 **1. Full output retained on disk, not just head+tail in memory.** Codex caps each session's
 in-memory buffer at 1 MiB and silently drops middle bytes once it fills. We mirror every byte the
 child writes to `/tmp/pi-unified-exec-<sid>-<random>.log` in parallel with the in-memory buffer. The
-file has the complete, unaltered stream across the entire session's lifetime; nothing is lost.
+file has the complete, unaltered stream across the entire session's lifetime; nothing is lost. If
+the file writer saturates, pipe and PTY output pause until it drains instead of growing an unbounded
+Node write queue.
 
 **2. LLM-visible output is tail-capped at pi's `bash` defaults (50 KiB or 2000 lines, whichever hits
 first), with a pointer to the log file.** Codex serializes up to ~40 KiB to the LLM on every call

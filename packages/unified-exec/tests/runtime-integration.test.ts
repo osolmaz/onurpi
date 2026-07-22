@@ -86,6 +86,11 @@ describe("runtime integration", () => {
     assert.equal(result.exit_code, 0);
     assert.match(result.output, /quick/);
     assert.equal(runtime.store.size, 0);
+    assert.equal(
+      runtime.store.allocateId(),
+      2,
+      "session ids remain monotonic after early completion",
+    );
     assert.ok(result.log_path);
     if (process.platform !== "win32") {
       const metadata = await stat(result.log_path);

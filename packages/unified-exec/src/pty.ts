@@ -45,6 +45,9 @@ export interface SpawnedChild {
   onData(handler: (chunk: Uint8Array) => void): () => void;
   /** Subscribe to the child's exit event. Fires at most once. */
   onExit(handler: ExitCallback): void;
+  /** Pause and resume child output when a downstream sink applies backpressure. */
+  pauseOutput(): void;
+  resumeOutput(): void;
   /** Send a signal to the process group; silently no-ops if already dead. */
   kill(signal?: NodeJS.Signals): void;
   /** Resize the PTY if applicable; no-op for pipe mode. */
@@ -77,6 +80,8 @@ type PtyProcess = {
     cb: (e: { exitCode: number; signal?: number }) => void,
   ) => { dispose: () => void } | undefined;
   write: (data: string | Buffer) => void;
+  pause: () => void;
+  resume: () => void;
   resize: (cols: number, rows: number) => void;
   kill: (signal?: string) => void;
 };
@@ -305,6 +310,22 @@ function spawnPty(mod: PtyModule, opts: SpawnOptions): SpawnedChild {
       if (exited) return;
       exitHandlers.add(handler);
     },
+    pauseOutput() {
+      if (exited) return;
+      try {
+        child.pause();
+      } catch {
+        // already gone
+      }
+    },
+    resumeOutput() {
+      if (exited) return;
+      try {
+        child.resume();
+      } catch {
+        // already gone
+      }
+    },
     kill(signal = "SIGTERM") {
       if (exited) return;
       if (IS_WINDOWS) {
@@ -422,6 +443,14 @@ function spawnPipes(opts: SpawnOptions): SpawnedChild {
     onExit(handler) {
       if (exited) return;
       exitHandlers.add(handler);
+    },
+    pauseOutput() {
+      child.stdout?.pause();
+      child.stderr?.pause();
+    },
+    resumeOutput() {
+      child.stdout?.resume();
+      child.stderr?.resume();
     },
     kill(signal = "SIGTERM") {
       if (exited || !child.pid) return;

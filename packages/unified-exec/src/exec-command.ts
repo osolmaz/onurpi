@@ -94,7 +94,6 @@ function spawn(
     shell: prepared.shell,
     windowsVerbatimArguments: prepared.windowsVerbatimArguments,
   });
-  if (session.failureMessage) runtime.store.releaseId(id);
   return session;
 }
 
