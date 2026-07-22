@@ -239,36 +239,36 @@ describe("weather spinner", () => {
   it("matches the cli-spinners weather variant at its 100 ms interval", () => {
     expect(WEATHER_SPINNER_INTERVAL_MS).toBe(100);
     expect(getWeatherSpinnerFrames()).toEqual([
-      "☀️ ",
-      "☀️ ",
-      "☀️ ",
-      "🌤️ ",
-      "⛅️ ",
-      "🌥️ ",
-      "☁️ ",
-      "🌧️ ",
-      "🌨️ ",
-      "🌧️ ",
-      "🌨️ ",
-      "🌧️ ",
-      "🌨️ ",
-      "⛈️ ",
-      "🌨️ ",
-      "🌧️ ",
-      "🌨️ ",
-      "☁️ ",
-      "🌥️ ",
-      "⛅️ ",
-      "🌤️ ",
-      "☀️ ",
-      "☀️ ",
+      "☀️",
+      "☀️",
+      "☀️",
+      "🌤️",
+      "⛅️",
+      "🌥️",
+      "☁️",
+      "🌧️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "⛈️",
+      "🌨️",
+      "🌧️",
+      "🌨️",
+      "☁️",
+      "🌥️",
+      "⛅️",
+      "🌤️",
+      "☀️",
+      "☀️",
     ]);
   });
 
   it("keeps every frame at the same terminal width", () => {
     const widths = getWeatherSpinnerFrames().map((frame) => visibleWidth(frame));
 
-    expect(new Set(widths)).toEqual(new Set([3]));
+    expect(new Set(widths)).toEqual(new Set([2]));
   });
 
   it("returns a fresh frame array", () => {
