@@ -1,0 +1,24 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - .
+    exclude:
+      - "**/*.test.ts"
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  mutation:
+    targets:
+      - plan-context.ts
+      - plan-render.ts
+      - plan-replay.ts
+      - plan-schema.ts
+      - plan-state.ts
+  dependency_boundaries:
+    - from: .
+      allow: []
