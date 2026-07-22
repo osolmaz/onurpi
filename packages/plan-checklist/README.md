@@ -1,11 +1,12 @@
 # @onurpi/plan-checklist
 
-`@onurpi/plan-checklist` is a branch-aware checklist extension for Pi. It gives the model an
-`update_plan` tool and keeps the current task plan visible above the editor.
+`@onurpi/plan-checklist` is a branch-aware checklist extension for Pi. Its `update_plan` tool keeps
+the current task plan visible above the editor throughout a long Pi session.
 
-Each update replaces the complete checklist. The model can mark steps `pending`, `in_progress`, or
-`completed`, with at most one active step. Pi renders the update in the main transcript and stores
-the successful tool call and result in its normal session history.
+Each update replaces the complete checklist with a new ordered snapshot of task progress. The model
+can use `pending`, `in_progress`, or `completed` while keeping at most one active step. Pi renders
+the update in the main transcript and stores the successful tool call and result in its normal
+session history.
 
 ## Install
 
@@ -46,17 +47,17 @@ Duplicate steps and direct status changes are allowed.
 
 ## Sessions and compaction
 
-The latest successful `update_plan` tool result on the active branch supplies the current state.
-Reloading Pi, navigating the session tree, forking, and compacting therefore preserve branch-correct
-plans without a separate file or database. Failed and malformed tool results leave the previous plan
-unchanged.
+The latest successful `update_plan` tool result on the active branch supplies the current state. The
+current plan stays branch-correct when Pi reloads or the user navigates, forks, or compacts the
+session. This needs no separate file or database. Failed and malformed tool results leave the
+previous plan unchanged.
 
 When compaction removes the latest plan call from model context, the extension adds the current
 snapshot to the next provider context through Pi's public `context` hook. This message is transient
 and hidden. It is never appended to the session.
 
-The widget appears only in TUI mode. Tool calls and results continue to work in RPC, JSON, print,
-and `--no-session` modes. An ephemeral session loses its plan when the process exits.
+The widget appears only in TUI mode. Tool calls and results continue to work through RPC/JSON/print
+interfaces and in `--no-session` mode. An ephemeral session loses its plan when the process exits.
 
 ## Scope
 
