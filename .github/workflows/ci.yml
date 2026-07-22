@@ -27,12 +27,6 @@ jobs:
       - name: Check @onurpi/turn-fold package with Slophammer
         working-directory: packages/turn-fold
         run: npm run slophammer
-      - name: Check pi-tui-history-replay package
-        working-directory: packages/pi-tui-history-replay
-        run: npm run check
-      - name: Check pi-tui-history-replay package with Slophammer
-        working-directory: packages/pi-tui-history-replay
-        run: npm run slophammer
       - name: Check @onurpi/live-stats package
         working-directory: packages/live-stats
         run: npm run check
@@ -83,9 +77,6 @@ jobs:
       - run: npm run mutate
       - name: Mutate @onurpi/turn-fold package
         working-directory: packages/turn-fold
-        run: npm run mutate
-      - name: Mutate pi-tui-history-replay package
-        working-directory: packages/pi-tui-history-replay
         run: npm run mutate
       - name: Mutate @onurpi/live-stats package
         working-directory: packages/live-stats

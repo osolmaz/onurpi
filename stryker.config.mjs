@@ -2,10 +2,12 @@ export default {
   checkers: ["typescript"],
   coverageAnalysis: "perTest",
   mutate: [
+    "packages/turn-fold/configuration.ts",
     "packages/turn-fold/fold-policy.ts",
     "packages/turn-fold/mode.ts",
+    "packages/turn-fold/transcript-window-adapter.ts",
+    "packages/turn-fold/transcript-windows.ts",
     "packages/turn-fold/tool-padding.ts",
-    "packages/pi-tui-history-replay/history-replay.ts",
     "packages/live-stats/live-stats.ts",
     "packages/nyan-mode/src/cost.ts",
     "packages/nyan-mode/src/png.ts",

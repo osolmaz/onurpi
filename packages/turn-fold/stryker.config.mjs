@@ -1,5 +1,12 @@
 export default {
-  mutate: ["fold-policy.ts", "mode.ts", "tool-padding.ts"],
+  mutate: [
+    "configuration.ts",
+    "fold-policy.ts",
+    "mode.ts",
+    "transcript-window-adapter.ts",
+    "transcript-windows.ts",
+    "tool-padding.ts",
+  ],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

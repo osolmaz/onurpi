@@ -16,7 +16,11 @@ A **summary line** is a synthetic row created by Turn Fold. A running turn may h
 
 The **final content row** is the one assistant or tool row retained after a compact turn settles.
 
+A **compaction window** is an active-branch range between compaction entries. The current window ends at the active leaf. The **window value** is a positive integer or `all` and controls how much of the active branch Pi renders in its main transcript.
+
 ## Display invariants
+
+Turn Fold MUST select the configured number of newest compaction windows before applying compact or expanded rendering. A numeric range starts at the nearest user message before its oldest compaction boundary and continues through the active leaf. `all` selects the complete active branch.
 
 Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. The retained final content row shows the local completion time beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
@@ -101,13 +105,15 @@ Stale partial assistant text MUST NOT replace a terminal tool error selected as 
 
 ## Expanded mode
 
-Expanded mode shows Pi's original transcript rows in their original order, including attached and standalone compaction rows. Turn Fold summary lines are hidden.
+Expanded mode shows Pi's original transcript rows in their original order within the selected window range, including attached and standalone compaction rows. Turn Fold summary lines are hidden.
 
 Switching between compact and expanded mode MUST update the existing transcript immediately. A single mode change MUST invalidate each affected component no more than once.
 
 ## History and reload
 
-Turn Fold reconstructs turn groups from the active session branch when Pi starts, reloads, switches trees, or rebuilds the transcript after compaction.
+Turn Fold reconstructs turn groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. Its turn index and Pi's TUI projection MUST use the same entry snapshot.
+
+Changing the window value MUST wait for Pi to become idle before persisting the new value and rebuilding the main transcript. Every value except `all` applies without confirmation. `all` MUST report the active-branch entry count and require confirmation because full replay can slow editor input. Cancellation leaves the existing value and transcript unchanged.
 
 Turn Fold keeps attached compaction associations in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, and it retains the active turn's existing entry IDs so split turns can be restored without guessing. Associations are limited to compactions on the active branch. The registry survives `/reload` and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
 
@@ -121,7 +127,7 @@ Elapsed time and the final-content timestamp come from persisted turn completion
 
 Turn Fold changes rendering only. It MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context. Compaction folding MUST NOT append custom entries, custom messages, labels, tool-result metadata, or any other persistent state.
 
-Mode changes are the existing explicit exception and are stored as custom session entries. The supported modes are exactly `compact` and `expanded`; unknown historical values resolve to `compact`.
+Mode and window changes are the explicit exception and are stored together in Turn Fold custom session entries. The supported modes are exactly `compact` and `expanded`. The window value is a positive safe integer or `all`. Entries that do not match the complete configuration shape are ignored, and the defaults are compact mode with three windows.
 
 ## Controls
 
@@ -133,13 +139,18 @@ The extension provides these commands:
 /turn-fold expanded
 /turn-fold toggle
 /turn-fold status
+/turn-fold windows 5
+/turn-fold windows +2
+/turn-fold windows -1
+/turn-fold windows all
+/turn-fold windows reset
 ```
 
 `Ctrl+Shift+O` toggles the mode but does not appear beside the summary text. `Ctrl+O` remains Pi's tool-output expansion control.
 
 ## Compatibility boundary
 
-Turn Fold patches Pi's exported `AssistantMessageComponent`, `ToolExecutionComponent`, and `CompactionSummaryMessageComponent` because Pi 0.80.10 does not expose a whole-turn transcript renderer. Each supported Pi release requires component-level integration testing.
+Turn Fold patches Pi's built-in transcript component renderers because Pi 0.80.10 does not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
 
 ## Acceptance tests
 
@@ -156,4 +167,7 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Compaction handling performs no Pi session or sidecar writes.
 - Expanded mode restores Pi's original compaction rows and spacing.
 - Compact and expanded mode switching updates the existing transcript.
+- Exact, relative, reset, and confirmed `all` window changes rebuild the expected user-anchored range.
+- Cancelling `all` and invalid arguments leave the transcript unchanged.
+- Repeated unchanged renders perform no activity sorting or assistant-content rescans.
 - Session messages and model context are unchanged.

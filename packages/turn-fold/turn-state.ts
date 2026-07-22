@@ -21,6 +21,22 @@ type ComponentInfo = {
   sequence: number;
 };
 
+type GroupLayoutParts = {
+  activities: object[];
+  lastAssistant: object | undefined;
+  toolComponents: Map<string, object>;
+};
+
+type GroupLayout = {
+  failedTools: number;
+  finalAnchor: object | undefined;
+  hiddenActivities: number;
+  recentActivities: ReadonlySet<object>;
+  revision: number;
+  settledSummaryAnchor: object | undefined;
+  streamingSummaryAnchor: object | undefined;
+};
+
 type TurnGroup = {
   aborted: boolean;
   assistantKeys: Set<string>;
@@ -31,6 +47,8 @@ type TurnGroup = {
   endedAt?: number;
   failedToolCallIds: Set<string>;
   id: string;
+  layout: GroupLayout | undefined;
+  revision: number;
   settled: boolean;
   startedAt: number;
   startedByUser: boolean;
@@ -133,18 +151,6 @@ function entryTimestamp(entry: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function latestBySequence(
-  components: Map<object, ComponentInfo>,
-  candidates: readonly object[],
-): object | undefined {
-  return candidates.reduce<object | undefined>((latest, candidate) => {
-    if (!latest) return candidate;
-    const currentSequence = components.get(candidate)?.sequence ?? -1;
-    const latestSequence = components.get(latest)?.sequence ?? -1;
-    return currentSequence > latestSequence ? candidate : latest;
-  }, undefined);
-}
-
 function groupNumber(id: string): number {
   const value = Number(id.slice("turn-".length));
   return Number.isSafeInteger(value) && value >= 0 ? value : 0;
@@ -155,14 +161,28 @@ function invalidateComponent(component: object): void {
   if (typeof invalidate === "function") Reflect.apply(invalidate, component, []);
 }
 
-function assistantDisplayClassChanged(
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function assistantHasVisibleContent(snapshot: AssistantSnapshot | undefined): boolean {
+  return snapshot?.hasVisibleContent === true;
+}
+
+function assistantIsDisplayable(snapshot: AssistantSnapshot | undefined): boolean {
+  return snapshot?.hasVisibleContent === true || snapshot?.hasTerminalNotice === true;
+}
+
+function assistantLayoutChanged(
   previous: AssistantSnapshot | undefined,
   current: AssistantSnapshot,
 ): boolean {
   if (!previous) return false;
   return (
     previous.hasVisibleContent !== current.hasVisibleContent ||
-    previous.hasTerminalNotice !== current.hasTerminalNotice
+    previous.hasTerminalNotice !== current.hasTerminalNotice ||
+    previous.interrupted !== current.interrupted ||
+    !sameStrings(previous.terminalErrorToolCallIds, current.terminalErrorToolCallIds)
   );
 }
 
@@ -175,6 +195,7 @@ export class TurnFoldState {
   private assistantGroupByKey = new Map<string, string>();
   private assistantKeyByMessage = new WeakMap<object, string>();
   private assistantOrdinalByTimestamp = new Map<number, number>();
+  private assistantSnapshotByMessage = new WeakMap<object, AssistantSnapshot>();
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private compactionComponentGroup = new WeakMap<object, string | null>();
   private compactionGroupByTimestamp = new Map<number, string | null>();
@@ -307,7 +328,7 @@ export class TurnFoldState {
     const added = group ? !group.toolCallIds.has(toolCallId) : false;
     group?.toolCallIds.add(toolCallId);
     this.toolGroupById.set(toolCallId, groupId);
-    if (group && added) this.invalidateGroupComponents(group);
+    if (group && added) this.markGroupChanged(group);
   }
 
   registerToolEnd(toolCallId: string, failed: boolean): void {
@@ -315,7 +336,7 @@ export class TurnFoldState {
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group || !failed || group.failedToolCallIds.has(toolCallId)) return;
     group.failedToolCallIds.add(toolCallId);
-    this.invalidateGroupComponents(group);
+    this.markGroupChanged(group);
   }
 
   associateUser(component: object): void {
@@ -337,7 +358,7 @@ export class TurnFoldState {
     const key =
       this.messageAssistantKey(message) ?? this.latestAssistantKeyByTimestamp.get(timestamp);
     if (!key) return;
-    const snapshot = assistantSnapshot(message, key);
+    const snapshot = this.cachedAssistantSnapshot(message, key);
     if (!snapshot) return;
     const group = this.groupForAssistantComponent(component, snapshot);
     if (!group) return;
@@ -345,8 +366,8 @@ export class TurnFoldState {
     const previousSnapshot = group.assistants.get(component);
     const added = this.associateComponent(component, group, "assistant");
     group.assistants.set(component, snapshot);
-    if (added || assistantDisplayClassChanged(previousSnapshot, snapshot)) {
-      this.invalidateGroupComponents(group);
+    if (added || assistantLayoutChanged(previousSnapshot, snapshot)) {
+      this.markGroupChanged(group);
     }
   }
 
@@ -357,7 +378,7 @@ export class TurnFoldState {
 
     const added = this.associateComponent(component, group, "tool");
     group.tools.set(component, toolCallId);
-    if (added) this.invalidateGroupComponents(group);
+    if (added) this.markGroupChanged(group);
   }
 
   registerCompaction(
@@ -382,7 +403,7 @@ export class TurnFoldState {
     this.compactionAssociations.set(compactionEntryId, association);
     const added = this.indexCompactionAssociation(group, association);
     this.queueLiveCompactionComponents(group.id);
-    if (added) this.invalidateGroupComponents(group);
+    if (added) this.markGroupChanged(group);
     return association;
   }
 
@@ -393,7 +414,7 @@ export class TurnFoldState {
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group) return;
     if (this.associateComponent(component, group, "compaction")) {
-      this.invalidateGroupComponents(group);
+      this.markGroupChanged(group);
     }
   }
 
@@ -403,7 +424,7 @@ export class TurnFoldState {
     if (group) {
       group.settled = true;
       group.endedAt = endedAt;
-      this.invalidateGroupComponents(group);
+      this.markGroupChanged(group);
     }
     this.activeGroupId = undefined;
   }
@@ -419,15 +440,16 @@ export class TurnFoldState {
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group) return undefined;
 
+    const layout = this.layoutFor(group);
     const display = foldDisplay({
-      isFinalAnchor: component === this.finalAnchor(group),
-      isRecentActivity: this.isRecentActivity(group, component),
-      isSettledSummaryAnchor: component === this.settledSummaryAnchor(group),
-      isStreamingSummaryAnchor: component === this.streamingSummaryAnchor(group),
+      isFinalAnchor: component === layout.finalAnchor,
+      isRecentActivity: layout.recentActivities.has(component),
+      isSettledSummaryAnchor: component === layout.settledSummaryAnchor,
+      isStreamingSummaryAnchor: component === layout.streamingSummaryAnchor,
       mode: this.mode,
       settled: group.settled,
     });
-    return { display, summary: this.summary(group, now) };
+    return { display, summary: this.summary(group, layout, now) };
   }
 
   private queueLiveCompactionComponents(groupId: string | null): void {
@@ -458,8 +480,22 @@ export class TurnFoldState {
     return key;
   }
 
-  private registerAssistantSnapshot(message: unknown, key: string): void {
+  private cachedAssistantSnapshot(message: unknown, key: string): AssistantSnapshot | undefined {
+    if (isRecord(message)) {
+      const cached = this.assistantSnapshotByMessage.get(message);
+      if (cached?.key === key) return cached;
+    }
+    return this.captureAssistantSnapshot(message, key);
+  }
+
+  private captureAssistantSnapshot(message: unknown, key: string): AssistantSnapshot | undefined {
     const snapshot = assistantSnapshot(message, key);
+    if (snapshot && isRecord(message)) this.assistantSnapshotByMessage.set(message, snapshot);
+    return snapshot;
+  }
+
+  private registerAssistantSnapshot(message: unknown, key: string): void {
+    const snapshot = this.captureAssistantSnapshot(message, key);
     if (!snapshot) return;
     if (isRecord(message)) this.assistantKeyByMessage.set(message, key);
     this.latestAssistantKeyByTimestamp.set(snapshot.timestamp, key);
@@ -467,7 +503,7 @@ export class TurnFoldState {
     const group = this.groups.get(groupId);
     if (!group) return;
     const changed = this.indexAssistantSnapshot(group, groupId, snapshot);
-    if (changed) this.invalidateGroupComponents(group);
+    if (changed) this.markGroupChanged(group);
   }
 
   private groupForAssistantComponent(
@@ -488,6 +524,8 @@ export class TurnFoldState {
   ): boolean {
     const previousMessages = group.assistantKeys.size;
     const previousTools = group.toolCallIds.size;
+    const wasAborted = group.aborted;
+    const previousTerminalErrors = [...group.terminalErrorToolCallIds];
     group.assistantKeys.add(snapshot.key);
     if (snapshot.interrupted) group.aborted = true;
     group.terminalErrorToolCallIds = new Set(snapshot.terminalErrorToolCallIds);
@@ -497,7 +535,10 @@ export class TurnFoldState {
       this.toolGroupById.set(toolCallId, groupId);
     }
     return (
-      group.assistantKeys.size !== previousMessages || group.toolCallIds.size !== previousTools
+      group.assistantKeys.size !== previousMessages ||
+      group.toolCallIds.size !== previousTools ||
+      group.aborted !== wasAborted ||
+      !sameStrings(previousTerminalErrors, snapshot.terminalErrorToolCallIds)
     );
   }
 
@@ -505,64 +546,72 @@ export class TurnFoldState {
     return group.assistantKeys.size > 0 || group.toolCallIds.size > 0;
   }
 
-  private activityComponents(group: TurnGroup): [object, ComponentInfo][] {
-    return [...group.components]
-      .filter(
-        ([candidate, info]) =>
-          info.kind === "tool" || group.assistants.get(candidate)?.hasVisibleContent === true,
-      )
-      .sort(([, left], [, right]) => right.sequence - left.sequence);
-  }
-
-  private isRecentActivity(group: TurnGroup, component: object): boolean {
-    return this.activityComponents(group)
-      .slice(0, LIVE_ACTIVITY_LIMIT)
-      .some(([candidate]) => candidate === component);
-  }
-
-  private streamingSummaryAnchor(group: TurnGroup): object | undefined {
-    return this.activityComponents(group).slice(LIVE_ACTIVITY_LIMIT).at(-1)?.[0];
-  }
-
-  private settledSummaryAnchor(group: TurnGroup): object | undefined {
-    return [...group.components].sort(
-      ([, left], [, right]) => left.sequence - right.sequence,
-    )[0]?.[0];
-  }
-
-  private lastAssistant(group: TurnGroup): object | undefined {
-    const candidates = [...group.assistants]
-      .filter(([, snapshot]) => snapshot.hasVisibleContent || snapshot.hasTerminalNotice)
-      .map(([component]) => component);
-    return latestBySequence(group.components, candidates);
-  }
-
-  private finalAnchor(group: TurnGroup): object | undefined {
-    const terminalErrorToolCallId = [...group.terminalErrorToolCallIds].at(-1);
-    if (terminalErrorToolCallId) {
-      return this.componentForTool(group, terminalErrorToolCallId);
+  private collectLayoutComponent(
+    group: TurnGroup,
+    parts: GroupLayoutParts,
+    component: object,
+    info: ComponentInfo,
+  ): void {
+    const assistant = group.assistants.get(component);
+    if (info.kind === "tool" || assistantHasVisibleContent(assistant)) {
+      parts.activities.push(component);
     }
-    const assistant = this.lastAssistant(group);
-    if (assistant) return assistant;
-    const finalToolCallId = [...group.toolCallIds].at(-1);
-    if (!finalToolCallId) return this.activityComponents(group).at(0)?.[0];
-    return this.componentForTool(group, finalToolCallId);
+    if (assistantIsDisplayable(assistant)) parts.lastAssistant = component;
+    const toolCallId = group.tools.get(component);
+    if (toolCallId) parts.toolComponents.set(toolCallId, component);
   }
 
-  private componentForTool(group: TurnGroup, toolCallId: string | undefined): object | undefined {
-    if (!toolCallId) return undefined;
-    return [...group.tools].find(([, candidate]) => candidate === toolCallId)?.[0];
+  private collectLayoutParts(group: TurnGroup): GroupLayoutParts {
+    const parts: GroupLayoutParts = {
+      activities: [],
+      lastAssistant: undefined,
+      toolComponents: new Map(),
+    };
+    for (const [component, info] of group.components) {
+      this.collectLayoutComponent(group, parts, component, info);
+    }
+    return parts;
   }
 
-  private summary(group: TurnGroup, now: number): FoldSummary {
-    const activityCount = this.activityComponents(group).length;
+  private lastToolCallId(toolCallIds: ReadonlySet<string>): string | undefined {
+    let last: string | undefined;
+    for (const toolCallId of toolCallIds) last = toolCallId;
+    return last;
+  }
+
+  private finalAnchor(group: TurnGroup, parts: GroupLayoutParts): object | undefined {
+    const terminalError = this.lastToolCallId(group.terminalErrorToolCallIds);
+    if (terminalError) return parts.toolComponents.get(terminalError);
+    if (parts.lastAssistant) return parts.lastAssistant;
+    const finalTool = this.lastToolCallId(group.toolCallIds);
+    return finalTool ? parts.toolComponents.get(finalTool) : parts.activities.at(-1);
+  }
+
+  private layoutFor(group: TurnGroup): GroupLayout {
+    if (group.layout?.revision === group.revision) return group.layout;
+    const parts = this.collectLayoutParts(group);
+    const layout: GroupLayout = {
+      failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
+      finalAnchor: this.finalAnchor(group, parts),
+      hiddenActivities: Math.max(0, parts.activities.length - LIVE_ACTIVITY_LIMIT),
+      recentActivities: new Set(parts.activities.slice(-LIVE_ACTIVITY_LIMIT)),
+      revision: group.revision,
+      settledSummaryAnchor: group.components.keys().next().value,
+      streamingSummaryAnchor:
+        parts.activities.length > LIVE_ACTIVITY_LIMIT ? parts.activities[0] : undefined,
+    };
+    group.layout = layout;
+    return layout;
+  }
+
+  private summary(group: TurnGroup, layout: GroupLayout, now: number): FoldSummary {
     return {
       aborted: group.aborted,
       compactions: group.compactionIds.size,
       completedAt: group.endedAt,
       durationMs: Math.max(0, (group.endedAt ?? now) - group.startedAt),
-      failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
-      hiddenActivities: Math.max(0, activityCount - LIVE_ACTIVITY_LIMIT),
+      failedTools: layout.failedTools,
+      hiddenActivities: layout.hiddenActivities,
       messages: group.assistantKeys.size,
       running: !group.settled,
       tools: group.toolCallIds.size,
@@ -589,6 +638,8 @@ export class TurnFoldState {
       components: new Map(),
       failedToolCallIds: new Set(),
       id: `turn-${String(this.groupCounter)}`,
+      layout: undefined,
+      revision: 0,
       settled,
       startedAt,
       startedByUser,
@@ -666,7 +717,7 @@ export class TurnFoldState {
     const timestamp = numberField(message, "timestamp");
     if (timestamp === undefined) return;
     const key = this.newAssistantKey(timestamp);
-    const snapshot = assistantSnapshot(message, key);
+    const snapshot = this.captureAssistantSnapshot(message, key);
     if (!snapshot) return;
     if (isRecord(message)) this.assistantKeyByMessage.set(message, key);
     group.assistantKeys.add(snapshot.key);
@@ -701,6 +752,12 @@ export class TurnFoldState {
     for (const component of group.components.keys()) invalidateComponent(component);
   }
 
+  private markGroupChanged(group: TurnGroup): void {
+    group.revision += 1;
+    group.layout = undefined;
+    this.invalidateGroupComponents(group);
+  }
+
   private invalidateAllComponents(): void {
     for (const group of this.groups.values()) this.invalidateGroupComponents(group);
   }
@@ -716,6 +773,8 @@ export class TurnFoldState {
       group.assistants.clear();
       group.components.clear();
       group.tools.clear();
+      group.revision += 1;
+      group.layout = undefined;
     }
   }
 
@@ -727,6 +786,7 @@ export class TurnFoldState {
     this.assistantGroupByKey = new Map();
     this.assistantKeyByMessage = new WeakMap();
     this.assistantOrdinalByTimestamp = new Map();
+    this.assistantSnapshotByMessage = new WeakMap();
     this.componentInfo = new WeakMap();
     this.compactionComponentGroup = new WeakMap();
     this.compactionGroupByTimestamp = new Map();
@@ -798,6 +858,8 @@ export class TurnFoldState {
       active.terminalErrorToolCallIds = new Set(visible.terminalErrorToolCallIds);
       active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
     }
+    active.revision += 1;
+    active.layout = undefined;
   }
 
   private reassignGroupIds(fromGroupIds: ReadonlySet<string>, toGroupId: string): void {

@@ -4,12 +4,14 @@ export default defineConfig({
   test: {
     coverage: {
       include: [
+        "packages/turn-fold/configuration.ts",
         "packages/turn-fold/ephemeral-compactions.ts",
         "packages/turn-fold/fold-policy.ts",
         "packages/turn-fold/mode.ts",
+        "packages/turn-fold/transcript-window-adapter.ts",
+        "packages/turn-fold/transcript-windows.ts",
         "packages/turn-fold/turn-state.ts",
         "packages/turn-fold/tool-padding.ts",
-        "packages/pi-tui-history-replay/history-replay.ts",
         "packages/live-stats/live-stats.ts",
         "packages/live-stats/working-phrases.ts",
         "packages/nyan-mode/src/cat-state.ts",

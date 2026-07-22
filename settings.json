@@ -3,7 +3,6 @@
     "git:github.com/osolmaz/pi-workflows",
     "npm:pi-web-access@0.13.0",
     "git:github.com/osolmaz/pi-must-win",
-    "../../repos/onurpi/packages/pi-tui-history-replay",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -70,6 +70,39 @@ describe("compact streaming", () => {
       "original",
       "original",
     ]);
+  });
+
+  it("reuses cached layout and assistant snapshots across unchanged renders", () => {
+    const state = new TurnFoldState();
+    const component = {};
+    let contentReads = 0;
+    const contentItem = {
+      get text() {
+        contentReads += 1;
+        return "Cached";
+      },
+      get type() {
+        contentReads += 1;
+        return "text";
+      },
+    };
+    const message = assistantMessage(110, [contentItem]);
+    state.ensureActive(100);
+    registerAssistant(state, component, message);
+    state.viewFor(component);
+    contentReads = 0;
+    const sortSpy = vi.spyOn(Array.prototype, "sort");
+    try {
+      for (let index = 0; index < 100; index += 1) {
+        state.associateAssistant(component, message);
+        state.viewFor(component, 200 + index);
+      }
+
+      expect(contentReads).toBe(0);
+      expect(sortSpy).not.toHaveBeenCalled();
+    } finally {
+      sortSpy.mockRestore();
+    }
   });
 
   it("invalidates existing rows as new activity changes the compact window", () => {
