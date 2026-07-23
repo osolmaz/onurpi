@@ -104,6 +104,25 @@ describe("weekly status formatting", () => {
   });
 });
 
+describe("usage service", () => {
+  it("deduplicates matching timeouts without weakening a shorter command timeout", async () => {
+    const query = vi.fn((_ctx, options: { timeoutMs: number }) =>
+      Promise.resolve({ ok: true as const, report: report(options.timeoutMs / 1_000) }),
+    );
+    const service = createUsageService({ now: Date.now, query });
+    const fixture = context();
+
+    await Promise.all([
+      service.read(fixture.ctx, { refresh: true, timeoutMs: 15_000 }),
+      service.read(fixture.ctx, { refresh: true, timeoutMs: 1_000 }),
+      service.read(fixture.ctx, { refresh: true, timeoutMs: 1_000 }),
+    ]);
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls.map(([, options]) => options.timeoutMs)).toEqual([15_000, 1_000]);
+  });
+});
+
 describe("weekly status lifecycle", () => {
   it("queries only for Codex models and clears on other providers", async () => {
     const query = vi.fn(() => Promise.resolve({ ok: true as const, report: report() }));
