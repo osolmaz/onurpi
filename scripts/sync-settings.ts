@@ -19,7 +19,10 @@ const liveSettingsPath = join(homedir(), ".pi", "agent", "settings.json");
 const trackedSettingsPath = join(repoRoot, "settings.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
-const REPLACED_PACKAGE_SOURCES = [/^npm:pi-unified-exec(?:@.*)?$/];
+const REPLACED_PACKAGE_SOURCES = [
+  /^npm:pi-unified-exec(?:@.*)?$/,
+  /^npm:@narumitw\/pi-codex-usage(?:@.*)?$/,
+];
 const CANONICAL_REPO_ROOT = resolve(dirname(liveSettingsPath), "..", "..", "repos", "onurpi");
 const WORKTREES_ROOT = resolve(CANONICAL_REPO_ROOT, "..", "onurpi-worktrees");
 

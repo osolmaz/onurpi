@@ -12,6 +12,7 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
+| [`@onurpi/codex-usage`](packages/codex-usage/)                     | On-demand Codex subscription usage reports                       |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 
@@ -44,9 +45,9 @@ npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
 ```
 
 An entry counts as belonging to this repo when it points into the main checkout, into an
-`onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced
-`npm:pi-unified-exec` source is also treated as repo-owned so it cannot coexist with the vendored
-package. Those entries are replaced with one canonical `../../repos/onurpi/packages/<name>` entry
+`onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced npm sources for
+Unified Exec and Codex Usage are also treated as repo-owned so they cannot coexist with the vendored
+packages. Those entries are replaced with one canonical `../../repos/onurpi/packages/<name>` entry
 per registered package. External entries (npm packages, other git repos) and all other settings pass
 through untouched.
 
