@@ -1,7 +1,7 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 import type { CatMood } from "./cat-state.ts";
-import { normalizeProgress } from "./progress.ts";
+import { normalizeAvailableProgress } from "./progress.ts";
 
 export type TextNyanOptions = {
   mood?: CatMood;
@@ -49,7 +49,7 @@ export function renderTextNyan(
   const cat = renderCat(options.mood ?? "neutral", options.animationFrame ?? 0);
   if (width < CAT_CELLS) return `${rainbowTrail(width)}${RESET_FOREGROUND}`;
 
-  const position = Math.round(normalizeProgress(percent) * (width - CAT_CELLS));
+  const position = Math.round(normalizeAvailableProgress(percent) * (width - CAT_CELLS));
   const trail = rainbowTrail(position);
   const ahead = "·".repeat(width - position - CAT_CELLS);
   return `${trail}${RESET_FOREGROUND}${BOLD}${cat}${RESET_INTENSITY}${AHEAD_FOREGROUND}${ahead}${RESET_FOREGROUND}`;

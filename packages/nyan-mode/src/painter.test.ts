@@ -77,12 +77,13 @@ describe("inline Nyan painter", () => {
 
     expect(painter.render({ cells: 8, startColumn: 3, percent: 50 })).toBe("IMAGE");
     expect(tuiMocks.renderImage).toHaveBeenCalledTimes(1);
-    expect(painter.debugInfo()).toBe("inline cells=8 col=3 target=50%");
+    expect(painter.debugInfo()).toBe("inline cells=8 col=3 available=50%");
 
     vi.advanceTimersByTime(100);
     expect(requestRender).toHaveBeenCalledTimes(1);
     expect(painter.render({ cells: 10, startColumn: 4, percent: 75 })).toBe("IMAGE");
     expect(tuiMocks.renderImage).toHaveBeenCalledTimes(2);
+    expect(painter.debugInfo()).toBe("inline cells=10 col=4 available=25%");
 
     painter.clear();
     expect(painter.debugInfo()).toBe("idle");

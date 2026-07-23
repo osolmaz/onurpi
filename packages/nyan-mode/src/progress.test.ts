@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { animationFrame, normalizeProgress, progressPixelBucket } from "./progress.ts";
+import { animationFrame, normalizeAvailableProgress, progressPixelBucket } from "./progress.ts";
 
 describe("Nyan progress", () => {
-  it("normalizes context percentages", () => {
-    expect(normalizeProgress(undefined)).toBe(0);
-    expect(normalizeProgress(null)).toBe(0);
-    expect(normalizeProgress(Number.NaN)).toBe(0);
-    expect(normalizeProgress(-1)).toBe(0);
-    expect(normalizeProgress(0)).toBe(0);
-    expect(normalizeProgress(25)).toBe(0.25);
-    expect(normalizeProgress(100)).toBe(1);
-    expect(normalizeProgress(101)).toBe(1);
+  it("normalizes remaining context from used percentages", () => {
+    expect(normalizeAvailableProgress(undefined)).toBe(1);
+    expect(normalizeAvailableProgress(null)).toBe(1);
+    expect(normalizeAvailableProgress(Number.NaN)).toBe(1);
+    expect(normalizeAvailableProgress(-1)).toBe(1);
+    expect(normalizeAvailableProgress(0)).toBe(1);
+    expect(normalizeAvailableProgress(25)).toBe(0.75);
+    expect(normalizeAvailableProgress(100)).toBe(0);
+    expect(normalizeAvailableProgress(101)).toBe(0);
   });
 
   it("cycles positive animation frames and reserves zero for static art", () => {
