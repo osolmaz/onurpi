@@ -2,7 +2,7 @@
   "name": "@onurpi/codex-usage",
   "version": "0.1.0",
   "private": true,
-  "description": "On-demand Codex subscription usage reports for Pi",
+  "description": "Codex subscription reports and model-gated weekly status for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

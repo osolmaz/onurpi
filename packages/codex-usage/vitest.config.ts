@@ -6,7 +6,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["src/codex-usage.ts", "src/format.ts", "src/normalize.ts"],
+      include: [
+        "src/codex-usage.ts",
+        "src/format.ts",
+        "src/normalize.ts",
+        "src/usage-service.ts",
+        "src/weekly-status.ts",
+      ],
       thresholds: {
         statements: 85,
         branches: 85,

@@ -1,5 +1,9 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
+export const CODEX_WEEKLY_STATUS_ID = "onurpi:codex-weekly";
+export const INLINE_EXTENSION_STATUS_IDS: ReadonlySet<string> = new Set([CODEX_WEEKLY_STATUS_ID]);
+const NO_EXCLUDED_STATUS_IDS: ReadonlySet<string> = new Set();
+
 export type FittedRunway = {
   cells: number;
   left: string;
@@ -66,12 +70,23 @@ function paddedLine(left: string, center: string, right: string, width: number):
   return truncateToWidth(leftCenter + padding + right, width, "");
 }
 
+export function extensionStatusText(
+  statuses: ReadonlyMap<string, string>,
+  id: string,
+): string | undefined {
+  const status = statuses.get(id);
+  if (status === undefined) return undefined;
+  return sanitizeStatusText(status) || undefined;
+}
+
 export function formatExtensionStatusLine(
   statuses: ReadonlyMap<string, string>,
   width: number,
+  excludedIds: ReadonlySet<string> = NO_EXCLUDED_STATUS_IDS,
 ): string | undefined {
   if (width <= 0 || statuses.size === 0) return undefined;
   const text = [...statuses.entries()]
+    .filter(([id]) => !excludedIds.has(id))
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, status]) => sanitizeStatusText(status))
     .filter(Boolean)

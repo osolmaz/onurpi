@@ -1,4 +1,5 @@
 import { queryViaCodexAppServer } from "./app-server-client.js";
+import { CODEX_PROVIDER_ID } from "./constants.js";
 import { normalizeBackendPayload } from "./normalize.js";
 import type {
   CodexUsageReport,
@@ -9,7 +10,6 @@ import type {
   UsageQueryError,
 } from "./types.js";
 
-const CODEX_PROVIDER_ID = "openai-codex";
 const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const MAX_ERROR_BODY_CHARS = 600;
 

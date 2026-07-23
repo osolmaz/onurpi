@@ -18,11 +18,6 @@ export type QueryUsageOptions = {
   timeoutMs: number;
 };
 
-export type CachedReport = {
-  createdAt: number;
-  report: CodexUsageReport;
-};
-
 export type QueryUsageResult =
   | { ok: true; report: CodexUsageReport }
   | { ok: false; errors: UsageQueryError[] };
