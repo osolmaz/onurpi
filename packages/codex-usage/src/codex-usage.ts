@@ -78,9 +78,15 @@ export default function codexUsage(pi: ExtensionAPI): void {
   const weeklyStatus = createWeeklyStatusController(service);
   registerCodexUsage(pi, createCodexStatusHandler(service, weeklyStatus.publish));
 
-  pi.on("session_start", (_event, ctx) => weeklyStatus.sync(ctx));
-  pi.on("model_select", (event, ctx) => weeklyStatus.sync(ctx, event.model));
-  pi.on("agent_settled", (_event, ctx) => weeklyStatus.sync(ctx));
+  pi.on("session_start", (_event, ctx) => {
+    void weeklyStatus.sync(ctx);
+  });
+  pi.on("model_select", (event, ctx) => {
+    void weeklyStatus.sync(ctx, event.model);
+  });
+  pi.on("agent_settled", (_event, ctx) => {
+    void weeklyStatus.sync(ctx);
+  });
   pi.on("session_shutdown", (_event, ctx) => {
     weeklyStatus.clear(ctx);
   });
