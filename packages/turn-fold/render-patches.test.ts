@@ -52,6 +52,20 @@ describe("turn fold summary rendering", () => {
     );
   });
 
+  it.each([
+    [500, "<1s"],
+    [1_000, "1s"],
+    [65_000, "1m 5s"],
+    [3_600_000, "1h"],
+    [3_723_000, "1h 2m 3s"],
+    [90_061_000, "1d 1h 1m 1s"],
+    [788_645_000, "1w 2d 3h 4m 5s"],
+  ])("formats %i milliseconds with larger duration units", (durationMs, expected) => {
+    expect(formatSettledSummary(summary({ durationMs, messages: 0, tools: 0 }))).toBe(
+      `▶ Worked for ${expected}`,
+    );
+  });
+
   it("renders every themed summary line in bold warning color", () => {
     const testTheme = {
       bold: (text: string) => `<bold>${text}</bold>`,

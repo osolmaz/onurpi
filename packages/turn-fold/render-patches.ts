@@ -29,13 +29,24 @@ function compactionLabel(count: number): string {
   return count === 1 ? "compacted" : countLabel(count, "compaction");
 }
 
+const DURATION_UNITS = [
+  ["w", 7 * 24 * 60 * 60],
+  ["d", 24 * 60 * 60],
+  ["h", 60 * 60],
+  ["m", 60],
+  ["s", 1],
+] as const;
+
 function formatDuration(durationMs: number): string {
   if (durationMs < 1_000) return "<1s";
-  const totalSeconds = Math.round(durationMs / 1_000);
-  if (totalSeconds < 60) return `${String(totalSeconds)}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `${String(minutes)}m` : `${String(minutes)}m ${String(seconds)}s`;
+  let remainingSeconds = Math.round(durationMs / 1_000);
+  const parts: string[] = [];
+  for (const [label, secondsPerUnit] of DURATION_UNITS) {
+    const count = Math.floor(remainingSeconds / secondsPerUnit);
+    if (count > 0) parts.push(`${String(count)}${label}`);
+    remainingSeconds %= secondsPerUnit;
+  }
+  return parts.join(" ");
 }
 
 export function formatStreamingSummary(summary: FoldSummary): string {
