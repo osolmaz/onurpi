@@ -187,6 +187,41 @@ it("renders local user and completion times in transcript order", () => {
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 
+it("timestamps every visible user and assistant message in both modes", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const userAt = new Date();
+  userAt.setHours(8, 1, 0, 0);
+  const firstAt = new Date(userAt);
+  firstAt.setMinutes(2);
+  const finalAt = new Date(userAt);
+  finalAt.setMinutes(3);
+  const first = assistantMessage(firstAt.getTime(), [{ text: "First response", type: "text" }]);
+  const final = assistantMessage(finalAt.getTime(), [{ text: "Final response", type: "text" }]);
+
+  state.loadHistory([
+    { message: { content: "Prompt", role: "user", timestamp: userAt.getTime() }, type: "message" },
+    { message: first, timestamp: firstAt.toISOString(), type: "message" },
+    { message: final, timestamp: finalAt.toISOString(), type: "message" },
+  ]);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(first, false, undefined, undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+
+  state.setMode("expanded");
+  const expanded = frame(transcript);
+  expect(expanded.match(/08:01/gu)).toHaveLength(1);
+  expect(expanded.match(/08:02/gu)).toHaveLength(1);
+  expect(expanded.match(/08:03/gu)).toHaveLength(1);
+
+  state.setMode("compact");
+  const compact = frame(transcript);
+  expect(compact.match(/08:01/gu)).toHaveLength(1);
+  expect(compact).not.toContain("08:02");
+  expect(compact.match(/08:03/gu)).toHaveLength(1);
+});
+
 it("folds an automatic compaction into the turn summary", () => {
   const state = new TurnFoldState();
   const transcript = new Container();

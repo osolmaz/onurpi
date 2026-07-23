@@ -21,6 +21,12 @@ function privateString(instance: object, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function finiteNumber(instance: unknown, key: string): number | undefined {
+  if (typeof instance !== "object" || instance === null) return undefined;
+  const value: unknown = Reflect.get(instance, key);
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function countLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${String(count)} ${count === 1 ? singular : plural}`;
 }
@@ -29,13 +35,24 @@ function compactionLabel(count: number): string {
   return count === 1 ? "compacted" : countLabel(count, "compaction");
 }
 
+const DURATION_UNITS = [
+  ["w", 7 * 24 * 60 * 60],
+  ["d", 24 * 60 * 60],
+  ["h", 60 * 60],
+  ["m", 60],
+  ["s", 1],
+] as const;
+
 function formatDuration(durationMs: number): string {
   if (durationMs < 1_000) return "<1s";
-  const totalSeconds = Math.round(durationMs / 1_000);
-  if (totalSeconds < 60) return `${String(totalSeconds)}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `${String(minutes)}m` : `${String(minutes)}m ${String(seconds)}s`;
+  let remainingSeconds = Math.round(durationMs / 1_000);
+  const parts: string[] = [];
+  for (const [label, secondsPerUnit] of DURATION_UNITS) {
+    const count = Math.floor(remainingSeconds / secondsPerUnit);
+    if (count > 0) parts.push(`${String(count)}${label}`);
+    remainingSeconds %= secondsPerUnit;
+  }
+  return parts.join(" ");
 }
 
 export function formatStreamingSummary(summary: FoldSummary): string {
@@ -265,15 +282,17 @@ function renderFoldView(
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
+  finalTimestamp = summary.completedAt,
 ): string[] {
   if (display === "original") return original();
   if (display === "hidden") return [];
   if (display === "streaming-summary") return renderStreamingSummary(summary, width, theme);
   if (display === "settled-summary") return renderSettledSummary(summary, width, theme);
   const originalLines = original();
+  const timestampedSummary = { ...summary, completedAt: finalTimestamp };
   return display === "settled-summary-final"
-    ? settledSummaryAndFinal(originalLines, summary, width, theme)
-    : settledFinal(originalLines, summary, width, theme);
+    ? settledSummaryAndFinal(originalLines, timestampedSummary, width, theme)
+    : settledFinal(originalLines, timestampedSummary, width, theme);
 }
 
 function installCompactionRenderPatch(
@@ -309,6 +328,23 @@ function installCompactionRenderPatch(
   };
 }
 
+function renderAssistantView(
+  component: AssistantMessageComponent,
+  state: TurnFoldState,
+  lastMessage: unknown,
+  original: () => string[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  state.associateAssistant(component, lastMessage);
+  const view = state.viewFor(component);
+  const timestamp = finiteNumber(lastMessage, "timestamp");
+  if (!view || view.display === "original") {
+    return timestampAfterContent(original(), timestamp, width, theme);
+  }
+  return renderFoldView(view.display, original, view.summary, width, theme, timestamp);
+}
+
 export function installRenderPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
@@ -338,13 +374,11 @@ export function installRenderPatches(
     width: number,
   ): string[] {
     const lastMessage: unknown = Reflect.get(this, "lastMessage");
-    state.associateAssistant(this, lastMessage);
-    const view = state.viewFor(this);
-    if (!view) return originalAssistantRender.call(this, width);
-    return renderFoldView(
-      view.display,
+    return renderAssistantView(
+      this,
+      state,
+      lastMessage,
       () => originalAssistantRender.call(this, width),
-      view.summary,
       width,
       getTheme(),
     );

@@ -22,7 +22,7 @@ A **compaction window** is an active-branch range between compaction entries. Th
 
 Turn Fold MUST select the configured number of newest compaction windows before applying compact or expanded rendering. A numeric range starts at the nearest user message before its oldest compaction boundary and continues through the active leaf. `all` selects the complete active branch.
 
-Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. The retained final content row shows the local completion time beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
+Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content in both compact and expanded modes. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
 In compact mode, every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
@@ -67,7 +67,7 @@ Final assistant response
                               18:43
 ```
 
-The settled summary reports elapsed time. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
+The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
 Compact mode MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
 
@@ -121,7 +121,7 @@ The first rendered frame after reconstruction MUST obey the same compact-mode ru
 
 Distinct assistant messages remain distinct even when they share the same millisecond timestamp. Streaming updates for one assistant message still count as one message.
 
-Elapsed time and the final-content timestamp come from persisted turn completion data when available. Time spent between saving and reopening a session MUST NOT increase the displayed duration. Epoch timestamps remain unchanged in session state and are formatted only for display.
+Elapsed time comes from persisted turn completion data when available. User and assistant timestamps come from their persisted message timestamps. Time spent between saving and reopening a session MUST NOT increase the displayed duration. Epoch timestamps remain unchanged in session state and are formatted only for display.
 
 ## State boundaries
 
@@ -157,7 +157,7 @@ Turn Fold patches Pi's built-in transcript component renderers because Pi 0.80.1
 A release is conforming only when automated or PTY tests verify all of the following:
 
 - Ten sequential tool calls show one streaming summary, the latest three activities, and Pi's working indicator.
-- User and final-content timestamps render in local time without changing stored epoch values.
+- User and every visible assistant timestamp render in local time in compact and expanded modes without changing stored epoch values.
 - Settlement leaves the summary directly below the user message and one final content row below it.
 - Interruption retains partial output or `Operation interrupted` below an interrupted summary.
 - Terminal tool failures retain the correct failed tool row and failure count.
