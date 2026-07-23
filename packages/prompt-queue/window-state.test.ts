@@ -129,7 +129,7 @@ describe("ManagerWindowState", () => {
     expect(state.moveCursor(1)).toBe(false);
     expect(state.deleteSelected()).toBe(false);
     expect(state.moveSelected(1)).toBe(false);
-    expect(state.takeForInsert()).toBeUndefined();
+    expect(state.takeSelected()).toBeUndefined();
   });
 
   it("deletes the selected queue item and clamps the cursor", () => {
@@ -193,15 +193,15 @@ describe("ManagerWindowState", () => {
     expect(state.selection()?.text).toBe("h1");
   });
 
-  it("takes history entries for insert without touching the history list", () => {
+  it("takes history entries without touching the history list", () => {
     const state = makeState([], ["h1"]);
-    expect(state.takeForInsert()).toBe("h1");
+    expect(state.takeSelected()).toBe("h1");
     expect(state.entries()).toHaveLength(1);
   });
 
-  it("takes queue items for insert and removes them from the queue", () => {
+  it("takes queue items and removes them from the queue", () => {
     const state = makeState(["q1"], []);
-    expect(state.takeForInsert()).toBe("q1");
+    expect(state.takeSelected()).toBe("q1");
     expect(state.queueCount()).toBe(0);
   });
 });

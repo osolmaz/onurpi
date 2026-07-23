@@ -11,9 +11,15 @@ export type QueueSnapshot = {
 };
 
 export type DeliveryDecision = "deliver-steer" | "deliver-next" | "none";
+export type SendNowDecision = "send" | "abort-and-send-on-settle";
 
 function gateClosed(gate: DeliveryGate): boolean {
   return gate.windowOpen || gate.held;
+}
+
+/** Deliver directly while idle, or abort an active run and send as soon as it settles. */
+export function decideSendNow(isIdle: boolean): SendNowDecision {
+  return isIdle ? "send" : "abort-and-send-on-settle";
 }
 
 /**

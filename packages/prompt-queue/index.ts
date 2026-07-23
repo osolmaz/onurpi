@@ -1,6 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { decideIdleDelivery, decideTurnEndDelivery, type DeliveryGate } from "./delivery-policy.ts";
+import {
+  decideIdleDelivery,
+  decideSendNow,
+  decideTurnEndDelivery,
+  type DeliveryGate,
+} from "./delivery-policy.ts";
 import { PromptHistory } from "./history-model.ts";
 import { ManagerWindow } from "./manager-window.ts";
 import { assistantStopReason, userMessageText } from "./message-text.ts";
@@ -10,6 +15,8 @@ import { widgetLines, type WidgetPalette } from "./widget-lines.ts";
 import { type ManagerResult, ManagerWindowState, type WindowTarget } from "./window-state.ts";
 
 const WIDGET_KEY = "onurpi-prompt-queue";
+
+type ManagerOutcome = Extract<ManagerResult, { kind: "close" | "resume" | "send-now" }>;
 
 function palette(ctx: ExtensionContext): WidgetPalette {
   const theme = ctx.ui.theme;
@@ -21,11 +28,13 @@ function palette(ctx: ExtensionContext): WidgetPalette {
 }
 
 /** Runtime state and Pi wiring for the prompt queue extension. */
-class PromptQueueRuntime {
+export class PromptQueueRuntime {
   readonly queue = new PromptQueue();
   readonly history = new PromptHistory();
   readonly gate: DeliveryGate = { windowOpen: false, held: false };
   private ctx: ExtensionContext | undefined;
+  private intentionalAbortPending = false;
+  private sendOnSettle: string | undefined;
 
   constructor(private readonly pi: ExtensionAPI) {}
 
@@ -58,6 +67,17 @@ class PromptQueueRuntime {
     this.updateWidget();
   }
 
+  private sendNow(text: string, ctx: ExtensionContext): void {
+    this.gate.held = false;
+    if (decideSendNow(ctx.isIdle()) === "send") {
+      this.pi.sendUserMessage(text);
+      return;
+    }
+    this.intentionalAbortPending = true;
+    this.sendOnSettle = text;
+    ctx.abort();
+  }
+
   onTurnEnd(message: unknown): void {
     const decision = decideTurnEndDelivery(
       this.gate,
@@ -72,11 +92,22 @@ class PromptQueueRuntime {
   }
 
   onSettled(): void {
-    this.deliverNextWhenIdle();
+    if (this.sendOnSettle !== undefined) {
+      const text = this.sendOnSettle;
+      this.sendOnSettle = undefined;
+      this.intentionalAbortPending = false;
+      this.pi.sendUserMessage(text);
+    } else {
+      this.deliverNextWhenIdle();
+    }
     this.updateWidget();
   }
 
   onAbort(): void {
+    if (this.intentionalAbortPending) {
+      this.intentionalAbortPending = false;
+      return;
+    }
     if (this.queue.size === 0 || this.gate.held) return;
     this.gate.held = true;
     this.ctx?.ui.notify(
@@ -109,15 +140,17 @@ class PromptQueueRuntime {
   private async runManager(
     ctx: ExtensionContext,
     state: ManagerWindowState,
-  ): Promise<"close" | "resume"> {
+  ): Promise<ManagerOutcome> {
     for (;;) {
       const result = await ctx.ui.custom<ManagerResult>(
         (tui, theme, _keybindings, done) => new ManagerWindow(state, tui, theme, done),
       );
-      if (result.kind === "close" || result.kind === "resume") return result.kind;
+      if (result.kind === "close" || result.kind === "resume" || result.kind === "send-now") {
+        return result;
+      }
       if (result.kind === "insert") {
         ctx.ui.setEditorText(result.text);
-        return "close";
+        return { kind: "close" };
       }
       const edited = await ctx.ui.editor("Edit prompt", result.text);
       if (edited !== undefined && edited.trim().length > 0) this.applyEdit(result.target, edited);
@@ -130,13 +163,14 @@ class PromptQueueRuntime {
     if (ctx?.mode !== "tui" || this.gate.windowOpen) return;
     this.gate.windowOpen = true;
     this.updateWidget();
-    let outcome: "close" | "resume" = "close";
+    let outcome: ManagerOutcome = { kind: "close" };
     try {
       outcome = await this.runManager(ctx, new ManagerWindowState(this.queue, this.history));
     } finally {
       this.gate.windowOpen = false;
-      if (outcome === "resume") this.gate.held = false;
-      this.deliverNextWhenIdle();
+      if (outcome.kind === "resume") this.gate.held = false;
+      if (outcome.kind === "send-now") this.sendNow(outcome.text, ctx);
+      else this.deliverNextWhenIdle();
       this.updateWidget();
     }
   }

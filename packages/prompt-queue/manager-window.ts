@@ -11,7 +11,7 @@ import {
 
 const MAX_VISIBLE_ROWS = 14;
 const HINT =
-  "↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · r resume · esc close";
+  "↑↓ move · ⇥ switch tab · enter to editor · e edit · m mode · s send now · d delete · p/n reorder · r resume · esc close";
 
 /**
  * Full-width tabbed list view shown in place of the prompt editor. Queue
@@ -31,13 +31,19 @@ export class ManagerWindow {
   }
 
   private handleKey(data: string): void {
-    if (this.handleSpecialKey(data)) return;
-    if (data === "e") this.finishEdit();
-    else if (data === "s") this.state.toggleSelectedMode();
-    else if (data === "x") this.state.deleteSelected();
+    if (this.handleSpecialKey(data) || this.handleFinishKey(data)) return;
+    if (data === "m") this.state.toggleSelectedMode();
+    else if (data === "d") this.state.deleteSelected();
     else if (data === "p") this.state.moveSelected(-1);
     else if (data === "n") this.state.moveSelected(1);
+  }
+
+  private handleFinishKey(data: string): boolean {
+    if (data === "e") this.finishEdit();
+    else if (data === "s") this.finishSendNow();
     else if (data === "r") this.done({ kind: "resume" });
+    else return false;
+    return true;
   }
 
   private handleSpecialKey(data: string): boolean {
@@ -52,8 +58,13 @@ export class ManagerWindow {
   }
 
   private finishInsert(): void {
-    const text = this.state.takeForInsert();
+    const text = this.state.takeSelected();
     if (text !== undefined) this.done({ kind: "insert", text });
+  }
+
+  private finishSendNow(): void {
+    const text = this.state.takeSelected();
+    if (text !== undefined) this.done({ kind: "send-now", text });
   }
 
   private finishEdit(): void {

@@ -23,6 +23,9 @@ never queued.
 - Steering items are injected at the next turn boundary, before the next LLM call.
 - Queued follow-ups are sent one at a time whenever the agent settles.
 - Delivery pauses while the manager window is open.
+- `s` in the manager sends the selected prompt immediately. If the agent is running, it aborts the
+  active run and continues with the selected prompt; remaining queued items keep their delivery
+  state.
 - Aborting a run (`Esc`) holds the queue so a stopped run is never restarted silently. Resume it
   explicitly with `r` in the manager window or `/queue resume`, or implicitly by submitting or
   queuing a new prompt. Just opening and closing the manager does not resume.
@@ -34,14 +37,15 @@ session prompt history. It opens on the queue tab when anything is pending, othe
 tab, and jumps to history when the last queue item is deleted.
 
 ```text
-↑↓ move · ⇥ switch tab · enter to editor · e edit · s steer/queue · x delete · p/n reorder · r resume · esc close
+↑↓ move · ⇥ switch tab · enter to editor · e edit · m mode · s send now · d delete · p/n reorder · r resume · esc close
 ```
 
 - `Tab`, `Left`, or `Right` switches between the queue and history tabs.
 - `Enter` inserts the selected text into the prompt editor (queue items are removed from the queue).
 - `e` opens Pi's editor dialog to edit the selected queue item or history entry in place.
-- `s` toggles the selected queue item between queued and steering delivery.
-- `x` deletes the selected item.
+- `m` toggles the selected queue item between queued and steering delivery.
+- `s` sends the selected queue or history prompt now, interrupting an active run before continuing.
+- `d` deletes the selected item.
 - `p` / `n` move a queue item earlier or later. History entries cannot be reordered.
 - `r` closes the window and resumes delivery after an interrupt.
 

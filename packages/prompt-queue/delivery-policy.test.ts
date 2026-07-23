@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { decideIdleDelivery, decideTurnEndDelivery } from "./delivery-policy.ts";
+import { decideIdleDelivery, decideSendNow, decideTurnEndDelivery } from "./delivery-policy.ts";
 
 const open = { windowOpen: false, held: false };
 const both = { hasSteer: true, hasAny: true };
+
+describe("decideSendNow", () => {
+  it("sends directly when idle and aborts before sending when busy", () => {
+    expect(decideSendNow(true)).toBe("send");
+    expect(decideSendNow(false)).toBe("abort-and-send-on-settle");
+  });
+});
 
 describe("decideTurnEndDelivery", () => {
   it("delivers a steer item on a normal turn boundary", () => {

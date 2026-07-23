@@ -19,7 +19,8 @@ export type ManagerResult =
   | { kind: "close" }
   | { kind: "resume" }
   | { kind: "edit"; target: WindowTarget; text: string }
-  | { kind: "insert"; text: string };
+  | { kind: "insert"; text: string }
+  | { kind: "send-now"; text: string };
 
 /** Visible slice of a list that keeps the selected index on screen. */
 export function viewportSlice(
@@ -143,8 +144,8 @@ export class ManagerWindowState {
     return true;
   }
 
-  /** Text of the selection; queue items are removed since they move to the editor. */
-  takeForInsert(): string | undefined {
+  /** Take the selection for insertion or delivery, removing queued items but preserving history. */
+  takeSelected(): string | undefined {
     const entry = this.selection();
     if (!entry) return undefined;
     if (entry.target.kind === "queue") this.queue.remove(entry.target.id);
