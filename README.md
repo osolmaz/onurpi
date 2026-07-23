@@ -12,7 +12,7 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
-| [`@onurpi/codex-usage`](packages/codex-usage/)                     | On-demand Codex subscription usage reports                       |
+| [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 

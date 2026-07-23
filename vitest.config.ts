@@ -37,6 +37,8 @@ export default defineConfig({
         "packages/codex-usage/src/codex-usage.ts",
         "packages/codex-usage/src/format.ts",
         "packages/codex-usage/src/normalize.ts",
+        "packages/codex-usage/src/usage-service.ts",
+        "packages/codex-usage/src/weekly-status.ts",
         "packages/plan-checklist/plan-context.ts",
         "packages/plan-checklist/plan-render.ts",
         "packages/plan-checklist/plan-replay.ts",

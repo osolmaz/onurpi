@@ -2,12 +2,15 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
+  CODEX_WEEKLY_STATUS_ID,
   composeInlineImageLine,
   composeLine,
+  extensionStatusText,
   fitRunway,
   formatContext,
   formatCount,
   formatExtensionStatusLine,
+  INLINE_EXTENSION_STATUS_IDS,
   joinParts,
   shortModel,
 } from "./layout.ts";
@@ -82,9 +85,27 @@ describe("footer labels", () => {
     expect(truncated).toContain("...");
   });
 
+  it("extracts Codex weekly usage for the inline footer and excludes it below", () => {
+    const statuses = new Map([
+      [CODEX_WEEKLY_STATUS_ID, " 59%\n wk "],
+      ["plan", "2 steps"],
+    ]);
+
+    expect(extensionStatusText(statuses, CODEX_WEEKLY_STATUS_ID)).toBe("59% wk");
+    expect(formatExtensionStatusLine(statuses, 80, INLINE_EXTENSION_STATUS_IDS)).toBe("2 steps");
+    expect(extensionStatusText(new Map(), CODEX_WEEKLY_STATUS_ID)).toBeUndefined();
+  });
+
   it("omits empty extension status lines", () => {
     expect(formatExtensionStatusLine(new Map(), 80)).toBeUndefined();
     expect(formatExtensionStatusLine(new Map([["empty", " \n "]]), 80)).toBeUndefined();
     expect(formatExtensionStatusLine(new Map([["status", "ready"]]), 0)).toBeUndefined();
+    expect(
+      formatExtensionStatusLine(
+        new Map([[CODEX_WEEKLY_STATUS_ID, "59% wk"]]),
+        80,
+        INLINE_EXTENSION_STATUS_IDS,
+      ),
+    ).toBeUndefined();
   });
 });

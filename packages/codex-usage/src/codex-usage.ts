@@ -1,16 +1,12 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { formatQueryErrors, showReport } from "./format.js";
-import { isStaleExtensionContextError, queryUsage } from "./query.js";
-import type {
-  CachedReport,
-  QueryUsageOptions,
-  QueryUsageResult,
-  UsageQueryContext,
-} from "./types.js";
+import { isStaleExtensionContextError } from "./query.js";
+import { createUsageService, type UsageService } from "./usage-service.js";
+import { createWeeklyStatusController } from "./weekly-status.js";
+import type { CodexUsageReport, QueryUsageOptions, UsageQueryContext } from "./types.js";
 
 const COMMAND_NAME = "codex-status";
 const DEFAULT_TIMEOUT_MS = 15_000;
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type CommandArgumentCompletion = {
   value: string;
@@ -20,7 +16,7 @@ type CommandArgumentCompletion = {
 
 type UsageCommandContext = UsageQueryContext & {
   hasUI: boolean;
-  ui: Pick<ExtensionCommandContext["ui"], "notify">;
+  ui: Pick<ExtensionCommandContext["ui"], "notify" | "setStatus">;
 };
 
 type CodexStatusCommand = {
@@ -33,13 +29,7 @@ type CodexUsageRegistrar = {
   registerCommand: (name: string, command: CodexStatusCommand) => void;
 };
 
-type CommandDependencies = {
-  now: () => number;
-  query: (
-    ctx: UsageQueryContext,
-    options: Pick<QueryUsageOptions, "timeoutMs">,
-  ) => Promise<QueryUsageResult>;
-};
+type ReportObserver = (ctx: UsageCommandContext, report: CodexUsageReport) => void;
 
 const COMMAND_COMPLETIONS: readonly CommandArgumentCompletion[] = [
   { value: "--refresh", label: "--refresh", description: "Refresh usage instead of cached data" },
@@ -47,10 +37,9 @@ const COMMAND_COMPLETIONS: readonly CommandArgumentCompletion[] = [
 ];
 
 export function createCodexStatusHandler(
-  dependencies: CommandDependencies = { now: Date.now, query: queryUsage },
+  service: UsageService = createUsageService(),
+  onReport?: ReportObserver,
 ): (args: string, ctx: UsageCommandContext) => Promise<void> {
-  let cache: CachedReport | undefined;
-
   return async (args, ctx) => {
     try {
       const options = parseArgs(args);
@@ -59,19 +48,13 @@ export function createCodexStatusHandler(
         return;
       }
 
-      const cached = freshCache(cache, dependencies.now());
-      if (cached && !options.value.refresh) {
-        showReport(ctx, cached.report);
-        return;
-      }
-
-      const result = await dependencies.query(ctx, options.value);
+      const result = await service.read(ctx, options.value);
       if (!result.ok) {
         ctx.ui.notify(formatQueryErrors(result.errors), "error");
         return;
       }
 
-      cache = { createdAt: dependencies.now(), report: result.report };
+      onReport?.(ctx, result.report);
       showReport(ctx, result.report);
     } catch (error) {
       if (!isStaleExtensionContextError(error)) throw error;
@@ -79,16 +62,28 @@ export function createCodexStatusHandler(
   };
 }
 
-export function registerCodexUsage(pi: CodexUsageRegistrar): void {
+export function registerCodexUsage(
+  pi: CodexUsageRegistrar,
+  handler = createCodexStatusHandler(),
+): void {
   pi.registerCommand(COMMAND_NAME, {
     description: "Show Codex ChatGPT subscription usage and rate-limit windows",
     getArgumentCompletions: completeCodexStatusArguments,
-    handler: createCodexStatusHandler(),
+    handler,
   });
 }
 
 export default function codexUsage(pi: ExtensionAPI): void {
-  registerCodexUsage(pi);
+  const service = createUsageService();
+  const weeklyStatus = createWeeklyStatusController(service);
+  registerCodexUsage(pi, createCodexStatusHandler(service, weeklyStatus.publish));
+
+  pi.on("session_start", (_event, ctx) => weeklyStatus.sync(ctx));
+  pi.on("model_select", (event, ctx) => weeklyStatus.sync(ctx, event.model));
+  pi.on("agent_settled", (_event, ctx) => weeklyStatus.sync(ctx));
+  pi.on("session_shutdown", (_event, ctx) => {
+    weeklyStatus.clear(ctx);
+  });
 }
 
 export function completeCodexStatusArguments(
@@ -190,10 +185,6 @@ function parseTimeoutMilliseconds(rawValue: string): number | undefined {
   return Math.round(parsed * 1000);
 }
 
-function freshCache(cache: CachedReport | undefined, now: number): CachedReport | undefined {
-  return cache && now - cache.createdAt < CACHE_TTL_MS ? cache : undefined;
-}
-
 function invalidUsage(): { ok: false; error: string } {
   return { ok: false, error: usageText() };
 }
@@ -205,6 +196,15 @@ function usageText(): string {
 export { formatCodexUsageReport } from "./format.js";
 export { normalizeAppServerResponse, normalizeBackendPayload } from "./normalize.js";
 export { isStaleExtensionContextError } from "./query.js";
+export { createUsageService, USAGE_CACHE_TTL_MS, type UsageService } from "./usage-service.js";
+export {
+  CODEX_PROVIDER_ID,
+  CODEX_WEEKLY_STATUS_ID,
+  createWeeklyStatusController,
+  formatWeeklyRemaining,
+  isCodexModel,
+  type WeeklyStatusController,
+} from "./weekly-status.js";
 export type {
   CodexUsageReport,
   NormalizedCredits,

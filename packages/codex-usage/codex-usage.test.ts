@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   completeCodexStatusArguments,
   createCodexStatusHandler,
+  createUsageService,
   formatCodexUsageReport,
   isStaleExtensionContextError,
   normalizeAppServerResponse,
@@ -52,8 +53,8 @@ function commandContext() {
   };
 }
 
-describe("command-only behavior", () => {
-  it("registers only the explicit command surface", () => {
+describe("command behavior", () => {
+  it("registers the explicit command surface", () => {
     const names: string[] = [];
     registerCodexUsage({
       registerCommand: (name) => {
@@ -96,10 +97,10 @@ describe("command-only behavior", () => {
     expect(parseArgs("--timeout nope").ok).toBe(false);
   });
 
-  it("caches reports without publishing status", async () => {
+  it("caches reports and leaves publication to the observer", async () => {
     let now = 10_000;
     const query = vi.fn(() => Promise.resolve({ ok: true as const, report: report() }));
-    const handler = createCodexStatusHandler({ now: () => now, query });
+    const handler = createCodexStatusHandler(createUsageService({ now: () => now, query }));
     const fixture = commandContext();
 
     await handler("", fixture.ctx);
@@ -111,6 +112,21 @@ describe("command-only behavior", () => {
     expect(fixture.notifications).toHaveLength(3);
     expect(fixture.notifications[0]?.message).toContain("75% left");
     expect(fixture.getStatusWrites()).toBe(0);
+  });
+
+  it("publishes successful explicit reports through the observer", async () => {
+    const query = vi.fn(() => Promise.resolve({ ok: true as const, report: report() }));
+    const observer = vi.fn();
+    const handler = createCodexStatusHandler(
+      createUsageService({ now: Date.now, query }),
+      observer,
+    );
+    const fixture = commandContext();
+
+    await handler("--refresh", fixture.ctx);
+
+    expect(observer).toHaveBeenCalledOnce();
+    expect(observer).toHaveBeenCalledWith(fixture.ctx, report());
   });
 
   it("refreshes an expired cache and reports query failures", async () => {
@@ -127,11 +143,13 @@ describe("command-only behavior", () => {
             },
       );
     });
-    const handler = createCodexStatusHandler({ now: () => now, query });
+    const handler = createCodexStatusHandler(createUsageService({ now: () => now, query }));
     const fixture = commandContext();
 
     await handler("", fixture.ctx);
     now += 5 * 60 * 1_000;
+    await handler("", fixture.ctx);
+    now += 1_000;
     await handler("", fixture.ctx);
 
     expect(query).toHaveBeenCalledTimes(2);
@@ -141,7 +159,7 @@ describe("command-only behavior", () => {
 
   it("warns for invalid arguments without querying", async () => {
     const query = vi.fn(() => Promise.resolve({ ok: true as const, report: report() }));
-    const handler = createCodexStatusHandler({ now: Date.now, query });
+    const handler = createCodexStatusHandler(createUsageService({ now: Date.now, query }));
     const fixture = commandContext();
 
     await handler("--bad", fixture.ctx);
@@ -152,18 +170,16 @@ describe("command-only behavior", () => {
 
   it("ignores stale extension contexts and rethrows other failures", async () => {
     const stale = new Error("This extension ctx is stale after session replacement or reload.");
-    const staleHandler = createCodexStatusHandler({
-      now: Date.now,
-      query: () => Promise.reject(stale),
-    });
+    const staleHandler = createCodexStatusHandler(
+      createUsageService({ now: Date.now, query: () => Promise.reject(stale) }),
+    );
     const fixture = commandContext();
     await expect(staleHandler("", fixture.ctx)).resolves.toBeUndefined();
 
     const failure = new Error("network broke");
-    const failingHandler = createCodexStatusHandler({
-      now: Date.now,
-      query: () => Promise.reject(failure),
-    });
+    const failingHandler = createCodexStatusHandler(
+      createUsageService({ now: Date.now, query: () => Promise.reject(failure) }),
+    );
     await expect(failingHandler("", fixture.ctx)).rejects.toThrow("network broke");
     expect(isStaleExtensionContextError(stale)).toBe(true);
     expect(isStaleExtensionContextError(failure)).toBe(false);

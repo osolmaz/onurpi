@@ -19,11 +19,14 @@ import {
   type TextNyanPainter,
 } from "./src/index.ts";
 import {
+  CODEX_WEEKLY_STATUS_ID,
   composeInlineImageLine,
   composeLine,
+  extensionStatusText,
   fitRunway,
   formatContext,
   formatExtensionStatusLine,
+  INLINE_EXTENSION_STATUS_IDS,
   joinParts,
   shortModel,
   type FittedRunway,
@@ -144,6 +147,7 @@ function installNyanFooter(
       render(width: number): string[] {
         const catState = lifecycle.getCatState();
         const mood = selectCatMood(catState, Date.now());
+        const statuses = footerData.getExtensionStatuses();
         const lines = [
           renderFooterLine({
             ...footerSnapshot(ctx, mood),
@@ -154,12 +158,14 @@ function installNyanFooter(
             textPainter: footer.textPainter,
             theme,
             thinkingLevel: pi.getThinkingLevel(),
+            weeklyUsage: extensionStatusText(statuses, CODEX_WEEKLY_STATUS_ID),
             width,
           }),
         ];
         const extensionStatuses = formatExtensionStatusLine(
-          footerData.getExtensionStatuses(),
+          statuses,
           width,
+          INLINE_EXTENSION_STATUS_IDS,
         );
         if (extensionStatuses) lines.push(extensionStatuses);
         return lines;
@@ -276,6 +282,7 @@ type FooterLineOptions = FooterSnapshot & {
   textPainter: TextNyanPainter;
   theme: Theme;
   thinkingLevel: string;
+  weeklyUsage: string | undefined;
   width: number;
 };
 
@@ -321,6 +328,7 @@ function renderFooterLine(options: FooterLineOptions): string {
     model,
     options.reasoning,
     options.thinkingLevel,
+    options.weeklyUsage,
   );
   const nyanLine = options.enabled
     ? composeNyanLine(
@@ -353,10 +361,12 @@ function rightFooter(
   model: string,
   reasoning: boolean | undefined,
   thinkingLevel: string,
+  weeklyUsage: string | undefined,
 ): string {
   return joinParts([
     colorContext(theme, percent, formatContext(percent, contextWindow)),
     mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
+    mutedLabel(theme, weeklyUsage),
     reasoning ? theme.fg("muted", `think ${thinkingLevel}`) : undefined,
     theme.fg("accent", model),
   ]);

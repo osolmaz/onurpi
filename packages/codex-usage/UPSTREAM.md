@@ -26,12 +26,14 @@ trust decisions, and creates no persistent background resources.
 
 - Renamed the private package to `@onurpi/codex-usage` and added the repository-standard root entry
   point and quality configuration.
-- Removed every automatic statusline path: status timers, lifecycle hooks, model selection logic,
-  `ctx.ui.setStatus()` calls, compact status formatting, and the `--no-statusline` and
+- Removed upstream status timers and broad statusline behavior, along with the `--no-statusline` and
   `--clear-statusline` flags.
+- Added a local model-gated weekly status that exists only for active `openai-codex` models. It uses
+  Pi lifecycle hooks without timers, shares the command cache and in-flight query, clears on other
+  providers, and stays quiet on automatic failures.
 - Kept `/codex-status`, explicit refreshes, bounded timeouts, the five-minute in-memory report
   cache, Pi-auth usage queries, the temporary Codex app-server fallback, full report formatting, and
   reset-credit reporting.
 - Replaced unchecked external-payload casts with strict unknown-input validation.
-- Added tests for command-only behavior, caching, argument parsing, payload normalization, report
-  formatting, and the absence of status publication.
+- Added tests for command behavior, cache and request deduplication, model gating, weekly status
+  formatting, lifecycle races, payload normalization, and full report formatting.

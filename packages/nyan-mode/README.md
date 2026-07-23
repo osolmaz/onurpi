@@ -7,7 +7,7 @@ full usable context ─────────────────── ex
 100% available                                   0% available
 ```
 
-Extensions can still publish status text below the runway, so compact information such as Codex subscription usage remains visible. The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
+Nyan places the namespaced Codex weekly-remaining status after `(sub)` in the main number group. That value disappears when a non-Codex model is active. Other extension status text remains on the line below the runway. The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
 
 ## Cat moods
 
