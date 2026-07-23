@@ -23,6 +23,7 @@ import {
   composeLine,
   fitRunway,
   formatContext,
+  formatExtensionStatusLine,
   joinParts,
   shortModel,
   type FittedRunway,
@@ -143,7 +144,7 @@ function installNyanFooter(
       render(width: number): string[] {
         const catState = lifecycle.getCatState();
         const mood = selectCatMood(catState, Date.now());
-        return [
+        const lines = [
           renderFooterLine({
             ...footerSnapshot(ctx, mood),
             bitmapPainter: footer.bitmapPainter,
@@ -156,6 +157,12 @@ function installNyanFooter(
             width,
           }),
         ];
+        const extensionStatuses = formatExtensionStatusLine(
+          footerData.getExtensionStatuses(),
+          width,
+        );
+        if (extensionStatuses) lines.push(extensionStatuses);
+        return lines;
       },
     };
   });

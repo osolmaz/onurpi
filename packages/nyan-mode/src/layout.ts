@@ -66,6 +66,19 @@ function paddedLine(left: string, center: string, right: string, width: number):
   return truncateToWidth(leftCenter + padding + right, width, "");
 }
 
+export function formatExtensionStatusLine(
+  statuses: ReadonlyMap<string, string>,
+  width: number,
+): string | undefined {
+  if (width <= 0 || statuses.size === 0) return undefined;
+  const text = [...statuses.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, status]) => sanitizeStatusText(status))
+    .filter(Boolean)
+    .join(" ");
+  return text ? truncateToWidth(text, width, "...") : undefined;
+}
+
 export function formatContext(
   percent: number | undefined,
   contextWindow: number | undefined,
@@ -92,4 +105,11 @@ export function shortModel(id: string): string {
 
 export function joinParts(parts: readonly (string | undefined)[]): string {
   return parts.filter((part): part is string => Boolean(part)).join(" ");
+}
+
+function sanitizeStatusText(text: string): string {
+  return text
+    .replace(/[\r\n\t]/gu, " ")
+    .replace(/ +/gu, " ")
+    .trim();
 }

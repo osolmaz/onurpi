@@ -7,6 +7,7 @@ import {
   fitRunway,
   formatContext,
   formatCount,
+  formatExtensionStatusLine,
   joinParts,
   shortModel,
 } from "./layout.ts";
@@ -68,5 +69,22 @@ describe("footer labels", () => {
     expect(shortModel("gpt-5-preview")).toBe("gpt5");
     expect(shortModel("model-latest")).toBe("model");
     expect(joinParts(["left", undefined, "right", ""])).toBe("left right");
+  });
+
+  it("sorts and sanitizes extension statuses", () => {
+    const statuses = new Map([
+      ["zeta", " second\n status "],
+      ["alpha", "first\tstatus"],
+    ]);
+    expect(formatExtensionStatusLine(statuses, 80)).toBe("first status second status");
+    const truncated = formatExtensionStatusLine(statuses, 12);
+    expect(visibleWidth(truncated ?? "")).toBe(12);
+    expect(truncated).toContain("...");
+  });
+
+  it("omits empty extension status lines", () => {
+    expect(formatExtensionStatusLine(new Map(), 80)).toBeUndefined();
+    expect(formatExtensionStatusLine(new Map([["empty", " \n "]]), 80)).toBeUndefined();
+    expect(formatExtensionStatusLine(new Map([["status", "ready"]]), 0)).toBeUndefined();
   });
 });
