@@ -21,6 +21,12 @@ function privateString(instance: object, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function finiteNumber(instance: unknown, key: string): number | undefined {
+  if (typeof instance !== "object" || instance === null) return undefined;
+  const value: unknown = Reflect.get(instance, key);
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function countLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${String(count)} ${count === 1 ? singular : plural}`;
 }
@@ -276,15 +282,17 @@ function renderFoldView(
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
+  finalTimestamp = summary.completedAt,
 ): string[] {
   if (display === "original") return original();
   if (display === "hidden") return [];
   if (display === "streaming-summary") return renderStreamingSummary(summary, width, theme);
   if (display === "settled-summary") return renderSettledSummary(summary, width, theme);
   const originalLines = original();
+  const timestampedSummary = { ...summary, completedAt: finalTimestamp };
   return display === "settled-summary-final"
-    ? settledSummaryAndFinal(originalLines, summary, width, theme)
-    : settledFinal(originalLines, summary, width, theme);
+    ? settledSummaryAndFinal(originalLines, timestampedSummary, width, theme)
+    : settledFinal(originalLines, timestampedSummary, width, theme);
 }
 
 function installCompactionRenderPatch(
@@ -320,6 +328,23 @@ function installCompactionRenderPatch(
   };
 }
 
+function renderAssistantView(
+  component: AssistantMessageComponent,
+  state: TurnFoldState,
+  lastMessage: unknown,
+  original: () => string[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  state.associateAssistant(component, lastMessage);
+  const view = state.viewFor(component);
+  const timestamp = finiteNumber(lastMessage, "timestamp");
+  if (!view || view.display === "original") {
+    return timestampAfterContent(original(), timestamp, width, theme);
+  }
+  return renderFoldView(view.display, original, view.summary, width, theme, timestamp);
+}
+
 export function installRenderPatches(
   state: TurnFoldState,
   getTheme: () => Theme | undefined,
@@ -349,13 +374,11 @@ export function installRenderPatches(
     width: number,
   ): string[] {
     const lastMessage: unknown = Reflect.get(this, "lastMessage");
-    state.associateAssistant(this, lastMessage);
-    const view = state.viewFor(this);
-    if (!view) return originalAssistantRender.call(this, width);
-    return renderFoldView(
-      view.display,
+    return renderAssistantView(
+      this,
+      state,
+      lastMessage,
       () => originalAssistantRender.call(this, width),
-      view.summary,
       width,
       getTheme(),
     );

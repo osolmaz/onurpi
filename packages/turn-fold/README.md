@@ -4,8 +4,8 @@ Compact transcript rendering for the Pi coding agent.
 
 `@onurpi/turn-fold` keeps Pi's working line and the latest three activity rows visible during a
 run. Earlier activity is replaced by one summary row directly below the user message. When the run
-stops, that position holds the `Worked for …` line, using `s`, `m`, `h`, `d`, and `w` units as needed. All summary rows use the theme's warning color. User messages show their local timestamp on the
-bottom line, and the retained final response shows its completion time below the content. Turn Fold
+stops, that position holds the `Worked for …` line, using `s`, `m`, `h`, `d`, and `w` units as needed. All summary rows use the theme's warning color. User messages and every visible assistant message
+show their local timestamp below the content in both compact and expanded modes. Turn Fold
 keeps one padding line before the next user message instead of Pi's usual two. Tool rows and
 intermediate assistant messages disappear, leaving the final response below the summary. Automatic
 compactions during a turn appear as `compacted` in the summary instead of a separate transcript row.
