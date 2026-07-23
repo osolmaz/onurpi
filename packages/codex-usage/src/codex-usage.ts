@@ -1,4 +1,8 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { formatQueryErrors, showReport } from "./format.js";
 import { isStaleExtensionContextError } from "./query.js";
 import { createUsageService, type UsageService } from "./usage-service.js";
@@ -79,17 +83,24 @@ export default function codexUsage(pi: ExtensionAPI): void {
   registerCodexUsage(pi, createCodexStatusHandler(service, weeklyStatus.publish));
 
   pi.on("session_start", (_event, ctx) => {
-    void weeklyStatus.sync(ctx);
+    startAutomaticStatusSync(ctx, () => weeklyStatus.sync(ctx));
   });
   pi.on("model_select", (event, ctx) => {
-    void weeklyStatus.sync(ctx, event.model);
+    startAutomaticStatusSync(ctx, () => weeklyStatus.sync(ctx, event.model));
   });
   pi.on("agent_settled", (_event, ctx) => {
-    void weeklyStatus.sync(ctx);
+    startAutomaticStatusSync(ctx, () => weeklyStatus.sync(ctx));
   });
   pi.on("session_shutdown", (_event, ctx) => {
     weeklyStatus.clear(ctx);
   });
+}
+
+export function startAutomaticStatusSync(
+  ctx: Pick<ExtensionContext, "hasUI">,
+  sync: () => Promise<void>,
+): void {
+  if (ctx.hasUI) void sync();
 }
 
 export function completeCodexStatusArguments(

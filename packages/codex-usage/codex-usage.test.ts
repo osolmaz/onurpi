@@ -9,6 +9,7 @@ import {
   normalizeBackendPayload,
   parseArgs,
   registerCodexUsage,
+  startAutomaticStatusSync,
   type CodexUsageReport,
 } from "./index.js";
 
@@ -62,6 +63,15 @@ describe("command behavior", () => {
       },
     });
     expect(names).toEqual(["codex-status"]);
+  });
+
+  it("starts automatic status work only when UI is available", () => {
+    const sync = vi.fn(() => Promise.resolve());
+
+    startAutomaticStatusSync({ hasUI: false }, sync);
+    startAutomaticStatusSync({ hasUI: true }, sync);
+
+    expect(sync).toHaveBeenCalledOnce();
   });
 
   it("offers only refresh and timeout options", () => {

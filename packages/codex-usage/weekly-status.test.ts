@@ -121,6 +121,29 @@ describe("usage service", () => {
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls.map(([, options]) => options.timeoutMs)).toEqual([15_000, 1_000]);
   });
+
+  it("does not let an older concurrent request replace the latest cache", async () => {
+    const resolvers = new Map<number, (result: QueryUsageResult) => void>();
+    const query = vi.fn(
+      (_ctx, options: { timeoutMs: number }) =>
+        new Promise<QueryUsageResult>((resolve) => {
+          resolvers.set(options.timeoutMs, resolve);
+        }),
+    );
+    const service = createUsageService({ now: Date.now, query });
+    const fixture = context();
+
+    const older = service.read(fixture.ctx, { refresh: true, timeoutMs: 15_000 });
+    const latest = service.read(fixture.ctx, { refresh: true, timeoutMs: 1_000 });
+    resolvers.get(1_000)?.({ ok: true, report: report(20) });
+    await latest;
+    resolvers.get(15_000)?.({ ok: true, report: report(90) });
+    await older;
+    const cached = await service.read(fixture.ctx, { refresh: false, timeoutMs: 15_000 });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(cached.ok ? formatWeeklyRemaining(cached.report) : undefined).toBe("80% wk");
+  });
 });
 
 describe("weekly status lifecycle", () => {

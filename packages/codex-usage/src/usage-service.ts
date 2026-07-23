@@ -19,6 +19,7 @@ export function createUsageService(
   dependencies: UsageServiceDependencies = { now: Date.now, query: queryUsage },
 ): UsageService {
   let cache: { createdAt: number; result: QueryUsageResult } | undefined;
+  let latestRequestSequence = 0;
   const inFlight = new Map<number, Promise<QueryUsageResult>>();
 
   return {
@@ -28,10 +29,13 @@ export function createUsageService(
       const existing = inFlight.get(options.timeoutMs);
       if (existing) return existing;
 
+      const requestSequence = ++latestRequestSequence;
       const request = dependencies
         .query(ctx, { timeoutMs: options.timeoutMs })
         .then((result) => {
-          cache = { createdAt: dependencies.now(), result };
+          if (requestSequence === latestRequestSequence) {
+            cache = { createdAt: dependencies.now(), result };
+          }
           return result;
         })
         .finally(() => {
