@@ -5,6 +5,7 @@ export type EmojiSpinnerVariant = {
   label: string;
   intervalMs: number;
   frames: readonly string[];
+  pickerFrame?: string;
 };
 
 const EMOJI_SPINNER_VARIANTS = [
@@ -84,13 +85,15 @@ const EMOJI_SPINNER_VARIANTS = [
     name: "man-lifecycle",
     label: "Man lifecycle",
     intervalMs: 220,
-    frames: ["🤰", "👶", "👦", "🧑", "👨", "🥸", "👴", "🪦", "👻", "✨"],
+    frames: ["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"],
+    pickerFrame: "👨",
   },
   {
     name: "woman-lifecycle",
     label: "Woman lifecycle",
     intervalMs: 220,
-    frames: ["🤰", "👶", "👧", "🧑", "👩", "👵", "🪦", "👻", "✨"],
+    frames: ["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"],
+    pickerFrame: "👩",
   },
 ] as const satisfies readonly EmojiSpinnerVariant[];
 
@@ -112,12 +115,7 @@ export type WorkingMessageStyles = {
 };
 
 function cloneEmojiSpinnerVariant(variant: EmojiSpinnerVariant): EmojiSpinnerVariant {
-  return {
-    name: variant.name,
-    label: variant.label,
-    intervalMs: variant.intervalMs,
-    frames: [...variant.frames],
-  };
+  return { ...variant, frames: [...variant.frames] };
 }
 
 export function getEmojiSpinnerVariants(): EmojiSpinnerVariant[] {

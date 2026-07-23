@@ -299,32 +299,13 @@ describe("emoji spinners", () => {
     ]);
   });
 
-  it("animates birth, aging, death, and reincarnation", () => {
+  it("ages from baby to senior and reverses without modifier sequences", () => {
     const variants = getEmojiSpinnerVariants();
+    const manFrames = variants.find(({ name }) => name === "man-lifecycle")?.frames;
+    const womanFrames = variants.find(({ name }) => name === "woman-lifecycle")?.frames;
 
-    expect(variants.find(({ name }) => name === "man-lifecycle")?.frames).toEqual([
-      "🤰",
-      "👶",
-      "👦",
-      "🧑",
-      "👨",
-      "🥸",
-      "👴",
-      "🪦",
-      "👻",
-      "✨",
-    ]);
-    expect(variants.find(({ name }) => name === "woman-lifecycle")?.frames).toEqual([
-      "🤰",
-      "👶",
-      "👧",
-      "🧑",
-      "👩",
-      "👵",
-      "🪦",
-      "👻",
-      "✨",
-    ]);
+    expect(manFrames).toEqual(["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"]);
+    expect(womanFrames).toEqual(["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"]);
   });
 
   it("finds command names with user-friendly normalization", () => {

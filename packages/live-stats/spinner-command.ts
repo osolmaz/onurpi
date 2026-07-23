@@ -15,7 +15,7 @@ import {
 const RANDOM_SPINNER_OPTION = "🎲 Random";
 
 function spinnerOptionLabel(spinner: EmojiSpinnerVariant): string {
-  return `${spinner.frames[0] ?? "?"} ${spinner.label}`;
+  return `${spinner.pickerFrame ?? spinner.frames[0] ?? "?"} ${spinner.label}`;
 }
 
 export function spinnerArgumentCompletions(prefix: string): AutocompleteItem[] | null {

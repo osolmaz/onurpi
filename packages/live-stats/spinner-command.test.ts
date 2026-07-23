@@ -29,7 +29,7 @@ describe("spinner command", () => {
     expect(spinnerArgumentCompletions("man")).toEqual([
       {
         value: "man-lifecycle",
-        label: "🤰 Man lifecycle",
+        label: "👨 Man lifecycle",
         description: "220 ms per frame",
       },
     ]);
@@ -58,7 +58,7 @@ describe("spinner command", () => {
 
     expect(select).toHaveBeenCalledWith(
       "Spinner · Weather",
-      expect.arrayContaining(["🎲 Random", "🌍 Rotating Earth", "🤰 Woman lifecycle"]),
+      expect.arrayContaining(["🎲 Random", "🌍 Rotating Earth", "👩 Woman lifecycle"]),
     );
     expect(state.current.name).toBe("earth");
   });
