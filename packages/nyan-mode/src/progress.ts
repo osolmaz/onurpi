@@ -1,8 +1,9 @@
 const ANIMATION_FRAME_COUNT = 6;
 
-export function normalizeProgress(percent: number | null | undefined): number {
-  if (percent === undefined || percent === null || Number.isNaN(percent)) return 0;
-  return Math.min(1, Math.max(0, percent / 100));
+export function normalizeAvailableProgress(usedPercent: number | null | undefined): number {
+  if (usedPercent === undefined || usedPercent === null || Number.isNaN(usedPercent)) return 1;
+  const normalizedUsed = Math.min(1, Math.max(0, usedPercent / 100));
+  return 1 - normalizedUsed;
 }
 
 export function animationFrame(frame: number): number {

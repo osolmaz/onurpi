@@ -26,8 +26,8 @@ function trailColors(text: string): string[] {
 }
 
 describe("ANSI Nyan runway", () => {
-  it("draws a smooth full-height rainbow behind a normally colored cat", () => {
-    const runway = renderTextNyan(80, 100);
+  it("draws a full rainbow while all context remains available", () => {
+    const runway = renderTextNyan(80, 0);
     const colors = trailColors(runway);
     expect(visibleWidth(runway)).toBe(80);
     expect(plain(runway)).toBe(`${"█".repeat(70)} (=^･ω･^=)`);
@@ -36,6 +36,14 @@ describe("ANSI Nyan runway", () => {
     expect(new Set(colors).size).toBeGreaterThan(60);
     expect(colors[0]).toBe("255,45,85");
     expect(colors.at(-1)).toBe("240,65,180");
+  });
+
+  it("depletes the runway as used context increases", () => {
+    const exhausted = renderTextNyan(80, 100);
+    expect(visibleWidth(exhausted)).toBe(80);
+    expect(plain(exhausted)).toBe(` (=^･ω･^=)${"·".repeat(70)}`);
+    expect(trailColors(exhausted)).toEqual([]);
+    expect(plain(renderTextNyan(80, undefined))).toBe(`${"█".repeat(70)} (=^･ω･^=)`);
   });
 
   it("keeps every streaming mood animated at a fixed width", () => {

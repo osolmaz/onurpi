@@ -1,10 +1,10 @@
 # Nyan Mode
 
-Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a bold animated kaomoji follows a smooth, full-height rainbow as the active model context fills and returns after compaction or a new session. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
+Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a bold animated kaomoji follows a smooth, full-height rainbow that starts full and drains as usable model context is consumed. Compaction or a new session fills it again. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator, while its numeric percentage remains Pi's context-used value.
 
 ```text
-empty context ─────────────────────────────── full context
-0%                                                     100%
+full usable context ─────────────────── exhausted context
+100% available                                   0% available
 ```
 
 Extensions can still publish status text below the runway, so compact information such as Codex subscription usage remains visible. The extension uses the original Emacs Nyan Mode artwork and the Kitty graphics protocol. It works in compatible Kitty, Ghostty, and WezTerm configurations. Auto mode verifies Kitty support with an end-to-end terminal query instead of trusting environment variables alone. Terminals and transports that do not answer, including Mosh, receive a normally colored ANSI kaomoji with an elongating true-color rainbow instead. `/nyan bitmap` and `/nyan text` remain available as explicit overrides.
