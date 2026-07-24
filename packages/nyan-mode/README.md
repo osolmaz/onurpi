@@ -1,6 +1,6 @@
 # Nyan Mode
 
-Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default: a bold animated kaomoji follows a smooth, full-height rainbow that starts full and drains as usable model context is consumed. Compaction or a new session fills it again. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator, while its numeric percentage remains Pi's context-used value.
+Nyan Mode adds a Nyan Cat context runway to Pi's footer. Text mode is the default. A bold animated kaomoji follows a smooth, full-height rainbow that starts full and drains as usable model context is consumed. Compaction or a new session fills it again. The percentage immediately after the cat shows context remaining, so `10%` means 10% of the model window is left. Bitmap mode remains available for Kitty-compatible terminals. The footer retains Pi's cumulative API cost and subscription indicator.
 
 ```text
 full usable context ─────────────────── exhausted context
@@ -11,14 +11,14 @@ Nyan places the namespaced Codex weekly-remaining status after `(sub)` in the ma
 
 ## Cat moods
 
-The text cat stays neutral while Pi is idle and moves continuously while Pi is streaming. Its session-local state machine chooses among dancing, thinking, focused, pleased, unimpressed, annoyed, and angry poses:
+The text cat moves continuously while Pi is streaming. Its session-local state machine chooses among dancing, thinking, focused, pleased, unimpressed, annoyed, and angry poses:
 
-- active tool calls make it focus;
-- successful tool results briefly make it pleased;
-- recent or repeated tool errors escalate from annoyed to angry;
-- longer runs progress through thinking, focusing, unimpressed, annoyed, and eventually angry moods.
+- Active tool calls make it focus.
+- Successful tool results briefly make it pleased.
+- Recent or repeated tool errors escalate from annoyed to angry.
+- Longer runs progress through thinking, focusing, unimpressed, annoyed, and eventually angry moods.
 
-Error history lasts only for the current Pi session. The extension does not persist telemetry or mood state. `/nyan debug` reports the current mood and session error count.
+Low context overrides calmer moods. At 25% remaining, the cat becomes unimpressed and uses the theme's warning color. At 10%, it becomes annoyed and takes on a vivid stress color. At 5%, it becomes angry and uses the theme's error color. Context stress remains visible while Pi is idle. Error history lasts only for the current Pi session. The extension does not persist telemetry or mood state. `/nyan debug` reports the current mood, context stress, remaining percentage, and session error count.
 
 ## Commands
 

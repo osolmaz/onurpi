@@ -1,9 +1,16 @@
 const ANIMATION_FRAME_COUNT = 6;
 
+export function remainingContextPercent(
+  usedPercent: number | null | undefined,
+): number | undefined {
+  if (usedPercent === undefined || usedPercent === null || !Number.isFinite(usedPercent)) {
+    return undefined;
+  }
+  return 100 - Math.min(100, Math.max(0, usedPercent));
+}
+
 export function normalizeAvailableProgress(usedPercent: number | null | undefined): number {
-  if (usedPercent === undefined || usedPercent === null || Number.isNaN(usedPercent)) return 1;
-  const normalizedUsed = Math.min(1, Math.max(0, usedPercent / 100));
-  return 1 - normalizedUsed;
+  return (remainingContextPercent(usedPercent) ?? 100) / 100;
 }
 
 export function animationFrame(frame: number): number {

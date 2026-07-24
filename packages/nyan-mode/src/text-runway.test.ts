@@ -2,10 +2,10 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import type { CatMood } from "./cat-state.ts";
-import { renderCat, renderTextNyan } from "./text-runway.ts";
+import { minimumTextNyanCells, renderCat, renderTextNyan } from "./text-runway.ts";
 
 const ESCAPE = String.fromCharCode(27);
-const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;2;\\d+;\\d+;\\d+|1|22|39|90)m`, "gu");
+const ANSI_FOREGROUND = new RegExp(`${ESCAPE}\\[(?:38;2;\\d+;\\d+;\\d+|1|22|31|39|90)m`, "gu");
 const RGB_BLOCK = new RegExp(`${ESCAPE}\\[38;2;(\\d+);(\\d+);(\\d+)m█`, "gu");
 const STREAMING_MOODS: readonly CatMood[] = [
   "dancing",
@@ -61,6 +61,26 @@ describe("ANSI Nyan runway", () => {
     const runway = renderTextNyan(40, 50, { mood: "angry", animationFrame: 1 });
     expect(visibleWidth(runway)).toBe(40);
     expect(plain(runway)).toContain("/(=ಠ益ಠ=)\\");
+  });
+
+  it("places remaining context beside the cat and keeps the total width fixed", () => {
+    const runway = renderTextNyan(20, 90, { mood: "annoyed", catSuffix: "10%" });
+    expect(plain(runway)).toBe(`█!(=¬_¬=)   10%${"·".repeat(5)}`);
+    expect(visibleWidth(runway)).toBe(20);
+    expect(minimumTextNyanCells("10%")).toBe(14);
+
+    const longSuffix = renderTextNyan(20, 50, { catSuffix: "remaining context" });
+    expect(visibleWidth(longSuffix)).toBe(20);
+  });
+
+  it("applies the selected stress color only to the cat", () => {
+    const runway = renderTextNyan(40, 90, {
+      mood: "annoyed",
+      styleCat: (cat) => `${ESCAPE}[31m${cat}${ESCAPE}[39m`,
+    });
+    expect(visibleWidth(runway)).toBe(40);
+    expect(runway).toContain(`${ESCAPE}[31m${ESCAPE}[1m!(=¬_¬=) `);
+    expect(plain(runway)).toContain("!(=¬_¬=) ");
   });
 
   it("uses a full-height rainbow bar when the runway is too narrow for the cat", () => {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createCatState, reduceCatState, selectCatMood, type CatState } from "./cat-state.ts";
+import {
+  createCatState,
+  reduceCatState,
+  selectCatPresentation,
+  type CatState,
+} from "./cat-state.ts";
 
 function started(nowMs = 0): CatState {
   return reduceCatState(createCatState(), { type: "stream_started", nowMs });
@@ -8,6 +13,10 @@ function started(nowMs = 0): CatState {
 
 function finish(state: CatState, toolCallId: string, isError: boolean, nowMs: number): CatState {
   return reduceCatState(state, { type: "tool_finished", toolCallId, isError, nowMs });
+}
+
+function selectCatMood(state: CatState, nowMs: number): string {
+  return selectCatPresentation(state, nowMs, 100).mood;
 }
 
 describe("cat state machine", () => {
@@ -83,5 +92,39 @@ describe("cat state machine", () => {
     expect(initial.activeToolIds.size).toBe(0);
     expect(second.activeToolIds.size).toBe(2);
     expect(duplicate.activeToolIds.size).toBe(2);
+  });
+});
+
+describe("cat context stress", () => {
+  it("escalates mood as remaining context falls", () => {
+    const idle = createCatState();
+    expect(selectCatPresentation(idle, 0, undefined)).toEqual({
+      contextStress: "none",
+      mood: "neutral",
+    });
+    expect(selectCatPresentation(idle, 0, 25)).toEqual({
+      contextStress: "watch",
+      mood: "unimpressed",
+    });
+    expect(selectCatPresentation(idle, 0, 10)).toEqual({
+      contextStress: "stressed",
+      mood: "annoyed",
+    });
+    expect(selectCatPresentation(idle, 0, 5)).toEqual({
+      contextStress: "critical",
+      mood: "angry",
+    });
+    expect(selectCatPresentation(idle, 0, 25.01)).toEqual({
+      contextStress: "none",
+      mood: "neutral",
+    });
+  });
+
+  it("preserves stronger error stress", () => {
+    const errored = finish(started(), "tool-1", true, 1_000);
+    expect(selectCatPresentation(errored, 1_000, 25)).toEqual({
+      contextStress: "watch",
+      mood: "annoyed",
+    });
   });
 });

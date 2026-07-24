@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { animationFrame, normalizeAvailableProgress, progressPixelBucket } from "./progress.ts";
+import {
+  animationFrame,
+  normalizeAvailableProgress,
+  progressPixelBucket,
+  remainingContextPercent,
+} from "./progress.ts";
 
 describe("Nyan progress", () => {
   it("normalizes remaining context from used percentages", () => {
@@ -12,6 +17,18 @@ describe("Nyan progress", () => {
     expect(normalizeAvailableProgress(25)).toBe(0.75);
     expect(normalizeAvailableProgress(100)).toBe(0);
     expect(normalizeAvailableProgress(101)).toBe(0);
+  });
+
+  it("reports bounded remaining percentages while preserving unknown usage", () => {
+    expect(remainingContextPercent(undefined)).toBeUndefined();
+    expect(remainingContextPercent(null)).toBeUndefined();
+    expect(remainingContextPercent(Number.NaN)).toBeUndefined();
+    expect(remainingContextPercent(Number.POSITIVE_INFINITY)).toBeUndefined();
+    expect(remainingContextPercent(-1)).toBe(100);
+    expect(remainingContextPercent(0)).toBe(100);
+    expect(remainingContextPercent(25)).toBe(75);
+    expect(remainingContextPercent(90)).toBe(10);
+    expect(remainingContextPercent(101)).toBe(0);
   });
 
   it("cycles positive animation frames and reserves zero for static art", () => {

@@ -8,6 +8,13 @@ export type CatMood =
   | "annoyed"
   | "angry";
 
+export type CatContextStress = "none" | "watch" | "stressed" | "critical";
+
+export type CatPresentation = {
+  contextStress: CatContextStress;
+  mood: CatMood;
+};
+
 export type CatState = {
   streaming: boolean;
   startedAtMs: number | undefined;
@@ -66,7 +73,17 @@ export function reduceCatState(state: CatState, event: CatEvent): CatState {
   return finishTool(state, event);
 }
 
-export function selectCatMood(state: CatState, nowMs: number): CatMood {
+export function selectCatPresentation(
+  state: CatState,
+  nowMs: number,
+  remainingContextPercent: number | undefined,
+): CatPresentation {
+  const contextStress = selectContextStress(remainingContextPercent);
+  const baseMood = selectBaseMood(state, nowMs);
+  return { contextStress, mood: escalateMood(baseMood, contextStress) };
+}
+
+function selectBaseMood(state: CatState, nowMs: number): CatMood {
   if (!state.streaming || state.startedAtMs === undefined) return "neutral";
 
   const elapsedMs = Math.max(0, nowMs - state.startedAtMs);
@@ -75,6 +92,34 @@ export function selectCatMood(state: CatState, nowMs: number): CatMood {
   if (escalation) return escalation;
   const activity = selectActivity(state, age(nowMs, state.lastSuccessAtMs));
   return activity ?? selectDurationMood(elapsedMs);
+}
+
+function selectContextStress(remainingPercent: number | undefined): CatContextStress {
+  if (remainingPercent === undefined || !Number.isFinite(remainingPercent)) return "none";
+  if (remainingPercent <= 5) return "critical";
+  if (remainingPercent <= 10) return "stressed";
+  if (remainingPercent <= 25) return "watch";
+  return "none";
+}
+
+function escalateMood(mood: CatMood, stress: CatContextStress): CatMood {
+  const minimumMood =
+    stress === "critical"
+      ? "angry"
+      : stress === "stressed"
+        ? "annoyed"
+        : stress === "watch"
+          ? "unimpressed"
+          : undefined;
+  if (!minimumMood) return mood;
+  return moodSeverity(mood) >= moodSeverity(minimumMood) ? mood : minimumMood;
+}
+
+function moodSeverity(mood: CatMood): number {
+  if (mood === "angry") return 3;
+  if (mood === "annoyed") return 2;
+  if (mood === "unimpressed") return 1;
+  return 0;
 }
 
 function finishTool(
