@@ -3,6 +3,7 @@ export default {
   coverageAnalysis: "perTest",
   mutate: [
     "packages/turn-fold/configuration.ts",
+    "packages/turn-fold/edit-diff-stat.ts",
     "packages/turn-fold/fold-policy.ts",
     "packages/turn-fold/mode.ts",
     "packages/turn-fold/transcript-window-adapter.ts",

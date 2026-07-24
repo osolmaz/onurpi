@@ -1,4 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -32,6 +33,20 @@ describe("turn fold summary rendering", () => {
     expect(formatStreamingSummary(summary({ compactions: 1, running: true }))).toBe(
       "▶ 7 earlier activities · 10 tools · 4 msgs · compacted",
     );
+  });
+
+  it("formats edit diffstats in streaming and settled summaries", () => {
+    const fileDiff = { additions: 42, deletions: 11, files: 3 };
+
+    expect(formatStreamingSummary(summary({ fileDiff, running: true }))).toBe(
+      "▶ 7 earlier activities · 10 tools · 4 msgs · 3 files +42 −11",
+    );
+    expect(formatSettledSummary(summary({ fileDiff }))).toBe(
+      "▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files +42 −11",
+    );
+    expect(
+      formatSettledSummary(summary({ fileDiff: { additions: 0, deletions: 2, files: 1 } })),
+    ).toContain("1 file +0 −2");
   });
 
   it("formats normal, compacted, and interrupted settled summaries", () => {
@@ -81,6 +96,38 @@ describe("turn fold summary rendering", () => {
     expect(
       renderSettledSummary(summary({ aborted: true, failedTools: 1 }), 100, testTheme)[1],
     ).toContain("<warning>");
+  });
+
+  it("colors additions and deletions with the documented diff colors", () => {
+    const testTheme = {
+      bold: (text: string) => `<bold>${text}</bold>`,
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+    } as unknown as Theme;
+    const rendered = renderSettledSummary(
+      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      1_000,
+      testTheme,
+    )[1];
+
+    expect(rendered).toContain("<toolDiffAdded>+42</toolDiffAdded>");
+    expect(rendered).toContain("<toolDiffRemoved>−11</toolDiffRemoved>");
+    expect(rendered).toContain("<warning>▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files ");
+  });
+
+  it("truncates styled summaries to the available visible width", () => {
+    const ansiTheme = {
+      bold: (text: string) => `\u001b[1m${text}\u001b[22m`,
+      fg: (color: string, text: string) =>
+        `${color === "toolDiffAdded" ? "\u001b[32m" : color === "toolDiffRemoved" ? "\u001b[31m" : "\u001b[33m"}${text}\u001b[39m`,
+    } as unknown as Theme;
+    const rendered = renderSettledSummary(
+      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      32,
+      ansiTheme,
+    )[1];
+
+    expect(visibleWidth(rendered ?? "")).toBeLessThanOrEqual(32);
+    expect(rendered).toContain("…");
   });
 
   it("renders summaries with a leading blank row and respects zero width", () => {

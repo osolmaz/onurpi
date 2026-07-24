@@ -86,6 +86,65 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("Turn Fold finalized edit results", () => {
+  it("adds finalized edit patches to the active turn summary", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    const toolCaller = {
+      content: [{ id: "edit-final", name: "edit", type: "toolCall" }],
+      role: "assistant",
+      timestamp: 110,
+    };
+    const finalMessage = {
+      content: [{ text: "Done", type: "text" }],
+      role: "assistant",
+      timestamp: 140,
+    };
+    turnFold(extension.pi);
+
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+    await emit(extension.handlers, "agent_start", { type: "agent_start" }, ctx);
+    await emit(
+      extension.handlers,
+      "message_start",
+      { message: { content: "Prompt", role: "user", timestamp: 100 } },
+      ctx,
+    );
+    await emit(extension.handlers, "message_start", { message: toolCaller }, ctx);
+    await emit(extension.handlers, "message_end", { message: toolCaller }, ctx);
+    await emit(
+      extension.handlers,
+      "message_end",
+      {
+        message: {
+          details: {
+            patch: "--- src/example.ts\n+++ src/example.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n+added\n",
+          },
+          isError: false,
+          role: "toolResult",
+          toolCallId: "edit-final",
+          toolName: "edit",
+        },
+      },
+      ctx,
+    );
+    await emit(extension.handlers, "message_start", { message: finalMessage }, ctx);
+    await emit(extension.handlers, "message_end", { message: finalMessage }, ctx);
+    await emit(extension.handlers, "agent_settled", { type: "agent_settled" }, ctx);
+
+    const state = renderPatchMock.states.at(-1);
+    expect(state).toBeInstanceOf(TurnFoldState);
+    if (!(state instanceof TurnFoldState)) throw new Error("Turn Fold state was not installed");
+    const final = {};
+    state.associateAssistant(final, finalMessage);
+    expect(state.viewFor(final)?.summary.fileDiff).toEqual({
+      additions: 2,
+      deletions: 1,
+      files: 1,
+    });
+  });
+});
+
 describe("Turn Fold extension compaction state", () => {
   it("does not append Pi session entries for automatic compactions", async () => {
     const { appendEntry, handlers, pi } = extensionHarness();
