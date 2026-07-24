@@ -9,7 +9,7 @@ show their local timestamp below the content in both compact and expanded modes.
 keeps one padding line before the next user message instead of Pi's usual two. Tool rows and
 intermediate assistant messages disappear, leaving the final response below the summary. Automatic
 compactions during a turn appear as `compacted` in the summary instead of a separate transcript row.
-Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a compact per-turn diffstat such as `3 files +42 −11`. Additions and deletions use Pi's diff colors, and the full absolute path of each edited file appears below the summary. Interrupted runs retain their last partial response or a fallback message.
+Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a compact per-turn diffstat such as `3 files +42 −11`. Each absolute file path appears below the summary with that file's cumulative additions and deletions. The counters use Pi's diff colors. A long path is truncated from the left so its filename and counters remain on one line. Interrupted runs retain their last partial response or a fallback message.
 
 The extension changes only the display. Pi keeps every stored session message, while compaction still
 controls what reaches the model. The normative behavior is defined in [SPEC.md](SPEC.md).

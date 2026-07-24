@@ -189,7 +189,7 @@ it("renders local user and completion times in transcript order", () => {
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 
-it("renders edit diffstats and full paths only in compact summaries", () => {
+it("renders per-file diffstats beside paths only in compact summaries", () => {
   const workingDirectory = resolve("/workspace/project");
   const expectedPath = resolve(workingDirectory, "src/example.ts");
   const state = new TurnFoldState(workingDirectory);
@@ -236,7 +236,9 @@ it("renders edit diffstats and full paths only in compact summaries", () => {
 
   const compact = frame(transcript);
   expect(compact).toContain("1 file +2 −1");
-  expect(compact).toContain(expectedPath);
+  const fileLine = compact.split("\n").find((line) => line.includes(expectedPath));
+  expect(fileLine).toContain("+2 −1");
+  expect(visibleWidth(fileLine ?? "")).toBeLessThanOrEqual(120);
   expect(compact.indexOf("1 file +2 −1")).toBeLessThan(compact.indexOf(expectedPath));
   expect(compact.indexOf(expectedPath)).toBeLessThan(compact.indexOf("Final response"));
   state.setMode("expanded");

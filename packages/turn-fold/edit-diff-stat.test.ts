@@ -78,8 +78,15 @@ describe("edit diffstat parser", () => {
     expect(diffs.summary((path) => resolve("/workspace/project", path))).toEqual({
       additions: 3,
       deletions: 4,
+      fileDiffs: [
+        {
+          additions: 3,
+          deletions: 1,
+          path: resolve("/workspace/project", "src/a.ts"),
+        },
+        { additions: 0, deletions: 3, path: resolve("/outside/b.ts") },
+      ],
       files: 2,
-      paths: [resolve("/workspace/project", "src/a.ts"), resolve("/outside/b.ts")],
     });
   });
 

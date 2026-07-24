@@ -262,11 +262,19 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toEqual({
       additions: 3,
       deletions: 6,
-      files: 2,
-      paths: [
-        resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
-        resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+      fileDiffs: [
+        {
+          additions: 3,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        },
+        {
+          additions: 0,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+        },
       ],
+      files: 2,
     });
   });
 
@@ -317,11 +325,19 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toEqual({
       additions: 5,
       deletions: 5,
-      files: 2,
-      paths: [
-        resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
-        resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+      fileDiffs: [
+        {
+          additions: 4,
+          deletions: 2,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        },
+        {
+          additions: 1,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+        },
       ],
+      files: 2,
     });
     state.setMode("expanded");
     expect(state.viewFor(final, 200)?.display).toBe("original");

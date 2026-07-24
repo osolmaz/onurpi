@@ -32,7 +32,7 @@ Turn Fold MUST leave Pi's working and compaction status indicators under Pi's co
 
 A summary line MUST fit the available terminal width. Turn Fold may truncate it with an ellipsis. Normal summary text uses the theme's warning color. Edit additions use `toolDiffAdded`, and edit deletions use `toolDiffRemoved`.
 
-When an edit diffstat is present, Turn Fold MUST render every unique absolute file path directly below the summary line in first-edit order. Path rows use `toolDiffContext` and appear before retained activity or final content. Long paths wrap across terminal-width lines without dropping path text. Control characters are escaped before rendering.
+When an edit diffstat is present, Turn Fold MUST render every unique absolute file path directly below the summary line in first-edit order. Each path row ends with that file's cumulative addition and deletion counts. Path text uses `toolDiffContext`; the counters use `toolDiffAdded` and `toolDiffRemoved`. Each file occupies exactly one row before retained activity or final content. When the complete row exceeds the terminal width, Turn Fold truncates the path from the left while keeping the filename and counters visible. Control characters are escaped before rendering.
 
 ## Compact mode while streaming
 
@@ -48,8 +48,8 @@ Example:
 User message
 
 ▶ 7 earlier activities · 8 tools · 9 msgs · 2 files +12 −4
-  /workspace/project/src/a.ts
-  /workspace/project/src/b.ts
+  /workspace/project/src/a.ts +8 −1
+  /workspace/project/src/b.ts +4 −3
 
 latest activity 1
 latest activity 2
@@ -68,14 +68,14 @@ A settled compact turn MUST show one settled summary line followed by one final 
 User message
 
 ▶ Worked for 14s · 8 tools · 9 msgs · 2 files +12 −4
-  /workspace/project/src/a.ts
-  /workspace/project/src/b.ts
+  /workspace/project/src/a.ts +8 −1
+  /workspace/project/src/b.ts +4 −3
 
 Final assistant response
                               18:43
 ```
 
-The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the absolute path rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
+The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
 Compact mode MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
 
@@ -181,6 +181,6 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Failed or malformed edit results do not affect the summary.
 - Live and reconstructed turns produce the same edit diffstat from finalized tool-result messages.
 - Compact diffstats use Pi's addition and deletion colors and remain absent in expanded mode.
-- Every compact diffstat lists unique absolute paths in first-edit order below the summary, wraps long paths without data loss, and escapes terminal controls.
+- Every compact diffstat lists unique absolute paths in first-edit order below the summary, shows cumulative colored counters beside each file, truncates long paths so each file fits one row, and escapes terminal controls.
 - Repeated unchanged renders perform no activity sorting or assistant-content rescans.
 - Session messages and model context are unchanged.

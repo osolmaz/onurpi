@@ -146,8 +146,14 @@ describe("Turn Fold finalized edit results", () => {
     expect(state.viewFor(final)?.summary.fileDiff).toEqual({
       additions: 2,
       deletions: 1,
+      fileDiffs: [
+        {
+          additions: 2,
+          deletions: 1,
+          path: resolve("/workspace/project/src/example.ts"),
+        },
+      ],
       files: 1,
-      paths: [resolve("/workspace/project/src/example.ts")],
     });
   });
 });

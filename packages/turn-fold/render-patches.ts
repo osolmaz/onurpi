@@ -6,8 +6,15 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import {
+  Container,
+  sliceByColumn,
+  Spacer,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 
+import type { EditFileDiff } from "./edit-diff-stat.ts";
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
 import type { FoldDisplay } from "./fold-policy.ts";
@@ -152,19 +159,41 @@ function safePathText(path: string): string {
   return safe;
 }
 
-function renderedPathLines(
-  paths: readonly string[],
+function truncatePathFromLeft(path: string, width: number): string {
+  if (width <= 0) return "";
+  if (visibleWidth(path) <= width) return path;
+  if (width === 1) return "…";
+  const tailWidth = width - 1;
+  const start = Math.max(0, visibleWidth(path) - tailWidth);
+  return `…${sliceByColumn(path, start, tailWidth, true)}`;
+}
+
+function styledFileDiff(diff: EditFileDiff, theme: Theme | undefined): string {
+  const additions = `+${String(diff.additions)}`;
+  const deletions = `−${String(diff.deletions)}`;
+  if (!theme) return `${additions} ${deletions}`;
+  return `${theme.fg("toolDiffAdded", additions)} ${theme.fg("toolDiffRemoved", deletions)}`;
+}
+
+function renderedFileDiffLine(diff: EditFileDiff, width: number, theme: Theme | undefined): string {
+  if (width <= 0) return "";
+  const statWidth = visibleWidth(`+${String(diff.additions)} −${String(diff.deletions)}`);
+  const prefix = width >= statWidth + 4 ? "  " : "";
+  const pathWidth = width - visibleWidth(prefix) - statWidth - 1;
+  if (pathWidth <= 0) return truncateToWidth(styledFileDiff(diff, theme), width, "");
+
+  const path = truncatePathFromLeft(safePathText(diff.path), pathWidth);
+  const styledPath = theme ? theme.fg("toolDiffContext", path) : path;
+  return truncateToWidth(`${prefix}${styledPath} ${styledFileDiff(diff, theme)}`, width, "");
+}
+
+function renderedFileDiffLines(
+  fileDiffs: readonly EditFileDiff[],
   width: number,
   theme: Theme | undefined,
 ): string[] {
   if (width <= 0) return [];
-  const prefix = width > 2 ? "  " : "";
-  const contentWidth = width - prefix.length;
-  return paths.flatMap((path) => {
-    const text = safePathText(path);
-    const styled = theme ? theme.fg("toolDiffContext", text) : text;
-    return wrapTextWithAnsi(styled, contentWidth).map((line) => prefix + line);
-  });
+  return fileDiffs.map((diff) => renderedFileDiffLine(diff, width, theme));
 }
 
 function renderedSummary(
@@ -175,7 +204,7 @@ function renderedSummary(
 ): string[] {
   return [
     ...styledSummary(segments, width, theme),
-    ...renderedPathLines(summary.fileDiff?.paths ?? [], width, theme),
+    ...renderedFileDiffLines(summary.fileDiff?.fileDiffs ?? [], width, theme),
   ];
 }
 
