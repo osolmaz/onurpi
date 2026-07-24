@@ -101,6 +101,7 @@ function loadVisibleHistory(
   branch: BranchEntries,
   registry: EphemeralCompactionRegistry,
 ): void {
+  state.setWorkingDirectory(ctx.cwd);
   state.loadHistory(
     ctx.sessionManager.buildContextEntries(),
     compactionAssociationsForBranch(branch, ctx, registry),

@@ -1,6 +1,10 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { TurnFoldState } from "./turn-state.ts";
+
+const TEST_WORKING_DIRECTORY = resolve("/workspace/project");
 
 function assistantMessage(
   timestamp: number,
@@ -238,8 +242,8 @@ describe("compact streaming", () => {
 });
 
 describe("edit diffstats", () => {
-  it("aggregates successful edit operations by tool call and unique file", () => {
-    const state = new TurnFoldState();
+  it("aggregates successful edit operations by tool call and unique absolute file", () => {
+    const state = new TurnFoldState(TEST_WORKING_DIRECTORY);
     const final = {};
     const message = assistantMessage(180, [{ text: "Done", type: "text" }]);
 
@@ -259,6 +263,10 @@ describe("edit diffstats", () => {
       additions: 3,
       deletions: 6,
       files: 2,
+      paths: [
+        resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+      ],
     });
   });
 
@@ -286,8 +294,8 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toBeUndefined();
   });
 
-  it("reconstructs the same diffstat from historical tool results", () => {
-    const state = new TurnFoldState();
+  it("reconstructs the same diffstat and paths from historical tool results", () => {
+    const state = new TurnFoldState(TEST_WORKING_DIRECTORY);
     const final = {};
     const finalMessage = assistantMessage(180, [{ text: "Done", type: "text" }]);
 
@@ -310,6 +318,10 @@ describe("edit diffstats", () => {
       additions: 5,
       deletions: 5,
       files: 2,
+      paths: [
+        resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+      ],
     });
     state.setMode("expanded");
     expect(state.viewFor(final, 200)?.display).toBe("original");

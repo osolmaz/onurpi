@@ -14,7 +14,7 @@ An **attached compaction** is an automatic threshold or overflow compaction obse
 
 A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for`.
 
-An **edit diffstat** is the cumulative number of added and removed lines from successful finalized `edit` tool results in one turn, plus the number of unique patch paths. It describes edit operations. The final Git working-tree difference can be different.
+An **edit diffstat** is the cumulative number of added and removed lines from successful finalized `edit` tool results in one turn, plus the number of unique edited files. Relative patch paths are resolved against Pi's working directory before display and deduplication. It describes edit operations. The final Git working-tree difference can be different.
 
 The **final content row** is the one assistant or tool row retained after a compact turn settles.
 
@@ -32,6 +32,8 @@ Turn Fold MUST leave Pi's working and compaction status indicators under Pi's co
 
 A summary line MUST fit the available terminal width. Turn Fold may truncate it with an ellipsis. Normal summary text uses the theme's warning color. Edit additions use `toolDiffAdded`, and edit deletions use `toolDiffRemoved`.
 
+When an edit diffstat is present, Turn Fold MUST render every unique absolute file path directly below the summary line in first-edit order. Path rows use `toolDiffContext` and appear before retained activity or final content. Long paths wrap across terminal-width lines without dropping path text. Control characters are escaped before rendering.
+
 ## Compact mode while streaming
 
 Compact mode shows at most the latest three activity rows in transcript order.
@@ -45,7 +47,9 @@ Example:
 ```text
 User message
 
-▶ 7 earlier activities · 8 tools · 9 msgs
+▶ 7 earlier activities · 8 tools · 9 msgs · 2 files +12 −4
+  /workspace/project/src/a.ts
+  /workspace/project/src/b.ts
 
 latest activity 1
 latest activity 2
@@ -63,13 +67,15 @@ A settled compact turn MUST show one settled summary line followed by one final 
 ```text
 User message
 
-▶ Worked for 14s · 8 tools · 9 msgs
+▶ Worked for 14s · 8 tools · 9 msgs · 2 files +12 −4
+  /workspace/project/src/a.ts
+  /workspace/project/src/b.ts
 
 Final assistant response
                               18:43
 ```
 
-The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11`. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
+The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the absolute path rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
 Compact mode MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
 
@@ -107,7 +113,7 @@ Stale partial assistant text MUST NOT replace a terminal tool error selected as 
 
 ## Expanded mode
 
-Expanded mode shows Pi's original transcript rows in their original order within the selected window range, including attached and standalone compaction rows. Turn Fold summary lines and edit diffstats are hidden.
+Expanded mode shows Pi's original transcript rows in their original order within the selected window range, including attached and standalone compaction rows. Turn Fold summary lines, edit diffstats, and edited-file path rows are hidden.
 
 Switching between compact and expanded mode MUST update the existing transcript immediately. A single mode change MUST invalidate each affected component no more than once.
 
@@ -174,6 +180,7 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Successful edit results aggregate exact patch line totals and unique files without double counting repeated tool-call IDs.
 - Failed or malformed edit results do not affect the summary.
 - Live and reconstructed turns produce the same edit diffstat from finalized tool-result messages.
-- Compact diffstats use Pi's addition and deletion colors, truncate within the available width, and remain absent in expanded mode.
+- Compact diffstats use Pi's addition and deletion colors and remain absent in expanded mode.
+- Every compact diffstat lists unique absolute paths in first-edit order below the summary, wraps long paths without data loss, and escapes terminal controls.
 - Repeated unchanged renders perform no activity sorting or assistant-content rescans.
 - Session messages and model context are unchanged.

@@ -8,6 +8,7 @@ export type EditDiffSummary = {
   additions: number;
   deletions: number;
   files: number;
+  paths: readonly string[];
 };
 
 type HunkCounts = {
@@ -186,9 +187,14 @@ export class TurnEditDiffs {
     for (const [toolCallId, stat] of other.byToolCallId) this.add(toolCallId, stat);
   }
 
-  summary(): EditDiffSummary | undefined {
-    return this.byToolCallId.size > 0
-      ? { additions: this.additions, deletions: this.deletions, files: this.files.size }
-      : undefined;
+  summary(resolvePath: (path: string) => string): EditDiffSummary | undefined {
+    if (this.byToolCallId.size === 0) return undefined;
+    const paths = [...new Set([...this.files].map((path) => resolvePath(path)))];
+    return {
+      additions: this.additions,
+      deletions: this.deletions,
+      files: paths.length,
+      paths,
+    };
   }
 }

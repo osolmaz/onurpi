@@ -6,7 +6,7 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, truncateToWidth } from "@earendil-works/pi-tui";
+import { Container, Spacer, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
@@ -136,12 +136,55 @@ function styledSummary(
   return ["", truncateToWidth(styled, width, ellipsis)];
 }
 
+function safePathText(path: string): string {
+  let safe = "";
+  for (const character of path) {
+    const codePoint = character.codePointAt(0);
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f))
+    ) {
+      safe += `\\x${codePoint.toString(16).padStart(2, "0")}`;
+    } else {
+      safe += character;
+    }
+  }
+  return safe;
+}
+
+function renderedPathLines(
+  paths: readonly string[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (width <= 0) return [];
+  const prefix = width > 2 ? "  " : "";
+  const contentWidth = width - prefix.length;
+  return paths.flatMap((path) => {
+    const text = safePathText(path);
+    const styled = theme ? theme.fg("toolDiffContext", text) : text;
+    return wrapTextWithAnsi(styled, contentWidth).map((line) => prefix + line);
+  });
+}
+
+function renderedSummary(
+  summary: FoldSummary,
+  segments: readonly SummarySegment[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  return [
+    ...styledSummary(segments, width, theme),
+    ...renderedPathLines(summary.fileDiff?.paths ?? [], width, theme),
+  ];
+}
+
 export function renderStreamingSummary(
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(streamingSummarySegments(summary), width, theme);
+  return renderedSummary(summary, streamingSummarySegments(summary), width, theme);
 }
 
 export function renderSettledSummary(
@@ -149,7 +192,7 @@ export function renderSettledSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(settledSummarySegments(summary), width, theme);
+  return renderedSummary(summary, settledSummarySegments(summary), width, theme);
 }
 
 function interruptionFallback(theme: Theme | undefined, width: number): string[] {

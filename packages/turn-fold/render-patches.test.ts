@@ -36,7 +36,12 @@ describe("turn fold summary rendering", () => {
   });
 
   it("formats edit diffstats in streaming and settled summaries", () => {
-    const fileDiff = { additions: 42, deletions: 11, files: 3 };
+    const fileDiff = {
+      additions: 42,
+      deletions: 11,
+      files: 3,
+      paths: ["/workspace/a.ts", "/workspace/b.ts", "/workspace/c.ts"],
+    };
 
     expect(formatStreamingSummary(summary({ fileDiff, running: true }))).toBe(
       "▶ 7 earlier activities · 10 tools · 4 msgs · 3 files +42 −11",
@@ -45,7 +50,11 @@ describe("turn fold summary rendering", () => {
       "▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files +42 −11",
     );
     expect(
-      formatSettledSummary(summary({ fileDiff: { additions: 0, deletions: 2, files: 1 } })),
+      formatSettledSummary(
+        summary({
+          fileDiff: { additions: 0, deletions: 2, files: 1, paths: ["/workspace/a.ts"] },
+        }),
+      ),
     ).toContain("1 file +0 −2");
   });
 
@@ -104,7 +113,14 @@ describe("turn fold summary rendering", () => {
       fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
     } as unknown as Theme;
     const rendered = renderSettledSummary(
-      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      summary({
+        fileDiff: {
+          additions: 42,
+          deletions: 11,
+          files: 3,
+          paths: ["/workspace/a.ts", "/workspace/b.ts", "/workspace/c.ts"],
+        },
+      }),
       1_000,
       testTheme,
     )[1];
@@ -112,6 +128,62 @@ describe("turn fold summary rendering", () => {
     expect(rendered).toContain("<toolDiffAdded>+42</toolDiffAdded>");
     expect(rendered).toContain("<toolDiffRemoved>−11</toolDiffRemoved>");
     expect(rendered).toContain("<warning>▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files ");
+  });
+});
+
+describe("edited file path rendering", () => {
+  it("renders every absolute path below the summary in first-edit order", () => {
+    const testTheme = {
+      bold: (text: string) => `<bold>${text}</bold>`,
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+    } as unknown as Theme;
+    const rendered = renderSettledSummary(
+      summary({
+        fileDiff: {
+          additions: 2,
+          deletions: 1,
+          files: 2,
+          paths: ["/workspace/project/src/a.ts", "/outside/b.ts"],
+        },
+      }),
+      1_000,
+      testTheme,
+    );
+
+    expect(rendered[1]).toContain("2 files ");
+    expect(rendered[1]).toContain("<toolDiffAdded>+2</toolDiffAdded>");
+    expect(rendered.slice(2)).toEqual([
+      "  <toolDiffContext>/workspace/project/src/a.ts</toolDiffContext>",
+      "  <toolDiffContext>/outside/b.ts</toolDiffContext>",
+    ]);
+  });
+
+  it("wraps rather than truncates full paths and escapes terminal controls", () => {
+    const fullPath = "/workspace/project/a-very-long-directory/another-directory/file.ts";
+    const rendered = renderSettledSummary(
+      summary({
+        fileDiff: {
+          additions: 1,
+          deletions: 0,
+          files: 2,
+          paths: [fullPath, "/tmp/unsafe\u001b]2;title\u0007.ts"],
+        },
+      }),
+      18,
+      undefined,
+    );
+    const pathLines = rendered.slice(2);
+
+    expect(pathLines.every((line) => visibleWidth(line) <= 18)).toBe(true);
+    expect(pathLines.join("\n")).not.toContain("\u001b");
+    expect(pathLines.join("\n")).toContain("\\x1b");
+    expect(pathLines.join("\n")).toContain("\\x07");
+    expect(
+      pathLines
+        .slice(0, Math.ceil(fullPath.length / 16))
+        .map((line) => line.slice(2))
+        .join(""),
+    ).toBe(fullPath);
   });
 
   it("truncates styled summaries to the available visible width", () => {
@@ -121,7 +193,14 @@ describe("turn fold summary rendering", () => {
         `${color === "toolDiffAdded" ? "\u001b[32m" : color === "toolDiffRemoved" ? "\u001b[31m" : "\u001b[33m"}${text}\u001b[39m`,
     } as unknown as Theme;
     const rendered = renderSettledSummary(
-      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      summary({
+        fileDiff: {
+          additions: 42,
+          deletions: 11,
+          files: 3,
+          paths: ["/workspace/a.ts", "/workspace/b.ts", "/workspace/c.ts"],
+        },
+      }),
       32,
       ansiTheme,
     )[1];

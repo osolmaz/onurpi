@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
@@ -138,6 +140,15 @@ export class TurnFoldState {
   private userComponentGroup = new WeakMap<object, string>();
   private userGroupCursor = 0;
   private userGroupIds: string[] = [];
+  private workingDirectory: string;
+
+  constructor(workingDirectory = process.cwd()) {
+    this.workingDirectory = resolve(workingDirectory);
+  }
+
+  setWorkingDirectory(workingDirectory: string): void {
+    this.workingDirectory = resolve(workingDirectory);
+  }
 
   getMode(): TurnFoldMode {
     return this.mode;
@@ -553,7 +564,7 @@ export class TurnFoldState {
       running: !group.settled,
       tools: group.toolCallIds.size,
     };
-    const fileDiff = group.editDiffs.summary();
+    const fileDiff = group.editDiffs.summary((path) => resolve(this.workingDirectory, path));
     if (fileDiff) summary.fileDiff = fileDiff;
     return summary;
   }

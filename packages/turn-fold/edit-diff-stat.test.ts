@@ -1,6 +1,8 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { parseEditPatch } from "./edit-diff-stat.ts";
+import { parseEditPatch, TurnEditDiffs } from "./edit-diff-stat.ts";
 
 describe("edit diffstat parser", () => {
   it("counts replacements and patch-like added content inside a hunk", () => {
@@ -65,6 +67,20 @@ describe("edit diffstat parser", () => {
         ].join("\n"),
       ),
     ).toEqual({ additions: 0, deletions: 2, path: "old.ts" });
+  });
+
+  it("reports unique absolute paths in first-edit order", () => {
+    const diffs = new TurnEditDiffs();
+    diffs.add("first", { additions: 2, deletions: 1, path: "src/a.ts" });
+    diffs.add("alias", { additions: 1, deletions: 0, path: "./src/a.ts" });
+    diffs.add("second", { additions: 0, deletions: 3, path: "/outside/b.ts" });
+
+    expect(diffs.summary((path) => resolve("/workspace/project", path))).toEqual({
+      additions: 3,
+      deletions: 4,
+      files: 2,
+      paths: [resolve("/workspace/project", "src/a.ts"), resolve("/outside/b.ts")],
+    });
   });
 
   it.each([

@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import {
   AssistantMessageComponent,
   CompactionSummaryMessageComponent,
@@ -187,8 +189,10 @@ it("renders local user and completion times in transcript order", () => {
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 
-it("renders edit diffstats only in compact summaries", () => {
-  const state = new TurnFoldState();
+it("renders edit diffstats and full paths only in compact summaries", () => {
+  const workingDirectory = resolve("/workspace/project");
+  const expectedPath = resolve(workingDirectory, "src/example.ts");
+  const state = new TurnFoldState(workingDirectory);
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
   const toolCaller = assistantMessage(110, [
@@ -230,9 +234,15 @@ it("renders edit diffstats only in compact summaries", () => {
   transcript.addChild(new AssistantMessageComponent(toolCaller, false, undefined, undefined, 0));
   transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
 
-  expect(frame(transcript)).toContain("1 file +2 −1");
+  const compact = frame(transcript);
+  expect(compact).toContain("1 file +2 −1");
+  expect(compact).toContain(expectedPath);
+  expect(compact.indexOf("1 file +2 −1")).toBeLessThan(compact.indexOf(expectedPath));
+  expect(compact.indexOf(expectedPath)).toBeLessThan(compact.indexOf("Final response"));
   state.setMode("expanded");
-  expect(frame(transcript)).not.toContain("1 file +2 −1");
+  const expanded = frame(transcript);
+  expect(expanded).not.toContain("1 file +2 −1");
+  expect(expanded).not.toContain(expectedPath);
 });
 
 it("timestamps every visible user and assistant message in both modes", () => {
