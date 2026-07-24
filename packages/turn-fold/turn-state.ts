@@ -1,20 +1,20 @@
+import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
 import { nextTurnFoldMode, type TurnFoldMode } from "./mode.ts";
+import {
+  assistantSnapshot,
+  type AssistantSnapshot,
+  entryTimestamp,
+  isRecord,
+  messageFromEntry,
+  numberField,
+  stringField,
+} from "./turn-message.ts";
 
 const LIVE_ACTIVITY_LIMIT = 3;
 
 type ComponentKind = "assistant" | "compaction" | "tool";
-
-type AssistantSnapshot = {
-  hasTerminalNotice: boolean;
-  hasVisibleContent: boolean;
-  interrupted: boolean;
-  key: string;
-  terminalErrorToolCallIds: string[];
-  timestamp: number;
-  toolCallIds: string[];
-};
 
 type ComponentInfo = {
   kind: ComponentKind;
@@ -44,6 +44,7 @@ type TurnGroup = {
   compactionIds: Set<string>;
   compactionTimestamps: Set<number>;
   components: Map<object, ComponentInfo>;
+  editDiffs: TurnEditDiffs;
   endedAt?: number;
   failedToolCallIds: Set<string>;
   id: string;
@@ -57,12 +58,15 @@ type TurnGroup = {
   tools: Map<object, string>;
 };
 
+export type FoldFileDiff = EditDiffSummary;
+
 export type FoldSummary = {
   aborted: boolean;
   compactions: number;
   completedAt: number | undefined;
   durationMs: number;
   failedTools: number;
+  fileDiff?: FoldFileDiff;
   hiddenActivities: number;
   messages: number;
   running: boolean;
@@ -73,83 +77,6 @@ export type ComponentView = {
   display: FoldDisplay;
   summary: FoldSummary;
 };
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null;
-}
-
-function stringField(value: unknown, key: string): string | undefined {
-  if (!isRecord(value)) return undefined;
-  const field = value[key];
-  return typeof field === "string" ? field : undefined;
-}
-
-function numberField(value: unknown, key: string): number | undefined {
-  if (!isRecord(value)) return undefined;
-  const field = value[key];
-  return typeof field === "number" && Number.isFinite(field) ? field : undefined;
-}
-
-function contentItems(message: unknown): readonly unknown[] {
-  if (!isRecord(message)) return [];
-  return Array.isArray(message["content"]) ? message["content"] : [];
-}
-
-function hasNonBlankContent(value: unknown, type: string, key: string): boolean {
-  if (stringField(value, "type") !== type) return false;
-  return Boolean(stringField(value, key)?.trim());
-}
-
-function summarizeAssistantContent(items: readonly unknown[]): {
-  hasVisibleContent: boolean;
-  toolCallIds: string[];
-} {
-  let hasVisibleContent = false;
-  const toolCallIds: string[] = [];
-  for (const item of items) {
-    if (hasNonBlankContent(item, "text", "text")) hasVisibleContent = true;
-    if (hasNonBlankContent(item, "thinking", "thinking")) hasVisibleContent = true;
-    const toolCallId =
-      stringField(item, "type") === "toolCall" ? stringField(item, "id") : undefined;
-    if (toolCallId) toolCallIds.push(toolCallId);
-  }
-  return { hasVisibleContent, toolCallIds };
-}
-
-function assistantSnapshot(message: unknown, key: string): AssistantSnapshot | undefined {
-  if (stringField(message, "role") !== "assistant") return undefined;
-  const timestamp = numberField(message, "timestamp");
-  if (timestamp === undefined) return undefined;
-
-  const { hasVisibleContent, toolCallIds } = summarizeAssistantContent(contentItems(message));
-  const stopReason = stringField(message, "stopReason");
-  return {
-    hasTerminalNotice:
-      stopReason === "aborted" ||
-      stopReason === "length" ||
-      (stopReason === "error" && toolCallIds.length === 0),
-    hasVisibleContent,
-    interrupted: stopReason === "aborted",
-    key,
-    terminalErrorToolCallIds: stopReason === "error" ? toolCallIds : [],
-    timestamp,
-    toolCallIds,
-  };
-}
-
-function messageFromEntry(entry: unknown): unknown {
-  if (!isRecord(entry) || entry["type"] !== "message") return undefined;
-  return entry["message"];
-}
-
-function entryTimestamp(entry: unknown): number | undefined {
-  if (!isRecord(entry)) return undefined;
-  const timestamp = entry["timestamp"];
-  if (typeof timestamp === "number" && Number.isFinite(timestamp)) return timestamp;
-  if (typeof timestamp !== "string") return undefined;
-  const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
 
 function groupNumber(id: string): number {
   const value = Number(id.slice("turn-".length));
@@ -337,6 +264,16 @@ export class TurnFoldState {
     if (!group || !failed || group.failedToolCallIds.has(toolCallId)) return;
     group.failedToolCallIds.add(toolCallId);
     this.markGroupChanged(group);
+  }
+
+  registerToolResult(message: unknown): void {
+    const editDiff = editDiffFromToolResult(message);
+    if (!editDiff) return;
+    const groupId = this.toolGroupById.get(editDiff.toolCallId) ?? this.activeGroupId;
+    const group = groupId ? this.groups.get(groupId) : undefined;
+    if (group?.editDiffs.add(editDiff.toolCallId, editDiff.stat)) {
+      this.markGroupChanged(group);
+    }
   }
 
   associateUser(component: object): void {
@@ -605,7 +542,7 @@ export class TurnFoldState {
   }
 
   private summary(group: TurnGroup, layout: GroupLayout, now: number): FoldSummary {
-    return {
+    const summary: FoldSummary = {
       aborted: group.aborted,
       compactions: group.compactionIds.size,
       completedAt: group.endedAt,
@@ -616,6 +553,9 @@ export class TurnFoldState {
       running: !group.settled,
       tools: group.toolCallIds.size,
     };
+    const fileDiff = group.editDiffs.summary();
+    if (fileDiff) summary.fileDiff = fileDiff;
+    return summary;
   }
 
   private associateComponent(component: object, group: TurnGroup, kind: ComponentKind): boolean {
@@ -636,6 +576,7 @@ export class TurnFoldState {
       compactionIds: new Set(),
       compactionTimestamps: new Set(),
       components: new Map(),
+      editDiffs: new TurnEditDiffs(),
       failedToolCallIds: new Set(),
       id: `turn-${String(this.groupCounter)}`,
       layout: undefined,
@@ -741,11 +682,21 @@ export class TurnFoldState {
       group.toolCallIds.add(toolCallId);
       this.toolGroupById.set(toolCallId, group.id);
     }
+    this.indexHistoricalToolError(group, message, toolCallId);
+    const editDiff = editDiffFromToolResult(message);
+    if (editDiff) group.editDiffs.add(editDiff.toolCallId, editDiff.stat);
+    const timestamp = completedAt ?? numberField(message, "timestamp");
+    if (timestamp !== undefined) group.endedAt = Math.max(group.endedAt ?? 0, timestamp);
+  }
+
+  private indexHistoricalToolError(
+    group: TurnGroup,
+    message: unknown,
+    toolCallId: string | undefined,
+  ): void {
     if (toolCallId && isRecord(message) && message["isError"] === true) {
       group.failedToolCallIds.add(toolCallId);
     }
-    const timestamp = completedAt ?? numberField(message, "timestamp");
-    if (timestamp !== undefined) group.endedAt = Math.max(group.endedAt ?? 0, timestamp);
   }
 
   private invalidateGroupComponents(group: TurnGroup): void {
@@ -857,6 +808,7 @@ export class TurnFoldState {
       ]);
       active.terminalErrorToolCallIds = new Set(visible.terminalErrorToolCallIds);
       active.toolCallIds = new Set([...active.toolCallIds, ...visible.toolCallIds]);
+      active.editDiffs.merge(visible.editDiffs);
     }
     active.revision += 1;
     active.layout = undefined;

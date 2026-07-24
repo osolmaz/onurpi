@@ -1,6 +1,7 @@
 export default {
   mutate: [
     "configuration.ts",
+    "edit-diff-stat.ts",
     "fold-policy.ts",
     "mode.ts",
     "transcript-window-adapter.ts",

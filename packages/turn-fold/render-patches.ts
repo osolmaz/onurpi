@@ -11,7 +11,7 @@ import { Container, Spacer, truncateToWidth } from "@earendil-works/pi-tui";
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
 import type { FoldDisplay } from "./fold-policy.ts";
-import type { FoldSummary } from "./turn-state.ts";
+import type { FoldFileDiff, FoldSummary } from "./turn-state.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 export type RestoreRenderPatches = () => void;
@@ -55,29 +55,85 @@ function formatDuration(durationMs: number): string {
   return parts.join(" ");
 }
 
+type SummaryItem = string | FoldFileDiff;
+type SummaryTone = "addition" | "base" | "deletion";
+type SummarySegment = { text: string; tone: SummaryTone };
+
+function appendSummarySegment(segments: SummarySegment[], text: string, tone: SummaryTone): void {
+  const previous = segments.at(-1);
+  if (previous?.tone === tone) previous.text += text;
+  else segments.push({ text, tone });
+}
+
+function summarySegments(items: readonly SummaryItem[]): SummarySegment[] {
+  const segments: SummarySegment[] = [];
+  appendSummarySegment(segments, "▶ ", "base");
+  items.forEach((item, index) => {
+    if (index > 0) appendSummarySegment(segments, " · ", "base");
+    if (typeof item === "string") {
+      appendSummarySegment(segments, item, "base");
+      return;
+    }
+    appendSummarySegment(segments, `${countLabel(item.files, "file")} `, "base");
+    appendSummarySegment(segments, `+${String(item.additions)}`, "addition");
+    appendSummarySegment(segments, " ", "base");
+    appendSummarySegment(segments, `−${String(item.deletions)}`, "deletion");
+  });
+  return segments;
+}
+
+function streamingSummarySegments(summary: FoldSummary): SummarySegment[] {
+  const items: SummaryItem[] = [
+    countLabel(summary.hiddenActivities, "earlier activity", "earlier activities"),
+  ];
+  if (summary.tools > 0) items.push(countLabel(summary.tools, "tool"));
+  if (summary.messages > 0) items.push(countLabel(summary.messages, "msg"));
+  if (summary.fileDiff) items.push(summary.fileDiff);
+  if (summary.compactions > 0) items.push(compactionLabel(summary.compactions));
+  return summarySegments(items);
+}
+
+function settledSummarySegments(summary: FoldSummary): SummarySegment[] {
+  const items: SummaryItem[] = [`Worked for ${formatDuration(summary.durationMs)}`];
+  if (summary.tools > 0) items.push(countLabel(summary.tools, "tool"));
+  if (summary.messages > 0) items.push(countLabel(summary.messages, "msg"));
+  if (summary.fileDiff) items.push(summary.fileDiff);
+  if (summary.failedTools > 0) items.push(countLabel(summary.failedTools, "failure"));
+  if (summary.compactions > 0) items.push(compactionLabel(summary.compactions));
+  if (summary.aborted) items.push("interrupted");
+  return summarySegments(items);
+}
+
+function plainSummary(segments: readonly SummarySegment[]): string {
+  return segments.map((segment) => segment.text).join("");
+}
+
 export function formatStreamingSummary(summary: FoldSummary): string {
-  const parts = [countLabel(summary.hiddenActivities, "earlier activity", "earlier activities")];
-  if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
-  if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
-  if (summary.compactions > 0) parts.push(compactionLabel(summary.compactions));
-  return `▶ ${parts.join(" · ")}`;
+  return plainSummary(streamingSummarySegments(summary));
 }
 
 export function formatSettledSummary(summary: FoldSummary): string {
-  const parts = [`Worked for ${formatDuration(summary.durationMs)}`];
-  if (summary.tools > 0) parts.push(countLabel(summary.tools, "tool"));
-  if (summary.messages > 0) parts.push(countLabel(summary.messages, "msg"));
-  if (summary.failedTools > 0) parts.push(countLabel(summary.failedTools, "failure"));
-  if (summary.compactions > 0) parts.push(compactionLabel(summary.compactions));
-  if (summary.aborted) parts.push("interrupted");
-  return `▶ ${parts.join(" · ")}`;
+  return plainSummary(settledSummarySegments(summary));
 }
 
-function styledSummary(text: string, width: number, theme: Theme | undefined): string[] {
+function segmentColor(tone: SummaryTone): "toolDiffAdded" | "toolDiffRemoved" | "warning" {
+  if (tone === "addition") return "toolDiffAdded";
+  if (tone === "deletion") return "toolDiffRemoved";
+  return "warning";
+}
+
+function styledSummary(
+  segments: readonly SummarySegment[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
   if (width <= 0) return [];
-  const truncated = truncateToWidth(text, width, "…");
-  const styled = theme ? theme.bold(theme.fg("warning", truncated)) : truncated;
-  return ["", styled];
+  if (!theme) return ["", truncateToWidth(plainSummary(segments), width, "…")];
+  const styled = segments
+    .map((segment) => theme.bold(theme.fg(segmentColor(segment.tone), segment.text)))
+    .join("");
+  const ellipsis = theme.bold(theme.fg("warning", "…"));
+  return ["", truncateToWidth(styled, width, ellipsis)];
 }
 
 export function renderStreamingSummary(
@@ -85,7 +141,7 @@ export function renderStreamingSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(formatStreamingSummary(summary), width, theme);
+  return styledSummary(streamingSummarySegments(summary), width, theme);
 }
 
 export function renderSettledSummary(
@@ -93,7 +149,7 @@ export function renderSettledSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(formatSettledSummary(summary), width, theme);
+  return styledSummary(settledSummarySegments(summary), width, theme);
 }
 
 function interruptionFallback(theme: Theme | undefined, width: number): string[] {

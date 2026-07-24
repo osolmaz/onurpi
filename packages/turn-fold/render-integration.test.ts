@@ -187,6 +187,54 @@ it("renders local user and completion times in transcript order", () => {
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 
+it("renders edit diffstats only in compact summaries", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const toolCaller = assistantMessage(110, [
+    {
+      arguments: { edits: [{ newText: "new", oldText: "old" }], path: "src/example.ts" },
+      id: "edit-live",
+      name: "edit",
+      type: "toolCall",
+    },
+  ]);
+  const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
+  const editResult = {
+    content: [{ text: "edited", type: "text" as const }],
+    details: {
+      patch: [
+        "--- src/example.ts",
+        "+++ src/example.ts",
+        "@@ -1,1 +1,2 @@",
+        "-old",
+        "+new",
+        "+added",
+        "",
+      ].join("\n"),
+    },
+    isError: false,
+    role: "toolResult" as const,
+    timestamp: 130,
+    toolCallId: "edit-live",
+    toolName: "edit",
+  };
+
+  state.loadHistory([
+    { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
+    { message: toolCaller, type: "message" },
+    { message: editResult, type: "message" },
+    { message: final, timestamp: new Date(150).toISOString(), type: "message" },
+  ]);
+  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(toolCaller, false, undefined, undefined, 0));
+  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
+
+  expect(frame(transcript)).toContain("1 file +2 −1");
+  state.setMode("expanded");
+  expect(frame(transcript)).not.toContain("1 file +2 −1");
+});
+
 it("timestamps every visible user and assistant message in both modes", () => {
   const state = new TurnFoldState();
   const transcript = new Container();

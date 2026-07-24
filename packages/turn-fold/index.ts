@@ -58,6 +58,12 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
+function registerEndedAssistant(state: TurnFoldState, message: unknown): void {
+  if (messageRole(message) !== "assistant") return;
+  state.endAssistantMessage(message);
+  if (messageStopReason(message) === "aborted") state.abortActive();
+}
+
 function sessionRegistryKey(ctx: ExtensionContext): string {
   return ctx.sessionManager.getSessionFile() ?? `session:${ctx.sessionManager.getSessionId()}`;
 }
@@ -320,9 +326,11 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("message_end", (event, ctx) => {
     currentTheme = ctx.ui.theme;
-    if (messageRole(event.message) !== "assistant") return;
-    state.endAssistantMessage(event.message);
-    if (messageStopReason(event.message) === "aborted") state.abortActive();
+    registerEndedAssistant(state, event.message);
+  });
+
+  pi.on("turn_end", (event) => {
+    for (const result of event.toolResults) state.registerToolResult(result);
   });
 
   pi.on("tool_execution_start", (event, ctx) => {

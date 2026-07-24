@@ -5,11 +5,13 @@ export default defineConfig({
     coverage: {
       include: [
         "packages/turn-fold/configuration.ts",
+        "packages/turn-fold/edit-diff-stat.ts",
         "packages/turn-fold/ephemeral-compactions.ts",
         "packages/turn-fold/fold-policy.ts",
         "packages/turn-fold/mode.ts",
         "packages/turn-fold/transcript-window-adapter.ts",
         "packages/turn-fold/transcript-windows.ts",
+        "packages/turn-fold/turn-message.ts",
         "packages/turn-fold/turn-state.ts",
         "packages/turn-fold/tool-padding.ts",
         "packages/live-stats/live-stats.ts",
