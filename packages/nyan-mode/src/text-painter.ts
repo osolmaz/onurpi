@@ -1,11 +1,14 @@
-import type { CatMood } from "./cat-state.ts";
-import { renderTextNyan } from "./text-runway.ts";
+import { renderTextNyan, type TextNyanOptions } from "./text-runway.ts";
 
 export type TextNyanPainter = {
   clear(): void;
   debugInfo(): string;
   dispose(): void;
-  render(cells: number, percent: number | null | undefined, mood: CatMood): string;
+  render(
+    cells: number,
+    percent: number | null | undefined,
+    options: Omit<TextNyanOptions, "animationFrame">,
+  ): string;
   setStreaming(streaming: boolean): void;
 };
 
@@ -32,8 +35,12 @@ export function createTextNyanPainter(
       disposed = true;
       clear();
     },
-    render(cells: number, percent: number | null | undefined, mood: CatMood): string {
-      return renderTextNyan(cells, percent, { mood, animationFrame: frame });
+    render(
+      cells: number,
+      percent: number | null | undefined,
+      options: Omit<TextNyanOptions, "animationFrame">,
+    ): string {
+      return renderTextNyan(cells, percent, { ...options, animationFrame: frame });
     },
     setStreaming(streaming: boolean): void {
       if (!streaming || disposed || frameIntervalMs <= 0) {

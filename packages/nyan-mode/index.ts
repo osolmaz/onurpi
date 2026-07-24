@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-c
 import { basename } from "node:path";
 
 import {
+  catStyler,
   createCatState,
   createNyanRunwayPainter,
   createTextNyanPainter,
@@ -9,11 +10,13 @@ import {
   ensureKittyGraphics,
   formatApiCost,
   getNyanDebugInfo,
+  minimumTextNyanCells,
   reduceCatState,
+  remainingContextPercent,
   renderAnimatedNyanRunway,
-  selectCatMood,
+  selectCatPresentation,
   type CatEvent,
-  type CatMood,
+  type CatPresentation,
   type CatState,
   type NyanRunwayPainter,
   type TextNyanPainter,
@@ -24,15 +27,16 @@ import {
   composeLine,
   extensionStatusText,
   fitRunway,
-  formatContext,
   formatExtensionStatusLine,
+  formatRemainingContext,
   INLINE_EXTENSION_STATUS_IDS,
   joinParts,
   shortModel,
   type FittedRunway,
 } from "./src/layout.ts";
 
-type NyanDisplayMode = "auto" | "bitmap" | "text";
+export type NyanDisplayMode = "auto" | "bitmap" | "text";
+export type FooterTheme = Pick<Theme, "fg">;
 
 type ActiveFooter = {
   bitmapPainter: NyanRunwayPainter;
@@ -57,7 +61,7 @@ export default function nyanMode(pi: ExtensionAPI): void {
     handler: (args, ctx) => {
       const value = args.trim().toLowerCase();
       if (value === "debug") {
-        ctx.ui.notify(debugMessage(enabled, displayMode, catState, activeFooter), "info");
+        ctx.ui.notify(debugMessage(ctx, enabled, displayMode, catState, activeFooter), "info");
         return Promise.resolve();
       }
       const notify = (message: string): void => {
@@ -146,11 +150,10 @@ function installNyanFooter(
       },
       render(width: number): string[] {
         const catState = lifecycle.getCatState();
-        const mood = selectCatMood(catState, Date.now());
         const statuses = footerData.getExtensionStatuses();
         const lines = [
           renderFooterLine({
-            ...footerSnapshot(ctx, mood),
+            ...footerSnapshot(ctx, catState, Date.now()),
             bitmapPainter: footer.bitmapPainter,
             branch: footerData.getGitBranch(),
             displayMode: lifecycle.getDisplayMode(),
@@ -243,17 +246,26 @@ function applyEnabled(
 }
 
 function debugMessage(
+  ctx: ExtensionContext,
   enabled: boolean,
   displayMode: NyanDisplayMode,
   catState: CatState,
   footer: ActiveFooter | undefined,
 ): string {
   const info = getNyanDebugInfo();
+  const usedPercent = ctx.getContextUsage()?.percent ?? undefined;
+  const presentation = selectCatPresentation(
+    catState,
+    Date.now(),
+    remainingContextPercent(usedPercent),
+  );
   return joinParts([
     "Nyan:",
     `enabled=${String(enabled)}`,
     `mode=${displayMode}`,
-    `mood=${selectCatMood(catState, Date.now())}`,
+    `mood=${presentation.mood}`,
+    `contextStress=${presentation.contextStress}`,
+    `remaining=${formatRemainingContext(usedPercent)}`,
     `errors=${String(catState.errorCount)}`,
     `supported=${String(info.supported)}`,
     `imageProtocol=${info.imageProtocol ?? "none"}`,
@@ -263,37 +275,37 @@ function debugMessage(
   ]);
 }
 
-type FooterSnapshot = {
-  contextWindow: number | undefined;
+export type FooterSnapshot = {
   cumulativeCost: number;
   modelId: string | undefined;
-  mood: CatMood;
-  percent: number | undefined;
+  presentation: CatPresentation;
   project: string;
   reasoning: boolean | undefined;
+  usedPercent: number | undefined;
   usingSubscription: boolean;
 };
 
-type FooterLineOptions = FooterSnapshot & {
+export type FooterLineOptions = FooterSnapshot & {
   bitmapPainter: NyanRunwayPainter;
   branch: string | null;
   displayMode: NyanDisplayMode;
   enabled: boolean;
   textPainter: TextNyanPainter;
-  theme: Theme;
+  theme: FooterTheme;
   thinkingLevel: string;
   weeklyUsage: string | undefined;
   width: number;
 };
 
-function footerSnapshot(ctx: ExtensionContext, mood: CatMood): FooterSnapshot {
+function footerSnapshot(ctx: ExtensionContext, catState: CatState, nowMs: number): FooterSnapshot {
   const project = basename(ctx.cwd);
+  const usedPercent = ctx.getContextUsage()?.percent ?? undefined;
   return {
-    ...usageSnapshot(ctx),
     ...modelSnapshot(ctx),
     cumulativeCost: cumulativeApiCost(ctx.sessionManager.getEntries()),
-    mood,
+    presentation: selectCatPresentation(catState, nowMs, remainingContextPercent(usedPercent)),
     project: project || ctx.cwd,
+    usedPercent,
     usingSubscription: usingSubscription(ctx),
   };
 }
@@ -304,48 +316,45 @@ function usingSubscription(ctx: ExtensionContext): boolean {
   return model ? ctx.modelRegistry.isUsingOAuth(model) : false;
 }
 
-function usageSnapshot(ctx: ExtensionContext): Pick<FooterSnapshot, "contextWindow" | "percent"> {
-  const context = ctx.getContextUsage();
-  return {
-    contextWindow: context?.contextWindow ?? ctx.model?.contextWindow,
-    percent: context?.percent ?? undefined,
-  };
-}
-
 function modelSnapshot(ctx: ExtensionContext): Pick<FooterSnapshot, "modelId" | "reasoning"> {
   return { modelId: ctx.model?.id, reasoning: ctx.model?.reasoning };
 }
 
-function renderFooterLine(options: FooterLineOptions): string {
+export function renderFooterLine(options: FooterLineOptions): string {
   const model = options.modelId ? shortModel(options.modelId) : "no-model";
   const left = leftFooter(options.theme, options.project, options.branch);
   const right = rightFooter(
     options.theme,
     options.cumulativeCost,
     options.usingSubscription,
-    options.percent,
-    options.contextWindow,
     model,
     options.reasoning,
     options.thinkingLevel,
     options.weeklyUsage,
   );
+  const context = colorRemainingContext(
+    options.theme,
+    options.usedPercent,
+    formatRemainingContext(options.usedPercent),
+  );
   const nyanLine = options.enabled
     ? composeNyanLine(
         options.bitmapPainter,
         options.textPainter,
-        options.mood,
+        options.presentation,
         left,
+        context,
         right,
-        options.percent,
+        options.usedPercent,
         options.width,
         options.displayMode,
+        options.theme,
       )
     : undefined;
-  return nyanLine ?? composeLine(left, "", right, options.width);
+  return nyanLine ?? composeLine(left, "", joinParts([context, right]), options.width);
 }
 
-function leftFooter(theme: Theme, project: string, branch: string | null): string {
+function leftFooter(theme: FooterTheme, project: string, branch: string | null): string {
   return joinParts([
     theme.fg("accent", "π"),
     theme.fg("text", branch ? `${project}  ${branch}` : project),
@@ -353,18 +362,15 @@ function leftFooter(theme: Theme, project: string, branch: string | null): strin
 }
 
 function rightFooter(
-  theme: Theme,
+  theme: FooterTheme,
   cumulativeCost: number,
   usingSubscription: boolean,
-  percent: number | undefined,
-  contextWindow: number | undefined,
   model: string,
   reasoning: boolean | undefined,
   thinkingLevel: string,
   weeklyUsage: string | undefined,
 ): string {
   return joinParts([
-    colorContext(theme, percent, formatContext(percent, contextWindow)),
     mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
     mutedLabel(theme, weeklyUsage),
     reasoning ? theme.fg("muted", `think ${thinkingLevel}`) : undefined,
@@ -375,23 +381,41 @@ function rightFooter(
 function composeNyanLine(
   bitmapPainter: NyanRunwayPainter,
   textPainter: TextNyanPainter,
-  mood: CatMood,
+  presentation: CatPresentation,
   left: string,
+  context: string,
   right: string,
-  percent: number | undefined,
+  usedPercent: number | undefined,
   width: number,
   displayMode: NyanDisplayMode,
+  theme: FooterTheme,
 ): string | undefined {
-  const layout = fitRunway(left, right, width);
-  if (!layout) {
+  const bitmapRight = joinParts([context, right]);
+  const bitmapLayout = fitRunway(left, bitmapRight, width);
+  if (bitmapLayout) {
+    const bitmap = renderBitmapRunway(bitmapPainter, bitmapLayout, usedPercent, displayMode);
+    if (bitmap) {
+      return composeInlineImageLine(
+        bitmapLayout.left,
+        bitmap,
+        bitmapLayout.right,
+        bitmapLayout.cells,
+      );
+    }
+  } else {
     bitmapPainter.clear();
-    return undefined;
   }
-  const bitmap = renderBitmapRunway(bitmapPainter, layout, percent, displayMode);
-  if (bitmap) return composeInlineImageLine(layout.left, bitmap, layout.right, layout.cells);
   if (displayMode === "bitmap") return undefined;
-  const text = textPainter.render(layout.cells, percent, mood);
-  return text ? `${layout.left} ${text} ${layout.right}` : undefined;
+
+  const textLayout = fitRunway(left, right, width, minimumTextNyanCells(context));
+  if (!textLayout) return undefined;
+  const styleCat = catStyler(theme, presentation.contextStress);
+  const text = textPainter.render(textLayout.cells, usedPercent, {
+    catSuffix: context,
+    mood: presentation.mood,
+    ...(styleCat ? { styleCat } : {}),
+  });
+  return text ? `${textLayout.left} ${text} ${textLayout.right}` : undefined;
 }
 
 function renderBitmapRunway(
@@ -416,12 +440,17 @@ function renderBitmapRunway(
       });
 }
 
-function mutedLabel(theme: Theme, label: string | undefined): string | undefined {
+function mutedLabel(theme: FooterTheme, label: string | undefined): string | undefined {
   return label ? theme.fg("muted", label) : undefined;
 }
 
-function colorContext(theme: Theme, percent: number | undefined, label: string): string {
-  if (percent !== undefined && percent >= 90) return theme.fg("error", label);
-  if (percent !== undefined && percent >= 70) return theme.fg("warning", label);
+function colorRemainingContext(
+  theme: FooterTheme,
+  usedPercent: number | undefined,
+  label: string,
+): string {
+  const remaining = remainingContextPercent(usedPercent);
+  if (remaining !== undefined && remaining <= 5) return theme.fg("error", label);
+  if (remaining !== undefined && remaining <= 25) return theme.fg("warning", label);
   return theme.fg("success", label);
 }

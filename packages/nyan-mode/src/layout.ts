@@ -1,5 +1,7 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
+import { remainingContextPercent } from "./progress.ts";
+
 export const CODEX_WEEKLY_STATUS_ID = "onurpi:codex-weekly";
 export const INLINE_EXTENSION_STATUS_IDS: ReadonlySet<string> = new Set([CODEX_WEEKLY_STATUS_ID]);
 const NO_EXCLUDED_STATUS_IDS: ReadonlySet<string> = new Set();
@@ -94,19 +96,9 @@ export function formatExtensionStatusLine(
   return text ? truncateToWidth(text, width, "...") : undefined;
 }
 
-export function formatContext(
-  percent: number | undefined,
-  contextWindow: number | undefined,
-): string {
-  const window = contextWindow ? formatCount(contextWindow) : "?";
-  return percent === undefined ? `?/${window}` : `${percent.toFixed(0)}%/${window}`;
-}
-
-export function formatCount(value: number): string {
-  if (value < 1_000) return String(value);
-  if (value < 10_000) return `${(value / 1_000).toFixed(1)}k`;
-  if (value < 1_000_000) return `${String(Math.round(value / 1_000))}k`;
-  return `${(value / 1_000_000).toFixed(1)}M`;
+export function formatRemainingContext(usedPercent: number | undefined): string {
+  const remaining = remainingContextPercent(usedPercent);
+  return remaining === undefined ? "?" : `${remaining.toFixed(0)}%`;
 }
 
 export function shortModel(id: string): string {

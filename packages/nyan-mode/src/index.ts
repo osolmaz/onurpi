@@ -1,9 +1,18 @@
 export {
+  catColorToken,
+  catStyler,
+  type CatColorToken,
+  type CatStyler,
+  type CatTheme,
+} from "./cat-color.ts";
+export {
   createCatState,
   reduceCatState,
-  selectCatMood,
+  selectCatPresentation,
+  type CatContextStress,
   type CatEvent,
   type CatMood,
+  type CatPresentation,
   type CatState,
 } from "./cat-state.ts";
 export { cumulativeApiCost, formatApiCost } from "./cost.ts";
@@ -14,8 +23,14 @@ export {
   KITTY_GRAPHICS_QUERY,
 } from "./kitty-probe.ts";
 export { createNyanRunwayPainter, renderAnimatedNyanRunway } from "./painter.ts";
+export { normalizeAvailableProgress, remainingContextPercent } from "./progress.ts";
 export { createTextNyanPainter, type TextNyanPainter } from "./text-painter.ts";
-export { renderCat, renderTextNyan, type TextNyanOptions } from "./text-runway.ts";
+export {
+  minimumTextNyanCells,
+  renderCat,
+  renderTextNyan,
+  type TextNyanOptions,
+} from "./text-runway.ts";
 export type {
   NyanDebugInfo,
   NyanRunwayLayout,

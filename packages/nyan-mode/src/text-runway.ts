@@ -1,11 +1,14 @@
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
+import type { CatStyler } from "./cat-color.ts";
 import type { CatMood } from "./cat-state.ts";
 import { normalizeAvailableProgress } from "./progress.ts";
 
 export type TextNyanOptions = {
   mood?: CatMood;
   animationFrame?: number;
+  catSuffix?: string;
+  styleCat?: CatStyler;
 };
 
 type Rgb = readonly [red: number, green: number, blue: number];
@@ -38,6 +41,10 @@ const CAT_POSES: Readonly<Record<CatMood, readonly string[]>> = {
   angry: ["!(=ಠ益ಠ=)!", "/(=ಠ益ಠ=)\\", "!(=ಠ益ಠ=)!", "\\(=ಠ益ಠ=)/"],
 };
 
+export function minimumTextNyanCells(catSuffix: string | undefined): number {
+  return CAT_CELLS + (catSuffix ? visibleWidth(catSuffix) + 1 : 0);
+}
+
 export function renderTextNyan(
   cells: number,
   percent?: number | null,
@@ -49,10 +56,20 @@ export function renderTextNyan(
   const cat = renderCat(options.mood ?? "neutral", options.animationFrame ?? 0);
   if (width < CAT_CELLS) return `${rainbowTrail(width)}${RESET_FOREGROUND}`;
 
-  const position = Math.round(normalizeAvailableProgress(percent) * (width - CAT_CELLS));
+  const suffix = fittedCatSuffix(options.catSuffix, width);
+  const trackCells = width - CAT_CELLS - visibleWidth(suffix);
+  const position = Math.round(normalizeAvailableProgress(percent) * trackCells);
   const trail = rainbowTrail(position);
-  const ahead = "·".repeat(width - position - CAT_CELLS);
-  return `${trail}${RESET_FOREGROUND}${BOLD}${cat}${RESET_INTENSITY}${AHEAD_FOREGROUND}${ahead}${RESET_FOREGROUND}`;
+  const ahead = "·".repeat(trackCells - position);
+  const boldCat = `${BOLD}${cat}${RESET_INTENSITY}`;
+  const styledCat = options.styleCat?.(boldCat) ?? boldCat;
+  return `${trail}${RESET_FOREGROUND}${styledCat}${suffix}${AHEAD_FOREGROUND}${ahead}${RESET_FOREGROUND}`;
+}
+
+function fittedCatSuffix(catSuffix: string | undefined, width: number): string {
+  if (!catSuffix || width <= CAT_CELLS) return "";
+  const text = truncateToWidth(catSuffix, width - CAT_CELLS - 1, "");
+  return text ? ` ${text}` : "";
 }
 
 export function renderCat(mood: CatMood, animationFrame: number): string {

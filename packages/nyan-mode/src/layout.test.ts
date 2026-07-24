@@ -7,9 +7,8 @@ import {
   composeLine,
   extensionStatusText,
   fitRunway,
-  formatContext,
-  formatCount,
   formatExtensionStatusLine,
+  formatRemainingContext,
   INLINE_EXTENSION_STATUS_IDS,
   joinParts,
   shortModel,
@@ -56,15 +55,12 @@ describe("footer layout", () => {
 });
 
 describe("footer labels", () => {
-  it("formats context windows and compact counts", () => {
-    expect(formatContext(undefined, undefined)).toBe("?/?");
-    expect(formatContext(34.4, 128_000)).toBe("34%/128k");
-    expect([999, 1_250, 12_500, 1_250_000].map(formatCount)).toEqual([
-      "999",
-      "1.3k",
-      "13k",
-      "1.3M",
-    ]);
+  it("formats remaining context instead of used context or full capacity", () => {
+    expect(formatRemainingContext(undefined)).toBe("?");
+    expect(formatRemainingContext(0)).toBe("100%");
+    expect(formatRemainingContext(34.4)).toBe("66%");
+    expect(formatRemainingContext(90)).toBe("10%");
+    expect(formatRemainingContext(100)).toBe("0%");
   });
 
   it("shortens common model identifiers and joins present labels", () => {
