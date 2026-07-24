@@ -114,17 +114,20 @@ describe("Turn Fold finalized edit results", () => {
     await emit(extension.handlers, "message_end", { message: toolCaller }, ctx);
     await emit(
       extension.handlers,
-      "message_end",
+      "turn_end",
       {
-        message: {
-          details: {
-            patch: "--- src/example.ts\n+++ src/example.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n+added\n",
+        toolResults: [
+          {
+            details: {
+              patch:
+                "--- src/example.ts\n+++ src/example.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n+added\n",
+            },
+            isError: false,
+            role: "toolResult",
+            toolCallId: "edit-final",
+            toolName: "edit",
           },
-          isError: false,
-          role: "toolResult",
-          toolCallId: "edit-final",
-          toolName: "edit",
-        },
+        ],
       },
       ctx,
     );

@@ -58,13 +58,8 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
-function registerEndedMessage(state: TurnFoldState, message: unknown): void {
-  const role = messageRole(message);
-  if (role === "toolResult") {
-    state.registerToolResult(message);
-    return;
-  }
-  if (role !== "assistant") return;
+function registerEndedAssistant(state: TurnFoldState, message: unknown): void {
+  if (messageRole(message) !== "assistant") return;
   state.endAssistantMessage(message);
   if (messageStopReason(message) === "aborted") state.abortActive();
 }
@@ -331,7 +326,11 @@ export default function turnFold(pi: ExtensionAPI): void {
 
   pi.on("message_end", (event, ctx) => {
     currentTheme = ctx.ui.theme;
-    registerEndedMessage(state, event.message);
+    registerEndedAssistant(state, event.message);
+  });
+
+  pi.on("turn_end", (event) => {
+    for (const result of event.toolResults) state.registerToolResult(result);
   });
 
   pi.on("tool_execution_start", (event, ctx) => {
