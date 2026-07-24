@@ -4,9 +4,16 @@ export type EditDiffStat = {
   path: string;
 };
 
+export type EditFileDiff = {
+  additions: number;
+  deletions: number;
+  path: string;
+};
+
 export type EditDiffSummary = {
   additions: number;
   deletions: number;
+  fileDiffs: readonly EditFileDiff[];
   files: number;
 };
 
@@ -171,14 +178,12 @@ export class TurnEditDiffs {
   private additions = 0;
   private byToolCallId = new Map<string, EditDiffStat>();
   private deletions = 0;
-  private files = new Set<string>();
 
   add(toolCallId: string, stat: EditDiffStat): boolean {
     if (this.byToolCallId.has(toolCallId)) return false;
     this.byToolCallId.set(toolCallId, stat);
     this.additions += stat.additions;
     this.deletions += stat.deletions;
-    this.files.add(stat.path);
     return true;
   }
 
@@ -186,9 +191,24 @@ export class TurnEditDiffs {
     for (const [toolCallId, stat] of other.byToolCallId) this.add(toolCallId, stat);
   }
 
-  summary(): EditDiffSummary | undefined {
-    return this.byToolCallId.size > 0
-      ? { additions: this.additions, deletions: this.deletions, files: this.files.size }
-      : undefined;
+  summary(resolvePath: (path: string) => string): EditDiffSummary | undefined {
+    if (this.byToolCallId.size === 0) return undefined;
+    const byPath = new Map<string, EditFileDiff>();
+    for (const stat of this.byToolCallId.values()) {
+      const path = resolvePath(stat.path);
+      const current = byPath.get(path);
+      byPath.set(path, {
+        additions: (current?.additions ?? 0) + stat.additions,
+        deletions: (current?.deletions ?? 0) + stat.deletions,
+        path,
+      });
+    }
+    const fileDiffs = [...byPath.values()];
+    return {
+      additions: this.additions,
+      deletions: this.deletions,
+      fileDiffs,
+      files: fileDiffs.length,
+    };
   }
 }

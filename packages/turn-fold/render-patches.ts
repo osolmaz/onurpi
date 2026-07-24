@@ -6,8 +6,15 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  Container,
+  sliceByColumn,
+  Spacer,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 
+import type { EditFileDiff } from "./edit-diff-stat.ts";
 import { removeToolHorizontalPadding } from "./tool-padding.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
 import type { FoldDisplay } from "./fold-policy.ts";
@@ -136,12 +143,77 @@ function styledSummary(
   return ["", truncateToWidth(styled, width, ellipsis)];
 }
 
+function safePathText(path: string): string {
+  let safe = "";
+  for (const character of path) {
+    const codePoint = character.codePointAt(0);
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f))
+    ) {
+      safe += `\\x${codePoint.toString(16).padStart(2, "0")}`;
+    } else {
+      safe += character;
+    }
+  }
+  return safe;
+}
+
+function truncatePathFromLeft(path: string, width: number): string {
+  if (width <= 0) return "";
+  if (visibleWidth(path) <= width) return path;
+  if (width === 1) return "…";
+  const tailWidth = width - 1;
+  const start = Math.max(0, visibleWidth(path) - tailWidth);
+  return `…${sliceByColumn(path, start, tailWidth, true)}`;
+}
+
+function styledFileDiff(diff: EditFileDiff, theme: Theme | undefined): string {
+  const additions = `+${String(diff.additions)}`;
+  const deletions = `−${String(diff.deletions)}`;
+  if (!theme) return `${additions} ${deletions}`;
+  return `${theme.fg("toolDiffAdded", additions)} ${theme.fg("toolDiffRemoved", deletions)}`;
+}
+
+function renderedFileDiffLine(diff: EditFileDiff, width: number, theme: Theme | undefined): string {
+  if (width <= 0) return "";
+  const statWidth = visibleWidth(`+${String(diff.additions)} −${String(diff.deletions)}`);
+  const prefix = width >= statWidth + 4 ? "  " : "";
+  const pathWidth = width - visibleWidth(prefix) - statWidth - 1;
+  if (pathWidth <= 0) return truncateToWidth(styledFileDiff(diff, theme), width, "");
+
+  const path = truncatePathFromLeft(safePathText(diff.path), pathWidth);
+  const styledPath = theme ? theme.fg("toolDiffContext", path) : path;
+  return truncateToWidth(`${prefix}${styledPath} ${styledFileDiff(diff, theme)}`, width, "");
+}
+
+function renderedFileDiffLines(
+  fileDiffs: readonly EditFileDiff[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  if (width <= 0) return [];
+  return fileDiffs.map((diff) => renderedFileDiffLine(diff, width, theme));
+}
+
+function renderedSummary(
+  summary: FoldSummary,
+  segments: readonly SummarySegment[],
+  width: number,
+  theme: Theme | undefined,
+): string[] {
+  return [
+    ...styledSummary(segments, width, theme),
+    ...renderedFileDiffLines(summary.fileDiff?.fileDiffs ?? [], width, theme),
+  ];
+}
+
 export function renderStreamingSummary(
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(streamingSummarySegments(summary), width, theme);
+  return renderedSummary(summary, streamingSummarySegments(summary), width, theme);
 }
 
 export function renderSettledSummary(
@@ -149,7 +221,7 @@ export function renderSettledSummary(
   width: number,
   theme: Theme | undefined,
 ): string[] {
-  return styledSummary(settledSummarySegments(summary), width, theme);
+  return renderedSummary(summary, settledSummarySegments(summary), width, theme);
 }
 
 function interruptionFallback(theme: Theme | undefined, width: number): string[] {

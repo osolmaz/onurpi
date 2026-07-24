@@ -1,6 +1,10 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { TurnFoldState } from "./turn-state.ts";
+
+const TEST_WORKING_DIRECTORY = resolve("/workspace/project");
 
 function assistantMessage(
   timestamp: number,
@@ -238,8 +242,8 @@ describe("compact streaming", () => {
 });
 
 describe("edit diffstats", () => {
-  it("aggregates successful edit operations by tool call and unique file", () => {
-    const state = new TurnFoldState();
+  it("aggregates successful edit operations by tool call and unique absolute file", () => {
+    const state = new TurnFoldState(TEST_WORKING_DIRECTORY);
     const final = {};
     const message = assistantMessage(180, [{ text: "Done", type: "text" }]);
 
@@ -258,6 +262,18 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toEqual({
       additions: 3,
       deletions: 6,
+      fileDiffs: [
+        {
+          additions: 3,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        },
+        {
+          additions: 0,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+        },
+      ],
       files: 2,
     });
   });
@@ -286,8 +302,8 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toBeUndefined();
   });
 
-  it("reconstructs the same diffstat from historical tool results", () => {
-    const state = new TurnFoldState();
+  it("reconstructs the same diffstat and paths from historical tool results", () => {
+    const state = new TurnFoldState(TEST_WORKING_DIRECTORY);
     const final = {};
     const finalMessage = assistantMessage(180, [{ text: "Done", type: "text" }]);
 
@@ -309,6 +325,18 @@ describe("edit diffstats", () => {
     expect(state.viewFor(final, 200)?.summary.fileDiff).toEqual({
       additions: 5,
       deletions: 5,
+      fileDiffs: [
+        {
+          additions: 4,
+          deletions: 2,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/a.ts"),
+        },
+        {
+          additions: 1,
+          deletions: 3,
+          path: resolve(TEST_WORKING_DIRECTORY, "src/b.ts"),
+        },
+      ],
       files: 2,
     });
     state.setMode("expanded");

@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -44,6 +46,7 @@ function context(
   sessionFile = "/tmp/turn-fold-session.jsonl",
 ) {
   return {
+    cwd: "/workspace/project",
     hasUI: true,
     reload: vi.fn(() => Promise.resolve()),
     sessionManager: {
@@ -143,6 +146,13 @@ describe("Turn Fold finalized edit results", () => {
     expect(state.viewFor(final)?.summary.fileDiff).toEqual({
       additions: 2,
       deletions: 1,
+      fileDiffs: [
+        {
+          additions: 2,
+          deletions: 1,
+          path: resolve("/workspace/project/src/example.ts"),
+        },
+      ],
       files: 1,
     });
   });

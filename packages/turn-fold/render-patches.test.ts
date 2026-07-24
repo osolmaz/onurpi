@@ -25,6 +25,17 @@ function summary(overrides: Partial<FoldSummary> = {}): FoldSummary {
   };
 }
 
+function fileDiff(
+  ...fileDiffs: { additions: number; deletions: number; path: string }[]
+): NonNullable<FoldSummary["fileDiff"]> {
+  return {
+    additions: fileDiffs.reduce((total, diff) => total + diff.additions, 0),
+    deletions: fileDiffs.reduce((total, diff) => total + diff.deletions, 0),
+    fileDiffs,
+    files: fileDiffs.length,
+  };
+}
+
 describe("turn fold summary rendering", () => {
   it("formats the streaming overflow summary", () => {
     expect(formatStreamingSummary(summary({ running: true }))).toBe(
@@ -36,16 +47,24 @@ describe("turn fold summary rendering", () => {
   });
 
   it("formats edit diffstats in streaming and settled summaries", () => {
-    const fileDiff = { additions: 42, deletions: 11, files: 3 };
+    const editDiff = fileDiff(
+      { additions: 20, deletions: 5, path: "/workspace/a.ts" },
+      { additions: 12, deletions: 3, path: "/workspace/b.ts" },
+      { additions: 10, deletions: 3, path: "/workspace/c.ts" },
+    );
 
-    expect(formatStreamingSummary(summary({ fileDiff, running: true }))).toBe(
+    expect(formatStreamingSummary(summary({ fileDiff: editDiff, running: true }))).toBe(
       "▶ 7 earlier activities · 10 tools · 4 msgs · 3 files +42 −11",
     );
-    expect(formatSettledSummary(summary({ fileDiff }))).toBe(
+    expect(formatSettledSummary(summary({ fileDiff: editDiff }))).toBe(
       "▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files +42 −11",
     );
     expect(
-      formatSettledSummary(summary({ fileDiff: { additions: 0, deletions: 2, files: 1 } })),
+      formatSettledSummary(
+        summary({
+          fileDiff: fileDiff({ additions: 0, deletions: 2, path: "/workspace/a.ts" }),
+        }),
+      ),
     ).toContain("1 file +0 −2");
   });
 
@@ -104,7 +123,13 @@ describe("turn fold summary rendering", () => {
       fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
     } as unknown as Theme;
     const rendered = renderSettledSummary(
-      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      summary({
+        fileDiff: fileDiff(
+          { additions: 20, deletions: 5, path: "/workspace/a.ts" },
+          { additions: 12, deletions: 3, path: "/workspace/b.ts" },
+          { additions: 10, deletions: 3, path: "/workspace/c.ts" },
+        ),
+      }),
       1_000,
       testTheme,
     )[1];
@@ -112,6 +137,70 @@ describe("turn fold summary rendering", () => {
     expect(rendered).toContain("<toolDiffAdded>+42</toolDiffAdded>");
     expect(rendered).toContain("<toolDiffRemoved>−11</toolDiffRemoved>");
     expect(rendered).toContain("<warning>▶ Worked for 1m 5s · 10 tools · 4 msgs · 3 files ");
+  });
+});
+
+describe("edited file path rendering", () => {
+  it("renders each file's diff beside its absolute path in first-edit order", () => {
+    const testTheme = {
+      bold: (text: string) => `<bold>${text}</bold>`,
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+    } as unknown as Theme;
+    const rendered = renderSettledSummary(
+      summary({
+        fileDiff: fileDiff(
+          { additions: 2, deletions: 1, path: "/workspace/project/src/a.ts" },
+          { additions: 5, deletions: 3, path: "/outside/b.ts" },
+        ),
+      }),
+      1_000,
+      testTheme,
+    );
+
+    expect(rendered[1]).toContain("2 files ");
+    expect(rendered.slice(2)).toEqual([
+      "  <toolDiffContext>/workspace/project/src/a.ts</toolDiffContext> <toolDiffAdded>+2</toolDiffAdded> <toolDiffRemoved>−1</toolDiffRemoved>",
+      "  <toolDiffContext>/outside/b.ts</toolDiffContext> <toolDiffAdded>+5</toolDiffAdded> <toolDiffRemoved>−3</toolDiffRemoved>",
+    ]);
+  });
+
+  it("keeps each file on one line and truncates the path from the left", () => {
+    const fullPath = "/workspace/project/a-very-long-directory/another-directory/file.ts";
+    const editDiff = fileDiff({ additions: 12, deletions: 3, path: fullPath });
+
+    for (let width = 1; width <= 40; width += 1) {
+      const fileLines = renderSettledSummary(
+        summary({ fileDiff: editDiff }),
+        width,
+        undefined,
+      ).slice(2);
+      expect(fileLines).toHaveLength(1);
+      expect(visibleWidth(fileLines[0] ?? "")).toBeLessThanOrEqual(width);
+    }
+
+    const fileLine = renderSettledSummary(summary({ fileDiff: editDiff }), 28, undefined)[2];
+    expect(fileLine).toContain("…");
+    expect(fileLine).toContain("file.ts +12 −3");
+    expect(fileLine).not.toContain("/workspace/project");
+  });
+
+  it("escapes terminal controls before rendering a file row", () => {
+    const rendered = renderSettledSummary(
+      summary({
+        fileDiff: fileDiff({
+          additions: 1,
+          deletions: 0,
+          path: "/tmp/unsafe\u001b]2;title\u0007.ts",
+        }),
+      }),
+      80,
+      undefined,
+    )[2];
+
+    expect(rendered).not.toContain("\u001b");
+    expect(rendered).toContain("\\x1b");
+    expect(rendered).toContain("\\x07");
+    expect(rendered).toContain("+1 −0");
   });
 
   it("truncates styled summaries to the available visible width", () => {
@@ -121,7 +210,13 @@ describe("turn fold summary rendering", () => {
         `${color === "toolDiffAdded" ? "\u001b[32m" : color === "toolDiffRemoved" ? "\u001b[31m" : "\u001b[33m"}${text}\u001b[39m`,
     } as unknown as Theme;
     const rendered = renderSettledSummary(
-      summary({ fileDiff: { additions: 42, deletions: 11, files: 3 } }),
+      summary({
+        fileDiff: fileDiff(
+          { additions: 20, deletions: 5, path: "/workspace/a.ts" },
+          { additions: 12, deletions: 3, path: "/workspace/b.ts" },
+          { additions: 10, deletions: 3, path: "/workspace/c.ts" },
+        ),
+      }),
       32,
       ansiTheme,
     )[1];
