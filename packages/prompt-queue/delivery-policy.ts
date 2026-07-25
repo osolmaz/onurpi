@@ -1,8 +1,11 @@
+export type HoldReason = "abort" | "error";
+export type TurnOutcome = "completed" | HoldReason | undefined;
+
 export type DeliveryGate = {
   /** The manager window is open; the user is editing the queue. */
   windowOpen: boolean;
-  /** Delivery was held after an abort until the user re-engages. */
-  held: boolean;
+  /** Why automatic delivery is held until the user re-engages. */
+  holdReason: HoldReason | undefined;
 };
 
 export type QueueSnapshot = {
@@ -11,10 +14,18 @@ export type QueueSnapshot = {
 };
 
 export type DeliveryDecision = "deliver-steer" | "deliver-next" | "none";
+export type SettledDecision = "deliver-next" | "hold-abort" | "hold-error" | "none";
 export type SendNowDecision = "send" | "abort-and-send-on-settle";
 
 function gateClosed(gate: DeliveryGate): boolean {
-  return gate.windowOpen || gate.held;
+  return gate.windowOpen || gate.holdReason !== undefined;
+}
+
+/** Convert Pi's structured assistant stop reason into queue lifecycle state. */
+export function turnOutcome(stopReason: string | undefined): TurnOutcome {
+  if (stopReason === "aborted") return "abort";
+  if (stopReason === "error") return "error";
+  return stopReason === undefined ? undefined : "completed";
 }
 
 /** Deliver directly while idle, or abort an active run and send as soon as it settles. */
@@ -30,18 +41,27 @@ export function decideSendNow(isIdle: boolean): SendNowDecision {
 export function decideTurnEndDelivery(
   gate: DeliveryGate,
   snapshot: QueueSnapshot,
-  stopReason: string | undefined,
+  outcome: TurnOutcome,
 ): DeliveryDecision {
   if (gateClosed(gate)) return "none";
-  if (stopReason === "aborted" || stopReason === "error") return "none";
+  if (outcome === "abort" || outcome === "error") return "none";
   return snapshot.hasSteer ? "deliver-steer" : "none";
 }
 
 /**
- * Once the agent is idle, the next pending item (steer or queued) becomes a
- * fresh prompt. One item per settle keeps delivery one-at-a-time.
+ * Once the agent fully settles, a final error or abort holds the queue. This
+ * check happens at settlement rather than the first errored turn so Pi can
+ * exhaust its automatic retries without unnecessarily pausing delivery.
+ * Otherwise the next pending item becomes a fresh prompt.
  */
-export function decideIdleDelivery(gate: DeliveryGate, snapshot: QueueSnapshot): DeliveryDecision {
+export function decideSettledDelivery(
+  gate: DeliveryGate,
+  snapshot: QueueSnapshot,
+  finalOutcome: TurnOutcome,
+): SettledDecision {
+  if (!snapshot.hasAny) return "none";
+  if (finalOutcome === "error") return "hold-error";
+  if (finalOutcome === "abort") return "hold-abort";
   if (gateClosed(gate)) return "none";
-  return snapshot.hasAny ? "deliver-next" : "none";
+  return "deliver-next";
 }

@@ -26,8 +26,14 @@ function itemLine(item: QueueItem, position: number, palette: WidgetPalette): st
 }
 
 function statusLine(gate: DeliveryGate, palette: WidgetPalette): string {
-  if (gate.windowOpen || gate.held) {
+  if (gate.windowOpen) {
     return palette.warning("prompt queue paused") + palette.dim(" — press ↑ to manage");
+  }
+  if (gate.holdReason !== undefined) {
+    const reason = gate.holdReason === "error" ? "agent error" : "abort";
+    return (
+      palette.warning(`prompt queue paused after ${reason}`) + palette.dim(" — press ↑ to manage")
+    );
   }
   return palette.dim("↑ manage queue");
 }
@@ -41,7 +47,7 @@ export function widgetLines(
   gate: DeliveryGate,
   palette: WidgetPalette,
 ): string[] {
-  if (items.length === 0 && !gate.held && !gate.windowOpen) return [];
+  if (items.length === 0 && gate.holdReason === undefined && !gate.windowOpen) return [];
   const shown = items.slice(0, MAX_WIDGET_ITEMS);
   const lines = shown.map((item, index) => itemLine(item, index + 1, palette));
   if (items.length > shown.length) {
