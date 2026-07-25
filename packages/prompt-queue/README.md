@@ -26,9 +26,13 @@ never queued.
 - `s` in the manager sends the selected prompt immediately. If the agent is running, it aborts the
   active run and continues with the selected prompt; remaining queued items keep their delivery
   state.
-- Aborting a run (`Esc`) holds the queue so a stopped run is never restarted silently. Resume it
-  explicitly with `r` in the manager window or `/queue resume`, or implicitly by submitting or
-  queuing a new prompt. Just opening and closing the manager does not resume.
+- Aborting a run (`Esc`) holds the queue so a stopped run is never restarted silently.
+- If the agent ends with an error, delivery pauses after Pi exhausts its automatic retries. A retry
+  that eventually succeeds continues normal queue delivery. The failed in-flight prompt remains in
+  session history and is not automatically requeued, avoiding duplicate work after an ambiguous
+  provider failure.
+- Resume held delivery explicitly with `r` in the manager window or `/queue resume`, or implicitly
+  by submitting or queuing a new prompt. Just opening and closing the manager does not resume.
 
 ## Manager window
 

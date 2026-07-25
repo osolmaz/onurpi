@@ -39,7 +39,7 @@ describe("previewText", () => {
 });
 
 describe("widgetLines", () => {
-  const open = { windowOpen: false, held: false };
+  const open = { windowOpen: false, holdReason: undefined };
 
   it("returns no lines when there is nothing to show", () => {
     expect(widgetLines([], open, plain)).toEqual([]);
@@ -74,16 +74,20 @@ describe("widgetLines", () => {
   });
 
   it("shows a paused status while the manager window is open", () => {
-    const lines = widgetLines([], { windowOpen: true, held: false }, plain);
+    const lines = widgetLines([], { windowOpen: true, holdReason: undefined }, plain);
     expect(lines).toEqual(["W(prompt queue paused)D( — press ↑ to manage)"]);
   });
 
-  it("shows a paused status while delivery is held after an abort", () => {
-    const lines = widgetLines(
-      [{ id: 1, mode: "queue", text: "x" }],
-      { windowOpen: false, held: true },
-      plain,
-    );
-    expect(lines).toEqual(["D(1.) A(queued) x", "W(prompt queue paused)D( — press ↑ to manage)"]);
+  it("shows why delivery is held", () => {
+    const item = [{ id: 1, mode: "queue" as const, text: "x" }];
+
+    expect(widgetLines(item, { windowOpen: false, holdReason: "abort" }, plain)).toEqual([
+      "D(1.) A(queued) x",
+      "W(prompt queue paused after abort)D( — press ↑ to manage)",
+    ]);
+    expect(widgetLines(item, { windowOpen: false, holdReason: "error" }, plain)).toEqual([
+      "D(1.) A(queued) x",
+      "W(prompt queue paused after agent error)D( — press ↑ to manage)",
+    ]);
   });
 });
