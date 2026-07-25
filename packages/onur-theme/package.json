@@ -1,0 +1,15 @@
+{
+  "name": "@onurpi/theme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Onur's dark theme for Pi",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "themes": [
+      "./themes/onur-dark.json"
+    ]
+  }
+}

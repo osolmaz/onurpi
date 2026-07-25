@@ -10,7 +10,7 @@
   `~/.pi/agent/settings.json` may be edited directly when needed (for example to point an entry at a
   worktree during development); `npm run settings:reset` normalizes it back. Both scripts replace
   repo-owned entries (checkout paths, worktree paths, the git source) with canonical per-package
-  paths derived from `pi.extensions` in the root manifest.
+  paths derived from the Pi resources in the root manifest.
 - Keep transcript selection and folding policy separate from Pi TUI patching and other runtime
   integration.
 - Add or update tests for every behavior change.

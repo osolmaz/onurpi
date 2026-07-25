@@ -1,6 +1,7 @@
 # OnurPi
 
-OnurPi is a workspace for Pi coding agent extensions and a reproducible global configuration.
+OnurPi is a workspace for Pi coding agent extensions, themes, and a reproducible global
+configuration.
 
 ## Packages
 
@@ -15,10 +16,12 @@ OnurPi is a workspace for Pi coding agent extensions and a reproducible global c
 | [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
+| [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
 
 ## Install
 
-The root manifest registers every extension, so one package entry covers the whole workspace:
+The root manifest registers every extension and the `onur-dark` theme, so one package entry covers
+the whole workspace:
 
 ```bash
 pi install git:github.com/osolmaz/onurpi
@@ -36,8 +39,8 @@ state remain outside this repository. Review settings for credentials or machine
 before committing future changes.
 
 Two scripts keep the copies in agreement without ever leaking machine-local development state. Both
-derive the canonical package entries from the root manifest (`pi.extensions`), so the list never
-needs manual maintenance:
+derive the canonical package entries from the root Pi resource manifest, so the list never needs
+manual maintenance:
 
 ```bash
 npm run settings:sync   # live settings -> tracked settings.json, repo entries normalized
@@ -48,8 +51,8 @@ An entry counts as belonging to this repo when it points into the main checkout,
 `onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced npm sources for
 Unified Exec and Codex Usage are also treated as repo-owned so they cannot coexist with the vendored
 packages. Those entries are replaced with one canonical `../../repos/onurpi/packages/<name>` entry
-per registered package. External entries (npm packages, other git repos) and all other settings pass
-through untouched.
+per registered extension or theme package. External entries (npm packages, other git repos) and all
+other settings pass through untouched.
 
 Unified Exec replaces Pi's built-in `bash` tool and the old `shell-execution-policy` package. Its
 attachment windows stay bounded, while the underlying session remains alive until it exits, is
@@ -62,8 +65,9 @@ During development the live file may point anywhere, including a worktree or a d
 ## Structure
 
 Each extension is an independent package under `packages/` with its own `package.json` and entry
-point. Tests and a README live beside the source. Package manifests declare Pi entry points through
-`pi.extensions`. The private root manifest also registers them for workspace-wide development.
+point. Tests and a README live beside the source. The theme follows the same package layout and
+registers its JSON file through `pi.themes`. The private root manifest registers every resource for
+workspace-wide development.
 
 This workspace follows the package-directory structure used by
 [`ogulcancelik/pi-extensions`](https://github.com/ogulcancelik/pi-extensions), while keeping shared

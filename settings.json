@@ -14,7 +14,8 @@
     "../../repos/onurpi/packages/context-window-policy",
     "../../repos/onurpi/packages/codex-usage",
     "../../repos/onurpi/packages/plan-checklist",
-    "../../repos/onurpi/packages/unified-exec"
+    "../../repos/onurpi/packages/unified-exec",
+    "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.81.1",
   "defaultProvider": "openai-codex",
