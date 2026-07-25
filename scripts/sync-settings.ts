@@ -4,7 +4,7 @@
 //   node scripts/sync-settings.ts reset   normalize the live settings in place
 //
 // Entries belonging to this repo (main checkout paths, worktree paths, or the git source) are
-// replaced with one canonical local-path entry per package derived from the root manifest. All
+// replaced with one canonical local-path entry per package referenced by the root Pi manifest. All
 // other entries and settings pass through untouched.
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -23,6 +23,7 @@ const REPLACED_PACKAGE_SOURCES = [
   /^npm:pi-unified-exec(?:@.*)?$/,
   /^npm:@narumitw\/pi-codex-usage(?:@.*)?$/,
 ];
+const RESOURCE_TYPES = ["extensions", "skills", "prompts", "themes"] as const;
 const CANONICAL_REPO_ROOT = resolve(dirname(liveSettingsPath), "..", "..", "repos", "onurpi");
 const WORKTREES_ROOT = resolve(CANONICAL_REPO_ROOT, "..", "onurpi-worktrees");
 
@@ -44,14 +45,32 @@ function isSettings(value: unknown): value is Settings {
 
 function canonicalEntries(): string[] {
   const manifest = readJson(join(repoRoot, "package.json"));
-  const extensions: unknown = (manifest as { pi?: { extensions?: unknown } }).pi?.extensions;
-  if (!Array.isArray(extensions)) throw new Error("Root manifest is missing pi.extensions");
-  return extensions.map((entry) => {
-    if (typeof entry !== "string") throw new Error("Non-string entry in pi.extensions");
+  const piManifest: unknown = (manifest as { pi?: unknown }).pi;
+  if (!isResourceManifest(piManifest)) throw new Error("Root manifest is missing Pi resources");
+
+  const packageNames = new Set<string>();
+  for (const resourceType of RESOURCE_TYPES) {
+    for (const name of packageNamesForResource(piManifest[resourceType], resourceType)) {
+      packageNames.add(name);
+    }
+  }
+
+  return [...packageNames].map((name) => `../../repos/onurpi/packages/${name}`);
+}
+
+function packageNamesForResource(entries: unknown, resourceType: string): string[] {
+  if (entries === undefined) return [];
+  if (!Array.isArray(entries)) throw new Error(`Non-array pi.${resourceType}`);
+  return entries.map((entry) => {
+    if (typeof entry !== "string") throw new Error(`Non-string entry in pi.${resourceType}`);
     const match = /^\.\/packages\/([^/]+)\//.exec(entry);
-    if (!match?.[1]) throw new Error(`Unexpected pi.extensions entry: ${entry}`);
-    return `../../repos/onurpi/packages/${match[1]}`;
+    if (!match?.[1]) throw new Error(`Unexpected pi.${resourceType} entry: ${entry}`);
+    return match[1];
   });
+}
+
+function isResourceManifest(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isOurs(entry: string): boolean {
