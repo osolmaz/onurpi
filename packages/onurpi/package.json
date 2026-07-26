@@ -1,0 +1,26 @@
+{
+  "name": "onurpi",
+  "version": "0.0.0",
+  "description": "Reserved for the OnurPi Pi coding agent extension collection",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/osolmaz/onurpi.git",
+    "directory": "packages/onurpi"
+  },
+  "homepage": "https://github.com/osolmaz/onurpi#readme",
+  "bugs": {
+    "url": "https://github.com/osolmaz/onurpi/issues"
+  },
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "extensions"
+  ],
+  "files": [
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
