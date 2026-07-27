@@ -22,6 +22,12 @@ const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
 const REPLACED_PACKAGE_SOURCES = [
   /^npm:pi-unified-exec(?:@.*)?$/,
   /^npm:@narumitw\/pi-codex-usage(?:@.*)?$/,
+  /^npm:pi-huggingface-oauth(?:@.*)?$/,
+  /^git:github\.com\/osolmaz\/pi-workflows(?:@.*)?$/,
+  /^git:github\.com\/osolmaz\/pi-must-win(?:@.*)?$/,
+  /^npm:pi-must-win(?:@.*)?$/,
+  /^git:github\.com\/osolmaz\/pi-demo-mode(?:@.*)?$/,
+  /^npm:pi-demo-mode(?:@.*)?$/,
 ];
 const RESOURCE_TYPES = ["extensions", "skills", "prompts", "themes"] as const;
 const CANONICAL_REPO_ROOT = resolve(dirname(liveSettingsPath), "..", "..", "repos", "onurpi");
@@ -61,11 +67,12 @@ function canonicalEntries(): string[] {
 function packageNamesForResource(entries: unknown, resourceType: string): string[] {
   if (entries === undefined) return [];
   if (!Array.isArray(entries)) throw new Error(`Non-array pi.${resourceType}`);
-  return entries.map((entry) => {
+  return entries.flatMap((entry) => {
     if (typeof entry !== "string") throw new Error(`Non-string entry in pi.${resourceType}`);
     const match = /^\.\/packages\/([^/]+)\//.exec(entry);
-    if (!match?.[1]) throw new Error(`Unexpected pi.${resourceType} entry: ${entry}`);
-    return match[1];
+    if (match?.[1]) return [match[1]];
+    if (entry.startsWith("./node_modules/")) return [];
+    throw new Error(`Unexpected pi.${resourceType} entry: ${entry}`);
   });
 }
 

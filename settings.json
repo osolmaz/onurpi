@@ -1,12 +1,8 @@
 {
   "packages": [
-    "git:github.com/osolmaz/pi-workflows",
     "npm:pi-web-access@0.13.0",
-    "git:github.com/osolmaz/pi-must-win",
     "git:github.com/Michaelliv/pi-goal@3f100be5434454d3388755a119d01caca9127c16",
-    "npm:pi-must-win",
     "npm:@narumitw/pi-btw@0.25.0",
-    "npm:pi-huggingface-oauth@0.1.1",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",

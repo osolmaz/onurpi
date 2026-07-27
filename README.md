@@ -18,6 +18,20 @@ configuration.
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 | [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
 
+## Included extension dependencies
+
+OnurPi installs these extensions as pinned package dependencies and loads them from `node_modules`.
+Their source remains in the original repositories.
+
+| Extension          | Source                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| Hugging Face OAuth | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
+| Pi Must Win        | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) 0.2.0                   |
+| Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `630622e`          |
+| Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
+
+Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set.
+
 ## Install
 
 The root manifest registers every extension and the `onur-dark` theme, so one package entry covers
