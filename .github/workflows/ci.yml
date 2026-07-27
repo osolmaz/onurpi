@@ -57,6 +57,12 @@ jobs:
       - name: Check @onurpi/context-window-policy package with Slophammer
         working-directory: packages/context-window-policy
         run: npm run slophammer
+      - name: Check @onurpi/infinite-retry package
+        working-directory: packages/infinite-retry
+        run: npm run check
+      - name: Check @onurpi/infinite-retry package with Slophammer
+        working-directory: packages/infinite-retry
+        run: npm run slophammer
       - name: Check @onurpi/codex-usage package
         working-directory: packages/codex-usage
         run: npm run check
@@ -125,6 +131,9 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/context-window-policy package
         working-directory: packages/context-window-policy
+        run: npm run mutate
+      - name: Mutate @onurpi/infinite-retry package
+        working-directory: packages/infinite-retry
         run: npm run mutate
       - name: Mutate @onurpi/codex-usage package
         working-directory: packages/codex-usage
