@@ -132,9 +132,6 @@ jobs:
       - name: Mutate @onurpi/context-window-policy package
         working-directory: packages/context-window-policy
         run: npm run mutate
-      - name: Mutate @onurpi/infinite-retry package
-        working-directory: packages/infinite-retry
-        run: npm run mutate
       - name: Mutate @onurpi/codex-usage package
         working-directory: packages/codex-usage
         run: npm run mutate
