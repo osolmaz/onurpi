@@ -2,7 +2,7 @@ import { AgentSession, VERSION } from "@earendil-works/pi-coding-agent";
 
 export const SUPPORTED_PI_VERSION = "0.82.1";
 export const MAX_RETRY_DELAY_MS = 600_000;
-const INFINITE_ATTEMPTS_LABEL = "∞";
+const INFINITE_ATTEMPTS = Number.MAX_SAFE_INTEGER;
 const PREPARE_RETRY_METHOD = "_prepareRetry";
 const WILL_RETRY_METHOD = "_willRetryAfterAgentEnd";
 
@@ -165,7 +165,7 @@ function installMethods(registry: PatchRegistry, maxDelayMs: number): void {
     emit(this, {
       type: "auto_retry_start",
       attempt,
-      maxAttempts: INFINITE_ATTEMPTS_LABEL,
+      maxAttempts: INFINITE_ATTEMPTS,
       delayMs,
       errorMessage: readErrorMessage(message),
     });

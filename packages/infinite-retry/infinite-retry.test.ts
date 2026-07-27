@@ -161,7 +161,7 @@ describe("installInfiniteRetryPatch", () => {
     expect(session.events[0]).toMatchObject({
       type: "auto_retry_start",
       attempt: 1,
-      maxAttempts: "∞",
+      maxAttempts: Number.MAX_SAFE_INTEGER,
       delayMs: 2_000,
     });
     expect(lease.retryNow()).toBe(true);

@@ -12,6 +12,7 @@ export default function infiniteRetry(pi: ExtensionAPI): void {
   let lease: InfiniteRetryPatchLease | undefined;
   let startupError: Error | undefined;
   let context: ExtensionContext | undefined;
+  let countdownTimer: NodeJS.Timeout | undefined;
 
   try {
     lease = installInfiniteRetryPatch();
@@ -19,9 +20,20 @@ export default function infiniteRetry(pi: ExtensionAPI): void {
     startupError = error instanceof Error ? error : new Error(String(error));
   }
 
-  const removeReporter = lease?.onStatus((status) => {
+  const clearCountdown = (): void => {
+    if (countdownTimer === undefined) return;
+    clearInterval(countdownTimer);
+    countdownTimer = undefined;
+  };
+  const renderStatus = (status: RetryStatus): void => {
+    clearCountdown();
     updateStatus(context, status);
-  });
+    if (status.state !== "waiting") return;
+    countdownTimer = setInterval(() => {
+      updateStatus(context, status);
+    }, 1_000);
+  };
+  const removeReporter = lease?.onStatus(renderStatus);
 
   pi.on("session_start", (_event, ctx) => {
     context = ctx;
@@ -29,10 +41,11 @@ export default function infiniteRetry(pi: ExtensionAPI): void {
       ctx.ui.notify(startupError.message, "error");
       return;
     }
-    if (lease !== undefined) updateStatus(ctx, lease.getStatus());
+    if (lease !== undefined) renderStatus(lease.getStatus());
   });
 
   pi.on("session_shutdown", () => {
+    clearCountdown();
     context?.ui.setStatus(STATUS_ID, undefined);
     context = undefined;
     removeReporter?.();
@@ -103,7 +116,7 @@ function updateStatus(ctx: ExtensionContext | undefined, status: RetryStatus): v
     ctx.ui.setStatus(STATUS_ID, undefined);
     return;
   }
-  const label = `retry ${String(status.attempt)} in ${formatDuration(remainingMs(status))} · Alt+R now`;
+  const label = `retry ${String(status.attempt)}/∞ in ${formatDuration(remainingMs(status))} · Alt+R now`;
   ctx.ui.setStatus(STATUS_ID, ctx.ui.theme.fg("warning", label));
 }
 
