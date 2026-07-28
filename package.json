@@ -35,7 +35,7 @@
     "pi-demo-mode": "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75",
     "pi-huggingface-oauth": "0.1.1",
     "pi-must-win": "0.2.0",
-    "pi-workflows": "git+https://github.com/osolmaz/pi-workflows.git#041fc73f9e3c7720e9da358e0629e2f644d026bb"
+    "pi-workflows": "git+https://github.com/osolmaz/pi-workflows.git#cbd844ad105a7b3c731855d9adae3f72b9f40d27"
   },
   "bundledDependencies": [
     "pi-demo-mode",

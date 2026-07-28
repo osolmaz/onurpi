@@ -29,7 +29,7 @@ Their source remains in the original repositories.
 | ------------------ | --------------------------------------------------------------------------------------- |
 | Hugging Face OAuth | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | Pi Must Win        | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) 0.2.0                   |
-| Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `041fc73`          |
+| Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `cbd844a`          |
 | Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set.

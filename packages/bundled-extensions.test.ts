@@ -32,7 +32,7 @@ const extensions = [
   {
     name: "pi-workflows",
     source:
-      "git+https://github.com/osolmaz/pi-workflows.git#041fc73f9e3c7720e9da358e0629e2f644d026bb",
+      "git+https://github.com/osolmaz/pi-workflows.git#cbd844ad105a7b3c731855d9adae3f72b9f40d27",
     entry: "./node_modules/pi-workflows/src/extension/index.ts",
   },
 ] as const;
