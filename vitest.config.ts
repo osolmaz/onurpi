@@ -37,6 +37,8 @@ export default defineConfig({
         "packages/reliable-compaction/reliable-compaction.ts",
         "packages/context-window-policy/context-window-policy.ts",
         "packages/infinite-retry/infinite-retry.ts",
+        "packages/onur-openclaw-maintainer/maintainer.ts",
+        "packages/onur-openclaw-maintainer/openclaw-maintainer.workflow.ts",
         "packages/codex-usage/src/codex-usage.ts",
         "packages/codex-usage/src/format.ts",
         "packages/codex-usage/src/normalize.ts",

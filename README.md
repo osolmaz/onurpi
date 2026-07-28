@@ -5,19 +5,20 @@ configuration.
 
 ## Packages
 
-| Package                                                            | Purpose                                                          |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and turn-level folding                 |
-| [`@onurpi/live-stats`](packages/live-stats/)                       | Shimmering Turkish working messages with live response metrics   |
-| [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                          |
-| [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
-| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
-| [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
-| [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                 |
-| [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
-| [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
-| [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
-| [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
+| Package                                                                  | Purpose                                                          |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and turn-level folding                 |
+| [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering Turkish working messages with live response metrics   |
+| [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                          |
+| [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager        |
+| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                   |
+| [`@onurpi/context-window-policy`](packages/context-window-policy/)       | Model-relative context compaction threshold                      |
+| [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                 |
+| [`@onurpi/onur-openclaw-maintainer`](packages/onur-openclaw-maintainer/) | Read-only OpenClaw local-model issue workflow                    |
+| [`@onurpi/codex-usage`](packages/codex-usage/)                           | Codex reports and model-gated weekly usage                       |
+| [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                  |
+| [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake |
+| [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                    |
 
 ## Included extension dependencies
 
@@ -28,7 +29,7 @@ Their source remains in the original repositories.
 | ------------------ | --------------------------------------------------------------------------------------- |
 | Hugging Face OAuth | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | Pi Must Win        | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) 0.2.0                   |
-| Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `630622e`          |
+| Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `041fc73`          |
 | Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set.

@@ -18,6 +18,7 @@
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
       "./packages/infinite-retry/index.ts",
+      "./packages/onur-openclaw-maintainer/index.ts",
       "./packages/codex-usage/index.ts",
       "./packages/plan-checklist/index.ts",
       "./packages/unified-exec/index.ts",
@@ -34,7 +35,7 @@
     "pi-demo-mode": "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75",
     "pi-huggingface-oauth": "0.1.1",
     "pi-must-win": "0.2.0",
-    "pi-workflows": "https://codeload.github.com/osolmaz/pi-workflows/tar.gz/630622e44fcd486690b6bcb923b4d18dc516723e"
+    "pi-workflows": "git+https://github.com/osolmaz/pi-workflows.git#041fc73f9e3c7720e9da358e0629e2f644d026bb"
   },
   "bundledDependencies": [
     "pi-demo-mode",
