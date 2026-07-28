@@ -114,6 +114,9 @@ describe("OpenClaw maintainer workflow", () => {
       expect(request.prompt).toContain("This is a test of the maintainer workflow.");
       expect(request.prompt).toContain("Do not create commits");
     }
+    expect(executor.requests[0]?.prompt).toContain("Do not run reproductions or tests");
+    expect(executor.requests[1]?.prompt).toContain("full literal command");
+    expect(executor.requests[1]?.prompt).toContain("Never use ellipses");
   });
 
   it("rejects writable or malformed input", () => {
@@ -136,6 +139,9 @@ describe("OpenClaw maintainer workflow", () => {
   it("rejects malformed proof and recommendations", () => {
     expect(() => validateProof({ ...proof, proofType: "guess" })).toThrow(/one of/);
     expect(() => validateProof({ ...proof, rootCause: "" })).toThrow(/non-empty/);
+    expect(() => validateProof({ ...proof, commands: ["node ... synthetic proof"] })).toThrow(
+      /exact commands without elisions/,
+    );
     expect(() => validateProof({ ...proof, workingTreeClean: false })).toThrow(/must be true/);
     expect(() => validateRecommendation({ ...recommendation, route: "merge" })).toThrow(/one of/);
     expect(() => validateRecommendation({ ...recommendation, mergeRecommended: true })).toThrow(

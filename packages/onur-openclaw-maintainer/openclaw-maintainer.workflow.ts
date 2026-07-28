@@ -37,8 +37,9 @@ export default defineWorkflow({
           "",
           `Investigate ${issue.issueUrl} in the current OpenClaw checkout.`,
           "Read the live issue, its maintainer comments, repository instructions, current compaction implementation, focused tests, and relevant recent history.",
+          "Keep this inspection bounded. Do not run reproductions or tests in this step; the next step owns proof.",
           "Check whether current main still has the reported behavior. Distinguish the reporter's proposed fix from the verified root cause.",
-          "Explain the failure plainly and identify related issues or pull requests only when there is evidence.",
+          "Explain the failure plainly, identify related issues or pull requests only when there is evidence, and submit once the source evidence is sufficient.",
         ].join("\n");
       },
       expectedOutput: [
@@ -64,6 +65,7 @@ export default defineWorkflow({
           `Prove or disprove ${issue.issueUrl} against the current checkout.`,
           "Use the cheapest honest path first: focused existing test, temporary synthetic reproduction, or source proof.",
           "Run the focused compaction tests when feasible. Record exact commands and outcomes.",
+          "Every commands item must be the full literal command that actually ran and must be copy-pastable. Never use ellipses, placeholders, or paraphrases.",
           "Check git status after the proof and leave the worktree clean.",
           "Classify the evidence accurately; do not call source inspection a live reproduction.",
           "",
@@ -202,7 +204,12 @@ export function validateProof(value: unknown): unknown {
   const record = requiredRecord(value, "proof");
   requiredChoice(record, "proofType", ["source", "unit", "synthetic", "local_live", "blocked"]);
   requiredChoice(record, "reproduced", ["yes", "no", "partial", "blocked"]);
-  requiredStringArray(record, "commands");
+  const commands = requiredStringArray(record, "commands");
+  for (const command of commands) {
+    if (/(?:^|\s)(?:\.\.\.|…)(?:\s|$)/u.test(command)) {
+      throw new Error("proof.commands must contain exact commands without elisions");
+    }
+  }
   requiredStringArray(record, "observations");
   requiredString(record, "rootCause");
   requiredChoice(record, "confidence", ["low", "medium", "high"]);
