@@ -1,0 +1,14 @@
+export const MIN_YIELD_TIME_MS = 250;
+export const MAX_YIELD_TIME_MS = 30_000;
+export const MIN_EMPTY_YIELD_TIME_MS = 5_000;
+export const DEFAULT_MAX_BACKGROUND_POLL_MS = 290_000;
+export const MAX_EMPTY_POLL_ENV_VAR = "PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS";
+export const DEFAULT_EXEC_YIELD_MS = 10_000;
+export const DEFAULT_WRITE_STDIN_YIELD_MS = 250;
+export const EARLY_EXIT_GRACE_PERIOD_MS = 150;
+export const MAX_SESSIONS = 64;
+export const WARNING_SESSIONS = 60;
+export const LRU_PROTECTED_COUNT = 8;
+export const OUTPUT_POLL_INTERVAL_MS = 250;
+export const LONG_WAIT_UPDATE_INTERVAL_MS = 30_000;
+export const SESSION_UI_KEY = "unified-exec.sessions";
