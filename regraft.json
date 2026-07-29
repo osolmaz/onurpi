@@ -19,7 +19,7 @@
       "dest": "packages/nyan-mode",
       "source": {
         "url": "https://github.com/tornikegomareli/pi-nyan-mode.git",
-        "ref": "7e47605c37fbb143b379ae39305dc36810c6566b",
+        "ref": "main",
         "subdir": "."
       },
       "commit": "7e47605c37fbb143b379ae39305dc36810c6566b",
