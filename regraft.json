@@ -13,6 +13,19 @@
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/codex-usage/UPSTREAM.md."
       ]
+    },
+    {
+      "name": "nyan-mode",
+      "dest": "packages/nyan-mode",
+      "source": {
+        "url": "https://github.com/tornikegomareli/pi-nyan-mode.git",
+        "ref": "7e47605c37fbb143b379ae39305dc36810c6566b",
+        "subdir": "."
+      },
+      "commit": "7e47605c37fbb143b379ae39305dc36810c6566b",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/nyan-mode/UPSTREAM.md."
+      ]
     }
   ]
 }

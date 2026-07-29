@@ -1,0 +1,35 @@
+{
+  "name": "pi-nyan-mode",
+  "version": "0.1.0",
+  "description": "Nyan Mode context runway for Pi statuslines.",
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "nyan",
+    "statusline"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "extensions",
+    "assets",
+    "examples",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/nyan-footer.ts"
+    ]
+  }
+}
