@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "grafts": [
+    {
+      "name": "codex-usage",
+      "dest": "packages/codex-usage",
+      "source": {
+        "url": "https://github.com/narumiruna/pi-extensions.git",
+        "ref": "befd5684a7f4d861a9909b24f0723ee671029b1e",
+        "subdir": "extensions/pi-codex-usage"
+      },
+      "commit": "befd5684a7f4d861a9909b24f0723ee671029b1e",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/codex-usage/UPSTREAM.md."
+      ]
+    }
+  ]
+}
