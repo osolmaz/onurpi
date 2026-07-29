@@ -26,6 +26,19 @@
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/nyan-mode/UPSTREAM.md."
       ]
+    },
+    {
+      "name": "unified-exec",
+      "dest": "packages/unified-exec",
+      "source": {
+        "url": "https://github.com/iamwrm/pi-unified-exec.git",
+        "ref": "3cad4a93f430b16bb4fb59cdf4a42cc005a933e7",
+        "subdir": "."
+      },
+      "commit": "3cad4a93f430b16bb4fb59cdf4a42cc005a933e7",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/unified-exec/UPSTREAM.md."
+      ]
     }
   ]
 }
