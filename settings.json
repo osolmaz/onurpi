@@ -9,6 +9,7 @@
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
+    "../../repos/onurpi/packages/startup-model",
     "../../repos/onurpi/packages/infinite-retry",
     "../../repos/onurpi/packages/codex-usage",
     "../../repos/onurpi/packages/plan-checklist",
