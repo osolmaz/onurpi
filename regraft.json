@@ -32,7 +32,7 @@
       "dest": "packages/unified-exec",
       "source": {
         "url": "https://github.com/iamwrm/pi-unified-exec.git",
-        "ref": "3cad4a93f430b16bb4fb59cdf4a42cc005a933e7",
+        "ref": "main",
         "subdir": "."
       },
       "commit": "3cad4a93f430b16bb4fb59cdf4a42cc005a933e7",

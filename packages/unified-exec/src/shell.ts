@@ -25,32 +25,32 @@ const WINDOWS_SHELL_EXTS = [".com", ".exe"];
 
 /** %SystemRoot%\System32 path builder with a sane fallback. */
 function system32(...parts: string[]): string {
-	const root = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
-	return join(root, "System32", ...parts);
+  const root = process.env["SystemRoot"] ?? process.env["windir"] ?? "C:\\Windows";
+  return join(root, "System32", ...parts);
 }
 
 /** statSync().isFile() that never throws. */
 function isFile(p: string): boolean {
-	try {
-		return statSync(p).isFile();
-	} catch {
-		return false;
-	}
+  try {
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export interface ShellCommand {
-	command: string[];
-	/**
-	 * Pass args to the OS verbatim (no Node re-quoting). Required for
-	 * cmd.exe, whose quoting rules CreateProcess-style escaping mangles.
-	 */
-	windowsVerbatimArguments?: boolean;
+  command: string[];
+  /**
+   * Pass args to the OS verbatim (no Node re-quoting). Required for
+   * cmd.exe, whose quoting rules CreateProcess-style escaping mangles.
+   */
+  windowsVerbatimArguments?: boolean;
 }
 
 /** Basename without a Windows executable extension, lowercased. */
 function shellBase(shellBin: string): string {
-	const base = shellBin.split(/[\\/]/).pop() ?? shellBin;
-	return base.replace(/\.(exe|cmd|bat)$/i, "").toLowerCase();
+  const base = shellBin.split(/[\\/]/).pop() ?? shellBin;
+  return base.replace(/\.(com|exe|cmd|bat)$/i, "").toLowerCase();
 }
 
 /**
@@ -58,38 +58,42 @@ function shellBase(shellBin: string): string {
  * `isWindows` is a parameter (defaulting to the real platform) so tests can
  * exercise both branches anywhere.
  */
-export function buildShellCommand(shellBin: string, cmd: string, isWindows: boolean = IS_WINDOWS): ShellCommand {
-	const base = shellBase(shellBin);
-	// cmd.exe specialization only applies on Windows — a POSIX binary that
-	// happens to be named `cmd` must get the uniform `-c` treatment.
-	if (isWindows && base === "cmd") {
-		if (/[\r\n]/.test(cmd)) {
-			// cmd.exe /c silently stops at the first newline, executing only
-			// the first line — fail closed rather than silently truncate.
-			throw new Error(
-				'cmd.exe cannot run multiline commands via /c (everything after the first line is silently dropped). Join lines with " & ", or use shell: "powershell" or bash.',
-			);
-		}
-		// /d skip AutoRun, /s standard quote handling, /c run-and-exit.
-		// Verbatim so cmd.exe sees exactly: /d /s /c "<cmd>"
-		return { command: [shellBin, "/d", "/s", "/c", `"${cmd}"`], windowsVerbatimArguments: true };
-	}
-	// powershell/pwsh take -Command on every platform (pwsh is cross-platform).
-	if (base === "powershell" || base === "pwsh") {
-		// -NonInteractive/-NoLogo: with stdin kept open as a pipe (for write_stdin),
-		// bare -Command can hang waiting for interactive input on some hosts
-		// (observed: Node 24 windows-latest CI). -NoProfile alone is not enough.
-		return { command: [shellBin, "-NoProfile", "-NonInteractive", "-NoLogo", "-Command", cmd] };
-	}
-	// bash, sh, zsh, fish, … all take -c.
-	return { command: [shellBin, "-c", cmd] };
+export function buildShellCommand(
+  shellBin: string,
+  cmd: string,
+  isWindows: boolean = IS_WINDOWS,
+): ShellCommand {
+  const base = shellBase(shellBin);
+  // cmd.exe specialization only applies on Windows — a POSIX binary that
+  // happens to be named `cmd` must get the uniform `-c` treatment.
+  if (isWindows && base === "cmd") {
+    if (/[\r\n]/.test(cmd)) {
+      // cmd.exe /c silently stops at the first newline, executing only
+      // the first line — fail closed rather than silently truncate.
+      throw new Error(
+        'cmd.exe cannot run multiline commands via /c (everything after the first line is silently dropped). Join lines with " & ", or use shell: "powershell" or bash.',
+      );
+    }
+    // /d skip AutoRun, /s standard quote handling, /c run-and-exit.
+    // Verbatim so cmd.exe sees exactly: /d /s /c "<cmd>"
+    return { command: [shellBin, "/d", "/s", "/c", `"${cmd}"`], windowsVerbatimArguments: true };
+  }
+  // powershell/pwsh take -Command on every platform (pwsh is cross-platform).
+  if (base === "powershell" || base === "pwsh") {
+    // -NonInteractive/-NoLogo: with stdin kept open as a pipe (for write_stdin),
+    // bare -Command can hang waiting for interactive input on some hosts
+    // (observed: Node 24 windows-latest CI). -NoProfile alone is not enough.
+    return { command: [shellBin, "-NoProfile", "-NonInteractive", "-NoLogo", "-Command", cmd] };
+  }
+  // bash, sh, zsh, fish, … all take -c.
+  return { command: [shellBin, "-c", cmd] };
 }
 
 export interface FindOnPathOptions {
-	/** Extensions to probe, in order. Defaults per-platform. */
-	exts?: string[];
-	/** Skip matches whose full path matches this pattern. */
-	exclude?: RegExp;
+  /** Extensions to probe, in order. Defaults per-platform. */
+  exts?: string[];
+  /** Skip matches whose full path matches this pattern. */
+  exclude?: RegExp;
 }
 
 /**
@@ -97,33 +101,38 @@ export interface FindOnPathOptions {
  * .exe/.cmd/.bat extensions. Only regular files count (a directory named
  * like the binary is skipped).
  */
+// eslint-disable-next-line complexity -- Preserve cross-platform PATH probing behavior.
 export function findOnPath(
-	bin: string,
-	env: NodeJS.ProcessEnv = process.env,
-	opts: FindOnPathOptions = {},
+  bin: string,
+  env: NodeJS.ProcessEnv = process.env,
+  opts: FindOnPathOptions = {},
 ): string | undefined {
-	const pathVar = env.PATH ?? env.Path ?? "";
-	const exts = opts.exts ?? (IS_WINDOWS ? WINDOWS_EXEC_EXTS : [""]);
-	for (const dir of pathVar.split(delimiter)) {
-		if (!dir) continue;
-		for (const ext of exts) {
-			// resolve() (not join): a relative PATH entry must not yield a
-			// cwd-dependent result that breaks when spawned from another cwd.
-			const full = resolve(dir, bin + ext);
-			if (opts.exclude?.test(full)) continue;
-			if (isFile(full)) return full;
-		}
-	}
-	return undefined;
+  const pathVar = env["PATH"] ?? env["Path"] ?? "";
+  const exts = opts.exts ?? (IS_WINDOWS ? WINDOWS_EXEC_EXTS : [""]);
+  const hasKnownExtension = exts.some(
+    (ext) => ext.length > 0 && bin.toLowerCase().endsWith(ext.toLowerCase()),
+  );
+  const candidateExts = hasKnownExtension ? [""] : exts;
+  for (const dir of pathVar.split(delimiter)) {
+    if (!dir) continue;
+    for (const ext of candidateExts) {
+      // resolve() (not join): a relative PATH entry must not yield a
+      // cwd-dependent result that breaks when spawned from another cwd.
+      const full = resolve(dir, bin + ext);
+      if (opts.exclude?.test(full)) continue;
+      if (isFile(full)) return full;
+    }
+  }
+  return undefined;
 }
 
 export interface DefaultShell {
-	/** Shell to spawn. Absolute path when resolved from PATH. */
-	shell: string;
-	/** true when Windows had no usable bash and we fell back to powershell. */
-	fellBack: boolean;
-	/** How bash was located (absent when fellBack or on POSIX). */
-	bashSource?: BashSource;
+  /** Shell to spawn. Absolute path when resolved from PATH. */
+  shell: string;
+  /** true when Windows had no usable bash and we fell back to powershell. */
+  fellBack: boolean;
+  /** How bash was located (absent when fellBack or on POSIX). */
+  bashSource?: BashSource;
 }
 
 /** System32's bash.exe is the WSL stub — a different OS view entirely. */
@@ -133,8 +142,8 @@ const SYSTEM32_RE = /[\\/]system32[\\/]/i;
 export type BashSource = "env" | "path" | "git-derived" | "install-root";
 
 export interface WindowsBash {
-	path: string;
-	source: BashSource;
+  path: string;
+  source: BashSource;
 }
 
 /**
@@ -156,41 +165,42 @@ export interface WindowsBash {
  * admin/user-owned install roots or the tree of an already-PATH-trusted
  * git.exe are probed; never anything cwd-relative.
  */
+// eslint-disable-next-line complexity -- Preserve the audited Windows shell candidate order.
 export function findWindowsBash(env: NodeJS.ProcessEnv): WindowsBash | undefined {
-	// 1. Explicit override.
-	const override = env.PI_UNIFIED_EXEC_BASH?.trim();
-	if (override && isFile(override)) return { path: override, source: "env" };
+  // 1. Explicit override.
+  const override = env["PI_UNIFIED_EXEC_BASH"]?.trim();
+  if (override && isFile(override)) return { path: override, source: "env" };
 
-	// 2. Plain PATH.
-	const onPath = findOnPath("bash", env, { exts: WINDOWS_SHELL_EXTS, exclude: SYSTEM32_RE });
-	if (onPath) return { path: onPath, source: "path" };
+  // 2. Plain PATH.
+  const onPath = findOnPath("bash", env, { exts: WINDOWS_SHELL_EXTS, exclude: SYSTEM32_RE });
+  if (onPath) return { path: onPath, source: "path" };
 
-	// 3. Derive from git.exe on PATH.
-	const git = findOnPath("git", env, { exts: WINDOWS_SHELL_EXTS, exclude: SYSTEM32_RE });
-	if (git) {
-		let dir = dirname(git); // e.g. <root>\cmd or <root>\mingw64\bin
-		for (let i = 0; i < 3; i++) {
-			const candidate = join(dir, "bin", "bash.exe");
-			if (isFile(candidate)) return { path: candidate, source: "git-derived" };
-			const parent = dirname(dir);
-			if (parent === dir) break;
-			dir = parent;
-		}
-	}
+  // 3. Derive from git.exe on PATH.
+  const git = findOnPath("git", env, { exts: WINDOWS_SHELL_EXTS, exclude: SYSTEM32_RE });
+  if (git) {
+    let dir = dirname(git); // e.g. <root>\cmd or <root>\mingw64\bin
+    for (let i = 0; i < 3; i++) {
+      const candidate = join(dir, "bin", "bash.exe");
+      if (isFile(candidate)) return { path: candidate, source: "git-derived" };
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
 
-	// 4. Well-known install roots.
-	const roots = [
-		env.ProgramFiles && join(env.ProgramFiles, "Git"),
-		env.ProgramW6432 && join(env.ProgramW6432, "Git"),
-		env["ProgramFiles(x86)"] && join(env["ProgramFiles(x86)"], "Git"),
-		env.LOCALAPPDATA && join(env.LOCALAPPDATA, "Programs", "Git"),
-	];
-	for (const root of roots) {
-		if (!root) continue;
-		const candidate = join(root, "bin", "bash.exe");
-		if (isFile(candidate)) return { path: candidate, source: "install-root" };
-	}
-	return undefined;
+  // 4. Well-known install roots.
+  const roots = [
+    env["ProgramFiles"] && join(env["ProgramFiles"], "Git"),
+    env["ProgramW6432"] && join(env["ProgramW6432"], "Git"),
+    env["ProgramFiles(x86)"] && join(env["ProgramFiles(x86)"], "Git"),
+    env["LOCALAPPDATA"] && join(env["LOCALAPPDATA"], "Programs", "Git"),
+  ];
+  for (const root of roots) {
+    if (!root) continue;
+    const candidate = join(root, "bin", "bash.exe");
+    if (isFile(candidate)) return { path: candidate, source: "install-root" };
+  }
+  return undefined;
 }
 
 /**
@@ -201,19 +211,19 @@ export function findWindowsBash(env: NodeJS.ProcessEnv): WindowsBash | undefined
  * tests can drive it with a synthetic PATH on any platform.
  */
 export function probeWindowsDefaultShell(
-	env: NodeJS.ProcessEnv,
-	exts: string[] = WINDOWS_EXEC_EXTS,
+  env: NodeJS.ProcessEnv,
+  exts: string[] = WINDOWS_SHELL_EXTS,
 ): DefaultShell {
-	const bash = findWindowsBash(env);
-	if (bash) return { shell: bash.path, fellBack: false, bashSource: bash.source };
-	const powershell = findOnPath("powershell", env, { exts });
-	// Last resort: the canonical absolute location, never a bare name — a
-	// bare name would let Windows' cwd-first lookup execute a
-	// powershell.exe planted in an untrusted workdir.
-	return {
-		shell: powershell ?? system32("WindowsPowerShell", "v1.0", "powershell.exe"),
-		fellBack: true,
-	};
+  const bash = findWindowsBash(env);
+  if (bash) return { shell: bash.path, fellBack: false, bashSource: bash.source };
+  const powershell = findOnPath("powershell", env, { exts });
+  // Last resort: the canonical absolute location, never a bare name — a
+  // bare name would let Windows' cwd-first lookup execute a
+  // powershell.exe planted in an untrusted workdir.
+  return {
+    shell: powershell ?? system32("WindowsPowerShell", "v1.0", "powershell.exe"),
+    fellBack: true,
+  };
 }
 
 let cachedDefaultShell: DefaultShell | undefined;
@@ -224,10 +234,10 @@ let cachedDefaultShell: DefaultShell | undefined;
  * lifetime; passing an explicit `env` bypasses the cache (test hook).
  */
 export function resolveDefaultShell(env?: NodeJS.ProcessEnv): DefaultShell {
-	if (!IS_WINDOWS) return { shell: "bash", fellBack: false };
-	if (env) return probeWindowsDefaultShell(env);
-	if (!cachedDefaultShell) cachedDefaultShell = probeWindowsDefaultShell(process.env);
-	return cachedDefaultShell;
+  if (!IS_WINDOWS) return { shell: "bash", fellBack: false };
+  if (env) return probeWindowsDefaultShell(env);
+  if (!cachedDefaultShell) cachedDefaultShell = probeWindowsDefaultShell(process.env);
+  return cachedDefaultShell;
 }
 
 const resolvedBinaryCache = new Map<string, string>();
@@ -243,13 +253,13 @@ const resolvedBinaryCache = new Map<string, string>();
  * workdir must not shadow the real shell.
  */
 export function resolveBinary(bin: string, env?: NodeJS.ProcessEnv): string {
-	if (/[\\/]/.test(bin)) return bin;
-	if (env) return findOnPath(bin, env) ?? bin; // test hook: no caching
-	const cached = resolvedBinaryCache.get(bin);
-	if (cached) return cached;
-	const resolved = findOnPath(bin) ?? bin;
-	resolvedBinaryCache.set(bin, resolved);
-	return resolved;
+  if (/[\\/]/.test(bin)) return bin;
+  if (env) return findOnPath(bin, env) ?? bin; // test hook: no caching
+  const cached = resolvedBinaryCache.get(bin);
+  if (cached) return cached;
+  const resolved = findOnPath(bin) ?? bin;
+  resolvedBinaryCache.set(bin, resolved);
+  return resolved;
 }
 
 /**
@@ -261,32 +271,33 @@ export function resolveBinary(bin: string, env?: NodeJS.ProcessEnv): string {
  * would happily execute an attacker's powershell.exe from an untrusted
  * repo. Only .com/.exe are accepted (Node can't spawn .cmd/.bat directly).
  */
+// eslint-disable-next-line complexity -- Preserve Windows shell normalization and validation.
 export function resolveWindowsShell(bin: string, env?: NodeJS.ProcessEnv): string {
-	if (/[\\/]/.test(bin)) return bin; // explicit path: caller's responsibility
-	if (!env) {
-		const cached = resolvedBinaryCache.get(`shell:${bin}`);
-		if (cached) return cached;
-	}
-	const effectiveEnv = env ?? process.env;
-	// bash gets the extended probe (PATH → git-derived → install roots) so
-	// explicit shell:"bash" works on the common "git on PATH, bash not" setup.
-	const isBash = bin.replace(/\.(exe|com)$/i, "").toLowerCase() === "bash";
-	const found = isBash
-		? findWindowsBash(effectiveEnv)?.path
-		: findOnPath(bin, effectiveEnv, { exts: WINDOWS_SHELL_EXTS });
-	if (!found) {
-		throw new Error(
-			isBash
-				? 'bash not found: not on PATH, not derivable from git.exe, and not in a known Git install root. Install Git for Windows, or set PI_UNIFIED_EXEC_BASH to your bash.exe.'
-				: `shell "${bin}" not found on PATH (searched ${WINDOWS_SHELL_EXTS.join("/")}). Pass an absolute path, or use "powershell" / "cmd" / an installed bash.`,
-		);
-	}
-	if (!env) resolvedBinaryCache.set(`shell:${bin}`, found);
-	return found;
+  if (/[\\/]/.test(bin)) return bin; // explicit path: caller's responsibility
+  if (!env) {
+    const cached = resolvedBinaryCache.get(`shell:${bin}`);
+    if (cached) return cached;
+  }
+  const effectiveEnv = env ?? process.env;
+  // bash gets the extended probe (PATH → git-derived → install roots) so
+  // explicit shell:"bash" works on the common "git on PATH, bash not" setup.
+  const isBash = bin.replace(/\.(exe|com)$/i, "").toLowerCase() === "bash";
+  const found = isBash
+    ? findWindowsBash(effectiveEnv)?.path
+    : findOnPath(bin, effectiveEnv, { exts: WINDOWS_SHELL_EXTS });
+  if (!found) {
+    throw new Error(
+      isBash
+        ? "bash not found: not on PATH, not derivable from git.exe, and not in a known Git install root. Install Git for Windows, or set PI_UNIFIED_EXEC_BASH to your bash.exe."
+        : `shell "${bin}" not found on PATH (searched ${WINDOWS_SHELL_EXTS.join("/")}). Pass an absolute path, or use "powershell" / "cmd" / an installed bash.`,
+    );
+  }
+  if (!env) resolvedBinaryCache.set(`shell:${bin}`, found);
+  return found;
 }
 
 /** Test hook: forget cached shell/binary probes. */
 export function resetDefaultShellCache(): void {
-	cachedDefaultShell = undefined;
-	resolvedBinaryCache.clear();
+  cachedDefaultShell = undefined;
+  resolvedBinaryCache.clear();
 }
