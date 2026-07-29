@@ -67,6 +67,8 @@ describe("bundled extension dependencies", () => {
     const packages = settings["packages"];
     expect(packages).not.toEqual(
       expect.arrayContaining([
+        "git:github.com/Michaelliv/pi-goal@3f100be5434454d3388755a119d01caca9127c16",
+        "npm:pi-goal",
         "npm:pi-huggingface-oauth@0.1.1",
         "git:github.com/osolmaz/pi-workflows",
         "git:github.com/osolmaz/pi-must-win",

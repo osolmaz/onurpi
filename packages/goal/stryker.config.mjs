@@ -1,14 +1,5 @@
 export default {
-  mutate: [
-    "configuration.ts",
-    "edit-diff-stat.ts",
-    "fold-policy.ts",
-    "mode.ts",
-    "run-boundary.ts",
-    "transcript-window-adapter.ts",
-    "transcript-windows.ts",
-    "tool-padding.ts",
-  ],
+  mutate: ["goal-episode.ts", "goal-replay.ts", "goal-state.ts", "run-outcome.ts", "usage.ts"],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

@@ -23,6 +23,7 @@ import {
   type TranscriptWindowAdapter,
 } from "./transcript-window-adapter.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
+import { nearestRunStartIndex, RunBoundaryRecorder } from "./run-boundary.ts";
 import {
   compactionWindowCount,
   formatTranscriptWindowValue,
@@ -86,13 +87,10 @@ function compactionAssociationsForBranch(
 function turnEntryIds(branch: BranchEntries, compactionEntryId: string): readonly string[] {
   const compactionIndex = branch.findIndex((entry) => entry.id === compactionEntryId);
   if (compactionIndex < 0) return [];
-  for (let index = compactionIndex - 1; index >= 0; index -= 1) {
-    const entry = branch[index];
-    if (entry?.type === "message" && entry.message.role === "user") {
-      return branch.slice(index, compactionIndex).map((turnEntry) => turnEntry.id);
-    }
-  }
-  return [];
+  const startIndex = nearestRunStartIndex(branch, compactionIndex);
+  return startIndex === undefined
+    ? []
+    : branch.slice(startIndex, compactionIndex).map((turnEntry) => turnEntry.id);
 }
 
 function loadVisibleHistory(
@@ -261,96 +259,129 @@ function registerControls(
   });
 }
 
-export default function turnFold(pi: ExtensionAPI): void {
-  const state = new TurnFoldState();
-  const compactionRegistry = processCompactionRegistry();
-  let adapter: TranscriptWindowAdapter | undefined;
-  let configuration = DEFAULT_TURN_FOLD_CONFIGURATION;
-  let currentTheme: Theme | undefined;
-  const restorePatches = installRenderPatches(state, () => currentTheme);
+type TurnFoldRuntime = {
+  adapter: TranscriptWindowAdapter | undefined;
+  configuration: TurnFoldConfiguration;
+  currentTheme: Theme | undefined;
+  runBoundaries: RunBoundaryRecorder;
+};
 
-  const applyConfiguration = (next: TurnFoldConfiguration, persist: boolean): void => {
-    configuration = next;
-    adapter?.setValue(next.windows);
-    if (state.getMode() !== next.mode) state.setMode(next.mode);
-    if (persist) pi.appendEntry(TURN_FOLD_CONFIG_ENTRY, next);
-  };
-  registerControls(pi, state, () => configuration, applyConfiguration);
-
+function registerSessionEvents(
+  pi: ExtensionAPI,
+  state: TurnFoldState,
+  runtime: TurnFoldRuntime,
+  registry: EphemeralCompactionRegistry,
+  applyConfiguration: ApplyConfiguration,
+  restorePatches: () => void,
+): void {
   pi.on("session_start", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
+    runtime.currentTheme = ctx.ui.theme;
+    runtime.runBoundaries.reset();
     const branch = ctx.sessionManager.getBranch();
-    configuration = configurationFromBranch(branch);
-    adapter = installTranscriptWindowAdapter(ctx.sessionManager, configuration.windows);
-    applyConfiguration(configuration, false);
-    loadVisibleHistory(state, ctx, branch, compactionRegistry);
+    runtime.configuration = configurationFromBranch(branch);
+    runtime.adapter = installTranscriptWindowAdapter(
+      ctx.sessionManager,
+      runtime.configuration.windows,
+    );
+    applyConfiguration(runtime.configuration, false);
+    loadVisibleHistory(state, ctx, branch, registry);
   });
-
   pi.on("session_compact", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    adapter?.markPendingCompaction(event.compactionEntry.id);
+    runtime.currentTheme = ctx.ui.theme;
+    runtime.adapter?.markPendingCompaction(event.compactionEntry.id);
     const branch = ctx.sessionManager.getBranch();
     const association = state.registerCompaction(
       event.compactionEntry,
       event.reason,
       turnEntryIds(branch, event.compactionEntry.id),
     );
-    if (association) compactionRegistry.remember(sessionRegistryKey(ctx), association);
+    if (association) registry.remember(sessionRegistryKey(ctx), association);
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
-
   pi.on("session_tree", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
+    runtime.currentTheme = ctx.ui.theme;
     const branch = ctx.sessionManager.getBranch();
-    state.replaceCompactionAssociations(
-      compactionAssociationsForBranch(branch, ctx, compactionRegistry),
-    );
+    state.replaceCompactionAssociations(compactionAssociationsForBranch(branch, ctx, registry));
     state.deferHistoryReload(() => ctx.sessionManager.buildContextEntries());
   });
-
-  pi.on("agent_start", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.ensureActive();
-  });
-
-  pi.on("message_start", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    const role = messageRole(event.message);
-    if (role === "user") state.startUserTurn(messageTimestamp(event.message));
-    if (role === "assistant") state.beginAssistantMessage(event.message);
-  });
-
-  pi.on("message_update", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.registerAssistantMessage(event.message);
-  });
-
-  pi.on("message_end", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    registerEndedAssistant(state, event.message);
-  });
-
-  pi.on("turn_end", (event) => {
-    for (const result of event.toolResults) state.registerToolResult(result);
-  });
-
-  pi.on("tool_execution_start", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.registerToolStart(event.toolCallId);
-  });
-
-  pi.on("tool_execution_end", (event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.registerToolEnd(event.toolCallId, event.isError);
-  });
-
-  pi.on("agent_settled", (_event, ctx) => {
-    currentTheme = ctx.ui.theme;
-    state.settleActive();
-  });
-
   pi.on("session_shutdown", (event) => {
-    closeCompactionRegistry(compactionRegistry, event.reason);
+    runtime.runBoundaries.reset();
+    closeCompactionRegistry(registry, event.reason);
     restorePatches();
   });
+}
+
+function registerAgentEvents(
+  pi: ExtensionAPI,
+  state: TurnFoldState,
+  runtime: TurnFoldRuntime,
+): void {
+  pi.on("agent_start", (_event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    const hadActiveRun = state.hasActive();
+    const startedAt = Date.now();
+    state.ensureActive(startedAt);
+    if (!hadActiveRun) runtime.runBoundaries.start(ctx.sessionManager.getBranch(), startedAt);
+  });
+  pi.on("message_start", (event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    const role = messageRole(event.message);
+    if (role === "user") {
+      const previousRunId = state.activeId();
+      const startedAt = messageTimestamp(event.message) ?? Date.now();
+      const runId = state.startUserTurn(startedAt);
+      if (runId !== previousRunId) {
+        runtime.runBoundaries.start(ctx.sessionManager.getBranch(), startedAt);
+      }
+    }
+    if (role === "assistant") state.beginAssistantMessage(event.message);
+  });
+  pi.on("message_update", (event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    state.registerAssistantMessage(event.message);
+  });
+  pi.on("message_end", (event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    registerEndedAssistant(state, event.message);
+  });
+  pi.on("turn_end", (event, ctx) => {
+    for (const result of event.toolResults) state.registerToolResult(result);
+    runtime.runBoundaries.persist(ctx.sessionManager.getBranch());
+  });
+  pi.on("tool_execution_start", (event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    state.registerToolStart(event.toolCallId);
+  });
+  pi.on("tool_execution_end", (event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    state.registerToolEnd(event.toolCallId, event.isError);
+  });
+  pi.on("agent_settled", (_event, ctx) => {
+    runtime.currentTheme = ctx.ui.theme;
+    runtime.runBoundaries.persist(ctx.sessionManager.getBranch());
+    state.settleActive();
+  });
+}
+
+export default function turnFold(pi: ExtensionAPI): void {
+  const state = new TurnFoldState();
+  const registry = processCompactionRegistry();
+  const runtime: TurnFoldRuntime = {
+    adapter: undefined,
+    configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
+    currentTheme: undefined,
+    runBoundaries: new RunBoundaryRecorder((customType, data) => {
+      pi.appendEntry(customType, data);
+    }),
+  };
+  const restorePatches = installRenderPatches(state, () => runtime.currentTheme);
+  const applyConfiguration = (next: TurnFoldConfiguration, persist: boolean): void => {
+    runtime.configuration = next;
+    runtime.adapter?.setValue(next.windows);
+    if (state.getMode() !== next.mode) state.setMode(next.mode);
+    if (persist) pi.appendEntry(TURN_FOLD_CONFIG_ENTRY, next);
+  };
+  registerControls(pi, state, () => runtime.configuration, applyConfiguration);
+  registerSessionEvents(pi, state, runtime, registry, applyConfiguration, restorePatches);
+  registerAgentEvents(pi, state, runtime);
 }

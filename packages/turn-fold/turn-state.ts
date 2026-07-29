@@ -4,6 +4,7 @@ import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./e
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
 import { nextTurnFoldMode, type TurnFoldMode } from "./mode.ts";
+import { historicalRunStarts, type RunBoundary } from "./run-boundary.ts";
 import {
   assistantSnapshot,
   type AssistantSnapshot,
@@ -171,22 +172,16 @@ export class TurnFoldState {
     this.resetGroups();
     this.compactionAssociations = new Map(compactionAssociations);
     let currentGroup: TurnGroup | undefined;
+    const runStarts = historicalRunStarts(entries);
     for (const entry of entries) {
       if (this.indexHistoricalCompactionEntry(entry)) continue;
 
       const message = messageFromEntry(entry);
       const role = stringField(message, "role");
-      if (role === "user") {
-        currentGroup = this.createGroup(
-          numberField(message, "timestamp") ?? Date.now(),
-          true,
-          true,
-        );
-      } else {
-        currentGroup = this.historicalGroup(currentGroup, role, message);
-        if (currentGroup) {
-          this.indexHistoricalMessage(currentGroup, message, entryTimestamp(entry));
-        }
+      const boundary = runStarts.get(stringField(entry, "id") ?? "");
+      currentGroup = this.historicalEntryGroup(currentGroup, role, message, boundary);
+      if (currentGroup) {
+        this.indexHistoricalMessage(currentGroup, message, entryTimestamp(entry));
       }
       this.rememberHistoricalEntryGroup(entry, currentGroup);
     }
@@ -209,6 +204,14 @@ export class TurnFoldState {
     const entries = this.historyReload;
     this.historyReload = undefined;
     this.reloadHistory(entries());
+  }
+
+  hasActive(): boolean {
+    return this.activeGroupId !== undefined;
+  }
+
+  activeId(): string | undefined {
+    return this.activeGroupId;
   }
 
   ensureActive(startedAt = Date.now()): string {
@@ -628,6 +631,19 @@ export class TurnFoldState {
   private rememberHistoricalEntryGroup(entry: unknown, group: TurnGroup | undefined): void {
     const entryId = stringField(entry, "id");
     if (group && entryId) this.historicalGroupByEntryId.set(entryId, group.id);
+  }
+
+  private historicalEntryGroup(
+    currentGroup: TurnGroup | undefined,
+    role: string | undefined,
+    message: unknown,
+    boundary: RunBoundary | undefined,
+  ): TurnGroup | undefined {
+    if (boundary) return this.createGroup(boundary.startedAt, true, role === "user");
+    if (role === "user") {
+      return this.createGroup(numberField(message, "timestamp") ?? Date.now(), true, true);
+    }
+    return this.historicalGroup(currentGroup, role, message);
   }
 
   private historicalGroup(

@@ -12,6 +12,7 @@
   "pi": {
     "extensions": [
       "./packages/turn-fold/index.ts",
+      "./packages/goal/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
       "./packages/prompt-queue/index.ts",
@@ -26,6 +27,9 @@
       "./node_modules/pi-must-win/index.ts",
       "./node_modules/pi-workflows/src/extension/index.ts",
       "./node_modules/pi-demo-mode/extensions/demo-mode.ts"
+    ],
+    "skills": [
+      "./packages/goal/skills"
     ],
     "themes": [
       "./packages/onur-theme/themes/onur-dark.json"

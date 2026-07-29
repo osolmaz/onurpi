@@ -14,13 +14,11 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
-      - configuration.ts
-      - fold-policy.ts
-      - mode.ts
-      - run-boundary.ts
-      - transcript-window-adapter.ts
-      - transcript-windows.ts
-      - tool-padding.ts
+      - goal-episode.ts
+      - goal-replay.ts
+      - goal-state.ts
+      - run-outcome.ts
+      - usage.ts
   dependency_boundaries:
     - from: .
       allow: []

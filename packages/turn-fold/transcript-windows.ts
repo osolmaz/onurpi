@@ -1,5 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { nearestRunStartIndex } from "./run-boundary.ts";
+
 export const DEFAULT_TRANSCRIPT_WINDOWS = 3;
 export const ALL_TRANSCRIPT_WINDOWS = "all" as const;
 
@@ -17,12 +19,6 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 
 function entryType(entry: unknown): string | undefined {
   return isRecord(entry) && typeof entry["type"] === "string" ? entry["type"] : undefined;
-}
-
-function isUserEntry(entry: unknown): boolean {
-  if (entryType(entry) !== "message" || !isRecord(entry)) return false;
-  const message = entry["message"];
-  return isRecord(message) && message["role"] === "user";
 }
 
 export function isTranscriptWindowValue(value: unknown): value is TranscriptWindowValue {
@@ -54,13 +50,7 @@ export function selectTranscriptEntries(
 
   const boundaryIndex = compactionIndices[compactionIndices.length - value];
   if (boundaryIndex === undefined) return [...entries];
-  let startIndex = boundaryIndex;
-  for (let index = boundaryIndex - 1; index >= 0; index -= 1) {
-    if (isUserEntry(entries[index])) {
-      startIndex = index;
-      break;
-    }
-  }
+  const startIndex = nearestRunStartIndex(entries, boundaryIndex) ?? boundaryIndex;
   return entries.slice(startIndex);
 }
 

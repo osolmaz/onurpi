@@ -11,8 +11,9 @@ intermediate assistant messages disappear, leaving the final response below the 
 compactions during a turn appear as `compacted` in the summary instead of a separate transcript row.
 Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a compact per-turn diffstat such as `3 files +42 −11`. Each absolute file path appears below the summary with that file's cumulative additions and deletions. The counters use Pi's diff colors. A long path is truncated from the left so its filename and counters remain on one line. Interrupted runs retain their last partial response or a fallback message.
 
-The extension changes only the display. Pi keeps every stored session message, while compaction still
-controls what reaches the model. The normative behavior is defined in [SPEC.md](SPEC.md).
+The extension preserves every normal session message and Pi's model context. It stores one small
+custom boundary entry for each new agent run so extension-started runs replay correctly after a
+restart. Compaction still controls what reaches the model. The normative behavior is defined in [SPEC.md](SPEC.md).
 
 ## Modes
 
@@ -55,15 +56,18 @@ summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 ## Transcript windows
 
 Turn Fold loads three compaction windows into the main transcript by default. Changing the window
-value waits for Pi to become idle, then rebuilds that transcript. The selected range begins with the user message that led
-into its oldest compaction window and continues through the active leaf. `all` warns before replaying
+value waits for Pi to become idle, then rebuilds that transcript. The selected range begins with the
+user or custom prompt recorded by the nearest run boundary before its oldest compaction window and
+continues through the active leaf. Older sessions fall back to the nearest user message. `all` warns before replaying
 the full branch because a large transcript can slow editor input.
 
 Window selection changes only the TUI path. Pi's model context remains compacted. Turn Fold also
 caches the component layout and its counts so unchanged redraws avoid rescanning or sorting turn
 activity. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design.
 
-Mode and window changes are stored as custom session entries, so each session restores its latest
+Turn Fold writes one strict `onurpi-turn-fold-run` entry during the first completed turn of each new
+run. Automatic retries before settlement stay in the same run and do not add entries. Mode and
+window changes are stored as separate custom session entries, so each session restores its latest
 supported configuration. Automatic compaction associations live only in process memory and survive `/reload` without
 writing to Pi's session. They use exact compaction and active-turn entry IDs and are limited to the
 active branch. After a full Pi restart, earlier compactions remain standalone because Pi's stored

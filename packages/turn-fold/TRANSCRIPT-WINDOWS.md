@@ -26,9 +26,11 @@ Compact and expanded modes operate on the same selected range. Expanded mode res
 
 `transcript-windows.ts` receives `ctx.sessionManager.getBranch()` in root-to-leaf order. For a numeric value, it collects compaction positions and finds the requested oldest boundary. A value of three selects the third-newest compaction. If the branch contains fewer compactions, selection starts at the branch root. `all` returns the complete active branch.
 
-When a numeric boundary exists, selection walks backward to the nearest preceding user-message entry. The returned slice begins at that user entry and ends at the active leaf. This keeps the initiating prompt when compaction happened during a tool continuation.
+When a numeric boundary exists, selection walks backward to the nearest `onurpi-turn-fold-run` entry. The marker's `promptEntryId` moves the start to the persisted user or custom prompt that began the run. A user-message entry remains the fallback for sessions without markers. The returned slice ends at the active leaf.
 
-Several compactions during one user turn naturally resolve to one anchor because the selector returns one continuous branch slice. Entry IDs and branch positions define boundaries. Timestamps are display metadata only. If no user entry precedes a boundary, selection starts at the boundary.
+Turn Fold writes one marker during the first completed turn after a new run starts. Retries before `agent_settled` stay in the same run and do not add markers. The marker carries only version, run ID, prompt entry ID, and start time. It never enters model context.
+
+Several compactions during one run naturally resolve to one anchor because the selector returns one continuous branch slice. Entry IDs and branch positions define boundaries. Timestamps are display metadata only. If no run or user anchor precedes a boundary, selection starts at the compaction.
 
 ## TUI adapter
 
@@ -50,7 +52,7 @@ A hidden component returns before invoking its native Markdown or tool renderer.
 
 ## Configuration
 
-The existing `onurpi-turn-fold-config` custom entry stores a complete object containing `mode` and `windows`. The window value is a positive safe integer or `all`. Entries that do not match the complete shape are ignored, and Turn Fold uses compact mode with three windows.
+The `onurpi-turn-fold-run` custom entry stores the strict run marker used for replay. The existing `onurpi-turn-fold-config` custom entry stores a complete object containing `mode` and `windows`. The window value is a positive safe integer or `all`. Entries that do not match the complete shape are ignored, and Turn Fold uses compact mode with three windows.
 
 A command appends one configuration entry before reloading. Reload restores the latest valid entry on the active branch. Tree navigation applies the same value to the newly selected branch. Turn Fold writes no custom messages, labels, tool metadata, or sidecar files.
 

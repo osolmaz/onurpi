@@ -1,12 +1,14 @@
 # Turn Fold behavior specification
 
-Turn Fold is a display-only transcript compactor for the Pi coding agent. It groups transcript rows into turns and reduces the visible activity without changing Pi's session data or model context.
+Turn Fold is a transcript compactor for the Pi coding agent. It groups transcript rows into settled agent runs and reduces visible activity without changing normal Pi messages or model context. It stores one small custom run-boundary entry for replay, plus its existing explicit configuration entries.
 
 This document defines the required behavior. The README explains how to use the extension. Tests and implementation must conform to this specification.
 
 ## Terms
 
-A **turn** starts with a user message and includes the assistant messages and tool executions that follow it until Pi settles the run. Agent continuations, tool round trips, retries, and provider errors remain in the same turn.
+A **fold run** begins with a user message, including a queued user follow-up, or when an extension starts a custom-prompt agent run after the previous run settled. It includes the assistant messages and tool executions that follow. Tool round trips, automatic retries, compaction retries, and queued steering without a new user message remain together.
+
+A **run boundary** is a `onurpi-turn-fold-run` custom entry containing `version`, `runId`, `promptEntryId`, and `startedAt`. Turn Fold writes it once during the first completed turn in a new fold run. It does not enter model context.
 
 An **activity row** is a visible assistant text or thinking row, or a tool execution row. An assistant shell that contains only tool calls is not an activity row.
 
@@ -22,7 +24,7 @@ A **compaction window** is an active-branch range between compaction entries. Th
 
 ## Display invariants
 
-Turn Fold MUST select the configured number of newest compaction windows before applying compact or expanded rendering. A numeric range starts at the nearest user message before its oldest compaction boundary and continues through the active leaf. `all` selects the complete active branch.
+Turn Fold MUST select the configured number of newest compaction windows before applying compact or expanded rendering. A numeric range starts at the nearest persisted run boundary before its oldest compaction boundary and includes that boundary's prompt entry. A user message remains the fallback anchor for sessions that predate run boundaries. `all` selects the complete active branch.
 
 Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content in both compact and expanded modes. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
@@ -119,7 +121,7 @@ Switching between compact and expanded mode MUST update the existing transcript 
 
 ## History and reload
 
-Turn Fold reconstructs turn groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. Its turn index and Pi's TUI projection MUST use the same entry snapshot.
+Turn Fold reconstructs run groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. It pre-indexes run boundaries so a marker written after a run's first assistant response still anchors the earlier prompt entry. Its run index and Pi's TUI projection MUST use the same entry snapshot.
 
 Changing the window value MUST wait for Pi to become idle before persisting the new value and rebuilding the main transcript. Every value except `all` applies without confirmation. `all` MUST report the active-branch entry count and require confirmation because full replay can slow editor input. Cancellation leaves the existing value and transcript unchanged.
 
@@ -133,9 +135,9 @@ Elapsed time comes from persisted turn completion data when available. User and 
 
 ## State boundaries
 
-Turn Fold changes rendering only. It MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context. Compaction folding MUST NOT append custom entries, custom messages, labels, tool-result metadata, or any other persistent state.
+Turn Fold MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context. Compaction folding MUST NOT append custom messages, labels, tool-result metadata, or sidecar state.
 
-Mode and window changes are the explicit exception and are stored together in Turn Fold custom session entries. The supported modes are exactly `compact` and `expanded`. The window value is a positive safe integer or `all`. Entries that do not match the complete configuration shape are ignored, and the defaults are compact mode with three windows.
+Run boundaries are the first explicit persistence exception. Turn Fold appends exactly one compact `onurpi-turn-fold-run` custom entry for each new fold run, never for retries within the same unsettled run. Mode and window changes are the second exception and are stored together in Turn Fold custom session entries. The supported modes are exactly `compact` and `expanded`. The window value is a positive safe integer or `all`. Entries that do not match the complete configuration shape are ignored, and the defaults are compact mode with three windows.
 
 ## Controls
 
@@ -183,4 +185,7 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Compact diffstats use Pi's addition and deletion colors and remain absent in expanded mode.
 - Every compact diffstat lists unique absolute paths in first-edit order below the summary, shows cumulative colored counters beside each file, truncates long paths so each file fits one row, and escapes terminal controls.
 - Repeated unchanged renders perform no activity sorting or assistant-content rescans.
-- Session messages and model context are unchanged.
+- User-started and extension-started runs replay as separate groups after restart.
+- Each new fold run appends one strict run-boundary entry, while retries append none.
+- A synthetic 4,228-run transcript remains bounded by the configured compaction windows.
+- Normal session messages and model context are unchanged.

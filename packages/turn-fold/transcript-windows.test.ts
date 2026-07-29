@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import {
   ALL_TRANSCRIPT_WINDOWS,
   compactionWindowCount,
@@ -31,6 +32,30 @@ function entry(id: string, type = "custom"): Entry {
     parentId: null,
     timestamp: "2026-07-22T00:00:00.000Z",
     type: "custom",
+  };
+}
+
+function runMarker(id: string, promptEntryId: string): Entry {
+  return {
+    customType: TURN_FOLD_RUN_ENTRY,
+    data: { promptEntryId, runId: `run-${id}`, startedAt: 1, version: 1 },
+    id,
+    parentId: null,
+    timestamp: "2026-07-22T00:00:00.000Z",
+    type: "custom",
+  };
+}
+
+function customMessage(id: string): Entry {
+  return {
+    content: id,
+    customType: "goal",
+    details: {},
+    display: true,
+    id,
+    parentId: null,
+    timestamp: "2026-07-22T00:00:00.000Z",
+    type: "custom_message",
   };
 }
 
@@ -107,7 +132,26 @@ describe("transcript window selection", () => {
     ]);
   });
 
-  it("starts at the boundary when no preceding user exists", () => {
+  it("anchors extension-started runs at their persisted prompt", () => {
+    const branch = [
+      user("old-user"),
+      entry("old-answer"),
+      customMessage("goal-prompt"),
+      entry("goal-answer"),
+      runMarker("goal-run", "goal-prompt"),
+      entry("c1", "compaction"),
+      entry("after"),
+    ];
+    expect(ids(selectTranscriptEntries(branch, 1))).toEqual([
+      "goal-prompt",
+      "goal-answer",
+      "goal-run",
+      "c1",
+      "after",
+    ]);
+  });
+
+  it("starts at the compaction when no run anchor exists", () => {
     const branch = [entry("custom"), entry("c1", "compaction"), entry("after")];
     expect(ids(selectTranscriptEntries(branch, 1))).toEqual(["c1", "after"]);
   });

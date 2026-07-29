@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import turnFold from "./index.ts";
+import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 const renderPatchMock = vi.hoisted(() => ({ states: [] as unknown[] }));
@@ -199,6 +200,54 @@ describe("Turn Fold extension compaction state", () => {
 
     expect(appendEntry).not.toHaveBeenCalled();
     await emit(handlers, "session_shutdown", { reason: "quit", type: "session_shutdown" }, ctx);
+  });
+});
+
+describe("Turn Fold persisted run boundaries", () => {
+  it("writes one compact marker after the first settled turn and not for retries", async () => {
+    const extension = extensionHarness();
+    const branch: unknown[] = [];
+    const ctx = context([], branch);
+    turnFold(extension.pi);
+
+    await emit(
+      extension.handlers,
+      "session_start",
+      { reason: "startup", type: "session_start" },
+      ctx,
+    );
+    await emit(extension.handlers, "agent_start", { type: "agent_start" }, ctx);
+    await emit(
+      extension.handlers,
+      "message_start",
+      { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message_start" },
+      ctx,
+    );
+    branch.push(
+      {
+        id: "prompt",
+        message: { content: "Prompt", role: "user", timestamp: 100 },
+        type: "message",
+      },
+      {
+        id: "answer",
+        message: { content: [{ text: "Done", type: "text" }], role: "assistant", timestamp: 110 },
+        type: "message",
+      },
+    );
+    await emit(extension.handlers, "turn_end", { toolResults: [], type: "turn_end" }, ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledTimes(1);
+    expect(extension.appendEntry.mock.calls[0]?.[0]).toBe(TURN_FOLD_RUN_ENTRY);
+    const boundaryData: unknown = extension.appendEntry.mock.calls[0]?.[1];
+    expect(parseRunBoundary(boundaryData)).toMatchObject({
+      promptEntryId: "prompt",
+      version: 1,
+    });
+
+    await emit(extension.handlers, "agent_start", { type: "agent_start" }, ctx);
+    await emit(extension.handlers, "turn_end", { toolResults: [], type: "turn_end" }, ctx);
+    expect(extension.appendEntry).toHaveBeenCalledTimes(1);
   });
 });
 

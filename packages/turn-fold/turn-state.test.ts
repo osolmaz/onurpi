@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 const TEST_WORKING_DIRECTORY = resolve("/workspace/project");
@@ -576,6 +577,54 @@ describe("historical transcript", () => {
 
     expect(state.userTimestampFor(first)).toBe(100);
     expect(state.userTimestampFor(second)).toBe(200);
+  });
+
+  it("reconstructs extension-started runs from persisted boundaries", () => {
+    const state = new TurnFoldState();
+    const first = assistantMessage(110, [{ text: "First", type: "text" }]);
+    const second = assistantMessage(210, [{ text: "Second", type: "text" }]);
+    const firstComponent = {};
+    const secondComponent = {};
+
+    state.loadHistory([
+      {
+        content: "Continue",
+        customType: "pi-goal-event",
+        details: { kind: "continuation" },
+        display: true,
+        id: "goal-prompt-1",
+        timestamp: new Date(100).toISOString(),
+        type: "custom_message",
+      },
+      { id: "goal-answer-1", message: first, type: "message" },
+      {
+        customType: TURN_FOLD_RUN_ENTRY,
+        data: { promptEntryId: "goal-prompt-1", runId: "goal-run-1", startedAt: 100, version: 1 },
+        id: "boundary-1",
+        type: "custom",
+      },
+      {
+        content: "Continue",
+        customType: "pi-goal-event",
+        details: { kind: "continuation" },
+        display: true,
+        id: "goal-prompt-2",
+        timestamp: new Date(200).toISOString(),
+        type: "custom_message",
+      },
+      { id: "goal-answer-2", message: second, type: "message" },
+      {
+        customType: TURN_FOLD_RUN_ENTRY,
+        data: { promptEntryId: "goal-prompt-2", runId: "goal-run-2", startedAt: 200, version: 1 },
+        id: "boundary-2",
+        type: "custom",
+      },
+    ]);
+    state.associateAssistant(firstComponent, first);
+    state.associateAssistant(secondComponent, second);
+
+    expect(state.viewFor(firstComponent)?.display).toBe("settled-summary-final");
+    expect(state.viewFor(secondComponent)?.display).toBe("settled-summary-final");
   });
 
   it("reconstructs turns and keeps each last assistant response", () => {

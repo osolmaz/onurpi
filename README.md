@@ -7,7 +7,8 @@ configuration.
 
 | Package                                                            | Purpose                                                          |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and turn-level folding                 |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and run-level folding                  |
+| [`@onurpi/goal`](packages/goal/)                                   | Bounded autonomous goals with no-progress circuit breakers       |
 | [`@onurpi/live-stats`](packages/live-stats/)                       | Shimmering Turkish working messages with live response metrics   |
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                          |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
@@ -64,11 +65,11 @@ npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
 ```
 
 An entry counts as belonging to this repo when it points into the main checkout, into an
-`onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced npm sources for
-Unified Exec and Codex Usage are also treated as repo-owned so they cannot coexist with the vendored
-packages. Those entries are replaced with one canonical `../../repos/onurpi/packages/<name>` entry
-per registered extension or theme package. External entries (npm packages, other git repos) and all
-other settings pass through untouched.
+`onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced sources for Goal,
+Unified Exec, and Codex Usage are also treated as repo-owned so they cannot coexist with the
+vendored packages. Those entries are replaced with one canonical
+`../../repos/onurpi/packages/<name>` entry per registered extension or theme package. External
+entries (npm packages, other git repos) and all other settings pass through untouched.
 
 Unified Exec replaces Pi's built-in `bash` tool and the old `shell-execution-policy` package. Its
 attachment windows stay bounded, while the underlying session remains alive until it exits, is

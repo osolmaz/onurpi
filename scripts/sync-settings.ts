@@ -20,6 +20,8 @@ const trackedSettingsPath = join(repoRoot, "settings.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
 const REPLACED_PACKAGE_SOURCES = [
+  /^git:github\.com\/Michaelliv\/pi-goal(?:@.*)?$/,
+  /^npm:pi-goal(?:@.*)?$/,
   /^npm:pi-unified-exec(?:@.*)?$/,
   /^npm:@narumitw\/pi-codex-usage(?:@.*)?$/,
   /^npm:pi-huggingface-oauth(?:@.*)?$/,
