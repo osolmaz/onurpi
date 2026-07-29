@@ -19,13 +19,11 @@
       "dest": "packages/goal",
       "source": {
         "url": "https://github.com/Michaelliv/pi-goal.git",
-        "ref": "3f100be5434454d3388755a119d01caca9127c16",
+        "ref": "main",
         "subdir": ".pi/extensions/pi-goal"
       },
       "commit": "3f100be5434454d3388755a119d01caca9127c16",
-      "notes": [
-        "Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."
-      ]
+      "notes": ["Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."]
     },
     {
       "name": "nyan-mode",
