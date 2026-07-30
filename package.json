@@ -42,7 +42,7 @@
     "pi-huggingface-oauth": "0.1.1",
     "pi-must-win": "0.2.0",
     "pi-regraft": "0.2.0",
-    "@osolmaz/regrafter": "github:osolmaz/regrafter#8d3011e1a3568637cdd173acd665ca1f9d1030df",
+    "@osolmaz/regrafter": "https://github.com/osolmaz/regrafter/releases/download/v0.1.0/osolmaz-regrafter-0.1.0.tgz",
     "pi-workflows": "https://codeload.github.com/osolmaz/pi-workflows/tar.gz/630622e44fcd486690b6bcb923b4d18dc516723e"
   },
   "bundledDependencies": [

@@ -32,7 +32,7 @@ Their source remains in the original repositories.
 | Hugging Face OAuth | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | Pi Must Win        | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) 0.2.0                   |
 | Pi Regraft         | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) 0.2.0                     |
-| Regrafter          | [`osolmaz/regrafter`](https://github.com/osolmaz/regrafter) at `8d3011e`                |
+| Regrafter          | [`osolmaz/regrafter`](https://github.com/osolmaz/regrafter) 0.1.0                       |
 | Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `630622e`          |
 | Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
