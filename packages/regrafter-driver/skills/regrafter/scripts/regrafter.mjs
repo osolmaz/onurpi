@@ -1,8 +1,4 @@
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import process from "node:process";
+import { runCli } from "pi-regraft/regrafter/cli";
 
-const require = createRequire(import.meta.url);
-const packageEntry = require.resolve("@osolmaz/regrafter");
-const cli = join(dirname(packageEntry), "cli-main.js");
-await import(pathToFileURL(cli).href);
+process.exitCode = await runCli(process.argv.slice(2));
