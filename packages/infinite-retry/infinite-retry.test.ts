@@ -3,12 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   calculateRetryDelayMs,
+  hideInfiniteRetryDenominator,
+  installInfiniteRetryIndicatorPatch,
   installInfiniteRetryPatch,
+  loadPiRetryStatusIndicatorPrototype,
   MAX_RETRY_DELAY_MS,
   MINIMUM_PI_VERSION,
   type InfiniteRetryPatchLease,
+  type RetryIndicatorPatchLease,
   type RetryStatus,
 } from "./infinite-retry.ts";
+import { formatRetryStatusLabel } from "./index.ts";
 
 type RetrySettings = { enabled: boolean; maxRetries: number; baseDelayMs: number };
 
@@ -18,6 +23,16 @@ type FakeAssistant = {
   errorMessage?: string;
   retryable?: boolean;
 };
+
+class FakeRetryIndicatorBase {
+  text: unknown;
+
+  setText(text: unknown): void {
+    this.text = text;
+  }
+}
+
+class FakeRetryIndicator extends FakeRetryIndicatorBase {}
 
 class FakeAgentSession {
   readonly agent = { state: { messages: [] as unknown[] } };
@@ -51,9 +66,11 @@ class FakeAgentSession {
 }
 
 const leases: InfiniteRetryPatchLease[] = [];
+const indicatorLeases: RetryIndicatorPatchLease[] = [];
 
 afterEach(() => {
   for (const lease of leases.splice(0).reverse()) lease.release();
+  for (const lease of indicatorLeases.splice(0).reverse()) lease.release();
   vi.useRealTimers();
 });
 
@@ -64,6 +81,17 @@ function install(maxDelayMs = MAX_RETRY_DELAY_MS): InfiniteRetryPatchLease {
     runtimeVersion: MINIMUM_PI_VERSION,
   });
   leases.push(lease);
+  return lease;
+}
+
+function installIndicator(
+  prototype: object = FakeRetryIndicator.prototype,
+): RetryIndicatorPatchLease {
+  const lease = installInfiniteRetryIndicatorPatch({
+    prototype,
+    runtimeVersion: MINIMUM_PI_VERSION,
+  });
+  indicatorLeases.push(lease);
   return lease;
 }
 
@@ -98,6 +126,78 @@ describe("calculateRetryDelayMs", () => {
     expect(() => calculateRetryDelayMs(-1, 1, MAX_RETRY_DELAY_MS)).toThrow("retry base delay");
     expect(() => calculateRetryDelayMs(1, 0, MAX_RETRY_DELAY_MS)).toThrow("retry attempt");
     expect(() => calculateRetryDelayMs(1, 1, Number.POSITIVE_INFINITY)).toThrow("retry delay cap");
+  });
+});
+
+describe("infinite retry indicator", () => {
+  it("removes only the infinite retry denominator", () => {
+    const infinite = `Retrying (2/${String(Number.MAX_SAFE_INTEGER)}) in 4s...`;
+    expect(hideInfiniteRetryDenominator(infinite)).toBe("Retrying (2) in 4s...");
+    expect(hideInfiniteRetryDenominator("Retrying (2/3) in 4s...")).toBe("Retrying (2/3) in 4s...");
+    expect(
+      formatRetryStatusLabel({ state: "waiting", attempt: 2, delayMs: 4_000, dueAt: 5_000 }, 1_000),
+    ).toBe("retry 2 in 4s · Alt+R now");
+  });
+
+  it("patches inherited setText calls and restores the prototype", () => {
+    const original: unknown = Reflect.get(FakeRetryIndicator.prototype, "setText");
+    expect(Object.hasOwn(FakeRetryIndicator.prototype, "setText")).toBe(false);
+    const lease = installIndicator();
+    const indicator = new FakeRetryIndicator();
+
+    indicator.setText(`Retrying (7/${String(Number.MAX_SAFE_INTEGER)}) in 10m...`);
+    expect(indicator.text).toBe("Retrying (7) in 10m...");
+    callSetText(indicator, 42);
+    expect(indicator.text).toBe(42);
+
+    lease.release();
+    expect(Object.hasOwn(FakeRetryIndicator.prototype, "setText")).toBe(false);
+    expect(Reflect.get(FakeRetryIndicator.prototype, "setText")).toBe(original);
+
+    const ownDescriptor = Object.getOwnPropertyDescriptor(
+      FakeRetryIndicatorBase.prototype,
+      "setText",
+    );
+    const ownLease = installIndicator(FakeRetryIndicatorBase.prototype);
+    ownLease.release();
+    expect(Object.getOwnPropertyDescriptor(FakeRetryIndicatorBase.prototype, "setText")).toEqual(
+      ownDescriptor,
+    );
+  });
+
+  it("shares one wrapper and rejects conflicting or locked prototypes", () => {
+    const first = installIndicator();
+    const patched: unknown = Reflect.get(FakeRetryIndicator.prototype, "setText");
+    const second = installIndicator();
+    expect(Reflect.get(FakeRetryIndicator.prototype, "setText")).toBe(patched);
+
+    class OtherRetryIndicator extends FakeRetryIndicatorBase {}
+    expect(() => installIndicator(OtherRetryIndicator.prototype)).toThrow(
+      "already installed on a different RetryStatusIndicator prototype",
+    );
+
+    first.release();
+    expect(Reflect.get(FakeRetryIndicator.prototype, "setText")).toBe(patched);
+    second.release();
+    expect(Object.hasOwn(FakeRetryIndicator.prototype, "setText")).toBe(false);
+
+    class LockedRetryIndicator extends FakeRetryIndicatorBase {}
+    Object.preventExtensions(LockedRetryIndicator.prototype);
+    expect(() => installIndicator(LockedRetryIndicator.prototype)).toThrow(
+      "setText() is not patchable",
+    );
+  });
+
+  it("loads, patches, and restores the current Pi retry indicator", async () => {
+    const prototype = await loadPiRetryStatusIndicatorPrototype();
+    const original: unknown = Reflect.get(prototype, "setText");
+    const hadOwnMethod = Object.hasOwn(prototype, "setText");
+    const lease = installIndicator(prototype);
+
+    expect(Reflect.get(prototype, "setText")).not.toBe(original);
+    lease.release();
+    expect(Object.hasOwn(prototype, "setText")).toBe(hadOwnMethod);
+    expect(Reflect.get(prototype, "setText")).toBe(original);
   });
 });
 
@@ -344,6 +444,12 @@ describe("patched retry behavior", () => {
     expect(session._retryAttempt).toBe(0);
   });
 });
+
+function callSetText(indicator: object, text: unknown): void {
+  const method: unknown = Reflect.get(indicator, "setText");
+  if (typeof method !== "function") throw new Error("Missing test setText() method");
+  Reflect.apply(method, indicator, [text]);
+}
 
 function methodValue(prototype: object, name: string): unknown {
   return Object.getOwnPropertyDescriptor(prototype, name)?.value;

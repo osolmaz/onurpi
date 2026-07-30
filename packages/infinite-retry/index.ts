@@ -1,22 +1,31 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import {
+  installInfiniteRetryIndicatorPatch,
   installInfiniteRetryPatch,
+  loadPiRetryStatusIndicatorPrototype,
   type InfiniteRetryPatchLease,
+  type RetryIndicatorPatchLease,
   type RetryStatus,
 } from "./infinite-retry.ts";
 
 const STATUS_ID = "infinite-retry";
 
-export default function infiniteRetry(pi: ExtensionAPI): void {
+export default async function infiniteRetry(pi: ExtensionAPI): Promise<void> {
   let lease: InfiniteRetryPatchLease | undefined;
+  let indicatorLease: RetryIndicatorPatchLease | undefined;
   let startupError: Error | undefined;
   let context: ExtensionContext | undefined;
   let countdownTimer: NodeJS.Timeout | undefined;
 
   try {
+    const retryIndicatorPrototype = await loadPiRetryStatusIndicatorPrototype();
+    indicatorLease = installInfiniteRetryIndicatorPatch({
+      prototype: retryIndicatorPrototype,
+    });
     lease = installInfiniteRetryPatch();
   } catch (error) {
+    indicatorLease?.release();
     startupError = error instanceof Error ? error : new Error(String(error));
   }
 
@@ -50,6 +59,7 @@ export default function infiniteRetry(pi: ExtensionAPI): void {
     context = undefined;
     removeReporter?.();
     lease?.release();
+    indicatorLease?.release();
   });
 
   pi.registerShortcut("alt+r", {
@@ -116,8 +126,15 @@ function updateStatus(ctx: ExtensionContext | undefined, status: RetryStatus): v
     ctx.ui.setStatus(STATUS_ID, undefined);
     return;
   }
-  const label = `retry ${String(status.attempt)}/∞ in ${formatDuration(remainingMs(status))} · Alt+R now`;
-  ctx.ui.setStatus(STATUS_ID, ctx.ui.theme.fg("warning", label));
+  ctx.ui.setStatus(STATUS_ID, ctx.ui.theme.fg("warning", formatRetryStatusLabel(status)));
+}
+
+export function formatRetryStatusLabel(
+  status: Extract<RetryStatus, { state: "waiting" }>,
+  now = Date.now(),
+): string {
+  const remaining = Math.max(0, status.dueAt - now);
+  return `retry ${String(status.attempt)} in ${formatDuration(remaining)} · Alt+R now`;
 }
 
 function remainingMs(status: Extract<RetryStatus, { state: "waiting" }>): number {

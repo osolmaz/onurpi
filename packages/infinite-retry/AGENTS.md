@@ -3,7 +3,8 @@
 - This package is an explicitly authorized private-runtime patch. Pi 0.82.1 is the minimum audited
   baseline, and Pi 0.83.0 has the same retry contract. Newer versions may load only when the private
   method shape still matches; review retry changes and rerun live lifecycle tests after upgrades.
-- Patch only `AgentSession._prepareRetry()` and `AgentSession._willRetryAfterAgentEnd()`.
+- Patch only `AgentSession._prepareRetry()`, `AgentSession._willRetryAfterAgentEnd()`, and the
+  inherited `RetryStatusIndicator.setText()` method.
 - Keep Pi's existing retry classifier, continuation path, events, assistant-error persistence, and
   Escape cancellation behavior.
 - Do not append session messages or custom entries, change schemas, write sidecar state, or patch
@@ -11,6 +12,8 @@
 - Backoff must use overflow-safe saturation and remain capped at 600,000 milliseconds.
 - A retry-now action may wake a pending wait but must never abort or duplicate an active provider
   request.
+- Hide the finite retry-count denominator only when it equals the Infinite Retry sentinel. Preserve
+  ordinary finite retry labels.
 - Prototype changes must be idempotent, reversible, and restored during session shutdown.
 - Fail closed on Pi versions older than the audited baseline or private-runtime shape mismatches.
 - Add or update tests for every behavior change.

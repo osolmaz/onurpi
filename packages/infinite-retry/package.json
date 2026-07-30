@@ -1,6 +1,6 @@
 {
   "name": "@onurpi/infinite-retry",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Contract-checked infinite retries with manual wake for Pi 0.82.1 and newer",
   "type": "module",

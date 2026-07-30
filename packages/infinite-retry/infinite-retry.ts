@@ -1,10 +1,15 @@
 import { AgentSession, VERSION } from "@earendil-works/pi-coding-agent";
+import { findPackageJSON } from "node:module";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export const MINIMUM_PI_VERSION = "0.82.1";
 export const MAX_RETRY_DELAY_MS = 600_000;
 const INFINITE_ATTEMPTS = Number.MAX_SAFE_INTEGER;
+const INFINITE_ATTEMPT_SUFFIX = `/${String(INFINITE_ATTEMPTS)})`;
 const PREPARE_RETRY_METHOD = "_prepareRetry";
 const WILL_RETRY_METHOD = "_willRetryAfterAgentEnd";
+const RETRY_INDICATOR_SET_TEXT_METHOD = "setText";
 
 export type RetryStatus =
   | { state: "idle" }
@@ -24,9 +29,20 @@ type PatchRegistry = {
   wait: RetryWait | undefined;
 };
 
+type OneArgumentMethod = (this: unknown, argument: unknown) => unknown;
+
+type RetryIndicatorPatchRegistry = {
+  prototype: object;
+  ownSetTextDescriptor: PropertyDescriptor | undefined;
+  originalSetText: OneArgumentMethod;
+  patchedSetText: OneArgumentMethod;
+  leases: number;
+};
+
 declare global {
-  // The global registry prevents duplicate prototype wrappers when Pi loads the package twice.
+  // The global registries prevent duplicate prototype wrappers when Pi loads the package twice.
   var onurPiInfiniteRetryPatchV1: PatchRegistry | undefined;
+  var onurPiInfiniteRetryIndicatorPatchV1: RetryIndicatorPatchRegistry | undefined;
 }
 
 export type InfiniteRetryPatchLease = {
@@ -39,6 +55,15 @@ export type InfiniteRetryPatchLease = {
 export type InfiniteRetryPatchOptions = {
   maxDelayMs?: number;
   prototype?: object;
+  runtimeVersion?: string;
+};
+
+export type RetryIndicatorPatchLease = {
+  release(): void;
+};
+
+export type RetryIndicatorPatchOptions = {
+  prototype: object;
   runtimeVersion?: string;
 };
 
@@ -112,6 +137,87 @@ function assertPositiveInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 1) {
     throw new Error(`Invalid ${label}: ${String(value)}`);
   }
+}
+
+export async function loadPiRetryStatusIndicatorPrototype(): Promise<object> {
+  const packageJsonPath = findPackageJSON("@earendil-works/pi-coding-agent", import.meta.url);
+  if (packageJsonPath === undefined) {
+    throw new Error(`Pi ${VERSION} retry indicator contract mismatch: package not found`);
+  }
+  const indicatorModuleUrl = pathToFileURL(
+    join(dirname(packageJsonPath), "dist/modes/interactive/components/status-indicator.js"),
+  );
+  const importedModule: unknown = await import(indicatorModuleUrl.href);
+  const moduleRecord = requireRecord(
+    importedModule,
+    `Pi ${VERSION} retry indicator contract mismatch: invalid module`,
+  );
+  const constructor = moduleRecord["RetryStatusIndicator"];
+  if (typeof constructor !== "function") {
+    throw new Error(
+      `Pi ${VERSION} retry indicator contract mismatch: missing RetryStatusIndicator`,
+    );
+  }
+  const prototype = requireRecord(
+    Reflect.get(constructor, "prototype"),
+    `Pi ${VERSION} retry indicator contract mismatch: invalid RetryStatusIndicator prototype`,
+  );
+  requireCallableMethod(prototype, RETRY_INDICATOR_SET_TEXT_METHOD, 1, VERSION);
+  return prototype;
+}
+
+export function installInfiniteRetryIndicatorPatch(
+  options: RetryIndicatorPatchOptions,
+): RetryIndicatorPatchLease {
+  const runtimeVersion = options.runtimeVersion ?? VERSION;
+  assertSupportedPiVersion(runtimeVersion);
+
+  const prototype = options.prototype;
+  let registry = globalThis.onurPiInfiniteRetryIndicatorPatchV1;
+  if (registry !== undefined) {
+    if (registry.prototype !== prototype) {
+      throw new Error(
+        "Infinite Retry indicator is already installed on a different RetryStatusIndicator prototype",
+      );
+    }
+    registry.leases += 1;
+    return createRetryIndicatorLease(registry);
+  }
+
+  const ownSetTextDescriptor = Object.getOwnPropertyDescriptor(
+    prototype,
+    RETRY_INDICATOR_SET_TEXT_METHOD,
+  );
+  assertPatchableRetryIndicator(prototype, ownSetTextDescriptor, runtimeVersion);
+  const originalSetText = requireCallableMethod(
+    prototype,
+    RETRY_INDICATOR_SET_TEXT_METHOD,
+    1,
+    runtimeVersion,
+  );
+  const patchedSetText: OneArgumentMethod = function (this: unknown, text: unknown): unknown {
+    const visibleText = typeof text === "string" ? hideInfiniteRetryDenominator(text) : text;
+    return Reflect.apply(originalSetText, this, [visibleText]);
+  };
+  registry = {
+    prototype,
+    ownSetTextDescriptor,
+    originalSetText,
+    patchedSetText,
+    leases: 1,
+  };
+  Object.defineProperty(prototype, RETRY_INDICATOR_SET_TEXT_METHOD, {
+    configurable: true,
+    enumerable: ownSetTextDescriptor?.enumerable ?? false,
+    value: patchedSetText,
+    writable: true,
+  });
+  globalThis.onurPiInfiniteRetryIndicatorPatchV1 = registry;
+  return createRetryIndicatorLease(registry);
+}
+
+export function hideInfiniteRetryDenominator(text: string): string {
+  return text.replace(INFINITE_ATTEMPT_SUFFIX, ")");
 }
 
 export function installInfiniteRetryPatch(
@@ -230,6 +336,38 @@ function installMethods(registry: PatchRegistry, maxDelayMs: number): void {
   });
 }
 
+function createRetryIndicatorLease(
+  registry: RetryIndicatorPatchRegistry,
+): RetryIndicatorPatchLease {
+  let released = false;
+  return {
+    release: () => {
+      if (released) return;
+      released = true;
+      registry.leases -= 1;
+      if (registry.leases > 0) return;
+      const current = Object.getOwnPropertyDescriptor(
+        registry.prototype,
+        RETRY_INDICATOR_SET_TEXT_METHOD,
+      );
+      if (current?.value === registry.patchedSetText) {
+        if (registry.ownSetTextDescriptor === undefined) {
+          Reflect.deleteProperty(registry.prototype, RETRY_INDICATOR_SET_TEXT_METHOD);
+        } else {
+          Object.defineProperty(
+            registry.prototype,
+            RETRY_INDICATOR_SET_TEXT_METHOD,
+            registry.ownSetTextDescriptor,
+          );
+        }
+      }
+      if (globalThis.onurPiInfiniteRetryIndicatorPatchV1 === registry) {
+        globalThis.onurPiInfiniteRetryIndicatorPatchV1 = undefined;
+      }
+    },
+  };
+}
+
 function createLease(registry: PatchRegistry): InfiniteRetryPatchLease {
   let released = false;
   return {
@@ -291,6 +429,41 @@ function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
     if (difference !== 0) return difference;
   }
   return 0;
+}
+
+function assertPatchableRetryIndicator(
+  prototype: object,
+  ownDescriptor: PropertyDescriptor | undefined,
+  runtimeVersion: string,
+): void {
+  if (ownDescriptor === undefined) {
+    if (!Object.isExtensible(prototype)) {
+      throw new Error(
+        `Pi ${runtimeVersion} retry indicator contract mismatch: setText() is not patchable`,
+      );
+    }
+    return;
+  }
+  if (ownDescriptor.configurable !== true || ownDescriptor.writable !== true) {
+    throw new Error(
+      `Pi ${runtimeVersion} retry indicator contract mismatch: setText() is not patchable`,
+    );
+  }
+}
+
+function requireCallableMethod(
+  prototype: object,
+  name: string,
+  arity: number,
+  runtimeVersion: string,
+): OneArgumentMethod {
+  const method: unknown = Reflect.get(prototype, name);
+  if (typeof method !== "function" || method.length !== arity) {
+    throw new Error(
+      `Pi ${runtimeVersion} retry indicator contract mismatch: expected ${name}() with ${String(arity)} parameter(s)`,
+    );
+  }
+  return method as OneArgumentMethod;
 }
 
 function requirePatchableMethodDescriptor(
