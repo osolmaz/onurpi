@@ -22,8 +22,11 @@ maintenance request should be delegated to the installed dedicated app.
 4. Start the run and parse its JSON result:
 
 ```bash
-node <driver> start --repo /path/to/repository --request-file /tmp/task.md --allow commits --json
+node <driver> start --repo /path/to/repository --request-file /tmp/task.md --json
 ```
+
+This baseline grants no overlay commits, pushes, or pull requests. Append `--allow` with only the
+permissions the user authorized.
 
 Delete the temporary request file after the command reads it. While the run owns the repository
 lease, treat the target worktree as read-only. Do not edit, stage, commit, reset, clean, or run

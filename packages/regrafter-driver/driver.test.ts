@@ -12,6 +12,8 @@ it("keeps delegation explicit and preserves repository ownership", () => {
   expect(skill).toContain("Silence does not approve");
   expect(skill).toContain("same run id");
   expect(skill).toContain("Abort does not reset files");
+  expect(skill).toContain("baseline grants no overlay commits");
+  expect(skill).not.toContain("--allow commits --json");
 });
 
 it("uses only the Regrafter controller surface", () => {
