@@ -1,6 +1,6 @@
 import { AgentSession, VERSION } from "@earendil-works/pi-coding-agent";
 
-export const SUPPORTED_PI_VERSION = "0.82.1";
+export const MINIMUM_PI_VERSION = "0.82.1";
 export const MAX_RETRY_DELAY_MS = 600_000;
 const INFINITE_ATTEMPTS = Number.MAX_SAFE_INTEGER;
 const PREPARE_RETRY_METHOD = "_prepareRetry";
@@ -118,11 +118,7 @@ export function installInfiniteRetryPatch(
   options: InfiniteRetryPatchOptions = {},
 ): InfiniteRetryPatchLease {
   const runtimeVersion = options.runtimeVersion ?? VERSION;
-  if (runtimeVersion !== SUPPORTED_PI_VERSION) {
-    throw new Error(
-      `Infinite Retry supports Pi ${SUPPORTED_PI_VERSION}; found ${runtimeVersion}. Review the private retry contract before enabling it.`,
-    );
-  }
+  assertSupportedPiVersion(runtimeVersion);
 
   const prototype = options.prototype ?? AgentSession.prototype;
   const maxDelayMs = options.maxDelayMs ?? MAX_RETRY_DELAY_MS;
@@ -137,8 +133,20 @@ export function installInfiniteRetryPatch(
     return createLease(registry);
   }
 
-  const prepareDescriptor = requireMethodDescriptor(prototype, PREPARE_RETRY_METHOD);
-  const willRetryDescriptor = requireMethodDescriptor(prototype, WILL_RETRY_METHOD);
+  const prepareDescriptor = requirePatchableMethodDescriptor(
+    prototype,
+    PREPARE_RETRY_METHOD,
+    1,
+    runtimeVersion,
+  );
+  const willRetryDescriptor = requirePatchableMethodDescriptor(
+    prototype,
+    WILL_RETRY_METHOD,
+    1,
+    runtimeVersion,
+  );
+  requireMethod(prototype, "_isRetryableError", 1, runtimeVersion);
+  requireMethod(prototype, "abortRetry", 0, runtimeVersion);
   registry = {
     prototype,
     prepareDescriptor,
@@ -159,7 +167,7 @@ function installMethods(registry: PatchRegistry, maxDelayMs: number): void {
     const settings = readRetrySettings(this);
     if (!settings.enabled) return false;
 
-    const attempt = readNumber(this, "_retryAttempt") + 1;
+    const attempt = Math.min(readNumber(this, "_retryAttempt") + 1, INFINITE_ATTEMPTS);
     writeField(this, "_retryAttempt", attempt);
     const delayMs = calculateRetryDelayMs(settings.baseDelayMs, attempt, maxDelayMs);
     emit(this, {
@@ -257,14 +265,58 @@ function report(registry: PatchRegistry, status: RetryStatus): void {
   for (const reporter of registry.reporters) reporter(status);
 }
 
-function requireMethodDescriptor(prototype: object, name: string): PropertyDescriptor {
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
-  if (descriptor === undefined || typeof descriptor.value !== "function") {
-    throw new Error(`Pi ${SUPPORTED_PI_VERSION} retry contract mismatch: missing ${name}()`);
-  }
-  if (descriptor.configurable !== true || descriptor.writable !== true) {
+function assertSupportedPiVersion(runtimeVersion: string): void {
+  const runtime = parsePiVersion(runtimeVersion);
+  const minimum = parsePiVersion(MINIMUM_PI_VERSION);
+  if (runtime === undefined || minimum === undefined || compareVersions(runtime, minimum) < 0) {
     throw new Error(
-      `Pi ${SUPPORTED_PI_VERSION} retry contract mismatch: ${name}() is not patchable`,
+      `Infinite Retry requires Pi ${MINIMUM_PI_VERSION} or newer with the compatible private retry contract; found ${runtimeVersion}.`,
+    );
+  }
+}
+
+type ParsedVersion = readonly [major: number, minor: number, patch: number];
+
+function parsePiVersion(version: string): ParsedVersion | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?$/.exec(version);
+  if (match === null) return undefined;
+  const parsed = match.slice(1, 4).map(Number);
+  if (parsed.some((part) => !Number.isSafeInteger(part))) return undefined;
+  return [parsed[0] ?? 0, parsed[1] ?? 0, parsed[2] ?? 0];
+}
+
+function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
+  for (let index = 0; index < left.length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function requirePatchableMethodDescriptor(
+  prototype: object,
+  name: string,
+  arity: number,
+  runtimeVersion: string,
+): PropertyDescriptor {
+  const descriptor = requireMethod(prototype, name, arity, runtimeVersion);
+  if (descriptor.configurable !== true || descriptor.writable !== true) {
+    throw new Error(`Pi ${runtimeVersion} retry contract mismatch: ${name}() is not patchable`);
+  }
+  return descriptor;
+}
+
+function requireMethod(
+  prototype: object,
+  name: string,
+  arity: number,
+  runtimeVersion: string,
+): PropertyDescriptor {
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+  const method: unknown = descriptor?.value;
+  if (descriptor === undefined || typeof method !== "function" || method.length !== arity) {
+    throw new Error(
+      `Pi ${runtimeVersion} retry contract mismatch: expected ${name}() with ${String(arity)} parameter(s)`,
     );
   }
   return descriptor;
@@ -320,7 +372,7 @@ function callMethod(value: unknown, name: string, ...arguments_: unknown[]): unk
 function readNumber(value: unknown, name: string): number {
   const record = requireRecord(value, `Pi retry contract mismatch: missing ${name}`);
   const field = record[name];
-  if (typeof field !== "number" || !Number.isInteger(field) || field < 0) {
+  if (typeof field !== "number" || !Number.isSafeInteger(field) || field < 0) {
     throw new Error(`Pi retry contract mismatch: invalid ${name}`);
   }
   return field;

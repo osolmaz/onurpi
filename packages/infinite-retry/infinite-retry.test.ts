@@ -1,10 +1,11 @@
+import { AgentSession, VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   calculateRetryDelayMs,
   installInfiniteRetryPatch,
   MAX_RETRY_DELAY_MS,
-  SUPPORTED_PI_VERSION,
+  MINIMUM_PI_VERSION,
   type InfiniteRetryPatchLease,
   type RetryStatus,
 } from "./infinite-retry.ts";
@@ -60,7 +61,7 @@ function install(maxDelayMs = MAX_RETRY_DELAY_MS): InfiniteRetryPatchLease {
   const lease = installInfiniteRetryPatch({
     maxDelayMs,
     prototype: FakeAgentSession.prototype,
-    runtimeVersion: SUPPORTED_PI_VERSION,
+    runtimeVersion: MINIMUM_PI_VERSION,
   });
   leases.push(lease);
   return lease;
@@ -68,6 +69,14 @@ function install(maxDelayMs = MAX_RETRY_DELAY_MS): InfiniteRetryPatchLease {
 
 function error(message = "Codex error: You can retry your request"): FakeAssistant {
   return { role: "assistant", stopReason: "error", errorMessage: message, retryable: true };
+}
+
+function oneArgumentMethod(value: unknown): boolean {
+  return value !== undefined;
+}
+
+function zeroArgumentMethod(): void {
+  return undefined;
 }
 
 describe("calculateRetryDelayMs", () => {
@@ -93,28 +102,78 @@ describe("calculateRetryDelayMs", () => {
 });
 
 describe("installInfiniteRetryPatch", () => {
-  it("rejects unsupported Pi versions and incompatible prototypes", () => {
-    expect(() =>
-      installInfiniteRetryPatch({
-        prototype: FakeAgentSession.prototype,
-        runtimeVersion: "0.82.2",
-      }),
-    ).toThrow("supports Pi 0.82.1");
-    expect(() =>
-      installInfiniteRetryPatch({ prototype: {}, runtimeVersion: SUPPORTED_PI_VERSION }),
-    ).toThrow("missing _prepareRetry");
+  it("patches and restores the current development Pi runtime", () => {
+    expect(VERSION).toBe("0.83.0");
+    const original = methodValue(AgentSession.prototype, "_prepareRetry");
+    const lease = installInfiniteRetryPatch();
+    leases.push(lease);
 
-    const lockedPrototype = {};
-    Object.defineProperty(lockedPrototype, "_prepareRetry", { value: () => false });
-    Object.defineProperty(lockedPrototype, "_willRetryAfterAgentEnd", { value: () => false });
+    expect(methodValue(AgentSession.prototype, "_prepareRetry")).not.toBe(original);
+    lease.release();
+    expect(methodValue(AgentSession.prototype, "_prepareRetry")).toBe(original);
+  });
+
+  it("accepts current and future Pi versions when the private retry shape matches", () => {
+    for (const runtimeVersion of [MINIMUM_PI_VERSION, "0.83.0", "0.84.0-next.1", "1.0.0"]) {
+      const lease = installInfiniteRetryPatch({
+        prototype: FakeAgentSession.prototype,
+        runtimeVersion,
+      });
+      lease.release();
+    }
+  });
+
+  it("rejects old, malformed, or incompatible private retry contracts", () => {
+    for (const runtimeVersion of ["0.82.0", "next", "999999999999999999999.0.0"]) {
+      expect(() =>
+        installInfiniteRetryPatch({
+          prototype: FakeAgentSession.prototype,
+          runtimeVersion,
+        }),
+      ).toThrow(`requires Pi ${MINIMUM_PI_VERSION} or newer`);
+    }
+    expect(() =>
+      installInfiniteRetryPatch({ prototype: {}, runtimeVersion: MINIMUM_PI_VERSION }),
+    ).toThrow("expected _prepareRetry() with 1 parameter(s)");
+
+    const lockedPrototype = {
+      _isRetryableError: oneArgumentMethod,
+      abortRetry: zeroArgumentMethod,
+    };
+    Object.defineProperty(lockedPrototype, "_prepareRetry", {
+      value: oneArgumentMethod,
+    });
+    Object.defineProperty(lockedPrototype, "_willRetryAfterAgentEnd", {
+      value: oneArgumentMethod,
+    });
     expect(() =>
       installInfiniteRetryPatch({
         prototype: lockedPrototype,
-        runtimeVersion: SUPPORTED_PI_VERSION,
+        runtimeVersion: MINIMUM_PI_VERSION,
       }),
     ).toThrow("is not patchable");
-  });
 
+    class MissingClassifier extends FakeAgentSession {}
+    Object.defineProperty(MissingClassifier.prototype, "_prepareRetry", {
+      configurable: true,
+      value: oneArgumentMethod,
+      writable: true,
+    });
+    Object.defineProperty(MissingClassifier.prototype, "_willRetryAfterAgentEnd", {
+      configurable: true,
+      value: oneArgumentMethod,
+      writable: true,
+    });
+    expect(() =>
+      installInfiniteRetryPatch({
+        prototype: MissingClassifier.prototype,
+        runtimeVersion: "0.83.0",
+      }),
+    ).toThrow("expected _isRetryableError() with 1 parameter(s)");
+  });
+});
+
+describe("patched retry behavior", () => {
   it("rejects a second AgentSession prototype while the patch is active", () => {
     install();
     class OtherSession extends FakeAgentSession {}
@@ -122,7 +181,7 @@ describe("installInfiniteRetryPatch", () => {
     expect(() =>
       installInfiniteRetryPatch({
         prototype: OtherSession.prototype,
-        runtimeVersion: SUPPORTED_PI_VERSION,
+        runtimeVersion: MINIMUM_PI_VERSION,
       }),
     ).toThrow("already installed on a different AgentSession prototype");
   });
@@ -187,6 +246,24 @@ describe("installInfiniteRetryPatch", () => {
       delayMs: MAX_RETRY_DELAY_MS,
     });
     await vi.advanceTimersByTimeAsync(MAX_RETRY_DELAY_MS);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it("saturates the reported attempt before integer precision is lost", async () => {
+    vi.useFakeTimers();
+    const lease = install();
+    const session = new FakeAgentSession();
+    const failed = error();
+    session._retryAttempt = Number.MAX_SAFE_INTEGER;
+    session.agent.state.messages = [failed];
+
+    const pending = session._prepareRetry(failed);
+    expect(lease.getStatus()).toMatchObject({
+      state: "waiting",
+      attempt: Number.MAX_SAFE_INTEGER,
+      delayMs: MAX_RETRY_DELAY_MS,
+    });
+    expect(lease.retryNow()).toBe(true);
     await expect(pending).resolves.toBe(true);
   });
 
