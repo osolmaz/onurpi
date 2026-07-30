@@ -46,7 +46,8 @@ const packages = [
   ...extensions,
   {
     name: "@osolmaz/regrafter",
-    source: "github:osolmaz/regrafter#8d3011e1a3568637cdd173acd665ca1f9d1030df",
+    source:
+      "https://github.com/osolmaz/regrafter/releases/download/v0.1.0/osolmaz-regrafter-0.1.0.tgz",
   },
 ] as const;
 
