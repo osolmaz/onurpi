@@ -19,6 +19,7 @@ configuration.
 | [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
+| [`@onurpi/regrafter-driver`](packages/regrafter-driver/)           | Optional delegation to the dedicated Regrafter app               |
 | [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
 
 ## Included extension dependencies
@@ -30,11 +31,13 @@ Their source remains in the original repositories.
 | ------------------ | --------------------------------------------------------------------------------------- |
 | Hugging Face OAuth | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | Pi Must Win        | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) 0.2.0                   |
-| Pi Regraft         | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) 0.1.0                     |
+| Pi Regraft         | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) 0.2.0                     |
+| Regrafter          | [`osolmaz/regrafter`](https://github.com/osolmaz/regrafter) at `8d3011e`                |
 | Pi Workflows       | [`osolmaz/pi-workflows`](https://github.com/osolmaz/pi-workflows) at `630622e`          |
 | Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
-Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set.
+Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts
+unless its driver skill matches an explicit delegation or vendored-code maintenance request.
 
 ## Install
 

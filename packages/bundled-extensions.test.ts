@@ -31,7 +31,7 @@ const extensions = [
   },
   {
     name: "pi-regraft",
-    source: "0.1.0",
+    source: "0.2.0",
     entry: "./node_modules/pi-regraft/extensions/regraft.ts",
   },
   {
@@ -42,6 +42,14 @@ const extensions = [
   },
 ] as const;
 
+const packages = [
+  ...extensions,
+  {
+    name: "@osolmaz/regrafter",
+    source: "github:osolmaz/regrafter#8d3011e1a3568637cdd173acd665ca1f9d1030df",
+  },
+] as const;
+
 describe("bundled extension dependencies", () => {
   it("pins and bundles every external extension", () => {
     const manifest = readJson("package.json");
@@ -49,9 +57,9 @@ describe("bundled extension dependencies", () => {
     const bundled = manifest["bundledDependencies"];
 
     expect(dependencies).toEqual(
-      Object.fromEntries(extensions.map((extension) => [extension.name, extension.source])),
+      Object.fromEntries(packages.map((dependency) => [dependency.name, dependency.source])),
     );
-    expect(bundled).toEqual(extensions.map((extension) => extension.name));
+    expect(bundled).toEqual(packages.map((dependency) => dependency.name));
   });
 
   it("registers installed extension entry points", () => {
@@ -67,6 +75,17 @@ describe("bundled extension dependencies", () => {
     }
   });
 
+  it("registers the optional Regrafter driver skill", () => {
+    const manifest = readJson("package.json");
+    const pi = manifest["pi"];
+    if (typeof pi !== "object" || pi === null || Array.isArray(pi))
+      throw new Error("Expected a Pi manifest");
+    const skills = (pi as { skills?: unknown }).skills;
+
+    expect(skills).toContain("./packages/regrafter-driver/skills");
+    expect(existsSync(join(root, "node_modules", ".bin", "regrafter"))).toBe(true);
+  });
+
   it("removes separate settings entries for bundled extensions", () => {
     const settings = readJson("settings.json");
     const packages = settings["packages"];
@@ -79,6 +98,7 @@ describe("bundled extension dependencies", () => {
         "git:github.com/osolmaz/pi-must-win",
         "npm:pi-must-win",
         "npm:pi-regraft@0.1.0",
+        "npm:pi-regraft@0.2.0",
       ]),
     );
   });

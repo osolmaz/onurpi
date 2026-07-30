@@ -20,7 +20,9 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["packages/regrafter-driver/skills/regrafter/scripts/regrafter.mjs"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
