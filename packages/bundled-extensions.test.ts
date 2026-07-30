@@ -30,6 +30,11 @@ const extensions = [
     entry: "./node_modules/pi-must-win/index.ts",
   },
   {
+    name: "pi-regraft",
+    source: "0.1.0",
+    entry: "./node_modules/pi-regraft/extensions/regraft.ts",
+  },
+  {
     name: "pi-workflows",
     source:
       "https://codeload.github.com/osolmaz/pi-workflows/tar.gz/630622e44fcd486690b6bcb923b4d18dc516723e",
@@ -73,6 +78,7 @@ describe("bundled extension dependencies", () => {
         "git:github.com/osolmaz/pi-workflows",
         "git:github.com/osolmaz/pi-must-win",
         "npm:pi-must-win",
+        "npm:pi-regraft@0.1.0",
       ]),
     );
   });
