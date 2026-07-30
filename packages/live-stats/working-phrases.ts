@@ -43,6 +43,7 @@ export const TURKISH_WORKING_PHRASES = [
   "Canımı dişime takıyorum",
   "Usta",
   "Yaparım",
+  "Okuyom ben ya",
   "Sıçtın mavisini izliyorum",
 ] as const;
 
