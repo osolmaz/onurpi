@@ -28,6 +28,7 @@ const REPLACED_PACKAGE_SOURCES = [
   /^git:github\.com\/osolmaz\/pi-workflows(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-must-win(?:@.*)?$/,
   /^npm:pi-must-win(?:@.*)?$/,
+  /^npm:pi-regraft(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-demo-mode(?:@.*)?$/,
   /^npm:pi-demo-mode(?:@.*)?$/,
 ];
