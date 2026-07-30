@@ -41,8 +41,7 @@
     "pi-demo-mode": "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75",
     "pi-huggingface-oauth": "0.1.1",
     "pi-must-win": "0.2.0",
-    "pi-regraft": "0.2.0",
-    "@osolmaz/regrafter": "https://github.com/osolmaz/regrafter/releases/download/v0.1.0/osolmaz-regrafter-0.1.0.tgz",
+    "pi-regraft": "0.3.0",
     "pi-workflows": "https://codeload.github.com/osolmaz/pi-workflows/tar.gz/630622e44fcd486690b6bcb923b4d18dc516723e"
   },
   "bundledDependencies": [
@@ -50,8 +49,7 @@
     "pi-huggingface-oauth",
     "pi-must-win",
     "pi-regraft",
-    "pi-workflows",
-    "@osolmaz/regrafter"
+    "pi-workflows"
   ],
   "scripts": {
     "settings:sync": "node scripts/sync-settings.ts sync",

@@ -13,6 +13,6 @@
     ]
   },
   "dependencies": {
-    "@osolmaz/regrafter": "*"
+    "pi-regraft": "0.3.0"
   }
 }

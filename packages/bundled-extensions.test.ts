@@ -31,7 +31,7 @@ const extensions = [
   },
   {
     name: "pi-regraft",
-    source: "0.2.0",
+    source: "0.3.0",
     entry: "./node_modules/pi-regraft/extensions/regraft.ts",
   },
   {
@@ -42,14 +42,7 @@ const extensions = [
   },
 ] as const;
 
-const packages = [
-  ...extensions,
-  {
-    name: "@osolmaz/regrafter",
-    source:
-      "https://github.com/osolmaz/regrafter/releases/download/v0.1.0/osolmaz-regrafter-0.1.0.tgz",
-  },
-] as const;
+const packages = extensions;
 
 describe("bundled extension dependencies", () => {
   it("pins and bundles every external extension", () => {
@@ -100,6 +93,7 @@ describe("bundled extension dependencies", () => {
         "npm:pi-must-win",
         "npm:pi-regraft@0.1.0",
         "npm:pi-regraft@0.2.0",
+        "npm:pi-regraft@0.3.0",
       ]),
     );
   });
