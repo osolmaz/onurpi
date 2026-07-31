@@ -135,6 +135,35 @@ describe("EpisodeBuilder", () => {
     );
   });
 
+  it("clears a transient terminal error after a successful retry", () => {
+    const builder = new EpisodeBuilder();
+    builder.accountAgentEnd([
+      { role: "assistant", stopReason: "error", errorMessage: "request 123 failed" },
+    ]);
+    builder.accountAgentEnd([
+      { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "recovered" }] },
+    ]);
+
+    expect(builder.finish(false)).toMatchObject({
+      terminalError: false,
+      terminalErrorFingerprint: null,
+    });
+  });
+
+  it("clears an error turn when a later retry turn succeeds", () => {
+    const builder = new EpisodeBuilder();
+    builder.accountTurn(
+      { role: "assistant", stopReason: "error", errorMessage: "request 123 failed", content: [] },
+      [],
+    );
+    builder.accountTurn(
+      { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "recovered" }] },
+      [],
+    );
+
+    expect(builder.finish(false).terminalError).toBe(false);
+  });
+
   it("preserves meaningful error status codes", () => {
     const first = new EpisodeBuilder();
     const second = new EpisodeBuilder();
