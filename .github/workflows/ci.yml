@@ -33,6 +33,12 @@ jobs:
       - name: Check @onurpi/goal package with Slophammer
         working-directory: packages/goal
         run: npm run slophammer
+      - name: Check @onurpi/loop-guard package
+        working-directory: packages/loop-guard
+        run: npm run check
+      - name: Check @onurpi/loop-guard package with Slophammer
+        working-directory: packages/loop-guard
+        run: npm run slophammer
       - name: Check @onurpi/live-stats package
         working-directory: packages/live-stats
         run: npm run check
@@ -131,6 +137,9 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/goal package
         working-directory: packages/goal
+        run: npm run mutate
+      - name: Mutate @onurpi/loop-guard package
+        working-directory: packages/loop-guard
         run: npm run mutate
       - name: Mutate @onurpi/live-stats package
         working-directory: packages/live-stats

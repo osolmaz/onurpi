@@ -4,6 +4,7 @@
     "npm:@narumitw/pi-btw@0.25.0",
     "../../repos/onurpi/packages/turn-fold",
     "../../repos/onurpi/packages/goal",
+    "../../repos/onurpi/packages/loop-guard",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
     "../../repos/onurpi/packages/prompt-queue",
@@ -17,7 +18,7 @@
     "../../repos/onurpi/packages/regrafter-driver",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.82.1",
+  "lastChangelogVersion": "0.83.0",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",
