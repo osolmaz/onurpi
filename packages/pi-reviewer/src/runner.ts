@@ -49,7 +49,7 @@ async function executePlan(
 ): Promise<string> {
   const child = spawn(command, args, {
     cwd,
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, PI_OFFLINE: "1" },
     shell: false,
     detached: process.platform !== "win32",
     stdio: ["pipe", "pipe", "pipe"],
