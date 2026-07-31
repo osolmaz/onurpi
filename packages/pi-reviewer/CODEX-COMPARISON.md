@@ -46,3 +46,7 @@ pi-reviewer --model openai-codex/gpt-5.6-terra --thinking high --base main
 ```
 
 Compare target resolution, finding priorities, locations, correctness verdicts, and command failures. Model reviews are stochastic, so identical findings are not required. A missing P0 or P1 from either tool must be investigated before release.
+
+## Historical comparison
+
+[`CASE-STUDY.md`](CASE-STUDY.md) records a paired run on two historical OnurPi pull request snapshots with defects confirmed by later fixes. It includes wall times, finding overlap, unique findings, known misses, and the limits of the small sample.

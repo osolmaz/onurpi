@@ -51,7 +51,7 @@ Normal reviews use an in-memory Pi SDK session and do not write Pi session histo
 
 ## Codex compatibility
 
-Pi Reviewer vendors Codex's review rubric and target prompt wording from commit `fa1d4c40d0e63eef2e0ba8a9e004ccd0a80b77f5`. [`UPSTREAM.md`](UPSTREAM.md) records the exact sources and local changes. [`CODEX-COMPARISON.md`](CODEX-COMPARISON.md) compares the commands and gives the same-branch verification procedure.
+Pi Reviewer vendors Codex's review rubric and target prompt wording from commit `fa1d4c40d0e63eef2e0ba8a9e004ccd0a80b77f5`. [`UPSTREAM.md`](UPSTREAM.md) records the exact sources and local changes. [`CODEX-COMPARISON.md`](CODEX-COMPARISON.md) compares the commands and gives the same-branch verification procedure. [`CASE-STUDY.md`](CASE-STUDY.md) records a paired comparison on two historical snapshots with known defects.
 
 Both tools support custom instructions and the same review targets. A target can cover uncommitted changes or compare against either a base branch or one commit. Both return findings with a title, body, confidence, priority, location, correctness verdict, and overall confidence. Pi Reviewer requires every finding to contain a P0 through P3 priority and fails closed on malformed output.
 
