@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  containsPath,
   executeShellCommand,
   validateCheckoutPath,
   validateShellCommand,
@@ -101,7 +102,7 @@ describe("read-only shell policy", () => {
 
     const controller = new AbortController();
     const pending = executeShellCommand(
-      await validateShellCommand("tail -f file.txt", root),
+      { program: process.execPath, args: ["-e", "setInterval(() => {}, 1_000)"] },
       root,
       controller.signal,
     );
@@ -111,8 +112,10 @@ describe("read-only shell policy", () => {
     await expect(pending).rejects.toThrow("cancelled");
   });
 
-  it("rejects lexical and symlink escapes", async () => {
+  it("rejects lexical, cross-drive, and symlink escapes", async () => {
     const { root, outside } = await roots();
+    expect(containsPath("C:\\repo", "D:\\secret.txt", path.win32)).toBe(false);
+    expect(containsPath("C:\\repo", "C:\\repo\\src\\file.ts", path.win32)).toBe(true);
     await expect(validateCheckoutPath("../outside", root)).rejects.toThrow("outside");
     await expect(validateCheckoutPath(path.join(outside, "secret.txt"), root)).rejects.toThrow(
       "outside",

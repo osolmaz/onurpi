@@ -22,7 +22,7 @@ Pi Reviewer follows standalone `codex review` at OpenAI Codex commit `fa1d4c40d0
 
 The test suite checks the following compatibility points:
 
-- `prompts/review-system.md` matches the pinned Codex rubric byte for byte after removing one documented `review_shell` instruction. The upstream SHA-256 is `ec60e7f36a1d1c2679ce095c0205ecc56f7dd8fb57707a13ef362072390f219f`.
+- After normalizing line endings, `prompts/review-system.md` matches the pinned Codex rubric byte for byte after removing one documented `review_shell` instruction. The upstream SHA-256 is `ec60e7f36a1d1c2679ce095c0205ecc56f7dd8fb57707a13ef362072390f219f`.
 - Target prompts for uncommitted changes, merge bases, unrelated branches, titled commits and custom instructions match `codex-rs/prompts/src/review_request.rs`.
 - Result validation uses Codex's `findings`, `overall_correctness`, `overall_explanation`, and `overall_confidence_score` fields.
 - Every finding keeps Codex's title, body, confidence score, numeric priority, absolute path, and line range.

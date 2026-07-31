@@ -245,17 +245,24 @@ export async function validateCheckoutPath(inputPath: string, cwd: string): Prom
   }
   const root = await realpath(cwd);
   const candidate = path.isAbsolute(inputPath) ? inputPath : path.resolve(root, inputPath);
-  if (!contains(root, candidate))
+  if (!containsPath(root, candidate))
     throw new Error("paths outside the review checkout are not allowed");
   const canonical = await realpath(candidate).catch(() => undefined);
-  if (canonical !== undefined && !contains(root, canonical)) {
+  if (canonical !== undefined && !containsPath(root, canonical)) {
     throw new Error("symlinks outside the review checkout are not allowed");
   }
 }
 
-function contains(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
+export function containsPath(
+  root: string,
+  candidate: string,
+  pathApi: Pick<typeof path, "relative" | "isAbsolute" | "sep"> = path,
+): boolean {
+  const relative = pathApi.relative(root, candidate);
+  return (
+    relative === "" ||
+    (!pathApi.isAbsolute(relative) && !relative.startsWith(`..${pathApi.sep}`) && relative !== "..")
+  );
 }
 
 function safeGitArgs(args: readonly string[]): readonly string[] {
