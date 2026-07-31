@@ -24,6 +24,7 @@ import {
   type GoalState,
 } from "./goal-state.ts";
 
+const LOOP_GUARD_EVENT = "onurpi:loop-guard";
 const EmptyParameters = Type.Object({}, { additionalProperties: false });
 const CreateGoalParameters = Type.Object(
   {
@@ -336,8 +337,27 @@ function registerCommand(pi: ExtensionAPI, controller: GoalController): void {
   });
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function loopGuardAction(value: unknown): "nudge" | "trip" | undefined {
+  if (!isRecord(value)) return undefined;
+  const action = value["action"];
+  const version = value["version"];
+  return version === 1 && (action === "nudge" || action === "trip") ? action : undefined;
+}
+
 function registerLifecycle(pi: ExtensionAPI, controller: GoalController): void {
+  let sessionContext: ExtensionContext | null = null;
+  pi.events.on(LOOP_GUARD_EVENT, (value) => {
+    const action = loopGuardAction(value);
+    if (action !== undefined && sessionContext !== null) {
+      controller.pauseForLoopGuard(sessionContext, action);
+    }
+  });
   pi.on("session_start", (event: SessionStartEvent, ctx) => {
+    sessionContext = ctx;
     controller.restore(event, ctx);
   });
   pi.on("before_agent_start", (event) => {
@@ -357,6 +377,7 @@ function registerLifecycle(pi: ExtensionAPI, controller: GoalController): void {
     controller.agentSettled(ctx);
   });
   pi.on("session_shutdown", () => {
+    sessionContext = null;
     controller.shutdown();
   });
 }

@@ -177,6 +177,19 @@ export class GoalController {
     return next;
   }
 
+  pauseForLoopGuard(ctx: ExtensionContext, action: "nudge" | "trip"): GoalState | undefined {
+    if (this.goal?.status !== "active") return undefined;
+    const next = pauseGoal(this.goal, { action, reason: "loop_guard" });
+    if (this.episode === null) this.persist(ctx, next);
+    else this.applyRuntimeState(ctx, next);
+    this.emit("paused", next);
+    ctx.ui.notify(
+      `Goal ${pauseLabel(next.safety.pause)}. Use /goal resume to continue.`,
+      "warning",
+    );
+    return next;
+  }
+
   resume(ctx: ExtensionContext): GoalState | undefined {
     if (!this.goal) return undefined;
     const next = resumeGoal(this.goal);
@@ -280,9 +293,13 @@ export class GoalController {
   }
 
   private persist(ctx: ExtensionContext, next: GoalState | null): void {
+    this.applyRuntimeState(ctx, next);
+    this.pi.appendEntry(GOAL_STATE_ENTRY, { goal: next, statusBarEnabled: this.statusBarEnabled });
+  }
+
+  private applyRuntimeState(ctx: ExtensionContext, next: GoalState | null): void {
     this.goal = next;
     if (next?.status !== "active") this.continuationQueued = false;
-    this.pi.appendEntry(GOAL_STATE_ENTRY, { goal: next, statusBarEnabled: this.statusBarEnabled });
     this.updateStatusBar(ctx);
     this.syncGoalTools();
   }

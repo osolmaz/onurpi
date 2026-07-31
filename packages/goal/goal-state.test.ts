@@ -98,6 +98,11 @@ describe("goal state parsing", () => {
   it("validates every pause shape strictly", () => {
     expect(normalizeGoalPause(null)).toBeNull();
     expect(normalizeGoalPause({ reason: "user" })).toEqual({ reason: "user" });
+    expect(normalizeGoalPause({ action: "trip", reason: "loop_guard" })).toEqual({
+      action: "trip",
+      reason: "loop_guard",
+    });
+    expect(normalizeGoalPause({ action: "unknown", reason: "loop_guard" })).toBeUndefined();
     expect(
       normalizeGoalPause({ cycleLength: 2, reason: "repeated_cycle", repetitions: 3 }),
     ).toEqual({ cycleLength: 2, reason: "repeated_cycle", repetitions: 3 });
@@ -191,6 +196,12 @@ describe("goal display formatting", () => {
     );
     expect(pauseLabel({ reason: "checkpoint", runLimit: 20 })).toBe(
       "paused at the 20-run checkpoint",
+    );
+    expect(pauseLabel({ action: "nudge", reason: "loop_guard" })).toBe(
+      "paused after Loop Guard intervened",
+    );
+    expect(pauseLabel({ action: "trip", reason: "loop_guard" })).toBe(
+      "paused after Loop Guard tripped",
     );
     expect(statusLine({ ...active, status: "budget_limited" })).toBe("Goal unmet (0s)");
     expect(statusLine({ ...active, status: "complete" })).toBe("Goal achieved (0s)");

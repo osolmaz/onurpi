@@ -11,6 +11,7 @@ type Harness = {
   activeTools: string[];
   appendEntry: ReturnType<typeof vi.fn>;
   commands: ReadonlyMap<string, Handler>;
+  eventHandlers: ReadonlyMap<string, Handler>;
   handlers: ReadonlyMap<string, Handler>;
   pi: ExtensionAPI;
   sendMessage: ReturnType<typeof vi.fn>;
@@ -21,11 +22,15 @@ function harness(): Harness {
   const activeTools = ["read", "create_goal"];
   const appendEntry = vi.fn();
   const commands = new Map<string, Handler>();
+  const eventHandlers = new Map<string, Handler>();
   const handlers = new Map<string, Handler>();
   const sendMessage = vi.fn();
   const tools = new Map<string, ToolDefinition>();
   const pi = {
     appendEntry,
+    events: {
+      on: (event: string, handler: Handler) => eventHandlers.set(event, handler),
+    },
     getActiveTools: () => [...activeTools],
     on: (event: string, handler: Handler) => handlers.set(event, handler),
     registerCommand: (name: string, definition: { handler: Handler }) =>
@@ -37,7 +42,16 @@ function harness(): Harness {
       activeTools.splice(0, activeTools.length, ...names);
     },
   } as unknown as ExtensionAPI;
-  return { activeTools, appendEntry, commands, handlers, pi, sendMessage, tools };
+  return {
+    activeTools,
+    appendEntry,
+    commands,
+    eventHandlers,
+    handlers,
+    pi,
+    sendMessage,
+    tools,
+  };
 }
 
 function context(branch: unknown[] = []) {
@@ -211,6 +225,63 @@ describe("Goal extension lifecycle", () => {
       status: "paused",
     });
     expect(sentKinds(extension)).toEqual(["continuation", "continuation", "paused"]);
+  });
+});
+
+describe("Goal extension safety integration", () => {
+  it("pauses an active goal when Loop Guard intervenes without queuing continuation", async () => {
+    const extension = harness();
+    const ctx = context();
+    goalExtension(extension.pi);
+    await emit(
+      extension.handlers,
+      "session_start",
+      { reason: "startup", type: "session_start" },
+      ctx,
+    );
+    await command(extension.commands, "ship it", ctx);
+    await emit(extension.handlers, "agent_start", { type: "agent_start" }, ctx);
+    extension.appendEntry.mockClear();
+    extension.sendMessage.mockClear();
+
+    extension.eventHandlers.get("onurpi:loop-guard")?.({
+      action: "nudge",
+      decision: { kind: "exact_cycle" },
+      version: 1,
+    });
+
+    expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(sentKinds(extension)).toEqual(["paused"]);
+    expect(latestPersistedGoal(extension)).toBeUndefined();
+    const promptResult = await emit(
+      extension.handlers,
+      "before_agent_start",
+      { systemPrompt: "base", type: "before_agent_start" },
+      ctx,
+    );
+    expect(promptResult).toBeUndefined();
+
+    await emit(
+      extension.handlers,
+      "turn_end",
+      { message: { role: "assistant", usage: { totalTokens: 10 } }, toolResults: [] },
+      ctx,
+    );
+    await emit(
+      extension.handlers,
+      "agent_end",
+      { messages: [{ role: "assistant", stopReason: "stop" }] },
+      ctx,
+    );
+    await emit(extension.handlers, "agent_settled", { type: "agent_settled" }, ctx);
+    await Promise.resolve();
+
+    expect(extension.appendEntry).toHaveBeenCalledTimes(1);
+    expect(latestPersistedGoal(extension)).toMatchObject({
+      safety: { pause: { action: "nudge", reason: "loop_guard" } },
+      status: "paused",
+    });
+    expect(sentKinds(extension)).toEqual(["paused"]);
   });
 
   it("pauses restored active goals without silently continuing", async () => {

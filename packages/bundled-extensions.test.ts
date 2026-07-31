@@ -69,6 +69,20 @@ describe("bundled extension dependencies", () => {
     }
   });
 
+  it("runs Loop Guard before Goal settlement handlers", () => {
+    const manifest = readJson("package.json");
+    const pi = manifest["pi"];
+    if (typeof pi !== "object" || pi === null || Array.isArray(pi)) {
+      throw new Error("Expected a Pi manifest");
+    }
+    const registered = (pi as { extensions?: unknown }).extensions;
+    if (!Array.isArray(registered)) throw new Error("Expected extension entries");
+
+    expect(registered.indexOf("./packages/loop-guard/index.ts")).toBeLessThan(
+      registered.indexOf("./packages/goal/index.ts"),
+    );
+  });
+
   it("registers the optional Regrafter driver skill", () => {
     const manifest = readJson("package.json");
     const pi = manifest["pi"];

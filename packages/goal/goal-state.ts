@@ -8,6 +8,7 @@ export type GoalPause =
   | { reason: "reload" }
   | { reason: "interrupted" }
   | { reason: "terminal_error" }
+  | { action: "nudge" | "trip"; reason: "loop_guard" }
   | { cycleLength: number; reason: "repeated_cycle"; repetitions: number }
   | { reason: "checkpoint"; runLimit: number };
 
@@ -80,6 +81,14 @@ function simplePause(value: Readonly<Record<string, unknown>>): GoalPause | unde
   return exactKeys(value, ["reason"]) ? { reason } : undefined;
 }
 
+function loopGuardPause(value: Readonly<Record<string, unknown>>): GoalPause | undefined {
+  if (value["reason"] !== "loop_guard") return undefined;
+  const action = value["action"];
+  return (action === "nudge" || action === "trip") && exactKeys(value, ["action", "reason"])
+    ? { action, reason: "loop_guard" }
+    : undefined;
+}
+
 function repeatedCyclePause(value: Readonly<Record<string, unknown>>): GoalPause | undefined {
   if (value["reason"] !== "repeated_cycle") return undefined;
   const cycleLength = nonnegativeInteger(value["cycleLength"]);
@@ -108,7 +117,12 @@ function checkpointPause(value: Readonly<Record<string, unknown>>): GoalPause | 
 export function normalizeGoalPause(value: unknown): GoalPause | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
-  return simplePause(value) ?? repeatedCyclePause(value) ?? checkpointPause(value);
+  return (
+    simplePause(value) ??
+    loopGuardPause(value) ??
+    repeatedCyclePause(value) ??
+    checkpointPause(value)
+  );
 }
 
 export function createGoalSafetyState(): GoalSafetyState {
@@ -274,7 +288,13 @@ export function pauseLabel(pause: GoalPause | null): string {
   if (pause.reason === "checkpoint") {
     return `paused at the ${String(pause.runLimit)}-run checkpoint`;
   }
-  const labels: Record<Exclude<GoalPause["reason"], "repeated_cycle" | "checkpoint">, string> = {
+  if (pause.reason === "loop_guard") {
+    return `paused after Loop Guard ${pause.action === "nudge" ? "intervened" : "tripped"}`;
+  }
+  const labels: Record<
+    Exclude<GoalPause["reason"], "repeated_cycle" | "checkpoint" | "loop_guard">,
+    string
+  > = {
     interrupted: "paused after interruption",
     reload: "paused after reload",
     terminal_error: "paused after terminal error",
