@@ -209,6 +209,10 @@ describe("LoopGuardController", () => {
     expect(harness.sent).toHaveLength(1);
     expect(harness.emitted).toMatchObject([{ action: "nudge" }, { action: "trip" }]);
   });
+});
+
+describe("LoopGuardController active runs", () => {
+  beforeEach(() => vi.restoreAllMocks());
 
   it("steers an active twelve-turn run and suppresses duplicate settled detection", () => {
     const harness = createHarness({ idle: false });

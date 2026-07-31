@@ -178,7 +178,9 @@ describe("EpisodeBuilder", () => {
       second.finish(false).terminalErrorFingerprint,
     );
   });
+});
 
+describe("EpisodeBuilder bounds", () => {
   it("bounds turns, tool calls, and action features", () => {
     const builder = new EpisodeBuilder();
     for (let index = 0; index < MAX_TURNS_PER_EPISODE + 5; index += 1) {
