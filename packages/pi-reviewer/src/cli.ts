@@ -11,6 +11,7 @@ import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./co
 import { resolveTarget } from "./git-target.js";
 import { renderReview } from "./render.js";
 import { runReview } from "./runner.js";
+import { terminalText } from "./terminal-text.js";
 import type { ModelSelection, ReviewRequest, ThinkingLevel, UserConfig } from "./types.js";
 
 export async function main(args: readonly string[]): Promise<number> {
@@ -65,9 +66,7 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
   const selection = resolveSelection(request.model, request.thinking, config);
   const target = await resolveTarget(request.target, request.cwd);
   const app = await loadReviewerApp();
-  process.stderr.write(
-    `Reviewing ${target.hint} with ${selection.provider}/${selection.model}:${selection.thinking}\n`,
-  );
+  process.stderr.write(formatReviewProgress(target.hint, selection));
   const output = await runReview({
     app,
     selection,
@@ -77,6 +76,12 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
   });
   process.stdout.write(renderReview(output));
   return 0;
+}
+
+export function formatReviewProgress(hint: string, selection: ModelSelection): string {
+  return terminalText(
+    `Reviewing ${hint} with ${selection.provider}/${selection.model}:${selection.thinking}\n`,
+  );
 }
 
 export function resolveSelection(
@@ -119,7 +124,7 @@ export async function runCli(args: readonly string[]): Promise<void> {
     process.exitCode = await main(args);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
+    process.stderr.write(`${terminalText(message)}\n`);
     process.exitCode = message === "review cancelled" ? 130 : 1;
   }
 }

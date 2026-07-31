@@ -4,6 +4,8 @@ import path from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
+import { terminalText } from "./terminal-text.js";
+
 type AuthType = Parameters<ModelRuntime["login"]>[1];
 type AuthInteraction = Parameters<ModelRuntime["login"]>[2];
 type AuthPrompt = Parameters<AuthInteraction["prompt"]>[0];
@@ -51,7 +53,7 @@ export async function loginReviewerApp(
   const provider = await selectProvider(providers, requestedProvider, terminal);
   const method = await selectAuthType(provider, terminal);
   await runtime.login(provider.id, method, createAuthInteraction(terminal));
-  terminal.write(`Authenticated ${provider.name} in the Pi Reviewer profile.\n`);
+  terminal.write(terminalText(`Authenticated ${provider.name} in the Pi Reviewer profile.\n`));
 }
 
 function loginProviders(providers: readonly LoginProvider[]): readonly LoginProvider[] {
@@ -97,7 +99,7 @@ function createAuthInteraction(terminal: AuthTerminal): AuthInteraction {
   return {
     prompt: async (prompt) => await answerPrompt(prompt, terminal),
     notify: (event) => {
-      terminal.write(formatAuthEvent(event));
+      terminal.write(terminalText(formatAuthEvent(event)));
     },
   };
 }
@@ -106,7 +108,7 @@ async function answerPrompt(prompt: AuthPrompt, terminal: AuthTerminal): Promise
   if (prompt.type === "select")
     return await select(prompt.message, prompt.options, terminal, prompt.signal);
   const suffix = prompt.placeholder === undefined ? "" : ` (${prompt.placeholder})`;
-  const message = `${prompt.message}${suffix}: `;
+  const message = terminalText(`${prompt.message}${suffix}: `);
   if (prompt.type === "secret") return await terminal.secret(message, prompt.signal);
   return await terminal.question(message, prompt.signal);
 }
@@ -118,10 +120,10 @@ async function select<T extends string>(
   signal?: AbortSignal,
 ): Promise<T> {
   if (options.length === 0) throw new Error(`${message}: no choices available`);
-  terminal.write(`${message}:\n`);
+  terminal.write(terminalText(`${message}:\n`));
   options.forEach((option, index) => {
     const description = option.description === undefined ? "" : ` — ${option.description}`;
-    terminal.write(`  ${String(index + 1)}. ${option.label}${description}\n`);
+    terminal.write(terminalText(`  ${String(index + 1)}. ${option.label}${description}\n`));
   });
   const answer = await terminal.question(`Enter number (1-${String(options.length)}): `, signal);
   const index = Number.parseInt(answer, 10) - 1;

@@ -192,6 +192,7 @@ function validateProgramArgs(program: string, args: readonly string[]): void {
       "-fls",
       "-fprint",
       "-fprint0",
+      "-files0-from",
       "-fprintf",
       "-L",
     ]);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { formatReviewProgress } from "../src/cli.js";
 import { PiEventCollector } from "../src/pi-events.js";
 import { renderReview } from "../src/render.js";
 import { parseReviewOutput } from "../src/review-output.js";
@@ -75,6 +76,17 @@ describe("review output", () => {
     expect(unsafe).not.toContain("\u001b");
     expect(unsafe).not.toContain("\u0007");
     expect(unsafe).toContain("�");
+  });
+
+  it("sanitizes untrusted review progress", () => {
+    const progress = formatReviewProgress("commit\u001b]52;c;bad\u0007", {
+      provider: "provider\u001b",
+      model: "model",
+      thinking: "high",
+    });
+    expect(progress).not.toContain("\u001b");
+    expect(progress).not.toContain("\u0007");
+    expect(progress).toContain("�");
   });
 
   it("accepts one JSON object surrounded by incidental text", () => {
