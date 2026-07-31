@@ -191,6 +191,7 @@ function validateProgramArgs(program: string, args: readonly string[]): void {
       "-okdir",
       "-fls",
       "-fprint",
+      "-fprint0",
       "-fprintf",
       "-L",
     ]);

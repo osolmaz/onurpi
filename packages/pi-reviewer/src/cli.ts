@@ -2,10 +2,11 @@
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { runPiApp, runPiCommand } from "@osolmaz/pi-factory";
+import { runPiCommand } from "@osolmaz/pi-factory";
 
-import { parseArgs, parseModel, reviewUsage } from "./args.js";
 import { loadReviewerApp } from "./app.js";
+import { parseArgs, parseModel, reviewUsage } from "./args.js";
+import { loginReviewerApp } from "./auth.js";
 import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./config.js";
 import { resolveTarget } from "./git-target.js";
 import { renderReview } from "./render.js";
@@ -49,9 +50,8 @@ async function runUtilityCommand(
 }
 
 async function runLogin(provider: string | undefined): Promise<number> {
-  const app = await loadReviewerApp();
-  const command = provider === undefined ? "/login" : `/login ${provider}`;
-  return await runPiApp(app, { cwd: process.cwd(), messages: [command] });
+  await loginReviewerApp(await loadReviewerApp(), provider);
+  return 0;
 }
 
 async function runModels(search: string | undefined): Promise<number> {

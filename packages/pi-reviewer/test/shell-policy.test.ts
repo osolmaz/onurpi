@@ -59,6 +59,9 @@ describe("read-only shell policy", () => {
     );
     await expect(validateShellCommand("find . -exec rm file.txt ;", root)).rejects.toThrow();
     await expect(validateShellCommand("find . -delete", root)).rejects.toThrow("unavailable");
+    await expect(validateShellCommand("find . -fprint0 review-output", root)).rejects.toThrow(
+      "unavailable",
+    );
     await expect(validateShellCommand("rg --pre cat pattern .", root)).rejects.toThrow(
       "unavailable",
     );
