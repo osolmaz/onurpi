@@ -1,0 +1,7 @@
+coverage/
+dist/
+node_modules/
+.stryker-tmp/
+prompts/review-system.md
+LICENSE
+LICENSE.codex

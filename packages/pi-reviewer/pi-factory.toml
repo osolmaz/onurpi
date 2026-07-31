@@ -1,0 +1,22 @@
+id = "pi-reviewer"
+name = "Pi Reviewer"
+version = "0.1.0"
+schema_version = 1
+description = "Standalone read-only code review with prioritized findings"
+state_dir = "~/.local/state/pi-reviewer"
+session_dir = "~/.local/state/pi-reviewer/sessions"
+pi_command = ["pi"]
+thinking = "high"
+tools = ["read", "grep", "find", "ls", "review_shell"]
+system_prompt = "prompts/review-system.md"
+
+[provider]
+id = "unconfigured"
+source = "pi"
+
+[model]
+id = "unconfigured"
+reasoning = true
+
+[[extensions]]
+path = "extensions/review-guard.ts"

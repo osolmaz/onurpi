@@ -48,6 +48,12 @@ typescript:
       - packages/unified-exec/src/time.ts
       - packages/unified-exec/src/unescape.ts
       - packages/yarp/index.ts
+      - packages/pi-reviewer/src/args.ts
+      - packages/pi-reviewer/src/config.ts
+      - packages/pi-reviewer/src/git-target.ts
+      - packages/pi-reviewer/src/pi-events.ts
+      - packages/pi-reviewer/src/review-output.ts
+      - packages/pi-reviewer/extensions/shell-policy.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -79,3 +85,6 @@ typescript:
     - from: packages/yarp
       allow:
         - packages/yarp
+    - from: packages/pi-reviewer
+      allow:
+        - packages/pi-reviewer
