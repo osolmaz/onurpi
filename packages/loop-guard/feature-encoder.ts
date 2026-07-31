@@ -302,14 +302,25 @@ function normalizeErrorText(value: string): string {
     .trim();
 }
 
-function terminalError(message: unknown): { error: boolean; fingerprint: string | null } {
-  if (!isRecord(message) || message["role"] !== "assistant" || message["stopReason"] !== "error") {
-    return { error: false, fingerprint: null };
+type AssistantTerminalState = {
+  error: boolean;
+  fingerprint: string | null;
+  observed: boolean;
+};
+
+function assistantTerminalState(message: unknown): AssistantTerminalState {
+  if (!isRecord(message) || message["role"] !== "assistant") {
+    return { error: false, fingerprint: null, observed: false };
   }
+  const stopReason = message["stopReason"];
+  if (typeof stopReason !== "string") {
+    return { error: false, fingerprint: null, observed: false };
+  }
+  if (stopReason !== "error") return { error: false, fingerprint: null, observed: true };
   const errorMessage =
     typeof message["errorMessage"] === "string" ? message["errorMessage"] : "terminal error";
   const digest = createHash("sha256").update(normalizeErrorText(errorMessage)).digest("hex");
-  return { error: true, fingerprint: `v1:${digest}` };
+  return { error: true, fingerprint: `v1:${digest}`, observed: true };
 }
 
 export function actionFeatureSimilarity(left: readonly number[], right: readonly number[]): number {
@@ -349,23 +360,24 @@ export class EpisodeBuilder {
     this.outcomeHash.update(JSON.stringify(projected));
     this.truncated ||= budget.truncated || toolResults.length > MAX_ACTIONS_PER_EPISODE;
 
-    const error = terminalError(message);
-    if (error.error) {
-      this.terminalErrorSeen = true;
-      this.terminalErrorFingerprint = error.fingerprint;
-    }
+    this.accountTerminalState(assistantTerminalState(message));
 
     for (const call of toolCalls(message)) this.accountToolCall(call);
   }
 
   accountAgentEnd(messages: readonly unknown[]): void {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const error = terminalError(messages[index]);
-      if (!error.error) continue;
-      this.terminalErrorSeen = true;
-      this.terminalErrorFingerprint = error.fingerprint;
+      const state = assistantTerminalState(messages[index]);
+      if (!state.observed) continue;
+      this.accountTerminalState(state);
       return;
     }
+  }
+
+  private accountTerminalState(state: AssistantTerminalState): void {
+    if (!state.observed) return;
+    this.terminalErrorSeen = state.error;
+    this.terminalErrorFingerprint = state.fingerprint;
   }
 
   private accountToolCall(call: Readonly<Record<string, unknown>>): void {
