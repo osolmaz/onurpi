@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   containsPath,
   executeShellCommand,
+  safeProgramArgs,
   validateCheckoutPath,
   validateShellCommand,
 } from "../extensions/shell-policy.js";
@@ -69,6 +70,9 @@ describe("read-only shell policy", () => {
     await expect(validateShellCommand("rg --pre cat pattern .", root)).rejects.toThrow(
       "unavailable",
     );
+    await expect(validateShellCommand("rg --config-path config pattern .", root)).rejects.toThrow(
+      "unavailable",
+    );
     await expect(validateShellCommand("rg --follow pattern .", root)).rejects.toThrow(
       "unavailable",
     );
@@ -91,6 +95,10 @@ describe("read-only shell policy", () => {
     await expect(validateShellCommand("cat file.txt\nwc file.txt", root)).rejects.toThrow(
       "multiline",
     );
+  });
+
+  it("forces ripgrep to ignore configuration", () => {
+    expect(safeProgramArgs("rg", ["needle", "."])).toEqual(["--no-config", "needle", "."]);
   });
 
   it("bounds output and supports cancellation", async () => {
