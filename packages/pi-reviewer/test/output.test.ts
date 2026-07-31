@@ -50,6 +50,15 @@ describe("review output", () => {
     expect(rendered.indexOf("[P0]")).toBeLessThan(rendered.indexOf("[P1]"));
     expect(rendered.indexOf("[P1]")).toBeLessThan(rendered.indexOf("[P2]"));
     expect(rendered).toContain("/repo/src/store.ts:4-4");
+
+    const firstFinding = output.findings[0];
+    if (firstFinding === undefined) throw new Error("expected a finding");
+    const canonicalized = renderReview({
+      ...output,
+      findings: [{ ...firstFinding, title: "[P3] Wrong label", priority: 0 }],
+    });
+    expect(canonicalized).toContain("[P0] Wrong label");
+    expect(canonicalized).not.toContain("[P3]");
   });
 
   it("accepts one JSON object surrounded by incidental text", () => {
@@ -77,6 +86,11 @@ describe("review output", () => {
         JSON.stringify({ ...VALID, findings: [{ ...VALID.findings[0], priority: null }] }),
       ),
     ).toThrow("priority");
+    expect(() =>
+      parseReviewOutput(
+        JSON.stringify({ ...VALID, findings: [{ ...VALID.findings[0], priority: 1 }] }),
+      ),
+    ).toThrow("title priority must match priority");
     expect(() =>
       parseReviewOutput(JSON.stringify({ ...VALID, overall_confidence_score: 2 })),
     ).toThrow("between 0 and 1");

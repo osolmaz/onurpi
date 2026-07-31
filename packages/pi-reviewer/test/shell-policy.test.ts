@@ -51,6 +51,12 @@ describe("read-only shell policy", () => {
     await expect(validateShellCommand("git diff --ext-diff", root)).rejects.toThrow(
       "external helpers",
     );
+    await expect(validateShellCommand("git diff --output=victim", root)).rejects.toThrow(
+      "output files",
+    );
+    await expect(validateShellCommand("git diff --output escape", root)).rejects.toThrow(
+      "output files",
+    );
     await expect(validateShellCommand("find . -exec rm file.txt ;", root)).rejects.toThrow();
     await expect(validateShellCommand("find . -delete", root)).rejects.toThrow("unavailable");
     await expect(validateShellCommand("rg --pre cat pattern .", root)).rejects.toThrow(
