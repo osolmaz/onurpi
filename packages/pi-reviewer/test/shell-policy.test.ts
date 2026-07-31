@@ -80,6 +80,9 @@ describe("read-only shell policy", () => {
       validateShellCommand("rg --ignore-file=/etc/passwd pattern .", root),
     ).rejects.toThrow("outside");
     await expect(validateShellCommand("grep -R pattern .", root)).rejects.toThrow("unavailable");
+    await expect(validateShellCommand("wc --files0-from names", root)).rejects.toThrow(
+      "unavailable",
+    );
     await expect(validateShellCommand("curl https://example.com", root)).rejects.toThrow(
       "allowlist",
     );
