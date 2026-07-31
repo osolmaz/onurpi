@@ -22,6 +22,7 @@ configuration.
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 | [`@onurpi/yarp`](packages/yarp/)                                   | Prunes long output from supported developer commands             |
 | [`@onurpi/regrafter-driver`](packages/regrafter-driver/)           | Optional delegation to the dedicated Regrafter app               |
+| [`@osolmaz/pi-reviewer`](packages/pi-reviewer/)                    | Standalone Pi Factory reviewer with P0–P3 findings               |
 | [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
 
 ## Included extension dependencies
@@ -116,6 +117,17 @@ Quality gates:
 npm ci
 npm run check
 npm run slophammer
+```
+
+Pi Reviewer is a standalone binary and is not loaded into normal Pi sessions. Configure its model
+outside the review extension, then review a branch:
+
+```bash
+npm run build --workspace @osolmaz/pi-reviewer
+npm link --workspace @osolmaz/pi-reviewer
+pi-reviewer config set model openai-codex/gpt-5.6-terra
+pi-reviewer config set thinking high
+pi-reviewer --base main
 ```
 
 Mutation testing remains available as an optional manual check:

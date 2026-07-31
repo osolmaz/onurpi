@@ -7,6 +7,7 @@ export default tseslint.config(
       ".stryker-tmp/**",
       "coverage/**",
       "dist/**",
+      "**/dist/**",
       "node_modules/**",
       "eslint.config.mjs",
       "packages/**/eslint.config.mjs",

@@ -1,0 +1,49 @@
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
+export type ModelSelection = {
+  readonly provider: string;
+  readonly model: string;
+  readonly thinking: ThinkingLevel;
+};
+
+export type ReviewTarget =
+  | { readonly kind: "uncommitted" }
+  | { readonly kind: "base"; readonly branch: string }
+  | { readonly kind: "commit"; readonly sha: string; readonly title?: string }
+  | { readonly kind: "custom"; readonly instructions: string };
+
+export type ReviewRequest = {
+  readonly target: ReviewTarget;
+  readonly cwd: string;
+  readonly model?: string;
+  readonly thinking?: ThinkingLevel;
+};
+
+export type ReviewFinding = {
+  readonly title: string;
+  readonly body: string;
+  readonly confidenceScore: number;
+  readonly priority: 0 | 1 | 2 | 3;
+  readonly codeLocation: {
+    readonly absoluteFilePath: string;
+    readonly lineRange: {
+      readonly start: number;
+      readonly end: number;
+    };
+  };
+};
+
+export type ReviewOutput = {
+  readonly findings: readonly ReviewFinding[];
+  readonly overallCorrectness: "patch is correct" | "patch is incorrect";
+  readonly overallExplanation: string;
+  readonly overallConfidenceScore: number;
+};
+
+export type UserConfig = {
+  readonly version: 1;
+  readonly model?: string;
+  readonly thinking?: ThinkingLevel;
+};
