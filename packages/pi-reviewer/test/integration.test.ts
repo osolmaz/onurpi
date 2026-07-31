@@ -133,11 +133,12 @@ describe("Pi Reviewer app", () => {
     ).rejects.toThrow("status 2");
   });
 
-  it("keeps the vendored Codex rubric byte-for-byte except for the review-shell note", async () => {
+  it("keeps the vendored Codex rubric after line-ending normalization", async () => {
     const prompt = await readFile(path.join(packageRoot, "prompts", "review-system.md"), "utf8");
+    const normalized = prompt.replaceAll("\r\n", "\n");
     const localLine =
       "* Use `review_shell` for read-only Git and repository inspection commands. Shell pipelines, redirection, network access, and mutation are unavailable.\n";
-    const upstream = prompt.replace(localLine, "");
+    const upstream = normalized.replace(localLine, "");
     expect(createHash("sha256").update(upstream).digest("hex")).toBe(
       "ec60e7f36a1d1c2679ce095c0205ecc56f7dd8fb57707a13ef362072390f219f",
     );

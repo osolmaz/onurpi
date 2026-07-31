@@ -52,7 +52,7 @@ describe("user config", () => {
       model: "openai-codex/gpt-review",
       thinking: "high",
     });
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
     expect(await readFile(file, "utf8")).toContain('"model": "openai-codex/gpt-review"');
     await resetConfig(file);
     await expect(loadConfig(file)).resolves.toEqual({ version: 1 });
