@@ -11,6 +11,7 @@ export default defineConfig({
         "intervention-message.ts",
         "loop-detector.ts",
         "loop-guard-controller.ts",
+        "thinking-stream-detector.ts",
       ],
       thresholds: {
         statements: 85,

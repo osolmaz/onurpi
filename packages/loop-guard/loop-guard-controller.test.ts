@@ -100,20 +100,61 @@ function settledEpisode(
   harness.controller.agentSettled(harness.ctx);
 }
 
-describe("isContinuationPrompt", () => {
-  it.each(["continue", "Continue please", "go on", "keep going", "you decide", "do it now"])(
-    "classifies %s as continuation",
-    (prompt) => {
-      expect(isContinuationPrompt(prompt)).toBe(true);
-    },
-  );
+function repeatedThinking(prefix: string): string {
+  const passage = Array.from({ length: 176 }, (_, index) => `${prefix}${String(index)}`).join(" ");
+  return `${passage} ${passage} ${passage}`;
+}
 
-  it.each(["continue with a proof", "check the tests", "use a different method", ""])(
-    "classifies %s as substantive",
-    (prompt) => {
-      expect(isContinuationPrompt(prompt)).toBe(false);
-    },
+function streamThinking(
+  harness: ReturnType<typeof createHarness>,
+  thinking: string,
+  chunkSize = thinking.length,
+): void {
+  harness.controller.messageStart({ message: { role: "assistant" } });
+  for (let offset = 0; offset < thinking.length; offset += chunkSize) {
+    harness.controller.messageUpdate(
+      {
+        assistantMessageEvent: {
+          delta: thinking.slice(offset, offset + chunkSize),
+          type: "thinking_delta",
+        },
+      },
+      harness.ctx,
+    );
+  }
+  harness.controller.messageUpdate(
+    { assistantMessageEvent: { type: "thinking_end" } },
+    harness.ctx,
   );
+}
+
+describe("isContinuationPrompt", () => {
+  it.each([
+    "continue",
+    "Continue please",
+    "go on",
+    "keep going",
+    "you decide",
+    "you choose",
+    "do it now",
+    "continue, you choose",
+    "please continue and you decide now",
+    "go ahead, then proceed",
+  ])("classifies %s as continuation", (prompt) => {
+    expect(isContinuationPrompt(prompt)).toBe(true);
+  });
+
+  it.each([
+    "continue with a proof",
+    "continue and",
+    "continue, choose problem 488",
+    "you choose the next test",
+    "check the tests",
+    "use a different method",
+    "",
+  ])("classifies %s as substantive", (prompt) => {
+    expect(isContinuationPrompt(prompt)).toBe(false);
+  });
 });
 
 describe("LoopGuardController", () => {
@@ -196,6 +237,17 @@ describe("LoopGuardController", () => {
     expect(harness.sent).toEqual([]);
   });
 
+  it("retains settled history for compound continuation prompts", () => {
+    const harness = createHarness();
+    harness.controller.enable(harness.ctx);
+    for (let index = 0; index < 3; index += 1) {
+      settledEpisode(harness, "python scan.py", "same", "continue, you choose");
+    }
+
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.emitted).toMatchObject([{ action: "nudge", decision: { kind: "exact_cycle" } }]);
+  });
+
   it("trips instead of sending a second automatic message", () => {
     const harness = createHarness();
     harness.controller.enable(harness.ctx);
@@ -208,6 +260,120 @@ describe("LoopGuardController", () => {
     expect(harness.controller.state).toBe("tripped");
     expect(harness.sent).toHaveLength(1);
     expect(harness.emitted).toMatchObject([{ action: "nudge" }, { action: "trip" }]);
+  });
+});
+
+describe("LoopGuardController streamed thinking", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("aborts repeated thinking and delivers one correction only after settlement", () => {
+    const harness = createHarness();
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+
+    streamThinking(harness, repeatedThinking("density"), 7);
+
+    expect(harness.abort).toHaveBeenCalledOnce();
+    expect(harness.controller.state).toBe("nudged");
+    expect(harness.sent).toEqual([]);
+    expect(harness.emitted).toMatchObject([
+      { action: "nudge", decision: { kind: "thinking_repetition" }, version: 1 },
+    ]);
+
+    harness.controller.agentSettled(harness.ctx);
+
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.sent[0]?.message.customType).toBe(LOOP_GUARD_MESSAGE_TYPE);
+    expect(harness.sent[0]?.message.content).toContain("reasoning windows");
+    expect(harness.sent[0]?.options).toEqual({
+      deliverAs: "followUp",
+      triggerTurn: true,
+    });
+  });
+
+  it("trips and aborts without a second correction on repeated streamed thinking", () => {
+    const harness = createHarness();
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    streamThinking(harness, repeatedThinking("first"), 31);
+    harness.controller.agentSettled(harness.ctx);
+
+    harness.controller.agentStart();
+    streamThinking(harness, repeatedThinking("second"), 29);
+
+    expect(harness.abort).toHaveBeenCalledTimes(2);
+    expect(harness.controller.state).toBe("tripped");
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.emitted).toMatchObject([{ action: "nudge" }, { action: "trip" }]);
+  });
+
+  it("trips safely if the delayed correction cannot be delivered", () => {
+    const harness = createHarness({ sendFails: true });
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    streamThinking(harness, repeatedThinking("delivery"));
+
+    harness.controller.agentSettled(harness.ctx);
+
+    expect(harness.abort).toHaveBeenCalledOnce();
+    expect(harness.controller.state).toBe("tripped");
+    expect(harness.sent).toEqual([]);
+    expect(harness.emitted).toMatchObject([{ action: "nudge" }, { action: "trip" }]);
+  });
+
+  it("ignores repeated visible answer text", () => {
+    const harness = createHarness();
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    harness.controller.messageStart({ message: { role: "assistant" } });
+    harness.controller.messageUpdate(
+      {
+        assistantMessageEvent: {
+          delta: repeatedThinking("answer"),
+          type: "text_delta",
+        },
+      },
+      harness.ctx,
+    );
+
+    expect(harness.abort).not.toHaveBeenCalled();
+    expect(harness.controller.state).toBe("armed");
+  });
+
+  it("clears partial stream evidence after substantive direction", () => {
+    const harness = createHarness({ idle: false });
+    const passage = Array.from({ length: 176 }, (_, index) => `partial${String(index)}`).join(" ");
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    streamThinking(harness, `${passage} ${passage}`);
+
+    harness.controller.input(
+      {
+        source: "interactive",
+        streamingBehavior: "steer",
+        text: "stop and prove a different lemma",
+      },
+      harness.ctx,
+    );
+    streamThinking(harness, passage);
+
+    expect(harness.abort).not.toHaveBeenCalled();
+    expect(harness.controller.state).toBe("armed");
+    expect(harness.sent).toEqual([]);
+  });
+
+  it("drops a pending correction when the session shuts down", () => {
+    const harness = createHarness();
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    streamThinking(harness, repeatedThinking("shutdown"));
+    expect(harness.abort).toHaveBeenCalledOnce();
+
+    harness.controller.sessionShutdown(harness.ctx);
+    harness.controller.agentSettled(harness.ctx);
+
+    expect(harness.controller.state).toBe("off");
+    expect(harness.sent).toEqual([]);
   });
 });
 

@@ -32,6 +32,13 @@ export type LoopDecision =
       kind: "turn_checkpoint";
     }
   | {
+      kind: "thinking_repetition";
+      matchedWindows: number;
+      occurrences: number;
+      tokensObserved: number;
+      windowTokens: number;
+    }
+  | {
       kind: "manual_nudge";
     };
 
