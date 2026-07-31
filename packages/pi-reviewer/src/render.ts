@@ -1,3 +1,4 @@
+import { terminalText } from "./terminal-text.js";
 import type { ReviewFinding, ReviewOutput } from "./types.js";
 
 export function renderReview(output: ReviewOutput): string {
@@ -31,17 +32,6 @@ function renderFindings(findings: readonly ReviewFinding[]): string {
 function priorityTitle(finding: ReviewFinding): string {
   const title = terminalText(finding.title).replace(/^\[P[0-3]\]\s*/u, "");
   return `[P${String(finding.priority)}] ${title}`;
-}
-
-function terminalText(value: string): string {
-  return Array.from(value, (character) =>
-    isTerminalControl(character.codePointAt(0)) ? "�" : character,
-  ).join("");
-}
-
-function isTerminalControl(codePoint: number | undefined): boolean {
-  if (codePoint === undefined) return false;
-  return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
 }
 
 function percent(value: number): string {

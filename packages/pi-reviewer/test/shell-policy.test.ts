@@ -63,6 +63,9 @@ describe("read-only shell policy", () => {
     await expect(validateShellCommand("find . -fprint0 review-output", root)).rejects.toThrow(
       "unavailable",
     );
+    await expect(validateShellCommand("find -files0-from roots", root)).rejects.toThrow(
+      "unavailable",
+    );
     await expect(validateShellCommand("rg --pre cat pattern .", root)).rejects.toThrow(
       "unavailable",
     );
