@@ -1,19 +1,36 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/yarp
-- Commit: `e8e976c44a055c4f3945351cf8813e5b92340dd7`
+- Commit: `0d29a076d1066015b8b291fa32063fd8ff926e51`
 - Retrieved: 2026-07-31
 - License: no license file or package license declared at the reviewed commit
 - Local changes: none; `index.ts` only re-exports the pinned upstream extension
 
 ## Review
 
-The review covered `hooks/pi/yarp.ts`, `hooks/pi/yarp.test.ts`, `package.json`, `Cargo.toml`, and
-all Rust source under `src/`. The extension intercepts `bash` and `exec_command` through Pi's public
-`tool_call` hook. It executes only `yarp --version` and `yarp rewrite <command>` through `pi.exec`.
-It does not read files, access credentials, make network requests, collect telemetry, change project
-trust, override tools, or start background resources.
+The review covered the Pi extension and ingest client, the SQLite schema and archive implementation,
+the command runner, CLI parsing, tests, package metadata, and archive specification.
+
+The extension uses Pi's documented `tool_execution_start`, `tool_call`, `tool_result`,
+`tool_execution_end`, `message_end`, session lifecycle, and `pi.exec` APIs. It does not modify Pi
+session state, Pi's persistent schema, project trust, provider credentials, or Pi internals.
+
+The extension starts one session-scoped `yarp archive ingest` child process. It sends bounded framed
+requests over local pipes, waits for commit acknowledgements, retries one unacknowledged request
+after a transport failure, and closes the process at session shutdown. It also runs
+`yarp --version`, `yarp rewrite`, and `yarp archive restore` through `pi.exec`.
+
+YARP stores tool inputs and results in `~/.local/share/yarp/tool-calls.sqlite3`. For wrapped
+commands it also stores exact stdout and stderr before and after pruning. It reads `fullOutputPath`
+only from Pi's documented built-in Bash result metadata. The archive is private on POSIX systems,
+content-addressed, compressed, transactionally written, integrity checked, and never uploaded or
+served.
 
 The Rust binary executes only commands accepted by its fixed allowlist. It keeps stdout and stderr
-separate, preserves child exit codes, truncates output in memory, and does not persist command
-output or history.
+separate, preserves child exit codes, bounds rendered output in memory, and restores raw output
+after post-execution archive failures. Archive statistics and verification do not print stored
+payloads.
+
+The archive can contain commands, source code, file contents, environment-derived values, and
+secrets printed by tools. `YARP_ARCHIVE_DISABLED=1` disables capture; `YARP_DISABLED=1` disables
+pruning while capture remains active.
