@@ -39,6 +39,7 @@ function suffixRepeats(history: readonly EpisodeDigest[], cycleLength: number): 
   const required = cycleLength * EXACT_CYCLE_REPETITIONS;
   if (history.length < required) return false;
   const start = history.length - required;
+  if (history.slice(start).some((episode) => episode.truncated)) return false;
   for (let offset = cycleLength; offset < required; offset += 1) {
     const current = history[start + offset];
     const expected = history[start + (offset % cycleLength)];
@@ -74,7 +75,9 @@ function repeatedError(history: readonly EpisodeDigest[]): boolean {
 function isContinuationWindow(episodes: readonly EpisodeDigest[]): boolean {
   return (
     episodes.length === CONTINUATION_CHURN_COUNT &&
-    episodes.every((episode) => episode.continuationPrompt && episode.toolCalls > 0)
+    episodes.every(
+      (episode) => episode.continuationPrompt && episode.toolCalls > 0 && !episode.truncated,
+    )
   );
 }
 

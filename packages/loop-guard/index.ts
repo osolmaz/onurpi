@@ -59,6 +59,9 @@ function registerLifecycle(pi: ExtensionAPI, controller: LoopGuardController): v
   pi.on("agent_start", () => {
     controller.agentStart();
   });
+  pi.on("turn_start", () => {
+    controller.turnStart();
+  });
   pi.on("turn_end", (event, ctx) => {
     controller.turnEnd(event, ctx);
   });

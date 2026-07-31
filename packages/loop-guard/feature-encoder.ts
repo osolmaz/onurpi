@@ -48,8 +48,9 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function boundedText(value: string, maximum = MAX_TEXT_BYTES_PER_VALUE): string {
+function boundedText(value: string, maximum = MAX_TEXT_BYTES_PER_VALUE, budget?: Budget): string {
   if (Buffer.byteLength(value, "utf8") <= maximum) return value;
+  if (budget !== undefined) budget.truncated = true;
   const marker = `<truncated:${String(value.length)}>`;
   const characterBudget = Math.max(0, Math.floor((maximum - marker.length) / 8));
   return `${value.slice(0, characterBudget)}${marker}${value.slice(-characterBudget)}`;
@@ -75,9 +76,9 @@ function hashFeature(value: string): number {
   return hash >>> 0;
 }
 
-function canonicalPrimitive(value: unknown): JsonValue | undefined {
+function canonicalPrimitive(value: unknown, budget: Budget): JsonValue | undefined {
   if (value === null || value === undefined) return null;
-  if (typeof value === "string") return boundedText(value);
+  if (typeof value === "string") return boundedText(value, MAX_TEXT_BYTES_PER_VALUE, budget);
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
   return undefined;
@@ -110,7 +111,7 @@ function canonicalValue(value: unknown, budget: Budget, depth = 0): JsonValue {
     return "<bounded>";
   }
   budget.remainingNodes -= 1;
-  const primitive = canonicalPrimitive(value);
+  const primitive = canonicalPrimitive(value, budget);
   if (primitive !== undefined) return primitive;
   if (Array.isArray(value)) return canonicalArray(value, budget, depth);
   return isRecord(value) ? canonicalRecord(value, budget, depth) : `<${typeof value}>`;
@@ -141,18 +142,28 @@ function projectContentItem(item: unknown, budget: Budget): ProjectedContentItem
   return { image: item["type"] === "image" };
 }
 
-function contentProjection(value: unknown, budget: Budget): JsonValue {
+function boundedContentItems(value: unknown, budget: Budget): readonly unknown[] {
   if (!Array.isArray(value)) return [];
+  if (value.length > MAX_ARRAY_ITEMS) budget.truncated = true;
+  return value.slice(0, MAX_ARRAY_ITEMS);
+}
+
+function contentProjection(value: unknown, budget: Budget): JsonValue {
   const projection: JsonValue[] = [];
   const text: string[] = [];
   let imageSeen = false;
-  for (const item of value.slice(0, MAX_ARRAY_ITEMS)) {
+  for (const item of boundedContentItems(value, budget)) {
     const projected = projectContentItem(item, budget);
     if (projected.text !== undefined) text.push(projected.text);
     if (projected.value !== undefined) projection.push(projected.value);
     imageSeen ||= projected.image;
   }
-  if (text.length > 0) projection.unshift({ text: boundedText(text.join("\n")), type: "text" });
+  if (text.length > 0) {
+    projection.unshift({
+      text: boundedText(text.join("\n"), MAX_TEXT_BYTES_PER_VALUE, budget),
+      type: "text",
+    });
+  }
   if (imageSeen) projection.push({ type: "image" });
   return projection;
 }
@@ -163,7 +174,9 @@ function observableMessage(value: unknown, budget: Budget): JsonValue {
     return {
       content: contentProjection(value["content"], budget),
       errorMessage:
-        typeof value["errorMessage"] === "string" ? boundedText(value["errorMessage"]) : null,
+        typeof value["errorMessage"] === "string"
+          ? boundedText(value["errorMessage"], MAX_TEXT_BYTES_PER_VALUE, budget)
+          : null,
       role: "assistant",
       stopReason: typeof value["stopReason"] === "string" ? value["stopReason"] : null,
     };
@@ -291,8 +304,9 @@ function toolCalls(message: unknown): Readonly<Record<string, unknown>>[] {
   );
 }
 
-function normalizeErrorText(value: string): string {
-  return boundedText(value)
+function normalizeErrorText(value: string): { text: string; truncated: boolean } {
+  const budget: Budget = { remainingNodes: 1, truncated: false };
+  const text = boundedText(value, MAX_TEXT_BYTES_PER_VALUE, budget)
     .toLowerCase()
     .replaceAll(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/giu, "<uuid>")
     .replaceAll(/\b(?:0x)?[0-9a-f]{12,}\b/giu, "<id>")
@@ -300,6 +314,7 @@ function normalizeErrorText(value: string): string {
     .replaceAll(/\/tmp\/[^\s'";|&]+/gu, "/tmp/<tmp>")
     .replaceAll(/\s+/gu, " ")
     .trim();
+  return { text, truncated: budget.truncated };
 }
 
 type AssistantTerminalState = {
@@ -319,7 +334,9 @@ function assistantTerminalState(message: unknown): AssistantTerminalState {
   if (stopReason !== "error") return { error: false, fingerprint: null, observed: true };
   const errorMessage =
     typeof message["errorMessage"] === "string" ? message["errorMessage"] : "terminal error";
-  const digest = createHash("sha256").update(normalizeErrorText(errorMessage)).digest("hex");
+  const normalized = normalizeErrorText(errorMessage);
+  if (normalized.truncated) return { error: true, fingerprint: null, observed: true };
+  const digest = createHash("sha256").update(normalized.text).digest("hex");
   return { error: true, fingerprint: `v1:${digest}`, observed: true };
 }
 

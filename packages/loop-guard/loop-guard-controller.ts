@@ -45,6 +45,7 @@ type LoopGuardContext = Pick<ExtensionContext, "abort" | "hasPendingMessages" | 
 };
 type LoopGuardInputEvent = {
   source: "extension" | "interactive" | "rpc";
+  streamingBehavior?: "followUp" | "steer";
   text: string;
 };
 type LoopGuardTurnEndEvent = {
@@ -61,6 +62,7 @@ export class LoopGuardController {
   private episodeContinuationPrompt = false;
   private epoch = 0;
   private nextContinuationPrompt = false;
+  private restartEpisodeOnNextTurn = false;
   private skipCurrentEpisodeAtSettle = false;
   private stateValue: LoopGuardState = "off";
 
@@ -132,7 +134,7 @@ export class LoopGuardController {
     this.nextContinuationPrompt = continuation;
     if (continuation) return;
     this.stateValue = "armed";
-    this.startEpoch();
+    this.startEpoch(event.streamingBehavior !== undefined);
     this.updateStatus(ctx);
   }
 
@@ -143,9 +145,17 @@ export class LoopGuardController {
     this.nextContinuationPrompt = false;
   }
 
+  turnStart(): void {
+    if (!this.isCollecting() || !this.restartEpisodeOnNextTurn) return;
+    this.episode = new EpisodeBuilder();
+    this.episodeContinuationPrompt = false;
+    this.restartEpisodeOnNextTurn = false;
+  }
+
   turnEnd(event: LoopGuardTurnEndEvent, ctx: LoopGuardContext): void {
     if (!this.isCollecting() || this.episode === null) return;
     this.episode.accountTurn(event.message, event.toolResults);
+    if (this.restartEpisodeOnNextTurn) return;
     const decision = turnCheckpoint(this.episode.turns);
     if (decision !== null) this.processDecision(decision, ctx, true);
   }
@@ -156,9 +166,17 @@ export class LoopGuardController {
   }
 
   agentSettled(ctx: LoopGuardContext): void {
-    if (this.stateValue === "off" || this.episode === null) return;
+    if (this.stateValue === "off") return;
+    if (this.episode === null) {
+      this.restartEpisodeOnNextTurn = false;
+      return;
+    }
     const episode = this.episode;
     this.episode = null;
+    if (this.restartEpisodeOnNextTurn) {
+      this.restartEpisodeOnNextTurn = false;
+      return;
+    }
     if (this.skipCurrentEpisodeAtSettle) {
       this.skipCurrentEpisodeAtSettle = false;
       return;
@@ -233,9 +251,12 @@ export class LoopGuardController {
     this.pi.events.emit(LOOP_GUARD_EVENT, event);
   }
 
-  private startEpoch(): void {
+  private startEpoch(preserveActiveEpisode = false): void {
+    const activeEpisode = preserveActiveEpisode ? this.episode : null;
     this.epoch += 1;
     this.clearRuntime();
+    this.episode = activeEpisode;
+    this.restartEpisodeOnNextTurn = preserveActiveEpisode;
   }
 
   private clearRuntime(): void {
@@ -243,6 +264,7 @@ export class LoopGuardController {
     this.episode = null;
     this.episodeContinuationPrompt = false;
     this.nextContinuationPrompt = false;
+    this.restartEpisodeOnNextTurn = false;
     this.skipCurrentEpisodeAtSettle = false;
   }
 

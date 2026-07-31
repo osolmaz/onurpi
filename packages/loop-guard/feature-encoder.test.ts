@@ -198,6 +198,41 @@ describe("EpisodeBuilder", () => {
     expect(result.truncated).toBe(true);
   });
 
+  it("marks bounded outcome text as truncated", () => {
+    const result = digest("python scan.py", `prefix-${"x".repeat(10_000)}-suffix`);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("marks bounded message content arrays as truncated", () => {
+    const builder = new EpisodeBuilder();
+    builder.accountTurn(
+      {
+        role: "assistant",
+        content: Array.from({ length: 65 }, (_, index) => ({
+          type: "text",
+          text: `part-${String(index)}`,
+        })),
+      },
+      [],
+    );
+    expect(builder.finish(false).truncated).toBe(true);
+  });
+
+  it("does not fingerprint oversized terminal errors as repeatable", () => {
+    const builder = new EpisodeBuilder();
+    builder.accountAgentEnd([
+      {
+        role: "assistant",
+        stopReason: "error",
+        errorMessage: `prefix-${"x".repeat(10_000)}-suffix`,
+      },
+    ]);
+    expect(builder.finish(false)).toMatchObject({
+      terminalError: true,
+      terminalErrorFingerprint: null,
+    });
+  });
+
   it("handles malformed external values without throwing", () => {
     const builder = new EpisodeBuilder();
     builder.accountTurn(
