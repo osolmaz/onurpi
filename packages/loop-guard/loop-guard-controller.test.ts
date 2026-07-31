@@ -242,6 +242,39 @@ describe("LoopGuardController", () => {
     expect(harness.abort).toHaveBeenCalledOnce();
   });
 
+  it("restarts collection at the next turn after streamed substantive direction", () => {
+    const harness = createHarness({ idle: false });
+    harness.controller.enable(harness.ctx);
+    harness.controller.agentStart();
+    for (let index = 0; index < 11; index += 1) {
+      harness.controller.turnEnd(
+        assistantTurn("python old.py", `old-${String(index)}`),
+        harness.ctx,
+      );
+    }
+
+    harness.controller.input(
+      {
+        source: "interactive",
+        streamingBehavior: "steer",
+        text: "stop measuring and use a different proof",
+      },
+      harness.ctx,
+    );
+    harness.controller.turnEnd(assistantTurn("python old.py", "old-final"), harness.ctx);
+    expect(harness.sent).toEqual([]);
+
+    harness.controller.turnStart();
+    for (let index = 0; index < 12; index += 1) {
+      harness.controller.turnEnd(
+        assistantTurn("python new.py", `new-${String(index)}`),
+        harness.ctx,
+      );
+    }
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.sent[0]?.options).toEqual({ deliverAs: "steer" });
+  });
+
   it("starts a fresh armed epoch on substantive user direction", () => {
     const harness = createHarness();
     harness.controller.enable(harness.ctx);

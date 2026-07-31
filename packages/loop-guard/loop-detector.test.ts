@@ -47,6 +47,13 @@ describe("LoopDetector", () => {
     }
   });
 
+  it("does not compare truncated outcomes as exact cycles", () => {
+    const detector = new LoopDetector();
+    for (let index = 0; index < 3; index += 1) {
+      expect(detector.observe(episode("same", { truncated: true }))).toBeNull();
+    }
+  });
+
   it("detects the same normalized terminal error three times", () => {
     const detector = new LoopDetector();
     let decision = null;
@@ -90,6 +97,20 @@ describe("LoopDetector", () => {
     expect(decision?.kind).toBe("continuation_churn");
     if (decision?.kind === "continuation_churn") {
       expect(decision.similarity).toBeGreaterThanOrEqual(0.85);
+    }
+  });
+
+  it("does not trigger fuzzy matching for truncated episodes", () => {
+    const detector = new LoopDetector();
+    for (let index = 0; index < CONTINUATION_CHURN_COUNT; index += 1) {
+      expect(
+        detector.observe(
+          episode(`truncated-${String(index)}`, {
+            continuationPrompt: true,
+            truncated: true,
+          }),
+        ),
+      ).toBeNull();
     }
   });
 
