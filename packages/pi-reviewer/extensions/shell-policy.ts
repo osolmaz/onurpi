@@ -208,6 +208,7 @@ function validateProgramArgs(program: string, args: readonly string[]): void {
     ]);
   if (program === "grep") rejectOptions(args, ["--dereference-recursive", "-R"]);
   if (program === "ls") rejectOptions(args, ["--dereference", "-L"]);
+  if (program === "wc") rejectOptions(args, ["--files0-from"]);
 }
 
 function rejectOptions(args: readonly string[], blocked: readonly string[]): void {
