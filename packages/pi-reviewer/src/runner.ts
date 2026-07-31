@@ -95,7 +95,7 @@ async function collectChild(
   child.stdout.on("data", (chunk: Buffer) => {
     resetInactivity();
     try {
-      collector.feed(chunk.toString("utf8"));
+      collector.feed(chunk);
     } catch (error) {
       failure = error instanceof Error ? error : new Error(String(error));
       terminate(failure.message);

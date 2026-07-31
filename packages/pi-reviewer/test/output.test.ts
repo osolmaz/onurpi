@@ -73,6 +73,10 @@ describe("review output", () => {
     expect(renderReview(clean)).toContain("No findings.");
   });
 
+  it("scans bounded malformed output in linear time", () => {
+    expect(() => parseReviewOutput("{".repeat(100_000))).toThrow("exactly one JSON object");
+  }, 1_000);
+
   it("fails closed on malformed and ambiguous output", () => {
     expect(() => parseReviewOutput("not json")).toThrow("exactly one JSON object");
     expect(() => parseReviewOutput(`${JSON.stringify(VALID)} ${JSON.stringify(VALID)}`)).toThrow(
@@ -164,19 +168,22 @@ describe("review output", () => {
 });
 
 describe("Pi JSON events", () => {
-  it("collects a completed assistant response across arbitrary chunks", () => {
+  it("collects a completed assistant response across arbitrary UTF-8 chunks", () => {
     const collector = new PiEventCollector();
-    const event = `${JSON.stringify({
-      type: "message_end",
-      message: {
-        role: "assistant",
-        stopReason: "stop",
-        content: [{ type: "text", text: JSON.stringify(VALID) }],
-      },
-    })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`;
-    for (let index = 0; index < event.length; index += 7)
-      collector.feed(event.slice(index, index + 7));
-    expect(collector.finish().finalText).toBe(JSON.stringify(VALID));
+    const expected = JSON.stringify({ ...VALID, overall_explanation: "The café change is valid." });
+    const event = Buffer.from(
+      `${JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          stopReason: "stop",
+          content: [{ type: "text", text: expected }],
+        },
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+    );
+    for (let index = 0; index < event.length; index += 1)
+      collector.feed(event.subarray(index, index + 1));
+    expect(collector.finish().finalText).toBe(expected);
   });
 
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {

@@ -1,3 +1,5 @@
+import { StringDecoder } from "node:string_decoder";
+
 const MAX_EVENT_LINE_BYTES = 2 * 1024 * 1024;
 const MAX_FINAL_TEXT_CHARS = 512 * 1024;
 
@@ -8,11 +10,16 @@ export type PiRunResult = {
 
 export class PiEventCollector {
   private buffer = "";
+  private readonly decoder = new StringDecoder("utf8");
   private finalText: string | undefined;
   private terminalError: string | undefined;
   private agentEnded = false;
 
-  feed(chunk: string): void {
+  feed(chunk: string | Buffer): void {
+    this.feedText(typeof chunk === "string" ? chunk : this.decoder.write(chunk));
+  }
+
+  private feedText(chunk: string): void {
     this.buffer += chunk;
     if (Buffer.byteLength(this.buffer) > MAX_EVENT_LINE_BYTES) {
       throw new Error("Pi emitted an oversized JSON event");
@@ -27,6 +34,7 @@ export class PiEventCollector {
   }
 
   finish(): PiRunResult {
+    this.feedText(this.decoder.end());
     if (this.buffer.trim() !== "") this.consume(this.buffer);
     this.buffer = "";
     if (!this.agentEnded) throw new Error("Pi exited before agent_end");

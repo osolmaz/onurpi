@@ -202,6 +202,3 @@ jobs:
       - name: Mutate @onurpi/yarp package
         working-directory: packages/yarp
         run: npm run mutate
-      - name: Mutate @osolmaz/pi-reviewer package
-        working-directory: packages/pi-reviewer
-        run: npm run mutate

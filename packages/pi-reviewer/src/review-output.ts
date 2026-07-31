@@ -82,17 +82,22 @@ function extractSingleObject(text: string): unknown {
 
 function jsonObjectCandidates(text: string): readonly unknown[] {
   const candidates: unknown[] = [];
-  for (let start = 0; start < text.length; start += 1) {
-    if (text[start] !== "{") continue;
-    const end = objectEnd(text, start);
-    if (end === undefined) continue;
-    try {
-      const value: unknown = JSON.parse(text.slice(start, end + 1));
-      if (isRecord(value)) candidates.push(value);
-      start = end;
-    } catch {
-      // Continue searching for a later valid object.
+  const state: ObjectScanState = { depth: 0, quoted: false, escaped: false };
+  let start: number | undefined;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index] ?? "";
+    if (start === undefined) {
+      if (char === "{") {
+        start = index;
+        state.depth = 1;
+      }
+      continue;
     }
+    if (!consumeObjectChar(state, char)) continue;
+    collectCandidate(text, start, index, candidates);
+    start = undefined;
+    state.quoted = false;
+    state.escaped = false;
   }
   return candidates;
 }
@@ -103,12 +108,13 @@ type ObjectScanState = {
   escaped: boolean;
 };
 
-function objectEnd(text: string, start: number): number | undefined {
-  const state: ObjectScanState = { depth: 0, quoted: false, escaped: false };
-  for (let index = start; index < text.length; index += 1) {
-    if (consumeObjectChar(state, text[index] ?? "")) return index;
+function collectCandidate(text: string, start: number, end: number, candidates: unknown[]): void {
+  try {
+    const value: unknown = JSON.parse(text.slice(start, end + 1));
+    if (isRecord(value)) candidates.push(value);
+  } catch {
+    // Continue searching for a later complete object.
   }
-  return undefined;
 }
 
 function consumeObjectChar(state: ObjectScanState, char: string): boolean {
