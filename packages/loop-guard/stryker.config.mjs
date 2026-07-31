@@ -4,6 +4,7 @@ export default {
     "intervention-message.ts",
     "loop-detector.ts",
     "loop-guard-controller.ts",
+    "thinking-stream-detector.ts",
   ],
   testRunner: "vitest",
   checkers: ["typescript"],

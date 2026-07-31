@@ -2,7 +2,7 @@
 
 Opt-in bounded loop detection for the Pi coding agent.
 
-Loop Guard watches finalized agent turns only after you enable it. It uses deterministic, bounded fingerprints and action features. It does not call another model, inspect the filesystem, use the network, or scan the complete session transcript.
+Loop Guard watches streamed reasoning and finalized agent turns after you enable it. It uses deterministic, bounded fingerprints and action features. It does not call another model, inspect the filesystem, use the network, or scan the complete session transcript.
 
 ## Commands
 
@@ -20,17 +20,18 @@ The extension starts off after every load, reload, or session replacement. `/loo
 
 Loop Guard intervenes after one of these bounded conditions:
 
+- Three separate 96-token reasoning windows each appear three times while one assistant response is streaming.
 - An exact outcome cycle of length one through four repeats three times.
 - The same terminal error occurs three times.
 - Four continuation-led episodes have at least 85% adjacent action similarity.
 - Eight settled episodes finish in one epoch.
 - One agent run reaches twelve turns.
 
-Fuzzy action similarity never triggers by itself.
+Streamed reasoning matching ignores case, punctuation, and whitespace differences. Fuzzy action similarity never triggers by itself.
 
 ## Intervention policy
 
-The first detection sends one visible `onurpi-loop-guard` message. It tells the model to stop the current approach, restate verified facts, identify invalidated work, and choose a materially different action. During an active run the message is delivered as steering. After settlement it starts one corrective follow-up run when Pi is idle.
+The first detection sends one visible `onurpi-loop-guard` message. It tells the model to stop the current approach, restate verified facts, identify invalidated work, and choose a materially different action. A streamed-reasoning detection aborts the looping provider response immediately, then starts one corrective follow-up after Pi settles. Other active-run detections are delivered as steering.
 
 A second detection in the same epoch trips the guard. It does not send another model message. If the agent is active, Loop Guard aborts it and waits for substantive user direction or `/loop-guard reset`.
 
@@ -38,7 +39,7 @@ Loop Guard emits `onurpi:loop-guard` events with versioned `nudge` and `trip` ac
 
 ## State and performance
 
-Disabled handlers return before allocating detector state. Enabled state is bounded to twelve episode digests, sixteen turns per episode, thirty-two tool actions per episode, and 256 hashed action features. Raw model and tool content is not retained.
+Disabled handlers return before collecting detector state. Enabled episode state is bounded to twelve digests, sixteen turns per episode, thirty-two tool actions per episode, and 256 hashed action features. Streamed reasoning state keeps one 96-token rolling window and at most 2,048 content-selected hashes. Raw model, reasoning, and tool content is not retained.
 
 The package persists no settings or detector state. The visible intervention message is the only session entry it adds.
 

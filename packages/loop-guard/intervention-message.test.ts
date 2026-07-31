@@ -9,6 +9,13 @@ const decisions: LoopDecision[] = [
   { count: 4, kind: "continuation_churn", similarity: 0.912 },
   { count: 8, kind: "episode_checkpoint" },
   { count: 12, kind: "turn_checkpoint" },
+  {
+    kind: "thinking_repetition",
+    matchedWindows: 3,
+    occurrences: 3,
+    tokensObserved: 9_234,
+    windowTokens: 96,
+  },
   { kind: "manual_nudge" },
 ];
 

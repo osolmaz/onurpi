@@ -21,6 +21,8 @@ function evidence(decision: LoopDecision): string {
       return `${String(decision.count)} settled runs finished without substantive user direction.`;
     case "turn_checkpoint":
       return `The current run reached ${String(decision.count)} model turns.`;
+    case "thinking_repetition":
+      return `${String(decision.matchedWindows)} separate ${String(decision.windowTokens)}-token reasoning windows each appeared ${String(decision.occurrences)} times within one response.`;
     case "manual_nudge":
       return "The user requested an immediate loop review.";
   }
@@ -55,6 +57,8 @@ export function decisionLabel(decision: LoopDecision): string {
       return `${String(decision.count)}-run checkpoint`;
     case "turn_checkpoint":
       return `${String(decision.count)}-turn checkpoint`;
+    case "thinking_repetition":
+      return "repeated streamed reasoning";
     case "manual_nudge":
       return "manual review";
   }
