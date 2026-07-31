@@ -33,6 +33,7 @@ function parseFinding(value: unknown, index: number): ReviewFinding {
   }
   const title = nonemptyString(value["title"], `${label}.title`);
   if (title.length > 80) throw new Error(`${label}.title exceeds 80 characters`);
+  assertTitlePriority(title, priority, label);
   return {
     title,
     body: nonemptyString(value["body"], `${label}.body`),
@@ -40,6 +41,13 @@ function parseFinding(value: unknown, index: number): ReviewFinding {
     priority,
     codeLocation: parseLocation(value["code_location"], `${label}.code_location`),
   };
+}
+
+function assertTitlePriority(title: string, priority: number, label: string): void {
+  const titlePriority = /^\[P([0-3])\]\s/u.exec(title);
+  if (titlePriority !== null && Number(titlePriority[1]) !== priority) {
+    throw new Error(`${label}.title priority must match priority`);
+  }
 }
 
 function parseLocation(value: unknown, label: string): ReviewFinding["codeLocation"] {

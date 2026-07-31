@@ -29,9 +29,8 @@ function renderFindings(findings: readonly ReviewFinding[]): string {
 }
 
 function priorityTitle(finding: ReviewFinding): string {
-  return /^\[P[0-3]\]\s/u.test(finding.title)
-    ? finding.title
-    : `[P${String(finding.priority)}] ${finding.title}`;
+  const title = finding.title.replace(/^\[P[0-3]\]\s*/u, "");
+  return `[P${String(finding.priority)}] ${title}`;
 }
 
 function percent(value: number): string {

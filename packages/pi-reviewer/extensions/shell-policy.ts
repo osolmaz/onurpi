@@ -26,7 +26,7 @@ const ALLOWED_GIT_COMMANDS = new Set([
   "diff-tree",
   "name-rev",
 ]);
-const BLOCKED_GIT_OPTIONS = new Set(["--ext-diff", "--textconv", "--exec-path"]);
+const BLOCKED_GIT_OPTIONS = ["--ext-diff", "--textconv", "--exec-path", "--output"];
 const MAX_OUTPUT_BYTES = 128 * 1024;
 
 export type ShellCommand = {
@@ -213,8 +213,12 @@ function validateGitArgs(args: readonly string[]): void {
   if (subcommand === undefined || !ALLOWED_GIT_COMMANDS.has(subcommand)) {
     throw new Error("Git subcommand is not in the read-only allowlist");
   }
-  if (args.some((arg) => BLOCKED_GIT_OPTIONS.has(arg))) {
-    throw new Error("Git external helpers are not allowed");
+  if (
+    args.some((arg) =>
+      BLOCKED_GIT_OPTIONS.some((option) => arg === option || arg.startsWith(`${option}=`)),
+    )
+  ) {
+    throw new Error("Git external helpers and output files are not allowed");
   }
 }
 
