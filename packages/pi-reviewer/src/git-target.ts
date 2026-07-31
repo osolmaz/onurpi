@@ -48,10 +48,13 @@ async function resolveBase(
 ): Promise<ResolvedTarget> {
   if (branch.startsWith("-") || branch.length > 1024) throw new Error("invalid base branch");
   await git(cwd, ["check-ref-format", "--branch", branch], signal);
-  const mergeBase = (await git(cwd, ["merge-base", "HEAD", branch], signal, true)).trim();
+  const baseCommit = (
+    await git(cwd, ["rev-parse", "--verify", "--end-of-options", `${branch}^{commit}`], signal)
+  ).trim();
+  const mergeBase = (await git(cwd, ["merge-base", "HEAD", baseCommit], signal, true)).trim();
   const prompt =
     mergeBase === ""
-      ? `Review the code changes against the base branch '${branch}'. Start by finding the merge diff between the current branch and ${branch}'s upstream e.g. (\`git merge-base HEAD "$(git rev-parse --abbrev-ref "${branch}@{upstream}")"\`), then run \`git diff\` against that SHA to see what changes we would merge into the ${branch} branch. Provide prioritized, actionable findings.`
+      ? `Review the code changes against the unrelated base branch '${branch}'. Run \`git diff ${baseCommit} HEAD\` to compare the two branch trees. Provide prioritized, actionable findings.`
       : `Review the code changes against the base branch '${branch}'. The merge base commit for this comparison is ${mergeBase}. Run \`git diff ${mergeBase}\` to inspect the changes relative to ${branch}. Provide prioritized, actionable findings.`;
   return { cwd, prompt, hint: `changes against '${branch}'` };
 }

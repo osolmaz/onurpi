@@ -57,7 +57,7 @@ export async function executeShellCommand(
   cwd: string,
   signal?: AbortSignal,
 ): Promise<ShellResult> {
-  const args = command.program === "git" ? safeGitArgs(command.args) : command.args;
+  const args = safeProgramArgs(command.program, command.args);
   return await new Promise<ShellResult>((resolve, reject) => {
     const child = spawn(command.program, args, {
       cwd,
@@ -197,7 +197,15 @@ function validateProgramArgs(program: string, args: readonly string[]): void {
       "-L",
     ]);
   if (program === "rg")
-    rejectOptions(args, ["--pre", "--pre-glob", "--search-zip", "--follow", "-L"]);
+    rejectOptions(args, [
+      "--config",
+      "--config-path",
+      "--pre",
+      "--pre-glob",
+      "--search-zip",
+      "--follow",
+      "-L",
+    ]);
   if (program === "grep") rejectOptions(args, ["--dereference-recursive", "-R"]);
   if (program === "ls") rejectOptions(args, ["--dereference", "-L"]);
 }
@@ -266,6 +274,12 @@ export function containsPath(
   );
 }
 
+export function safeProgramArgs(program: string, args: readonly string[]): readonly string[] {
+  if (program === "git") return safeGitArgs(args);
+  if (program === "rg") return ["--no-config", ...args];
+  return args;
+}
+
 function safeGitArgs(args: readonly string[]): readonly string[] {
   const [subcommand, ...rest] = args;
   const inspectionArgs =
@@ -286,11 +300,13 @@ function safeGitArgs(args: readonly string[]): readonly string[] {
 }
 
 function safeEnvironment(): NodeJS.ProcessEnv {
-  return {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     GIT_EXTERNAL_DIFF: "",
     GIT_OPTIONAL_LOCKS: "0",
     GIT_PAGER: "cat",
     PAGER: "cat",
   };
+  delete environment["RIPGREP_CONFIG_PATH"];
+  return environment;
 }

@@ -53,8 +53,9 @@ describe("review target resolution", () => {
     await exec("git", ["add", "other.ts"], { cwd: repo.root });
     await exec("git", ["commit", "-m", "unrelated"], { cwd: repo.root });
     const result = await resolveTarget({ kind: "base", branch: "main" }, repo.root);
-    expect(result.prompt).toContain("Start by finding the merge diff");
-    expect(result.prompt).toContain("main@{upstream}");
+    expect(result.prompt).toBe(
+      `Review the code changes against the unrelated base branch 'main'. Run \`git diff ${repo.head} HEAD\` to compare the two branch trees. Provide prioritized, actionable findings.`,
+    );
   });
 
   it("resolves commits and obtains their titles", async () => {
