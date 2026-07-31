@@ -80,60 +80,91 @@ function extractSingleObject(text: string): unknown {
   }
 }
 
-function jsonObjectCandidates(text: string): readonly unknown[] {
-  const candidates: unknown[] = [];
-  const state: ObjectScanState = { depth: 0, quoted: false, escaped: false };
-  let start: number | undefined;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index] ?? "";
-    if (start === undefined) {
-      if (char === "{") {
-        start = index;
-        state.depth = 1;
-      }
-      continue;
-    }
-    if (!consumeObjectChar(state, char)) continue;
-    collectCandidate(text, start, index, candidates);
-    start = undefined;
-    state.quoted = false;
-    state.escaped = false;
-  }
-  return candidates;
-}
+const REVIEW_MARKER = '"overall_correctness"';
+const MAX_OBJECT_DEPTH = 128;
+const MAX_CANDIDATE_PARSES = 64;
+
+type ObjectFrame = {
+  readonly start: number;
+  hasReviewMarker: boolean;
+};
 
 type ObjectScanState = {
-  depth: number;
+  readonly frames: ObjectFrame[];
+  readonly candidates: unknown[];
   quoted: boolean;
   escaped: boolean;
+  parseCount: number;
 };
+
+function jsonObjectCandidates(text: string): readonly unknown[] {
+  const state: ObjectScanState = {
+    frames: [],
+    candidates: [],
+    quoted: false,
+    escaped: false,
+    parseCount: 0,
+  };
+  for (let index = 0; index < text.length; index += 1) scanObjectCharacter(text, index, state);
+  return state.candidates;
+}
+
+function scanObjectCharacter(text: string, index: number, state: ObjectScanState): void {
+  if (text.startsWith(REVIEW_MARKER, index)) markFrames(state.frames);
+  const char = text[index] ?? "";
+  if (consumeStringCharacter(char, state)) return;
+  if (char === "{") pushFrame(state.frames, index);
+  if (char === "}") closeFrame(text, index, state);
+}
+
+function consumeStringCharacter(char: string, state: ObjectScanState): boolean {
+  if (state.escaped) {
+    state.escaped = false;
+    return true;
+  }
+  if (!state.quoted) {
+    if (char === '"') state.quoted = true;
+    return state.quoted;
+  }
+  if (char === "\\") state.escaped = true;
+  else if (char === '"') state.quoted = false;
+  return true;
+}
+
+function closeFrame(text: string, end: number, state: ObjectScanState): void {
+  const frame = state.frames.pop();
+  if (frame?.hasReviewMarker !== true) return;
+  if (state.parseCount >= MAX_CANDIDATE_PARSES) return;
+  state.parseCount += 1;
+  collectCandidate(text, frame.start, end, state.candidates);
+}
+
+function markFrames(frames: ObjectFrame[]): void {
+  for (const frame of frames) frame.hasReviewMarker = true;
+}
+
+function pushFrame(frames: ObjectFrame[], start: number): void {
+  if (frames.length >= MAX_OBJECT_DEPTH) frames.splice(0, frames.length);
+  frames.push({ start, hasReviewMarker: false });
+}
 
 function collectCandidate(text: string, start: number, end: number, candidates: unknown[]): void {
   try {
     const value: unknown = JSON.parse(text.slice(start, end + 1));
-    if (isRecord(value)) candidates.push(value);
+    if (isReviewCandidate(value)) candidates.push(value);
   } catch {
     // Continue searching for a later complete object.
   }
 }
 
-function consumeObjectChar(state: ObjectScanState, char: string): boolean {
-  if (state.escaped) {
-    state.escaped = false;
-    return false;
-  }
-  if (char === "\\" && state.quoted) {
-    state.escaped = true;
-    return false;
-  }
-  if (char === '"') {
-    state.quoted = !state.quoted;
-    return false;
-  }
-  if (state.quoted) return false;
-  if (char === "{") state.depth += 1;
-  if (char === "}") state.depth -= 1;
-  return state.depth === 0;
+function isReviewCandidate(value: unknown): value is Record<string, unknown> {
+  return (
+    isRecord(value) &&
+    "findings" in value &&
+    "overall_correctness" in value &&
+    "overall_explanation" in value &&
+    "overall_confidence_score" in value
+  );
 }
 
 function exactKeys(

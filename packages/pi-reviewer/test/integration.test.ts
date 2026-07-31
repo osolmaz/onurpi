@@ -36,15 +36,17 @@ afterEach(async () => {
 
 async function fakePi(
   exitCode = 0,
-): Promise<{ root: string; command: readonly string[]; argsFile: string }> {
+): Promise<{ root: string; command: readonly string[]; argsFile: string; offlineFile: string }> {
   const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-fake-"));
   cleanup.push(root);
   const script = path.join(root, "fake-pi.mjs");
   const argsFile = path.join(root, "args.json");
+  const offlineFile = path.join(root, "offline.txt");
   await writeFile(
     script,
     `import { writeFileSync } from "node:fs";
 writeFileSync(process.env.PI_REVIEWER_ARGS_FILE, JSON.stringify(process.argv.slice(2)));
+writeFileSync(process.env.PI_REVIEWER_OFFLINE_FILE, process.env.PI_OFFLINE ?? "");
 if (${String(exitCode)} !== 0) process.exit(${String(exitCode)});
 const output = process.env.PI_REVIEWER_OUTPUT;
 console.log(JSON.stringify({type:"session", version:3, id:"fake", cwd:process.cwd()}));
@@ -53,7 +55,7 @@ console.log(JSON.stringify({type:"agent_end", messages:[]}));
 `,
   );
   await chmod(script, 0o755);
-  return { root, command: [process.execPath, script], argsFile };
+  return { root, command: [process.execPath, script], argsFile, offlineFile };
 }
 
 describe("Pi Reviewer app", () => {
@@ -82,14 +84,20 @@ describe("Pi Reviewer app", () => {
       sessionDir: path.join(stateDir, "sessions"),
       env: {
         PI_REVIEWER_ARGS_FILE: fake.argsFile,
+        PI_REVIEWER_OFFLINE_FILE: fake.offlineFile,
         PI_REVIEWER_OUTPUT: JSON.stringify(OUTPUT),
       },
     };
+    const previousOffline = process.env["PI_OFFLINE"];
+    process.env["PI_OFFLINE"] = "0";
     const result = await runReview({
       app,
       selection: { provider: "openai-codex", model: "external-review-model", thinking: "high" },
       cwd: fake.root,
       prompt: "Review the change",
+    }).finally(() => {
+      if (previousOffline === undefined) delete process.env["PI_OFFLINE"];
+      else process.env["PI_OFFLINE"] = previousOffline;
     });
     expect(result.findings[0]?.priority).toBe(1);
     const args = JSON.parse(await readFile(fake.argsFile, "utf8")) as string[];
@@ -98,6 +106,7 @@ describe("Pi Reviewer app", () => {
     expect(args).toContain("external-review-model");
     expect(args).toContain("high");
     expect(args).toContain("Review the change");
+    expect(await readFile(fake.offlineFile, "utf8")).toBe("1");
     await expect(readFile(path.join(stateDir, "sessions", "session.jsonl"))).rejects.toThrow();
   });
 
@@ -108,7 +117,11 @@ describe("Pi Reviewer app", () => {
       ...loaded,
       stateDir: path.join(fake.root, "state"),
       sessionDir: path.join(fake.root, "sessions"),
-      env: { PI_REVIEWER_ARGS_FILE: fake.argsFile, PI_REVIEWER_OUTPUT: JSON.stringify(OUTPUT) },
+      env: {
+        PI_REVIEWER_ARGS_FILE: fake.argsFile,
+        PI_REVIEWER_OFFLINE_FILE: fake.offlineFile,
+        PI_REVIEWER_OUTPUT: JSON.stringify(OUTPUT),
+      },
     };
     await expect(
       runReview({

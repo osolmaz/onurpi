@@ -59,11 +59,31 @@ describe("review output", () => {
     });
     expect(canonicalized).toContain("[P0] Wrong label");
     expect(canonicalized).not.toContain("[P3]");
+
+    const unsafe = renderReview({
+      ...output,
+      overallExplanation: "unsafe\u001b]52;c;clipboard\u0007",
+      findings: [
+        {
+          ...firstFinding,
+          title: "[P2] Unsafe\u001b[2J title",
+          body: "body\u0007text",
+          codeLocation: { ...firstFinding.codeLocation, absoluteFilePath: "/repo/\u001bpath.ts" },
+        },
+      ],
+    });
+    expect(unsafe).not.toContain("\u001b");
+    expect(unsafe).not.toContain("\u0007");
+    expect(unsafe).toContain("�");
   });
 
   it("accepts one JSON object surrounded by incidental text", () => {
     const output = parseReviewOutput(`result follows\n${JSON.stringify(VALID)}\nend`);
     expect(output.findings).toHaveLength(3);
+    const afterUnmatchedBrace = parseReviewOutput(
+      `diagnostic { left open\n${JSON.stringify(VALID)}`,
+    );
+    expect(afterUnmatchedBrace.findings).toHaveLength(3);
   });
 
   it("renders a clean review without inventing findings", () => {
