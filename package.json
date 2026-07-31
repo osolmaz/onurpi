@@ -12,8 +12,8 @@
   "pi": {
     "extensions": [
       "./packages/turn-fold/index.ts",
-      "./packages/goal/index.ts",
       "./packages/loop-guard/index.ts",
+      "./packages/goal/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
       "./packages/prompt-queue/index.ts",

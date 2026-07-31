@@ -34,7 +34,7 @@ The first detection sends one visible `onurpi-loop-guard` message. It tells the 
 
 A second detection in the same epoch trips the guard. It does not send another model message. If the agent is active, Loop Guard aborts it and waits for substantive user direction or `/loop-guard reset`.
 
-Loop Guard emits `onurpi:loop-guard` events with versioned `nudge` and `trip` actions so other extensions can pause their own continuation policy.
+Loop Guard emits `onurpi:loop-guard` events with versioned `nudge` and `trip` actions so other extensions can pause their own continuation policy. OnurPi's bundled Goal extension listens for these events and pauses an active goal before it can queue another automatic run.
 
 ## State and performance
 

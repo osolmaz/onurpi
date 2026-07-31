@@ -39,6 +39,7 @@ Goal pauses when:
 - The final assistant response ends in a terminal error after Pi's retry policy settles.
 - The same outcome cycle, with a period of one to four runs, repeats three times.
 - Twenty automatic runs finish since the goal started or was last resumed.
+- The bundled Loop Guard emits a version-one `nudge` or `trip` event while the goal is active.
 
 Outcome fingerprints cover model text, tool calls, and tool results while excluding volatile IDs, timestamps, usage, model, provider, and API fields. Only bounded `v1:` SHA-256 hashes are stored. Raw model output and tool data are not copied into safety state. A changing fingerprint is not treated as proof of progress; the 20-run checkpoint remains the final bound.
 
