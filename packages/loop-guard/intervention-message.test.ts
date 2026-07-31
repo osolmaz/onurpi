@@ -7,8 +7,6 @@ const decisions: LoopDecision[] = [
   { cycleLength: 2, kind: "exact_cycle", repetitions: 3 },
   { count: 3, kind: "repeated_error" },
   { count: 4, kind: "continuation_churn", similarity: 0.912 },
-  { count: 8, kind: "episode_checkpoint" },
-  { count: 12, kind: "turn_checkpoint" },
   {
     kind: "thinking_repetition",
     matchedWindows: 3,

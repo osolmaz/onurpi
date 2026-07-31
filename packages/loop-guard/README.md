@@ -24,8 +24,8 @@ Loop Guard intervenes after one of these bounded conditions:
 - An exact outcome cycle of length one through four repeats three times.
 - The same terminal error occurs three times.
 - Four continuation-led episodes have at least 85% adjacent action similarity.
-- Eight settled episodes finish in one epoch.
-- One agent run reaches twelve turns.
+
+Turn and episode counts alone never trigger an intervention. Long agent runs continue while their reasoning, outcomes, actions, and errors remain materially distinct.
 
 Streamed reasoning matching ignores case, punctuation, and whitespace differences. Fuzzy action similarity never triggers by itself.
 

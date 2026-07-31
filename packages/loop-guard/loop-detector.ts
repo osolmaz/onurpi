@@ -5,8 +5,6 @@ export const MAX_EXACT_CYCLE_LENGTH = 4;
 export const REPEATED_ERROR_COUNT = 3;
 export const CONTINUATION_CHURN_COUNT = 4;
 export const CONTINUATION_SIMILARITY_THRESHOLD = 0.85;
-export const EPISODE_CHECKPOINT = 8;
-export const TURN_CHECKPOINT = 12;
 
 export type LoopDecision =
   | {
@@ -22,14 +20,6 @@ export type LoopDecision =
       count: number;
       kind: "continuation_churn";
       similarity: number;
-    }
-  | {
-      count: number;
-      kind: "episode_checkpoint";
-    }
-  | {
-      count: number;
-      kind: "turn_checkpoint";
     }
   | {
       kind: "thinking_repetition";
@@ -129,15 +119,7 @@ function detect(history: readonly EpisodeDigest[]): LoopDecision | null {
       similarity,
     };
   }
-  if (history.length >= EPISODE_CHECKPOINT) {
-    return { count: EPISODE_CHECKPOINT, kind: "episode_checkpoint" };
-  }
   return null;
-}
-
-export function turnCheckpoint(turns: number): LoopDecision | null {
-  if (turns < TURN_CHECKPOINT || turns % TURN_CHECKPOINT !== 0) return null;
-  return { count: turns, kind: "turn_checkpoint" };
 }
 
 export class LoopDetector {

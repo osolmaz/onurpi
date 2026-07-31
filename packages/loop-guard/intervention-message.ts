@@ -17,10 +17,6 @@ function evidence(decision: LoopDecision): string {
       return `The same terminal error occurred ${String(decision.count)} times.`;
     case "continuation_churn":
       return `${String(decision.count)} continuation-led runs had ${String(Math.round(decision.similarity * 100))}% action similarity.`;
-    case "episode_checkpoint":
-      return `${String(decision.count)} settled runs finished without substantive user direction.`;
-    case "turn_checkpoint":
-      return `The current run reached ${String(decision.count)} model turns.`;
     case "thinking_repetition":
       return `${String(decision.matchedWindows)} separate ${String(decision.windowTokens)}-token reasoning windows each appeared ${String(decision.occurrences)} times within one response.`;
     case "manual_nudge":
@@ -53,10 +49,6 @@ export function decisionLabel(decision: LoopDecision): string {
       return "repeated terminal error";
     case "continuation_churn":
       return "repeated continuation work";
-    case "episode_checkpoint":
-      return `${String(decision.count)}-run checkpoint`;
-    case "turn_checkpoint":
-      return `${String(decision.count)}-turn checkpoint`;
     case "thinking_repetition":
       return "repeated streamed reasoning";
     case "manual_nudge":

@@ -8,7 +8,7 @@ import {
   LOOP_GUARD_MESSAGE_TYPE,
   type LoopGuardEvent,
 } from "./intervention-message.ts";
-import { LoopDetector, turnCheckpoint, type LoopDecision } from "./loop-detector.ts";
+import { LoopDetector, type LoopDecision } from "./loop-detector.ts";
 import { ThinkingStreamDetector } from "./thinking-stream-detector.ts";
 
 export type LoopGuardState = "off" | "armed" | "nudged" | "tripped";
@@ -247,12 +247,9 @@ export class LoopGuardController {
     this.restartEpisodeOnNextTurn = false;
   }
 
-  turnEnd(event: LoopGuardTurnEndEvent, ctx: LoopGuardContext): void {
+  turnEnd(event: LoopGuardTurnEndEvent): void {
     if (!this.isCollecting() || this.episode === null) return;
     this.episode.accountTurn(event.message, event.toolResults);
-    if (this.restartEpisodeOnNextTurn) return;
-    const decision = turnCheckpoint(this.episode.turns);
-    if (decision !== null) this.processDecision(decision, ctx, true);
   }
 
   agentEnd(event: LoopGuardAgentEndEvent): void {

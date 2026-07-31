@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_EPISODES, type EpisodeDigest } from "./feature-encoder.ts";
-import {
-  CONTINUATION_CHURN_COUNT,
-  EPISODE_CHECKPOINT,
-  LoopDetector,
-  TURN_CHECKPOINT,
-  turnCheckpoint,
-} from "./loop-detector.ts";
+import { CONTINUATION_CHURN_COUNT, LoopDetector } from "./loop-detector.ts";
 
 function episode(
   hash: string,
@@ -136,36 +130,13 @@ describe("LoopDetector", () => {
     }
   });
 
-  it("uses a bounded hard checkpoint", () => {
-    const detector = new LoopDetector();
-    let decision = null;
-    for (let index = 0; index < EPISODE_CHECKPOINT; index += 1) {
-      decision = detector.observe(episode(`checkpoint-${String(index)}`));
-    }
-    expect(decision).toEqual({ count: EPISODE_CHECKPOINT, kind: "episode_checkpoint" });
-  });
-
-  it("keeps only the bounded history during long sessions", () => {
+  it("allows long histories of distinct work while keeping bounded state", () => {
     const detector = new LoopDetector();
     for (let index = 0; index < 4_228; index += 1) {
-      detector.observe(episode(`long-${String(index)}`));
+      expect(detector.observe(episode(`long-${String(index)}`))).toBeNull();
     }
     expect(detector.episodeCount).toBe(MAX_EPISODES);
     detector.reset();
     expect(detector.episodeCount).toBe(0);
-  });
-});
-
-describe("turnCheckpoint", () => {
-  it("fires at bounded multiples of the turn checkpoint", () => {
-    expect(turnCheckpoint(TURN_CHECKPOINT - 1)).toBeNull();
-    expect(turnCheckpoint(TURN_CHECKPOINT)).toEqual({
-      count: TURN_CHECKPOINT,
-      kind: "turn_checkpoint",
-    });
-    expect(turnCheckpoint(TURN_CHECKPOINT * 2)).toEqual({
-      count: TURN_CHECKPOINT * 2,
-      kind: "turn_checkpoint",
-    });
   });
 });
