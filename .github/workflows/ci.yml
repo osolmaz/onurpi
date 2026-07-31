@@ -99,6 +99,12 @@ jobs:
       - name: Check @onurpi/unified-exec package with Slophammer
         working-directory: packages/unified-exec
         run: npm run slophammer
+      - name: Check @onurpi/yarp package
+        working-directory: packages/yarp
+        run: npm run check
+      - name: Check @onurpi/yarp package with Slophammer
+        working-directory: packages/yarp
+        run: npm run slophammer
   unified-exec-platform:
     strategy:
       fail-fast: false
@@ -167,4 +173,7 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/unified-exec package
         working-directory: packages/unified-exec
+        run: npm run mutate
+      - name: Mutate @onurpi/yarp package
+        working-directory: packages/yarp
         run: npm run mutate

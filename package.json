@@ -24,6 +24,7 @@
       "./packages/codex-usage/index.ts",
       "./packages/plan-checklist/index.ts",
       "./packages/unified-exec/index.ts",
+      "./packages/yarp/index.ts",
       "./node_modules/pi-huggingface-oauth/index.ts",
       "./node_modules/pi-must-win/index.ts",
       "./node_modules/pi-regraft/extensions/regraft.ts",

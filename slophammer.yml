@@ -47,6 +47,7 @@ typescript:
       - packages/unified-exec/src/head-tail-buffer.ts
       - packages/unified-exec/src/time.ts
       - packages/unified-exec/src/unescape.ts
+      - packages/yarp/index.ts
   dependency_boundaries:
     - from: packages/turn-fold
       allow:
@@ -75,3 +76,6 @@ typescript:
     - from: packages/unified-exec
       allow:
         - packages/unified-exec
+    - from: packages/yarp
+      allow:
+        - packages/yarp

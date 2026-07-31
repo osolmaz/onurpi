@@ -36,6 +36,7 @@ export default {
     "packages/unified-exec/src/head-tail-buffer.ts",
     "packages/unified-exec/src/time.ts",
     "packages/unified-exec/src/unescape.ts",
+    "packages/yarp/index.ts",
   ],
   reporters: ["clear-text", "progress"],
   testRunner: "vitest",

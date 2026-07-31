@@ -20,6 +20,7 @@ configuration.
 | [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
+| [`@onurpi/yarp`](packages/yarp/)                                   | Prunes long output from supported developer commands             |
 | [`@onurpi/regrafter-driver`](packages/regrafter-driver/)           | Optional delegation to the dedicated Regrafter app               |
 | [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
 
@@ -37,7 +38,8 @@ Their source remains in the original repositories.
 | Pi Demo Mode       | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts
-unless its driver skill matches an explicit delegation or vendored-code maintenance request.
+unless its driver skill matches an explicit delegation or vendored-code maintenance request. YARP
+stays inactive unless its `yarp` binary is on `PATH`; see the [YARP package README](packages/yarp/).
 
 ## Install
 

@@ -1,0 +1,19 @@
+import { describe, expect, it } from "vitest";
+import yarpExtension, { commandBinding } from "yarp-cli/hooks/pi/yarp.ts";
+import exportedExtension from "./index.js";
+
+describe("YARP package", () => {
+  it("exports the pinned upstream extension", () => {
+    expect(exportedExtension).toBe(yarpExtension);
+  });
+
+  it("rewrites the command fields used by both shell tools", () => {
+    const bash = { command: "git status" };
+    commandBinding("bash", bash)?.replace("yarp run -- git status");
+    expect(bash.command).toBe("yarp run -- git status");
+
+    const exec = { cmd: "cargo test" };
+    commandBinding("exec_command", exec)?.replace("yarp run -- cargo test");
+    expect(exec.cmd).toBe("yarp run -- cargo test");
+  });
+});
