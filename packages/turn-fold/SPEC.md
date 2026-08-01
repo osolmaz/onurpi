@@ -156,7 +156,7 @@ The extension provides these commands:
 /turn-fold windows reset
 ```
 
-`Ctrl+Shift+O` toggles the mode but does not appear beside the summary text. `Ctrl+O` remains Pi's tool-output expansion control.
+Mode changes use `/turn-fold toggle` because rebuilding the replay projection requires Pi's command-only reload capability. `Ctrl+O` remains Pi's tool-output expansion control.
 
 ## Compatibility boundary
 

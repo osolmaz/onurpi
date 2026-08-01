@@ -51,8 +51,8 @@ The package is private and is not published yet.
 /turn-fold windows reset    return to the default of 3
 ```
 
-`Ctrl+Shift+O` switches between compact and expanded rendering without adding a shortcut hint to
-summary lines. `Ctrl+O` remains Pi's separate tool-output detail toggle.
+Use `/turn-fold toggle` to switch modes because changing the replay projection requires Pi's
+command-only reload capability. `Ctrl+O` remains Pi's separate tool-output detail toggle.
 
 ## Transcript windows
 

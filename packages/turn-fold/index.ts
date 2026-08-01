@@ -33,7 +33,6 @@ import {
 import { TurnFoldState } from "./turn-state.ts";
 import { projectTranscriptEntries } from "./transcript-projection.ts";
 
-const TOGGLE_SHORTCUT = "ctrl+shift+o";
 const WINDOW_ARGUMENTS = ["1", "3", "+1", "-1", "all", "reset"] as const;
 
 const MODE_LABELS: readonly { label: string; mode: TurnFoldMode }[] = [
@@ -265,14 +264,6 @@ function registerControls(
     getArgumentCompletions: argumentCompletions,
     handler: (args, ctx) =>
       handleCommand(args, ctx, state, getConfiguration, applyConfiguration, getSourceEntries),
-  });
-  pi.registerShortcut(TOGGLE_SHORTCUT, {
-    description: "Toggle compact and expanded transcript rendering",
-    handler: () => {
-      const configuration = getConfiguration();
-      const mode = configuration.mode === "compact" ? "expanded" : "compact";
-      applyConfiguration({ ...configuration, mode }, true);
-    },
   });
 }
 
