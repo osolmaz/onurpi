@@ -1,0 +1,121 @@
+# Turn Fold transcript projection
+
+## Status
+
+This document specifies the target compact-mode transcript projection for Turn Fold. The current release loads every entry in the selected compaction windows into Pi's component tree and hides most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
+
+## Purpose
+
+Turn Fold needs the full selected history to count messages, tools, failures, compactions, and edit changes. Pi's main transcript needs only the rows that Turn Fold displays. The projection separates those two inputs so hidden history never becomes TUI components.
+
+The projection affects display only. Pi's session tree, stored JSONL, compaction logic, and model context keep their existing behavior.
+
+## Terms
+
+The **source snapshot** is the active-branch entry range selected by the configured compaction windows. Turn Fold reads this snapshot to reconstruct runs and summaries.
+
+The **display projection** is the ordered subset of source entries returned to Pi's TUI replay path.
+
+A **display anchor** is an existing assistant or tool-call entry whose component renders a Turn Fold summary, retained activity, or final content. The projection does not create synthetic session entries.
+
+The **live tail** contains components that Pi adds after the latest replay. Pi clears and rebuilds this tail after a successful compaction.
+
+## Projection boundary
+
+The projection MUST be installed only on the TUI replay instance method `SessionManager.buildContextEntries()`. It MUST NOT replace the exported context builder or `buildSessionContext()`. JSON, RPC, print, and model execution paths MUST remain unchanged.
+
+The private adapter MUST live in `transcript-window-adapter.ts`. Folding policy, source reduction, and display selection MUST remain in pure modules that do not import Pi component classes.
+
+The adapter MUST capture the original method before installation. Shutdown MUST restore that method when the adapter still owns it. A second installation MUST reuse the existing owner and MUST NOT wrap the method again.
+
+## Atomic replay
+
+Each replay MUST use one root-to-leaf branch snapshot. The adapter performs these steps in order:
+
+1. Read the branch once.
+2. Select the configured compaction windows from that branch.
+3. Apply the one-rebuild pending-compaction omission.
+4. Reduce the selected entries into Turn Fold run state.
+5. Build the display projection from the same selected entries and run state.
+6. Publish the new state and return the projected entries.
+
+Turn Fold MUST NOT load state from one branch snapshot while returning entries from another. If reduction or projection fails, the adapter restores or calls Pi's original replay method and reports one warning. It MUST NOT return a partial projection.
+
+## Compact settled runs
+
+A settled run keeps its prompt row and one final display component. The final component follows the selection order in [SPEC.md](SPEC.md): terminal tool error, latest visible assistant content, final tool result, then the interruption fallback.
+
+When the final component is an assistant message, the projection keeps its original message entry. The patched assistant renderer emits the cached settled summary followed by the original final content.
+
+When the final component is a tool result, the projection keeps the assistant entry containing that tool call and its matching tool-result entry. Pi therefore creates one complete `ToolExecutionComponent`. The patched tool renderer emits the cached settled summary followed by the native final tool output.
+
+Intermediate assistant entries, hidden tool-call source entries, and their tool results MUST stay out of the display projection. Their data remains available in the source snapshot and contributes to the summary.
+
+## Compact active runs
+
+A reconstructed active run keeps its prompt and at most the latest three activity components. The projection also keeps the entries needed to construct those components. A retained tool component requires both its assistant tool-call entry and matching tool-result entry when the result exists.
+
+When earlier activity exists, the first retained activity acts as the streaming-summary anchor. The component renderer emits the cached summary before its native content. If no activity can serve as an anchor, Turn Fold retains one existing compaction or assistant entry that can render the summary without changing session data.
+
+Components added after replay form the live tail. Render-time folding remains responsible for that tail until Pi's next successful compaction rebuild. Live-tail lookups MUST be constant time, and summary aggregation MUST happen only when an event changes the run.
+
+## Compaction entries
+
+An attached compaction contributes to its run summary and stays out of the compact display projection unless it is required as the only available summary anchor. A standalone compaction keeps Pi's original entry and spacing.
+
+The process-local compaction registry remains the authority for this distinction. Projection MUST NOT infer attachment from timestamps, neighboring messages, or entry order.
+
+Pi performs a transcript rebuild after every successful compaction. The rebuilt projection removes hidden live-tail components from the component tree.
+
+## User and custom entries
+
+Every prompt entry that begins a projected run remains in source order. Its native content and Turn Fold timestamp behavior stay unchanged.
+
+Custom entries outside Turn Fold's managed assistant, tool, and compaction rows pass through unchanged. This preserves other extensions' registered entry renderers. Turn Fold's own run-boundary and configuration entries continue to have no renderer and create no visible component.
+
+The projection MUST preserve the original entry objects and ordering. It MUST NOT clone entries with changed messages, append display entries, or alter parent links.
+
+## Cached run snapshots
+
+Source reduction produces one immutable display snapshot per run revision. A snapshot contains the counts, elapsed time, completion state, selected anchors, edit summary, and pre-resolved file paths needed by renderers.
+
+Successful finalized tool results update edit state once. Path resolution and per-file aggregation MUST NOT run from a component's `render(width)` method. Hidden-component lookups MUST NOT request a summary.
+
+A display component may cache formatted lines by run revision, width, expanded state, and theme identity. A stable editor keystroke MUST reuse the same run snapshot.
+
+## Projection budget
+
+Compact projection MUST have a hard component budget independent of the number of entries in one run or compaction window. The implementation defines a conservative default from the latency benchmark in the implementation plan.
+
+If the selected windows contain more settled runs than the budget allows, Turn Fold keeps the newest complete runs. The oldest retained display anchor reports how many earlier runs were omitted from the active transcript. The omitted runs remain in the source snapshot, session tree, and model history.
+
+A single retained final message may exceed the ordinary byte estimate. Turn Fold may render a bounded preview in the main transcript and make the complete content available through the history viewer. It MUST NOT mutate or truncate the stored message.
+
+## Expanded history
+
+Compact projection remains active while the main editor is in use. Raw hidden activity opens through an on-demand paged history view. The viewer reads the source snapshot and creates components only for the current page plus a small overscan range.
+
+The viewer MUST have an explicit close action and MUST release its page components on close. Changing pages MUST replace the previous page instead of accumulating components. Opening the viewer has no effect on model context or stored session data.
+
+Until the paged viewer ships, expanded mode may continue to use full selected-window replay as an explicitly requested diagnostic mode. Compact mode MUST never fall back to full replay merely to support expansion.
+
+## Compatibility checks
+
+The adapter uses one undocumented Pi method and therefore requires a tested Pi version range. Startup MUST verify that the method exists, is callable, and returns a branch-entry array for a smoke fixture. An unsupported shape disables sparse projection and leaves Pi's original method installed.
+
+The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, mode change, shutdown restoration, and non-TUI isolation pass.
+
+## Performance requirements
+
+The primary performance measure is key-to-echo latency in compact mode after session replay. The release fixture includes the 44 MB session that exposed the problem, or a sanitized structural equivalent with the same large-run and edit-result shape.
+
+After warmup, at least ten measured runs MUST meet both limits:
+
+- p95 key-to-echo latency below 50 ms
+- p99 key-to-echo latency below 100 ms
+
+The test also records selected source entries, projected entries, created components, cache hits, replay time, and peak resident memory. An unchanged frame MUST perform no edit aggregation, path resolution, activity sorting, or assistant-content scan.
+
+## State impact
+
+Sparse projection adds no session entries and no sidecar files. Existing explicit run-boundary and configuration entries remain unchanged. The implementation adds no provider messages, labels, tool-result fields, session schema, or Pi source modification.
