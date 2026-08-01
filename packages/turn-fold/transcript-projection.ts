@@ -354,9 +354,9 @@ export function projectTranscriptEntries(
   const oldestRetainedEntryId = oldestRetainedRunEntryId(runs, keepByRun);
   return {
     displayEntries,
-    oldestRetainedEntryId,
     omittedRunCount,
     projectedComponentCount,
     sourceEntries,
+    ...(oldestRetainedEntryId === undefined ? {} : { oldestRetainedEntryId }),
   };
 }
