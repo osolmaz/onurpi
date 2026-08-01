@@ -68,14 +68,14 @@ export function historyEntryText(entry: unknown): string {
   return `${entryLabel(entry)} ${id}${body ? `\n${body}${suffix}` : ""}`;
 }
 
-export function historyPages(entries: readonly unknown[]): readonly (readonly string[])[] {
-  const rows = entries.map((entry) => historyEntryText(entry));
-  if (rows.length === 0) return [["No transcript entries in the selected range."]];
-  const pages: string[][] = [];
-  for (let index = 0; index < rows.length; index += ENTRIES_PER_PAGE) {
-    pages.push(rows.slice(index, index + ENTRIES_PER_PAGE));
-  }
-  return pages;
+export function historyPageCount(entries: readonly unknown[]): number {
+  return Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE));
+}
+
+export function historyPage(entries: readonly unknown[], page: number): readonly string[] {
+  if (entries.length === 0) return ["No transcript entries in the selected range."];
+  const start = page * ENTRIES_PER_PAGE;
+  return entries.slice(start, start + ENTRIES_PER_PAGE).map((entry) => historyEntryText(entry));
 }
 
 function isNextPageKey(data: string): boolean {
@@ -88,7 +88,8 @@ function isPreviousPageKey(data: string): boolean {
 
 export class HistoryViewer implements Component {
   private page = 0;
-  private readonly pages: readonly (readonly string[])[];
+  private readonly entries: readonly unknown[];
+  private readonly pageCount: number;
   private readonly requestRender: () => void;
   private readonly close: () => void;
   private readonly text: Text;
@@ -96,13 +97,14 @@ export class HistoryViewer implements Component {
   private readonly styleTitle: (text: string) => string;
 
   constructor(
-    pages: readonly (readonly string[])[],
+    entries: readonly unknown[],
     styleTitle: (text: string) => string,
     styleHint: (text: string) => string,
     requestRender: () => void,
     close: () => void,
   ) {
-    this.pages = pages;
+    this.entries = entries;
+    this.pageCount = historyPageCount(entries);
     this.styleTitle = styleTitle;
     this.styleHint = styleHint;
     this.requestRender = requestRender;
@@ -117,7 +119,7 @@ export class HistoryViewer implements Component {
       return;
     }
     if (isNextPageKey(data)) {
-      this.setPage(Math.min(this.pages.length - 1, this.page + 1));
+      this.setPage(Math.min(this.pageCount - 1, this.page + 1));
       return;
     }
     if (isPreviousPageKey(data)) {
@@ -142,10 +144,10 @@ export class HistoryViewer implements Component {
 
   private updateText(): void {
     const title = this.styleTitle(
-      `Turn Fold history ${String(this.page + 1)}/${String(this.pages.length)}`,
+      `Turn Fold history ${String(this.page + 1)}/${String(this.pageCount)}`,
     );
     const hint = this.styleHint("←/→ or h/l page · q/esc close");
-    this.text.setText(`${title}\n${hint}\n\n${(this.pages[this.page] ?? []).join("\n\n")}`);
+    this.text.setText(`${title}\n${hint}\n\n${historyPage(this.entries, this.page).join("\n\n")}`);
   }
 }
 
@@ -157,10 +159,9 @@ export async function showHistoryViewer(
     ctx.ui.notify("Turn Fold history is available only in TUI mode.", "warning");
     return;
   }
-  const pages = historyPages(entries);
   await ctx.ui.custom<undefined>((tui, theme, _keybindings, done) => {
     return new HistoryViewer(
-      pages,
+      entries,
       (text) => theme.bold(theme.fg("accent", text)),
       (text) => theme.fg("dim", text),
       () => {

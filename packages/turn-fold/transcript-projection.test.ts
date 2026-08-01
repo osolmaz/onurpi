@@ -160,6 +160,32 @@ describe("compact transcript projection", () => {
     ]);
   });
 
+  it("omits a parallel tool batch that cannot fit the active three-activity tail", () => {
+    const entries: Entries = [
+      user("user", 100),
+      assistant("first", 110, [{ text: "First", type: "text" }]),
+      assistant("second", 120, [{ text: "Second", type: "text" }]),
+      assistant("third", 130, [{ text: "Third", type: "text" }]),
+      assistant("batch", 140, [
+        { arguments: {}, id: "call-1", name: "read", type: "toolCall" },
+        { arguments: {}, id: "call-2", name: "read", type: "toolCall" },
+        { arguments: {}, id: "call-3", name: "read", type: "toolCall" },
+        { arguments: {}, id: "call-4", name: "read", type: "toolCall" },
+      ]),
+      toolResult("result-1", "call-1"),
+      toolResult("result-2", "call-2"),
+      toolResult("result-3", "call-3"),
+      toolResult("result-4", "call-4"),
+    ];
+
+    expect(ids(project(entries, { activeRun: true }).displayEntries)).toEqual([
+      "user",
+      "first",
+      "second",
+      "third",
+    ]);
+  });
+
   it("keeps at most the latest three reconstructed activities for an active run", () => {
     const entries: Entries = [
       user("user", 100),
@@ -200,7 +226,9 @@ describe("compact transcript projection", () => {
     expect(result.sourceEntries).toHaveLength(2_002);
     expect(result.projectedComponentCount).toBe(2);
   });
+});
 
+describe("compact transcript projection budgets and boundaries", () => {
   it("falls back to the prompt when one assistant exceeds the component budget", () => {
     const toolCalls: AssistantMessage["content"] = Array.from({ length: 600 }, (_, index) => ({
       arguments: {},
@@ -228,6 +256,23 @@ describe("compact transcript projection", () => {
     ];
 
     expect(ids(project(entries).displayEntries)).toEqual(["user", "status", "final"]);
+  });
+
+  it("uses the whole component budget for newer pass-through entries", () => {
+    const entries: Entry[] = [
+      user("user", 100),
+      assistant("final", 110, [{ text: "Done", type: "text" }]),
+    ];
+    for (let index = 0; index < 512; index += 1) {
+      entries.push(custom(`custom-${String(index)}`));
+    }
+
+    const result = project(entries);
+
+    expect(result.projectedComponentCount).toBe(512);
+    expect(result.displayEntries).toHaveLength(512);
+    expect(ids(result.displayEntries).at(0)).toBe("custom-0");
+    expect(result.omittedRunCount).toBe(1);
   });
 
   it("omits old complete runs when the component budget is exhausted", () => {
