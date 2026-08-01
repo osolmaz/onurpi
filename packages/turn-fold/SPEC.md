@@ -160,9 +160,9 @@ The extension provides these commands:
 
 ## Compatibility boundary
 
-Turn Fold patches Pi's built-in transcript component renderers because Pi 0.80.10 does not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
+Turn Fold patches Pi's built-in transcript component renderers because supported Pi releases do not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
 
-[TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies the proposed sparse replay behavior that will replace compact mode's render-time hiding. Until that work is implemented, this document describes the released component-level behavior.
+[TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies compact mode's sparse replay behavior. Hidden source entries contribute to summaries without becoming Pi components.
 
 ## Acceptance tests
 
@@ -186,7 +186,8 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Live and reconstructed turns produce the same edit diffstat from finalized tool-result messages.
 - Compact diffstats use Pi's addition and deletion colors and remain absent in expanded mode.
 - Every compact diffstat lists unique absolute paths in first-edit order below the summary, shows cumulative colored counters beside each file, truncates long paths so each file fits one row, and escapes terminal controls.
-- Repeated unchanged renders perform no activity sorting or assistant-content rescans.
+- Compact replay creates no component for hidden source entries and remains within its component budget.
+- Repeated unchanged renders perform no edit aggregation, path resolution, activity sorting, or assistant-content rescans.
 - User-started and extension-started runs replay as separate groups after restart.
 - Each new fold run appends one strict run-boundary entry, while retries append none.
 - A synthetic 4,228-run transcript remains bounded by the configured compaction windows.

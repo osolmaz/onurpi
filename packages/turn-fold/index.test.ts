@@ -8,6 +8,13 @@ import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 const renderPatchMock = vi.hoisted(() => ({ states: [] as unknown[] }));
+const historyViewerMock = vi.hoisted(() => ({ entries: [] as (readonly unknown[])[] }));
+
+vi.mock("./history-viewer.ts", () => ({
+  showHistoryViewer: (_ctx: unknown, entries: readonly unknown[]) => {
+    historyViewerMock.entries.push(entries);
+  },
+}));
 
 vi.mock("./render-patches.ts", () => ({
   installRenderPatches: (state: unknown) => {
@@ -88,6 +95,7 @@ async function runTurnFoldCommand(
 
 afterEach(() => {
   renderPatchMock.states.length = 0;
+  historyViewerMock.entries.length = 0;
   vi.clearAllMocks();
 });
 
@@ -333,7 +341,45 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
   });
 });
 
+describe("Turn Fold mode isolation", () => {
+  it("leaves session replay untouched outside TUI mode", async () => {
+    const extension = extensionHarness();
+    const entries = [{ id: "entry", type: "custom" }];
+    const ctx = context(entries);
+    ctx.mode = "rpc";
+    const originalReplay = ctx.sessionManager.buildContextEntries;
+    turnFold(extension.pi);
+
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    expect(ctx.sessionManager.buildContextEntries).toBe(originalReplay);
+    expect(ctx.sessionManager.buildContextEntries()).toBe(entries);
+  });
+});
+
 describe("Turn Fold window commands", () => {
+  it("opens paged history from the full selected source snapshot", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
+      {
+        id: "hidden",
+        message: { content: [], role: "assistant", timestamp: 1 },
+        type: "message",
+      },
+      { id: "final", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
+    ];
+    const ctx = context([], branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+    ctx.sessionManager.buildContextEntries();
+
+    await runTurnFoldCommand(extension.commands, "history", ctx);
+
+    expect(historyViewerMock.entries).toHaveLength(1);
+    expect(historyViewerMock.entries[0]?.map(entryId)).toEqual(["user", "hidden", "final"]);
+  });
+
   it("rebuilds the transcript when switching between sparse and expanded replay", async () => {
     const extension = extensionHarness();
     const ctx = context();

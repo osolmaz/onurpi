@@ -120,7 +120,7 @@ describe("compact transcript projection", () => {
 
     expect(ids(result.displayEntries)).toEqual(["user", "custom", "final"]);
     expect(ids(result.sourceEntries)).toEqual(ids(entries));
-    expect(result.projectedComponentCount).toBe(2);
+    expect(result.projectedComponentCount).toBe(3);
   });
 
   it("keeps the source and result required for a terminal tool error", () => {

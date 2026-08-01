@@ -2,7 +2,7 @@
 
 ## Status
 
-This document specifies the target compact-mode transcript projection for Turn Fold. The current release loads every entry in the selected compaction windows into Pi's component tree and hides most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
+This document specifies the compact-mode transcript projection implemented by Turn Fold. Earlier releases loaded every entry in the selected compaction windows into Pi's component tree and hid most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
 
 ## Purpose
 
@@ -115,6 +115,12 @@ After warmup, at least ten measured runs MUST meet both limits:
 - p99 key-to-echo latency below 100 ms
 
 The test also records selected source entries, projected entries, created components, cache hits, replay time, and peak resident memory. An unchanged frame MUST perform no edit aggregation, path resolution, activity sorting, or assistant-content scan.
+
+## Regression result
+
+The implementation was tested against a copy of the 44 MB session that exposed the delay. Three windows selected 3,684 entries. Sparse projection returned 33 entries and estimated 18 components. Projection took 6.48 ms and Turn Fold state reconstruction took 13.68 ms in the diagnostic run.
+
+The PTY key-to-echo test started ten fresh Pi processes and sent 20 distinct characters to each process after warmup. Across 200 keypresses, p50 was 12.94 ms, p95 was 20.11 ms, p99 was 21.08 ms, and the maximum was 21.28 ms. The test used Pi 0.83.0, a 120 by 40 terminal, the real session copy, and only the worktree Turn Fold extension. The original session file was never opened for writing.
 
 ## State impact
 

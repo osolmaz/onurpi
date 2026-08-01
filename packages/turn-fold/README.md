@@ -41,6 +41,7 @@ The package is private and is not published yet.
 /turn-fold                  open the mode picker
 /turn-fold compact          use the compact transcript
 /turn-fold expanded         show the complete transcript
+/turn-fold history          open bounded pages of the selected source transcript
 /turn-fold toggle           switch between compact and expanded
 /turn-fold status           show the current mode and window value
 /turn-fold windows 5        load exactly 5 compaction windows
@@ -61,9 +62,10 @@ user or custom prompt recorded by the nearest run boundary before its oldest com
 continues through the active leaf. Older sessions fall back to the nearest user message. `all` warns before replaying
 the full branch because a large transcript can slow editor input.
 
-Window selection changes only the TUI path. Pi's model context remains compacted. Turn Fold also
-caches the component layout and its counts so unchanged redraws avoid rescanning or sorting turn
-activity. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design.
+Window selection changes only the TUI path. Pi's model context remains compacted. Compact mode
+scans the selected source once, then gives Pi only the prompts and activity that can appear on
+screen. `/turn-fold history` reads the same source through bounded pages when older details are
+needed. See [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) for the design.
 
 Turn Fold writes one strict `onurpi-turn-fold-run` entry during the first completed turn of each new
 run. Automatic retries before settlement stay in the same run and do not add entries. Mode and
@@ -80,8 +82,8 @@ default.
 Pi does not expose a public whole-turn renderer or transcript-range API. Turn Fold patches Pi's
 built-in transcript component renderers and replaces the TUI-only `buildContextEntries()`
 projection. It does not replace `buildSessionContext()`. The package targets
-Pi 0.80.10 or newer and must be retested when Pi changes these interactive paths. The proposed
-[sparse transcript projection](TRANSCRIPT-PROJECTION.md) will keep hidden history out of Pi's active
+Pi 0.82.1 through 0.83.x and must be retested when Pi changes these interactive paths. The
+[sparse transcript projection](TRANSCRIPT-PROJECTION.md) keeps hidden history out of Pi's active
 component tree while preserving session and model context.
 
 ## Quality checks

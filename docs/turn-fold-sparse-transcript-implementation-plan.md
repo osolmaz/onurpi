@@ -10,6 +10,14 @@ The work is complete when the large-session regression meets the latency limits 
 [TRANSCRIPT-PROJECTION.md](../packages/turn-fold/TRANSCRIPT-PROJECTION.md). All supported modes must
 pass while normal session data and model context remain unchanged.
 
+## Implementation status
+
+The sparse compact projection, atomic adapter, cached edit summaries, component budget, and paged
+history viewer are implemented on the plan branch. The 44 MB regression-session copy projects 3,684
+selected entries to 33 entries and 18 estimated components. A repeated PTY test measured 20.11 ms
+p95 and 21.08 ms p99 key-to-echo latency across 200 keypresses. Repository, live TUI, and CI checks
+remain the release gates.
+
 ## Current behavior
 
 `transcript-window-adapter.ts` currently returns the complete selected branch slice from
