@@ -80,7 +80,9 @@ default.
 Pi does not expose a public whole-turn renderer or transcript-range API. Turn Fold patches Pi's
 built-in transcript component renderers and replaces the TUI-only `buildContextEntries()`
 projection. It does not replace `buildSessionContext()`. The package targets
-Pi 0.80.10 or newer and must be retested when Pi changes these interactive paths.
+Pi 0.80.10 or newer and must be retested when Pi changes these interactive paths. The proposed
+[sparse transcript projection](TRANSCRIPT-PROJECTION.md) will keep hidden history out of Pi's active
+component tree while preserving session and model context.
 
 ## Quality checks
 

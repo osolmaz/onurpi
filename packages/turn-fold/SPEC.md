@@ -162,6 +162,8 @@ The extension provides these commands:
 
 Turn Fold patches Pi's built-in transcript component renderers because Pi 0.80.10 does not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
 
+[TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies the proposed sparse replay behavior that will replace compact mode's render-time hiding. Until that work is implemented, this document describes the released component-level behavior.
+
 ## Acceptance tests
 
 A release is conforming only when automated or PTY tests verify all of the following:
