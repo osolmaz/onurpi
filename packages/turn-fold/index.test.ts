@@ -51,17 +51,18 @@ function extensionHarness(): {
 function context(
   entries: readonly unknown[] = [],
   branch: readonly unknown[] = entries,
-  sessionFile = "/tmp/turn-fold-session.jsonl",
+  sessionFile: string | null = "/tmp/turn-fold-session.jsonl",
 ) {
   return {
     cwd: "/workspace/project",
     hasUI: true,
     mode: "tui",
     reload: vi.fn(() => Promise.resolve()),
+    switchSession: vi.fn(() => Promise.resolve({ cancelled: false })),
     sessionManager: {
       buildContextEntries: () => entries,
       getBranch: () => branch,
-      getSessionFile: () => sessionFile,
+      getSessionFile: () => sessionFile ?? undefined,
       getSessionId: () => "session-id",
     },
     ui: {
@@ -372,7 +373,6 @@ describe("Turn Fold window commands", () => {
     const ctx = context([], branch);
     turnFold(extension.pi);
     await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-    ctx.sessionManager.buildContextEntries();
 
     await runTurnFoldCommand(extension.commands, "history", ctx);
 
@@ -393,10 +393,28 @@ describe("Turn Fold window commands", () => {
       windows: 3,
     });
     expect(ctx.waitForIdle).toHaveBeenCalledOnce();
-    expect(ctx.reload).toHaveBeenCalledOnce();
+    expect(ctx.switchSession).toHaveBeenCalledWith("/tmp/turn-fold-session.jsonl");
+    expect(ctx.reload).not.toHaveBeenCalled();
   });
 
-  it("persists relative changes and reloads the main transcript", async () => {
+  it("fails closed when replay cannot be rebuilt in a TUI no-session run", async () => {
+    const extension = extensionHarness();
+    const ctx = context([], [], null);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "expanded", ctx);
+
+    expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(ctx.switchSession).not.toHaveBeenCalled();
+    expect(ctx.reload).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Turn Fold replay changes require a persisted session in TUI mode.",
+      "warning",
+    );
+  });
+
+  it("persists relative changes and rebuilds the main transcript", async () => {
     const extension = extensionHarness();
     const ctx = context([
       { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
@@ -412,7 +430,8 @@ describe("Turn Fold window commands", () => {
       windows: 5,
     });
     expect(ctx.waitForIdle).toHaveBeenCalledTimes(2);
-    expect(ctx.reload).toHaveBeenCalledOnce();
+    expect(ctx.switchSession).toHaveBeenCalledWith("/tmp/turn-fold-session.jsonl");
+    expect(ctx.reload).not.toHaveBeenCalled();
   });
 
   it("confirms full replay and leaves state unchanged when cancelled", async () => {
@@ -429,10 +448,11 @@ describe("Turn Fold window commands", () => {
       expect.stringContaining("1 active-branch entries"),
     );
     expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(ctx.switchSession).not.toHaveBeenCalled();
     expect(ctx.reload).not.toHaveBeenCalled();
   });
 
-  it("persists confirmed full replay and reloads", async () => {
+  it("persists confirmed full replay and rebuilds", async () => {
     const extension = extensionHarness();
     const ctx = context([{ id: "user", message: { role: "user" }, type: "message" }]);
     turnFold(extension.pi);
@@ -444,10 +464,11 @@ describe("Turn Fold window commands", () => {
       mode: "compact",
       windows: "all",
     });
-    expect(ctx.reload).toHaveBeenCalledOnce();
+    expect(ctx.switchSession).toHaveBeenCalledWith("/tmp/turn-fold-session.jsonl");
+    expect(ctx.reload).not.toHaveBeenCalled();
   });
 
-  it("reports status and invalid window values without reloading", async () => {
+  it("reports status and invalid window values without rebuilding", async () => {
     const extension = extensionHarness();
     const ctx = context();
     turnFold(extension.pi);
@@ -461,6 +482,7 @@ describe("Turn Fold window commands", () => {
       "Use a positive number, +N, -N, all, or reset.",
       "warning",
     );
+    expect(ctx.switchSession).not.toHaveBeenCalled();
     expect(ctx.reload).not.toHaveBeenCalled();
   });
 

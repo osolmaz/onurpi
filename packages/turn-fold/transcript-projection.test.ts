@@ -101,6 +101,35 @@ function custom(id: string): Entry {
   };
 }
 
+function branchSummary(id: string): Entry {
+  return {
+    fromId: id,
+    id,
+    parentId: null,
+    summary: id,
+    timestamp: "2026-07-22T00:00:00.000Z",
+    type: "branch_summary",
+  };
+}
+
+function bashExecution(id: string): Entry {
+  return {
+    id,
+    message: {
+      cancelled: false,
+      command: id,
+      exitCode: 0,
+      output: id,
+      role: "bashExecution",
+      timestamp: 1,
+      truncated: false,
+    },
+    parentId: null,
+    timestamp: "2026-07-22T00:00:00.000Z",
+    type: "message",
+  };
+}
+
 function ids(entries: Entries): unknown[] {
   return entries.map((entry) => entry.id);
 }
@@ -272,6 +301,21 @@ describe("compact transcript projection budgets and boundaries", () => {
     expect(result.projectedComponentCount).toBe(512);
     expect(result.displayEntries).toHaveLength(512);
     expect(ids(result.displayEntries).at(0)).toBe("custom-0");
+    expect(result.omittedRunCount).toBe(1);
+  });
+
+  it("counts native branch summaries and bash executions against the budget", () => {
+    const entries: Entry[] = [user("user", 100)];
+    for (let index = 0; index < 300; index += 1) {
+      entries.push(branchSummary(`branch-${String(index)}`));
+      entries.push(bashExecution(`bash-${String(index)}`));
+    }
+
+    const result = project(entries);
+
+    expect(result.projectedComponentCount).toBe(512);
+    expect(result.displayEntries).toHaveLength(512);
+    expect(ids(result.displayEntries).at(0)).toBe("branch-44");
     expect(result.omittedRunCount).toBe(1);
   });
 

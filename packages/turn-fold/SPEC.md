@@ -123,7 +123,7 @@ Switching between compact and expanded mode MUST update the existing transcript 
 
 Turn Fold reconstructs run groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. It pre-indexes run boundaries so a marker written after a run's first assistant response still anchors the earlier prompt entry. Its run index and Pi's TUI projection MUST use the same entry snapshot.
 
-Changing the window value MUST wait for Pi to become idle before persisting the new value and rebuilding the main transcript. Every value except `all` applies without confirmation. `all` MUST report the active-branch entry count and require confirmation because full replay can slow editor input. Cancellation leaves the existing value and transcript unchanged.
+Changing the window value MUST wait for Pi to become idle before persisting the new value and rebuilding the main transcript. Every value except `all` applies without confirmation. `all` MUST report the active-branch entry count and require confirmation because full replay can slow editor input. Cancellation leaves the existing value and transcript unchanged. A TUI `--no-session` run MUST reject replay-setting changes without changing in-memory configuration because Pi exposes no public action that rebuilds an in-memory transcript after extension startup.
 
 Turn Fold keeps attached compaction associations in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, and it retains the active turn's existing entry IDs so split turns can be restored without guessing. Associations are limited to compactions on the active branch. The registry survives `/reload` and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
 
@@ -156,7 +156,7 @@ The extension provides these commands:
 /turn-fold windows reset
 ```
 
-Mode changes use `/turn-fold toggle` because rebuilding the replay projection requires Pi's command-only reload capability. `Ctrl+O` remains Pi's tool-output expansion control.
+Mode changes use `/turn-fold toggle`. In TUI mode, Turn Fold resumes the current session through Pi's public command context so the transcript is rebuilt only after the new projection adapter is installed. `Ctrl+O` remains Pi's tool-output expansion control.
 
 ## Compatibility boundary
 

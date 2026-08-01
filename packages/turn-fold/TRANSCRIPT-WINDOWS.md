@@ -16,9 +16,9 @@ One command handles exact limits, relative changes, full history, and reset:
 /turn-fold windows reset  return to the default of 3
 ```
 
-After Pi becomes idle, every successful change persists the complete Turn Fold configuration before reloading the main transcript. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
+After Pi becomes idle, every successful change persists the complete Turn Fold configuration before rebuilding the main transcript. In TUI mode, Turn Fold resumes the current session through Pi's public command context so the new adapter is installed before replay. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
 
-`all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports both the display mode and window value.
+`all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports both the display mode and window value. A TUI started with `--no-session` rejects replay-setting changes because Pi has no public action that rebuilds an in-memory transcript after extension startup.
 
 Compact and expanded modes operate on the same selected range. Expanded mode restores Pi's original rows within that range and does not load older entries.
 
@@ -56,7 +56,7 @@ Turn Fold keeps the selected entries as a source snapshot for one-pass summary r
 
 The `onurpi-turn-fold-run` custom entry stores the strict run marker used for replay. The existing `onurpi-turn-fold-config` custom entry stores a complete object containing `mode` and `windows`. The window value is a positive safe integer or `all`. Entries that do not match the complete shape are ignored, and Turn Fold uses compact mode with three windows.
 
-A command appends one configuration entry before reloading. Reload restores the latest valid entry on the active branch. Tree navigation applies the same value to the newly selected branch. Turn Fold writes no custom messages, labels, tool metadata, or sidecar files.
+A command appends one configuration entry before rebuilding the transcript. Session replacement restores the latest valid entry on the active branch before replay. Tree navigation applies the same value to the newly selected branch. Turn Fold writes no custom messages, labels, tool metadata, or sidecar files.
 
 ## Package replacement
 
@@ -66,6 +66,6 @@ The unlicensed vendored package has been removed. None of its source was copied 
 
 ## Verification
 
-Unit tests cover exact and relative values, reset, `all`, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, and adapter reuse. Integration tests verify that commands persist complete configuration and reload the selected range.
+Unit tests cover exact and relative values, reset, `all`, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, and adapter reuse. Integration tests verify that commands persist complete configuration and resume the selected range through Pi's public session action.
 
 Turn-state tests verify that unchanged renders do not sort activity or rescan assistant content. Workspace checks and the Pi extension-load smoke test cover the package alongside the rest of OnurPi.

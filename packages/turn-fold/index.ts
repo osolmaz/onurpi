@@ -29,6 +29,7 @@ import {
   compactionWindowCount,
   formatTranscriptWindowValue,
   resolveWindowArgument,
+  selectTranscriptEntries,
 } from "./transcript-windows.ts";
 import { TurnFoldState } from "./turn-state.ts";
 import { projectTranscriptEntries } from "./transcript-projection.ts";
@@ -96,6 +97,26 @@ function turnEntryIds(branch: BranchEntries, compactionEntryId: string): readonl
 
 type ApplyConfiguration = (configuration: TurnFoldConfiguration, persist: boolean) => void;
 type GetConfiguration = () => TurnFoldConfiguration;
+
+function canRebuildTranscript(ctx: ExtensionCommandContext): boolean {
+  if (ctx.mode !== "tui" || ctx.sessionManager.getSessionFile()) return true;
+  ctx.ui.notify("Turn Fold replay changes require a persisted session in TUI mode.", "warning");
+  return false;
+}
+
+async function reloadTranscript(ctx: ExtensionCommandContext): Promise<void> {
+  if (ctx.mode !== "tui") {
+    await ctx.reload();
+    return;
+  }
+  const sessionFile = ctx.sessionManager.getSessionFile();
+  if (!sessionFile) return;
+  const result = await ctx.switchSession(sessionFile);
+  if (result.cancelled) {
+    ctx.ui.notify("Turn Fold changed, but transcript replay was cancelled.", "warning");
+  }
+}
+
 async function applyMode(
   mode: TurnFoldMode,
   ctx: ExtensionCommandContext,
@@ -104,8 +125,9 @@ async function applyMode(
 ): Promise<void> {
   if (mode === configuration.mode) return;
   await ctx.waitForIdle();
+  if (!canRebuildTranscript(ctx)) return;
   applyConfiguration({ ...configuration, mode }, true);
-  await ctx.reload();
+  await reloadTranscript(ctx);
 }
 
 async function chooseMode(
@@ -188,8 +210,9 @@ async function applyWindowArgument(
   }
   if (resolved.value === "all" && !(await confirmAllWindows(ctx, branch))) return;
   await ctx.waitForIdle();
+  if (!canRebuildTranscript(ctx)) return;
   applyConfiguration({ ...configuration, windows: resolved.value }, true);
-  await ctx.reload();
+  await reloadTranscript(ctx);
 }
 
 async function handleInformationCommand(
@@ -315,6 +338,7 @@ function registerSessionEvents(
     runtime.runBoundaries.reset();
     const branch = ctx.sessionManager.getBranch();
     runtime.configuration = configurationFromBranch(branch);
+    runtime.lastSourceEntries = selectTranscriptEntries(branch, runtime.configuration.windows);
     state.setWorkingDirectory(ctx.cwd);
     applyConfiguration(runtime.configuration, false);
     if (ctx.mode !== "tui") {
