@@ -145,12 +145,6 @@ function keepToolActivity(
   }
 }
 
-function keepActivity(keep: Set<string>, run: ProjectedRun, activity: ProjectedActivity): void {
-  const assistantId = entryId(activity.assistant.entry);
-  if (assistantId) keep.add(assistantId);
-  if (activity.kind === "tool") keepToolActivity(keep, run, activity.assistant);
-}
-
 function latestDisplayableAssistant(run: ProjectedRun): ProjectedAssistant | undefined {
   for (let index = run.assistants.length - 1; index >= 0; index -= 1) {
     const assistant = run.assistants[index];
@@ -187,15 +181,26 @@ function finalToolCallId(run: ProjectedRun): string | undefined {
   );
 }
 
-function compactRunEntryIds(run: ProjectedRun, active: boolean): Set<string> {
-  const keep = new Set<string>();
-  const promptId = entryId(run.promptEntry);
-  if (promptId) keep.add(promptId);
-
-  if (active) {
-    for (const activity of run.activities.slice(-3)) keepActivity(keep, run, activity);
-    return keep;
+function activeRunEntryIds(run: ProjectedRun, keep: Set<string>): Set<string> {
+  const seenAssistants = new Set<ProjectedAssistant>();
+  let remainingActivities = 3;
+  for (let index = run.activities.length - 1; index >= 0; index -= 1) {
+    const assistant = run.activities[index]?.assistant;
+    if (!assistant || seenAssistants.has(assistant)) continue;
+    seenAssistants.add(assistant);
+    const activityCount =
+      assistant.snapshot.toolCallIds.length + (assistant.snapshot.hasVisibleContent ? 1 : 0);
+    if (activityCount > remainingActivities) continue;
+    keepToolActivity(keep, run, assistant);
+    remainingActivities -= activityCount;
+    if (remainingActivities === 0) break;
   }
+  return keep;
+}
+
+function compactRunEntryIds(run: ProjectedRun, active: boolean): Set<string> {
+  const keep = promptOnlyEntryIds(run);
+  if (active) return activeRunEntryIds(run, keep);
 
   const finalTool = finalToolCallId(run);
   const toolAssistant = finalTool ? assistantForTool(run, finalTool) : undefined;
@@ -240,26 +245,38 @@ function estimatedComponents(run: ProjectedRun, keptIds: ReadonlySet<string>): n
   return count + (run.promptEntry ? 1 : 0);
 }
 
-function passThroughComponentCount(
-  entries: BranchEntries,
-  runs: readonly ProjectedRun[],
+function entryOwners(runs: readonly ProjectedRun[]): ReadonlyMap<BranchEntry, ProjectedRun> {
+  const owners = new Map<BranchEntry, ProjectedRun>();
+  for (const run of runs) for (const entry of run.entries) owners.set(entry, run);
+  return owners;
+}
+
+function isPassThroughComponent(
+  entry: BranchEntry,
+  owner: ProjectedRun | undefined,
   attachedCompactionEntryIds: ReadonlySet<string>,
-): number {
-  const runEntries = new Set(runs.flatMap((run) => run.entries));
-  const promptEntries = new Set(runs.map((run) => run.promptEntry).filter((entry) => entry));
-  return entries.filter((entry) => {
-    const type = entryType(entry);
-    if (type === "custom_message") {
-      return !runEntries.has(entry) || !promptEntries.has(entry);
-    }
-    if (type === "custom") {
-      return !["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
-        stringField(entry, "customType") ?? "",
-      );
-    }
-    const id = entryId(entry);
-    return type === "compaction" && (id === undefined || !attachedCompactionEntryIds.has(id));
-  }).length;
+): boolean {
+  const type = entryType(entry);
+  if (type === "custom_message") return owner?.promptEntry !== entry;
+  if (type === "custom") {
+    return !["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
+      stringField(entry, "customType") ?? "",
+    );
+  }
+  const id = entryId(entry);
+  return type === "compaction" && (id === undefined || !attachedCompactionEntryIds.has(id));
+}
+
+function boundedPassThroughEntries(
+  entries: BranchEntries,
+  owners: ReadonlyMap<BranchEntry, ProjectedRun>,
+  attachedCompactionEntryIds: ReadonlySet<string>,
+  componentLimit: number,
+): ReadonlySet<BranchEntry> {
+  const candidates = entries.filter((entry) =>
+    isPassThroughComponent(entry, owners.get(entry), attachedCompactionEntryIds),
+  );
+  return new Set(candidates.slice(-componentLimit));
 }
 
 function promptOnlyEntryIds(run: ProjectedRun): Set<string> {
@@ -274,8 +291,10 @@ function boundedRunEntryIds(
   active: boolean,
   componentLimit: number,
 ): Set<string> {
+  if (componentLimit <= 0) return new Set();
   const keep = compactRunEntryIds(run, active);
-  return estimatedComponents(run, keep) <= componentLimit ? keep : promptOnlyEntryIds(run);
+  const fallback = promptOnlyEntryIds(run);
+  return estimatedComponents(run, keep) <= componentLimit ? keep : fallback;
 }
 
 function retainedRuns(
@@ -292,7 +311,7 @@ function retainedRuns(
     if (!run) continue;
     const keep = boundedRunEntryIds(run, activeRun && index === runs.length - 1, componentLimit);
     const nextComponents = estimatedComponents(run, keep);
-    if (keepByRun.size > 0 && components + nextComponents > componentLimit) {
+    if (nextComponents === 0 || components + nextComponents > componentLimit) {
       omittedRunCount += 1;
       continue;
     }
@@ -302,23 +321,45 @@ function retainedRuns(
   return { keepByRun, omittedRunCount };
 }
 
+function isKeptRunEntry(
+  run: ProjectedRun | undefined,
+  id: string | undefined,
+  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
+): boolean {
+  return run !== undefined && id !== undefined && keepByRun.get(run)?.has(id) === true;
+}
+
+function shouldProjectEntry(
+  entry: BranchEntry,
+  run: ProjectedRun | undefined,
+  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
+  allowedPassThroughEntries: ReadonlySet<BranchEntry>,
+  attachedCompactionEntryIds: ReadonlySet<string>,
+): boolean {
+  if (isKeptRunEntry(run, entryId(entry), keepByRun)) return true;
+  if (isPassThroughComponent(entry, run, attachedCompactionEntryIds)) {
+    return allowedPassThroughEntries.has(entry);
+  }
+  if (entryType(entry) === "custom_message" && run?.promptEntry === entry) return false;
+  return shouldPassThrough(entry, attachedCompactionEntryIds);
+}
+
 function projectedEntries(
   entries: BranchEntries,
-  runs: readonly ProjectedRun[],
+  owners: ReadonlyMap<BranchEntry, ProjectedRun>,
   keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
+  allowedPassThroughEntries: ReadonlySet<BranchEntry>,
   attachedCompactionEntryIds: ReadonlySet<string>,
 ): BranchEntries {
-  const owner = new Map<BranchEntry, ProjectedRun>();
-  for (const run of runs) for (const entry of run.entries) owner.set(entry, run);
-
-  return entries.filter((entry) => {
-    const run = owner.get(entry);
-    if (!run) return shouldPassThrough(entry, attachedCompactionEntryIds);
-    const id = entryId(entry);
-    if (id && keepByRun.get(run)?.has(id)) return true;
-    if (entryType(entry) === "custom_message") return run.promptEntry !== entry;
-    return shouldPassThrough(entry, attachedCompactionEntryIds);
-  });
+  return entries.filter((entry) =>
+    shouldProjectEntry(
+      entry,
+      owners.get(entry),
+      keepByRun,
+      allowedPassThroughEntries,
+      attachedCompactionEntryIds,
+    ),
+  );
 }
 
 function oldestRetainedRunEntryId(
@@ -354,17 +395,21 @@ export function projectTranscriptEntries(
 
   const { runs } = groupEntries(sourceEntries);
   const componentLimit = Math.max(1, options.componentLimit ?? DEFAULT_PROJECTED_COMPONENT_LIMIT);
-  const passThroughComponents = passThroughComponentCount(
+  const owners = entryOwners(runs);
+  const allowedPassThroughEntries = boundedPassThroughEntries(
     sourceEntries,
-    runs,
+    owners,
     options.attachedCompactionEntryIds,
+    componentLimit,
   );
-  const runComponentLimit = Math.max(1, componentLimit - passThroughComponents);
+  const passThroughComponents = allowedPassThroughEntries.size;
+  const runComponentLimit = componentLimit - passThroughComponents;
   const { keepByRun, omittedRunCount } = retainedRuns(runs, options.activeRun, runComponentLimit);
   const displayEntries = projectedEntries(
     sourceEntries,
-    runs,
+    owners,
     keepByRun,
+    allowedPassThroughEntries,
     options.attachedCompactionEntryIds,
   );
   const projectedComponentCount =

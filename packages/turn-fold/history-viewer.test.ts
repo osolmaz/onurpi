@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HistoryViewer, historyEntryText, historyPages } from "./history-viewer.ts";
+import {
+  HistoryViewer,
+  historyEntryText,
+  historyPage,
+  historyPageCount,
+} from "./history-viewer.ts";
 
 function assistant(id: string, text: string): unknown {
   return {
@@ -31,20 +36,50 @@ describe("Turn Fold history viewer", () => {
   it("moves between pages and closes without accumulating page components", () => {
     const requestRender = vi.fn();
     const close = vi.fn();
+    const entries = Array.from({ length: 21 }, (_, index) =>
+      assistant(`answer-${String(index)}`, `Text ${String(index)}`),
+    );
     const viewer = new HistoryViewer(
-      [["first"], ["second"]],
+      entries,
       (text) => text,
       (text) => text,
       requestRender,
       close,
     );
 
-    expect(viewer.render(80).join("\n")).toContain("first");
+    expect(viewer.render(80).join("\n")).toContain("Text 0");
+    expect(viewer.render(80).join("\n")).not.toContain("Text 20");
     viewer.handleInput("l");
-    expect(viewer.render(80).join("\n")).toContain("second");
+    expect(viewer.render(80).join("\n")).toContain("Text 20");
     expect(requestRender).toHaveBeenCalledOnce();
     viewer.handleInput("q");
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("formats only the current page when opening a large history", () => {
+    const bodyReads = vi.fn();
+    const entries = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `answer-${String(index)}`,
+      message: {
+        get content(): unknown {
+          bodyReads();
+          return [{ text: `Text ${String(index)}`, type: "text" }];
+        },
+        role: "assistant",
+        timestamp: index,
+      },
+      type: "message",
+    }));
+
+    new HistoryViewer(
+      entries,
+      (text) => text,
+      (text) => text,
+      vi.fn(),
+      vi.fn(),
+    );
+
+    expect(bodyReads).toHaveBeenCalledTimes(20);
   });
 
   it("paginates without retaining an unbounded active page", () => {
@@ -52,9 +87,7 @@ describe("Turn Fold history viewer", () => {
       assistant(`answer-${String(index)}`, `Text ${String(index)}`),
     );
 
-    const pages = historyPages(entries);
-
-    expect(pages).toHaveLength(3);
-    expect(pages.map((page) => page.length)).toEqual([20, 20, 1]);
+    expect(historyPageCount(entries)).toBe(3);
+    expect([0, 1, 2].map((page) => historyPage(entries, page).length)).toEqual([20, 20, 1]);
   });
 });
