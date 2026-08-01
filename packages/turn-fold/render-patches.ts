@@ -89,10 +89,14 @@ function summarySegments(items: readonly SummaryItem[]): SummarySegment[] {
   return segments;
 }
 
+function omittedRunSummaryItems(summary: FoldSummary): SummaryItem[] {
+  const omittedRuns = summary.omittedRuns ?? 0;
+  return omittedRuns > 0 ? [countLabel(omittedRuns, "earlier run")] : [];
+}
+
 function streamingSummarySegments(summary: FoldSummary): SummarySegment[] {
-  const items: SummaryItem[] = [
-    countLabel(summary.hiddenActivities, "earlier activity", "earlier activities"),
-  ];
+  const items = omittedRunSummaryItems(summary);
+  items.push(countLabel(summary.hiddenActivities, "earlier activity", "earlier activities"));
   if (summary.tools > 0) items.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) items.push(countLabel(summary.messages, "msg"));
   if (summary.fileDiff) items.push(summary.fileDiff);
@@ -101,7 +105,8 @@ function streamingSummarySegments(summary: FoldSummary): SummarySegment[] {
 }
 
 function settledSummarySegments(summary: FoldSummary): SummarySegment[] {
-  const items: SummaryItem[] = [`Worked for ${formatDuration(summary.durationMs)}`];
+  const items = omittedRunSummaryItems(summary);
+  items.push(`Worked for ${formatDuration(summary.durationMs)}`);
   if (summary.tools > 0) items.push(countLabel(summary.tools, "tool"));
   if (summary.messages > 0) items.push(countLabel(summary.messages, "msg"));
   if (summary.fileDiff) items.push(summary.fileDiff);
@@ -330,7 +335,6 @@ function installUserSpacingPatches(state: TurnFoldState): RestoreRenderPatches {
     const previous = this.children.at(-1);
     if (previous instanceof Spacer && isUserRow(component)) suppressedSpacers.add(previous);
     if (previous instanceof Spacer && component instanceof CompactionSummaryMessageComponent) {
-      state.reloadHistoryForNewComponent(component);
       const message: unknown = Reflect.get(component, "message");
       state.associateCompaction(component, message);
       compactionBySpacer.set(previous, component);
@@ -368,7 +372,6 @@ function installUserTimestampPatches(
   const originalSkillRender = skillPrototype.render;
 
   const patchedUserRender = function (this: UserMessageComponent, width: number): string[] {
-    state.reloadHistoryForNewComponent(this);
     state.associateUser(this);
     return timestampOnBottomLine(
       originalUserRender.call(this, width),
@@ -384,7 +387,6 @@ function installUserTimestampPatches(
   ): string[] {
     const original = originalSkillRender.call(this, width);
     if (skillHasUserMessage(this)) return original;
-    state.reloadHistoryForNewComponent(this);
     state.associateUser(this);
     return timestampOnBottomLine(
       original,
@@ -434,7 +436,6 @@ function installCompactionRenderPatch(
     this: CompactionSummaryMessageComponent,
     width: number,
   ): string[] {
-    state.reloadHistoryForNewComponent(this);
     const message: unknown = Reflect.get(this, "message");
     state.associateCompaction(this, message);
     const view = state.viewFor(this);
@@ -493,7 +494,6 @@ export function installRenderPatches(
     message: AssistantMessage,
   ): void {
     originalAssistantUpdate.call(this, message);
-    state.reloadHistoryForNewComponent(this);
     state.associateAssistant(this, message);
   };
 
@@ -513,7 +513,6 @@ export function installRenderPatches(
   };
 
   const patchedToolMarkExecutionStarted = function (this: ToolExecutionComponent): void {
-    state.reloadHistoryForNewComponent(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);
     originalToolMarkExecutionStarted.call(this);
@@ -521,7 +520,6 @@ export function installRenderPatches(
 
   const patchedToolRender = function (this: ToolExecutionComponent, width: number): string[] {
     removeToolHorizontalPadding(this);
-    state.reloadHistoryForNewComponent(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);
     const view = state.viewFor(this);

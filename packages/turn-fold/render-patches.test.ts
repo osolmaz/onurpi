@@ -19,6 +19,7 @@ function summary(overrides: Partial<FoldSummary> = {}): FoldSummary {
     failedTools: 0,
     hiddenActivities: 7,
     messages: 4,
+    omittedRuns: 0,
     running: false,
     tools: 10,
     ...overrides,
@@ -37,6 +38,12 @@ function fileDiff(
 }
 
 describe("turn fold summary rendering", () => {
+  it("formats omitted runs on the oldest retained summary", () => {
+    expect(formatSettledSummary(summary({ omittedRuns: 12 }))).toContain(
+      "12 earlier runs · Worked for 1m 5s",
+    );
+  });
+
   it("formats the streaming overflow summary", () => {
     expect(formatStreamingSummary(summary({ running: true }))).toBe(
       "▶ 7 earlier activities · 10 tools · 4 msgs",
