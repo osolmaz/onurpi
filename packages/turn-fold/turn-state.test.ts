@@ -790,20 +790,25 @@ describe("historical compactions", () => {
     expect(state.viewFor(unannotated)).toBeUndefined();
   });
 
-  it("preserves a live compaction through a deferred transcript rebuild", () => {
+  it("preserves a live compaction through an atomic transcript rebuild", () => {
     const state = new TurnFoldState();
     const oldStandaloneCompaction = {};
     const compaction = {};
     const entry = compactionEntry("compact-rebuild", 120);
-
-    state.ensureActive(100);
-    state.registerCompaction(entry, "overflow");
-    state.deferHistoryReload(() => [
+    const rebuiltEntries = [
       { message: { content: "old", role: "user", timestamp: 10 }, type: "message" },
       compactionEntry("compact-old-manual", 30),
       { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
-    ]);
-    state.reloadHistoryForNewComponent(oldStandaloneCompaction);
+    ];
+
+    state.ensureActive(100);
+    const association = state.registerCompaction(entry, "overflow");
+    if (!association) throw new Error("Expected a compaction association");
+    state.applyHistoryProjection(
+      rebuiltEntries,
+      rebuiltEntries,
+      new Map([[association.compactionEntryId, association]]),
+    );
     state.associateCompaction(oldStandaloneCompaction, compactionMessage(30));
     state.associateCompaction(compaction, compactionMessage(999));
     state.settleActive(150);
@@ -831,7 +836,7 @@ describe("historical transcript timing and reload", () => {
     expect(state.viewFor(component)?.summary.durationMs).toBe(4_000);
   });
 
-  it("preserves an active turn through a deferred transcript rebuild", () => {
+  it("preserves an active turn through an atomic transcript rebuild", () => {
     const state = new TurnFoldState();
     const original = {};
     const rebuilt = {};
@@ -844,12 +849,12 @@ describe("historical transcript timing and reload", () => {
     state.ensureActive(100);
     registerAssistant(state, original, message);
     state.registerToolResult(editResult);
-    state.deferHistoryReload(() => [
+    const rebuiltEntries = [
       { message: { content: "prompt", role: "user", timestamp: 100 }, type: "message" },
       { message, type: "message" },
       { message: editResult, type: "message" },
-    ]);
-    state.reloadHistoryForNewComponent(rebuilt);
+    ];
+    state.applyHistoryProjection(rebuiltEntries, rebuiltEntries);
     state.associateAssistant(rebuilt, message);
 
     expect(state.viewFor(original)).toBeUndefined();

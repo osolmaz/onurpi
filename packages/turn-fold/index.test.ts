@@ -49,6 +49,7 @@ function context(
   return {
     cwd: "/workspace/project",
     hasUI: true,
+    mode: "tui",
     reload: vi.fn(() => Promise.resolve()),
     sessionManager: {
       buildContextEntries: () => entries,
@@ -316,7 +317,7 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
     expect(state).toBeInstanceOf(TurnFoldState);
     if (!(state instanceof TurnFoldState)) throw new Error("Turn Fold state was not installed");
     const staleCompaction = {};
-    state.reloadHistoryForNewComponent(staleCompaction);
+    state.applyHistoryProjection(otherBranch, otherBranch);
     state.associateCompaction(staleCompaction, {
       role: "compactionSummary",
       timestamp: 120,
@@ -333,6 +334,22 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
 });
 
 describe("Turn Fold window commands", () => {
+  it("rebuilds the transcript when switching between sparse and expanded replay", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "expanded", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      mode: "expanded",
+      windows: 3,
+    });
+    expect(ctx.waitForIdle).toHaveBeenCalledOnce();
+    expect(ctx.reload).toHaveBeenCalledOnce();
+  });
+
   it("persists relative changes and reloads the main transcript", async () => {
     const extension = extensionHarness();
     const ctx = context([
@@ -502,6 +519,7 @@ describe("Turn Fold extension reload", () => {
       { reason: "reload", type: "session_start" },
       secondContext,
     );
+    secondContext.sessionManager.buildContextEntries();
 
     const state = renderPatchMock.states.at(-1);
     expect(state).toBeInstanceOf(TurnFoldState);

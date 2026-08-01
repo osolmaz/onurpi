@@ -126,6 +126,55 @@ describe("transcript window adapter", () => {
     ]);
   });
 
+  it("applies a display projector after window selection", () => {
+    const branch = [user("old"), compaction("c1"), user("recent"), custom("now")];
+    const sessionManager = manager(branch);
+    installTranscriptWindowAdapter(sessionManager, 1, (entries) =>
+      entries.filter((entry) => entry.id !== "c1"),
+    );
+
+    expect(sessionManager.buildContextEntries().map((entry) => entry.id)).toEqual([
+      "old",
+      "recent",
+      "now",
+    ]);
+  });
+
+  it("falls back to Pi replay and reports a projector failure once", () => {
+    const branch = [user("old"), compaction("c1"), user("recent")];
+    const sessionManager = manager(branch);
+    const originalEntries = [custom("native")];
+    sessionManager.buildContextEntries = vi.fn(() => originalEntries);
+    const onError = vi.fn();
+    installTranscriptWindowAdapter(
+      sessionManager,
+      1,
+      () => {
+        throw new Error("projection failed");
+      },
+      onError,
+    );
+
+    expect(sessionManager.buildContextEntries()).toBe(originalEntries);
+    expect(sessionManager.buildContextEntries()).toBe(originalEntries);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(new Error("projection failed"));
+  });
+
+  it("restores Pi replay only while it owns the method", () => {
+    const sessionManager = manager([custom("now")]);
+    const original = sessionManager.buildContextEntries;
+    const adapter = installTranscriptWindowAdapter(sessionManager, 1);
+
+    adapter.restore();
+    expect(sessionManager.buildContextEntries).toBe(original);
+
+    const replacement = vi.fn(() => []);
+    sessionManager.buildContextEntries = replacement;
+    adapter.restore();
+    expect(sessionManager.buildContextEntries).toBe(replacement);
+  });
+
   it("leaves the model-context builder untouched", () => {
     const buildSessionContext = vi.fn(() => ({ messages: ["compacted"] }));
     const sessionManager = {
