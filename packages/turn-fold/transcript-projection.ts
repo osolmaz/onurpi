@@ -94,7 +94,9 @@ function indexRunEntry(run: ProjectedRun, entry: BranchEntry, assistantOrdinal: 
   run.entries.push(entry);
   const message = messageFromEntry(entry);
   const role = stringField(message, "role");
-  if (role === "user" && !run.promptEntry) run.promptEntry = entry;
+  if ((role === "user" || entryType(entry) === "custom_message") && !run.promptEntry) {
+    run.promptEntry = entry;
+  }
   if (role === "toolResult") indexToolResult(run, entry, message);
   return role === "assistant"
     ? indexAssistant(run, entry, message, assistantOrdinal)
@@ -215,6 +217,14 @@ function shouldPassThrough(
   attachedCompactionEntryIds: ReadonlySet<string>,
 ): boolean {
   if (isManagedMessage(entry)) return false;
+  if (
+    entryType(entry) === "custom" &&
+    ["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
+      stringField(entry, "customType") ?? "",
+    )
+  ) {
+    return false;
+  }
   if (entryType(entry) !== "compaction") return true;
   const id = entryId(entry);
   return id === undefined || !attachedCompactionEntryIds.has(id);
@@ -228,6 +238,25 @@ function estimatedComponents(run: ProjectedRun, keptIds: ReadonlySet<string>): n
     count += 1 + assistant.snapshot.toolCallIds.length;
   }
   return count + (run.promptEntry ? 1 : 0);
+}
+
+function passThroughComponentCount(
+  entries: BranchEntries,
+  runs: readonly ProjectedRun[],
+  attachedCompactionEntryIds: ReadonlySet<string>,
+): number {
+  const runEntries = new Set(runs.flatMap((run) => run.entries));
+  return entries.filter((entry) => {
+    const type = entryType(entry);
+    if (type === "custom_message") return !runEntries.has(entry);
+    if (type === "custom") {
+      return !["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
+        stringField(entry, "customType") ?? "",
+      );
+    }
+    const id = entryId(entry);
+    return type === "compaction" && (id === undefined || !attachedCompactionEntryIds.has(id));
+  }).length;
 }
 
 function retainedRuns(
@@ -268,6 +297,7 @@ function projectedEntries(
     if (!run) return shouldPassThrough(entry, attachedCompactionEntryIds);
     const id = entryId(entry);
     if (id && keepByRun.get(run)?.has(id)) return true;
+    if (entryType(entry) === "custom_message") return false;
     return shouldPassThrough(entry, attachedCompactionEntryIds);
   });
 }
@@ -305,17 +335,22 @@ export function projectTranscriptEntries(
 
   const { runs } = groupEntries(sourceEntries);
   const componentLimit = Math.max(1, options.componentLimit ?? DEFAULT_PROJECTED_COMPONENT_LIMIT);
-  const { keepByRun, omittedRunCount } = retainedRuns(runs, options.activeRun, componentLimit);
+  const passThroughComponents = passThroughComponentCount(
+    sourceEntries,
+    runs,
+    options.attachedCompactionEntryIds,
+  );
+  const runComponentLimit = Math.max(1, componentLimit - passThroughComponents);
+  const { keepByRun, omittedRunCount } = retainedRuns(runs, options.activeRun, runComponentLimit);
   const displayEntries = projectedEntries(
     sourceEntries,
     runs,
     keepByRun,
     options.attachedCompactionEntryIds,
   );
-  const projectedComponentCount = [...keepByRun].reduce(
-    (count, [run, keep]) => count + estimatedComponents(run, keep),
-    0,
-  );
+  const projectedComponentCount =
+    passThroughComponents +
+    [...keepByRun].reduce((count, [run, keep]) => count + estimatedComponents(run, keep), 0);
   const oldestRetainedEntryId = oldestRetainedRunEntryId(runs, keepByRun);
   return {
     displayEntries,

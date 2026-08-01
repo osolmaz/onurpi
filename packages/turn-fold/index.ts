@@ -22,6 +22,7 @@ import {
   installTranscriptWindowAdapter,
   type TranscriptWindowAdapter,
 } from "./transcript-window-adapter.ts";
+import { showHistoryViewer } from "./history-viewer.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
 import { nearestRunStartIndex, RunBoundaryRecorder } from "./run-boundary.ts";
 import {
@@ -157,7 +158,7 @@ async function confirmAllWindows(
 function argumentCompletions(prefix: string): { label: string; value: string }[] {
   const windows = windowCompletions(prefix);
   if (windows.length > 0) return windows;
-  return ["compact", "expanded", "status", "toggle", "windows"]
+  return ["compact", "expanded", "history", "status", "toggle", "windows"]
     .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
     .map((value) => ({ label: value, value }));
 }
@@ -192,23 +193,46 @@ async function applyWindowArgument(
   await ctx.reload();
 }
 
+async function handleInformationCommand(
+  command: string,
+  ctx: ExtensionCommandContext,
+  state: TurnFoldState,
+  configuration: TurnFoldConfiguration,
+  getSourceEntries: () => BranchEntries,
+): Promise<boolean> {
+  if (command === "history") {
+    await showHistoryViewer(ctx, getSourceEntries());
+    return true;
+  }
+  if (command === "status") {
+    ctx.ui.notify(
+      `Turn fold: ${state.getMode()}, windows ${formatTranscriptWindowValue(configuration.windows)}`,
+      "info",
+    );
+    return true;
+  }
+  if (command === "windows") {
+    ctx.ui.notify(
+      `Loaded compaction windows: ${formatTranscriptWindowValue(configuration.windows)}`,
+      "info",
+    );
+    return true;
+  }
+  return false;
+}
+
 async function handleCommand(
   args: string,
   ctx: ExtensionCommandContext,
   state: TurnFoldState,
   getConfiguration: GetConfiguration,
   applyConfiguration: ApplyConfiguration,
+  getSourceEntries: () => BranchEntries,
 ): Promise<void> {
   const command = args.trim().toLowerCase();
   const configuration = getConfiguration();
   if (!command) return chooseMode(ctx, configuration, applyConfiguration);
-  if (command === "status") {
-    ctx.ui.notify(
-      `Turn fold: ${state.getMode()}, windows ${formatTranscriptWindowValue(configuration.windows)}`,
-      "info",
-    );
-    return;
-  }
+  if (await handleInformationCommand(command, ctx, state, configuration, getSourceEntries)) return;
   if (command === "toggle") {
     const mode = configuration.mode === "compact" ? "expanded" : "compact";
     await applyMode(mode, ctx, configuration, applyConfiguration);
@@ -218,20 +242,13 @@ async function handleCommand(
     await applyMode(command, ctx, configuration, applyConfiguration);
     return;
   }
-  if (command === "windows") {
-    ctx.ui.notify(
-      `Loaded compaction windows: ${formatTranscriptWindowValue(configuration.windows)}`,
-      "info",
-    );
-    return;
-  }
   const argument = windowArgument(command);
   if (argument !== undefined) {
     await applyWindowArgument(argument, ctx, configuration, applyConfiguration);
     return;
   }
   ctx.ui.notify(
-    "Usage: /turn-fold [compact|expanded|status|toggle|windows <N|+N|-N|all|reset>]",
+    "Usage: /turn-fold [compact|expanded|history|status|toggle|windows <N|+N|-N|all|reset>]",
     "warning",
   );
 }
@@ -241,11 +258,13 @@ function registerControls(
   state: TurnFoldState,
   getConfiguration: GetConfiguration,
   applyConfiguration: ApplyConfiguration,
+  getSourceEntries: () => BranchEntries,
 ): void {
   pi.registerCommand("turn-fold", {
     description: "Control transcript folding and loaded compaction windows.",
     getArgumentCompletions: argumentCompletions,
-    handler: (args, ctx) => handleCommand(args, ctx, state, getConfiguration, applyConfiguration),
+    handler: (args, ctx) =>
+      handleCommand(args, ctx, state, getConfiguration, applyConfiguration, getSourceEntries),
   });
   pi.registerShortcut(TOGGLE_SHORTCUT, {
     description: "Toggle compact and expanded transcript rendering",
@@ -416,7 +435,13 @@ export default function turnFold(pi: ExtensionAPI): void {
     if (state.getMode() !== next.mode) state.setMode(next.mode);
     if (persist) pi.appendEntry(TURN_FOLD_CONFIG_ENTRY, next);
   };
-  registerControls(pi, state, () => runtime.configuration, applyConfiguration);
+  registerControls(
+    pi,
+    state,
+    () => runtime.configuration,
+    applyConfiguration,
+    () => runtime.lastSourceEntries,
+  );
   registerSessionEvents(pi, state, runtime, registry, applyConfiguration, restorePatches);
   registerAgentEvents(pi, state, runtime);
 }

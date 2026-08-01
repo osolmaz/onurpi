@@ -50,7 +50,7 @@ Pi calls every loaded transcript component whenever it draws a TUI frame. Turn F
 
 A hidden component returns before invoking its native Markdown or tool renderer. Pi still visits every component in the selected range. A long run can cross several compaction boundaries, so the three-window default does not reliably bound the component count.
 
-The target design keeps the selected entries as a source snapshot for one-pass summary reconstruction and returns a sparse display projection to Pi. Compact replay will retain each prompt, one final display component for a settled run, and at most three activities for a reconstructed active run. Hidden source entries will remain in session and model history without entering Pi's component tree. [TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) defines that behavior, and the [implementation plan](../../docs/turn-fold-sparse-transcript-implementation-plan.md) lists the delivery and latency gates.
+Turn Fold keeps the selected entries as a source snapshot for one-pass summary reconstruction and returns a sparse display projection to Pi. Compact replay retains each prompt, one final display component for a settled run, and at most three activities for a reconstructed active run. Hidden source entries remain in session and model history without entering Pi's component tree. [TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) defines that behavior, and the [implementation plan](../../docs/turn-fold-sparse-transcript-implementation-plan.md) lists the delivery and latency gates.
 
 ## Configuration
 

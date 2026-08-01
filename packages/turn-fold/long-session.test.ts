@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
+import {
+  DEFAULT_PROJECTED_COMPONENT_LIMIT,
+  projectTranscriptEntries,
+} from "./transcript-projection.ts";
 import { selectTranscriptEntries } from "./transcript-windows.ts";
 
 type Entry = Parameters<typeof selectTranscriptEntries>[0][number];
@@ -78,5 +82,20 @@ describe("Goal-heavy transcript windows", () => {
     expect(selected[0]?.id).toBe("goal-prompt-4000");
     expect(selected.at(-1)?.id).toBe("boundary-4228");
     expect(selected.length).toBeLessThan(1_000);
+  });
+
+  it("keeps full-history compact replay within the component budget", () => {
+    const branch = Array.from({ length: 4_228 }, (_, index) => goalRun(index + 1)).flat();
+    const projection = projectTranscriptEntries(branch, {
+      activeRun: false,
+      attachedCompactionEntryIds: new Set(),
+      mode: "compact",
+    });
+
+    expect(projection.projectedComponentCount).toBeLessThanOrEqual(
+      DEFAULT_PROJECTED_COMPONENT_LIMIT,
+    );
+    expect(projection.omittedRunCount).toBeGreaterThan(3_900);
+    expect(projection.displayEntries.length).toBeLessThanOrEqual(DEFAULT_PROJECTED_COMPONENT_LIMIT);
   });
 });
