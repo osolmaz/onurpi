@@ -6,6 +6,8 @@ import { assistantSnapshot, messageFromEntry, stringField } from "./turn-message
 
 export const DEFAULT_PROJECTED_COMPONENT_LIMIT = 512;
 
+const MANAGED_MESSAGE_ROLES = new Set(["assistant", "toolResult", "user"]);
+
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 type BranchEntry = BranchEntries[number];
 
@@ -251,13 +253,13 @@ function entryOwners(runs: readonly ProjectedRun[]): ReadonlyMap<BranchEntry, Pr
   return owners;
 }
 
-function isPassThroughComponent(
+function isNativePassThroughComponent(
   entry: BranchEntry,
-  owner: ProjectedRun | undefined,
   attachedCompactionEntryIds: ReadonlySet<string>,
 ): boolean {
   const type = entryType(entry);
-  if (type === "custom_message") return owner?.promptEntry !== entry;
+  if (type === "branch_summary") return true;
+  if (type === "message") return !MANAGED_MESSAGE_ROLES.has(messageRole(entry) ?? "");
   if (type === "custom") {
     return !["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
       stringField(entry, "customType") ?? "",
@@ -265,6 +267,15 @@ function isPassThroughComponent(
   }
   const id = entryId(entry);
   return type === "compaction" && (id === undefined || !attachedCompactionEntryIds.has(id));
+}
+
+function isPassThroughComponent(
+  entry: BranchEntry,
+  owner: ProjectedRun | undefined,
+  attachedCompactionEntryIds: ReadonlySet<string>,
+): boolean {
+  if (entryType(entry) === "custom_message") return owner?.promptEntry !== entry;
+  return isNativePassThroughComponent(entry, attachedCompactionEntryIds);
 }
 
 function boundedPassThroughEntries(

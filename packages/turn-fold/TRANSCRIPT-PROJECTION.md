@@ -87,7 +87,7 @@ A display component may cache formatted lines by run revision, width, expanded s
 
 Compact projection MUST have a hard component budget independent of the number of entries in one run or compaction window. The implementation defines a conservative default from the latency benchmark in the implementation plan.
 
-If the selected windows contain more settled runs than the budget allows, Turn Fold keeps the newest complete runs. The oldest retained display anchor reports how many earlier runs were omitted from the active transcript. The omitted runs remain in the source snapshot, session tree, and model history.
+If the selected windows contain more settled runs than the budget allows, Turn Fold keeps the newest complete runs. Native pass-through components, including branch summaries, persisted shell executions, standalone compactions, and unrelated extension entries, consume the same budget; the newest ones are retained when they fill it. The oldest retained display anchor reports how many earlier runs were omitted from the active transcript. Omitted entries remain in the source snapshot, session tree, and model history.
 
 A single retained final message may exceed the ordinary byte estimate. Turn Fold may render a bounded preview in the main transcript and make the complete content available through the history viewer. It MUST NOT mutate or truncate the stored message.
 

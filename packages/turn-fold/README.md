@@ -51,8 +51,11 @@ The package is private and is not published yet.
 /turn-fold windows reset    return to the default of 3
 ```
 
-Use `/turn-fold toggle` to switch modes because changing the replay projection requires Pi's
-command-only reload capability. `Ctrl+O` remains Pi's separate tool-output detail toggle.
+Use `/turn-fold toggle` to switch modes. Turn Fold waits for Pi to become idle, stores the new
+configuration, and resumes the current session so Pi rebuilds the transcript through the new
+projection. `Ctrl+O` remains Pi's separate tool-output detail toggle. A TUI started with
+`--no-session` keeps its startup projection and rejects replay-setting changes because Pi has no
+public in-memory transcript rebuild action.
 
 ## Transcript windows
 
