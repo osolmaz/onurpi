@@ -77,6 +77,19 @@ function compaction(id: string): Entry {
   };
 }
 
+function customMessage(id: string, content: string): Entry {
+  return {
+    content,
+    customType: "other-extension",
+    details: {},
+    display: true,
+    id,
+    parentId: null,
+    timestamp: "2026-07-22T00:00:00.000Z",
+    type: "custom_message",
+  };
+}
+
 function custom(id: string): Entry {
   return {
     customType: "other-extension",
@@ -186,6 +199,35 @@ describe("compact transcript projection", () => {
     expect(ids(result.displayEntries)).toEqual(["user", "final"]);
     expect(result.sourceEntries).toHaveLength(2_002);
     expect(result.projectedComponentCount).toBe(2);
+  });
+
+  it("falls back to the prompt when one assistant exceeds the component budget", () => {
+    const toolCalls: AssistantMessage["content"] = Array.from({ length: 600 }, (_, index) => ({
+      arguments: {},
+      id: `call-${String(index)}`,
+      name: "read",
+      type: "toolCall" as const,
+    }));
+    const entries: Entry[] = [user("user", 100), assistant("oversized", 110, toolCalls)];
+    for (let index = 0; index < 600; index += 1) {
+      entries.push(toolResult(`result-${String(index)}`, `call-${String(index)}`));
+    }
+
+    const result = project(entries);
+
+    expect(ids(result.displayEntries)).toEqual(["user"]);
+    expect(result.projectedComponentCount).toBe(1);
+  });
+
+  it("preserves unrelated custom messages inside a projected run", () => {
+    const entries: Entries = [
+      user("user", 100),
+      assistant("hidden", 110, [{ text: "Working", type: "text" }]),
+      customMessage("status", "Still working"),
+      assistant("final", 120, [{ text: "Done", type: "text" }]),
+    ];
+
+    expect(ids(project(entries).displayEntries)).toEqual(["user", "status", "final"]);
   });
 
   it("omits old complete runs when the component budget is exhausted", () => {

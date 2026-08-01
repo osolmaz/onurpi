@@ -246,9 +246,12 @@ function passThroughComponentCount(
   attachedCompactionEntryIds: ReadonlySet<string>,
 ): number {
   const runEntries = new Set(runs.flatMap((run) => run.entries));
+  const promptEntries = new Set(runs.map((run) => run.promptEntry).filter((entry) => entry));
   return entries.filter((entry) => {
     const type = entryType(entry);
-    if (type === "custom_message") return !runEntries.has(entry);
+    if (type === "custom_message") {
+      return !runEntries.has(entry) || !promptEntries.has(entry);
+    }
     if (type === "custom") {
       return !["onurpi-turn-fold-config", "onurpi-turn-fold-run"].includes(
         stringField(entry, "customType") ?? "",
@@ -257,6 +260,22 @@ function passThroughComponentCount(
     const id = entryId(entry);
     return type === "compaction" && (id === undefined || !attachedCompactionEntryIds.has(id));
   }).length;
+}
+
+function promptOnlyEntryIds(run: ProjectedRun): Set<string> {
+  const keep = new Set<string>();
+  const promptId = entryId(run.promptEntry);
+  if (promptId) keep.add(promptId);
+  return keep;
+}
+
+function boundedRunEntryIds(
+  run: ProjectedRun,
+  active: boolean,
+  componentLimit: number,
+): Set<string> {
+  const keep = compactRunEntryIds(run, active);
+  return estimatedComponents(run, keep) <= componentLimit ? keep : promptOnlyEntryIds(run);
 }
 
 function retainedRuns(
@@ -271,7 +290,7 @@ function retainedRuns(
   for (let index = runs.length - 1; index >= 0; index -= 1) {
     const run = runs[index];
     if (!run) continue;
-    const keep = compactRunEntryIds(run, activeRun && index === runs.length - 1);
+    const keep = boundedRunEntryIds(run, activeRun && index === runs.length - 1, componentLimit);
     const nextComponents = estimatedComponents(run, keep);
     if (keepByRun.size > 0 && components + nextComponents > componentLimit) {
       omittedRunCount += 1;
@@ -297,7 +316,7 @@ function projectedEntries(
     if (!run) return shouldPassThrough(entry, attachedCompactionEntryIds);
     const id = entryId(entry);
     if (id && keepByRun.get(run)?.has(id)) return true;
-    if (entryType(entry) === "custom_message") return false;
+    if (entryType(entry) === "custom_message") return run.promptEntry !== entry;
     return shouldPassThrough(entry, attachedCompactionEntryIds);
   });
 }
