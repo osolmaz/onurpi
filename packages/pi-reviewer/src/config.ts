@@ -32,12 +32,12 @@ export function validateConfig(value: unknown, source = "config"): UserConfig {
   const unknown = Object.keys(value).filter((key) => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`${source}: unknown field ${unknown.join(", ")}`);
   if (value["version"] !== 1) throw new Error(`${source}: version must be 1`);
-  if (value["auth"] !== "pi") throw new Error(`${source}: auth must be pi`);
+  const auth = validateAuth(value["auth"], source);
   const model = optionalString(value["model"], `${source}: model`);
   const thinking = optionalString(value["thinking"], `${source}: thinking`);
   return {
     version: 1,
-    auth: "pi",
+    auth,
     ...(model === undefined ? {} : { model: validateModel(model) }),
     ...(thinking === undefined ? {} : { thinking: validateThinking(thinking) }),
   };
@@ -83,6 +83,11 @@ export async function writeConfig(config: UserConfig, file = defaultConfigPath()
   } finally {
     await rm(temporary, { force: true });
   }
+}
+
+function validateAuth(value: unknown, source: string): "pi" {
+  if (value !== undefined && value !== "pi") throw new Error(`${source}: auth must be pi`);
+  return "pi";
 }
 
 function optionalString(value: unknown, field: string): string | undefined {
