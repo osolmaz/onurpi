@@ -6,10 +6,11 @@ import { regularPiAuthPath } from "./auth-path.js";
 export async function listReviewerModels(
   app: PiAppDefinition,
   search?: string,
+  authPath = regularPiAuthPath(),
 ): Promise<readonly string[]> {
   const config = await writePiRuntimeConfig(app);
   const runtime = await ModelRuntime.create({
-    authPath: regularPiAuthPath(),
+    authPath,
     modelsPath: config.modelsPath,
     allowModelNetwork: false,
   });

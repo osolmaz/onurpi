@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadReviewerApp, selectAppModel } from "../src/app.js";
+import { regularPiAuthPath } from "../src/auth-path.js";
 import { runReview } from "../src/runner.js";
 
 const cleanup: string[] = [];
@@ -91,7 +92,7 @@ describe("Pi Reviewer app", () => {
       },
     };
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
-    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "regular-pi"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "overridden-agent"));
     const previousOffline = process.env["PI_OFFLINE"];
     process.env["PI_OFFLINE"] = "0";
     const result = await runReview({
@@ -113,7 +114,8 @@ describe("Pi Reviewer app", () => {
       prompt: "Review the change",
       cwd: fake.root,
     });
-    expect(request["authPath"]).toBe(path.join(fake.root, "regular-pi", "auth.json"));
+    expect(request["authPath"]).toBe(regularPiAuthPath());
+    expect(request["authPath"]).not.toBe(path.join(fake.root, "overridden-agent", "auth.json"));
     expect(await readFile(fake.offlineFile, "utf8")).toBe("1");
     await expect(readFile(path.join(stateDir, "sessions", "session.jsonl"))).rejects.toThrow();
   });
@@ -121,7 +123,7 @@ describe("Pi Reviewer app", () => {
   it("passes regular Pi auth to the worker while keeping app config isolated", async () => {
     const fake = await fakePi();
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
-    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "regular-pi"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "overridden-agent"));
     const loaded = await loadReviewerApp({ packageRoot, piCommand: fake.command });
     const stateDir = path.join(fake.root, "reviewer-state");
     const app = {
@@ -143,7 +145,7 @@ describe("Pi Reviewer app", () => {
     });
 
     const request = JSON.parse(await readFile(fake.argsFile, "utf8")) as Record<string, unknown>;
-    expect(request["authPath"]).toBe(path.join(fake.root, "regular-pi", "auth.json"));
+    expect(request["authPath"]).toBe(regularPiAuthPath());
     expect(request["modelsPath"]).toBe(path.join(stateDir, "pi-config-runtime", "models.json"));
     expect(request["configDir"]).toBe(path.join(stateDir, "pi-config-runtime"));
   });

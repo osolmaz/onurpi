@@ -35,7 +35,7 @@ describe("Pi Reviewer authentication", () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-auth-"));
     cleanup.push(root);
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
-    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "regular-pi"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "overridden-agent"));
     const loaded = await loadReviewerApp(appOptions);
     const app = {
       ...loaded,
@@ -74,7 +74,8 @@ describe("Pi Reviewer authentication", () => {
 
     expect(receivedProvider).toBe("openai-codex");
     expect(receivedMethod).toBe("oauth");
-    expect(authPath).toBe(path.join(root, "regular-pi", "auth.json"));
+    expect(authPath).toBe(regularPiAuthPath());
+    expect(authPath).not.toBe(path.join(root, "overridden-agent", "auth.json"));
     expect(modelsPath).toBe(path.join(root, "state", "pi-config-runtime", "models.json"));
     expect(ui.output.join("")).toContain("ABCD-EFGH");
     expect(ui.output.join("")).toContain("Continue in the browser");
@@ -82,9 +83,9 @@ describe("Pi Reviewer authentication", () => {
     expect(ui.output.join("")).toContain("Authenticated OpenAI Codex in the regular Pi profile");
   });
 
-  it("resolves auth.json from Pi's agent directory", () => {
-    expect(regularPiAuthPath(path.join("root", "pi-agent"))).toBe(
-      path.join("root", "pi-agent", "auth.json"),
+  it("resolves auth.json from the regular Pi home", () => {
+    expect(regularPiAuthPath(path.join("root", "home"))).toBe(
+      path.join("root", "home", ".pi", "agent", "auth.json"),
     );
   });
 
