@@ -44,7 +44,7 @@ function registerExecCommand(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
     parameters: ExecCommandParameters,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
-      const details = await runExecCommand(runtime, params, signal, onUpdate, ctx.cwd);
+      const details = await runExecCommand(runtime, params, signal, onUpdate, ctx.cwd, ctx.model);
       updateRunningSessionsUi(runtime);
       return { content: [{ type: "text", text: renderResponseText(details) }], details };
     },

@@ -4,6 +4,10 @@
   "private": true,
   "description": "Persistent Codex-style command sessions for Pi",
   "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./command-environment": "./src/command-environment.ts"
+  },
   "engines": {
     "node": ">=22.19.0"
   },

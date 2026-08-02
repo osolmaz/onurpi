@@ -60,6 +60,7 @@ export default defineConfig({
         "packages/plan-checklist/plan-schema.ts",
         "packages/plan-checklist/plan-state.ts",
         "packages/unified-exec/src/collect.ts",
+        "packages/unified-exec/src/command-environment.ts",
         "packages/unified-exec/src/completion.ts",
         "packages/unified-exec/src/constants.ts",
         "packages/unified-exec/src/format-time.ts",
