@@ -212,8 +212,3 @@ jobs:
       - name: Mutate @onurpi/yarp package
         working-directory: packages/yarp
         run: npm run mutate
-      - name: Mutate external extension wrappers
-        run: |
-          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
-            npm run mutate --workspace "@onurpi/$package"
-          done
