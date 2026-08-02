@@ -1,1 +1,1 @@
-export { default } from "pi-regraft-source/extension-source";
+export { default } from "pi-regraft/extension-source";

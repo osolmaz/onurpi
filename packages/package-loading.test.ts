@@ -57,19 +57,12 @@ const externalPackages = [
   {
     directory: "pi-must-win",
     dependency: "pi-must-win",
-    source:
-      "https://codeload.github.com/osolmaz/pi-must-win/tar.gz/8721f01745987736837b135a912c5ebdae5d75b2",
-  },
-  {
-    directory: "regrafter-driver",
-    dependency: "pi-regraft",
     source: "0.3.0",
   },
   {
     directory: "regrafter-driver",
-    dependency: "pi-regraft-source",
-    source:
-      "https://codeload.github.com/osolmaz/pi-regraft/tar.gz/ed3f4cfa0d3bccca5a5ad51154ca39ade2b8f411",
+    dependency: "pi-regraft",
+    source: "0.4.0",
   },
   {
     directory: "workflows",
@@ -130,7 +123,7 @@ describe("OnurPi package loading", () => {
         "git:github.com/osolmaz/pi-workflows",
         "git:github.com/osolmaz/pi-must-win",
         "npm:pi-must-win",
-        "npm:pi-regraft@0.3.0",
+        "npm:pi-regraft@0.4.0",
         "git:github.com/osolmaz/pi-demo-mode",
       ]),
     );
@@ -172,6 +165,8 @@ describe("OnurPi package loading", () => {
     const pi = resourceManifest();
     expect(pi["extensions"]).toContain("./packages/regrafter-driver/index.ts");
     expect(pi["skills"]).toContain("./packages/regrafter-driver/skills");
-    expect(existsSync(join(root, "node_modules", ".bin", "regrafter"))).toBe(true);
+    expect(
+      existsSync(join(root, "packages", "regrafter-driver", "node_modules", ".bin", "regrafter")),
+    ).toBe(true);
   });
 });

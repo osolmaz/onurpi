@@ -1,8 +1,7 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-must-win
-- Commit: `8721f01745987736837b135a912c5ebdae5d75b2`
-- Base release: `0.2.0`
+- Release: `pi-must-win@0.3.0`
 - License: MIT
 - Local changes: `index.ts` composes the pinned extension with OnurPi's Unified Exec environment
   event
