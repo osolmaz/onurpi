@@ -13,7 +13,6 @@ export type ParsedCommand =
   | { readonly kind: "config-reset" }
   | { readonly kind: "config-set-model"; readonly model: string }
   | { readonly kind: "config-set-thinking"; readonly thinking: ThinkingLevel }
-  | { readonly kind: "config-set-auth"; readonly auth: "pi" | "isolated" }
   | { readonly kind: "login"; readonly provider?: string }
   | { readonly kind: "models"; readonly search?: string }
   | { readonly kind: "help" }
@@ -51,22 +50,17 @@ function parseConfig(args: readonly string[]): ParsedCommand {
   if (action === "show") return noConfigArguments(rest, { kind: "config-show" });
   if (action === "reset") return noConfigArguments(rest, { kind: "config-reset" });
   if (action === "set") return parseConfigSet(rest);
-  throw new Error(
-    "usage: pi-reviewer config <show|reset|set model VALUE|set thinking LEVEL|set auth pi|isolated>",
-  );
+  throw new Error("usage: pi-reviewer config <show|reset|set model VALUE|set thinking LEVEL>");
 }
 
 function parseConfigSet(args: readonly string[]): ParsedCommand {
   const [key, value, extra] = args;
   if (value === undefined || extra !== undefined) {
-    throw new Error("usage: pi-reviewer config set <model VALUE|thinking LEVEL|auth pi|isolated>");
+    throw new Error("usage: pi-reviewer config set <model VALUE|thinking LEVEL>");
   }
   if (key === "model") return { kind: "config-set-model", model: validateModel(value) };
   if (key === "thinking") return { kind: "config-set-thinking", thinking: validateThinking(value) };
-  if (key === "auth" && (value === "pi" || value === "isolated")) {
-    return { kind: "config-set-auth", auth: value };
-  }
-  throw new Error("config key must be model, thinking, or auth");
+  throw new Error("config key must be model or thinking");
 }
 
 function noConfigArguments<T extends ParsedCommand>(args: readonly string[], command: T): T {

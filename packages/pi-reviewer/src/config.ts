@@ -16,7 +16,7 @@ export async function loadConfig(file = defaultConfigPath()): Promise<UserConfig
     if (isNodeError(error) && error.code === "ENOENT") return undefined;
     throw error;
   });
-  if (text === undefined) return { version: 1 };
+  if (text === undefined) return { version: 1, auth: "pi" };
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -28,14 +28,16 @@ export async function loadConfig(file = defaultConfigPath()): Promise<UserConfig
 
 export function validateConfig(value: unknown, source = "config"): UserConfig {
   if (!isRecord(value)) throw new Error(`${source}: config must be a JSON object`);
-  const allowed = new Set(["version", "model", "thinking"]);
+  const allowed = new Set(["version", "auth", "model", "thinking"]);
   const unknown = Object.keys(value).filter((key) => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`${source}: unknown field ${unknown.join(", ")}`);
   if (value["version"] !== 1) throw new Error(`${source}: version must be 1`);
+  if (value["auth"] !== "pi") throw new Error(`${source}: auth must be pi`);
   const model = optionalString(value["model"], `${source}: model`);
   const thinking = optionalString(value["thinking"], `${source}: thinking`);
   return {
     version: 1,
+    auth: "pi",
     ...(model === undefined ? {} : { model: validateModel(model) }),
     ...(thinking === undefined ? {} : { thinking: validateThinking(thinking) }),
   };

@@ -1,9 +1,9 @@
 import { createInterface } from "node:readline/promises";
-import path from "node:path";
 
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { getPiAuthGrant, writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
+import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
+import { regularPiAuthPath } from "./auth-path.js";
 import { terminalText } from "./terminal-text.js";
 
 type AuthType = Parameters<ModelRuntime["login"]>[1];
@@ -45,17 +45,15 @@ export async function loginReviewerApp(
   createRuntime: RuntimeFactory = defaultRuntimeFactory,
 ): Promise<void> {
   const config = await writePiRuntimeConfig(app);
-  const grant = await getPiAuthGrant(app.id);
   const runtime = await createRuntime({
-    authPath: grant?.authFile ?? path.join(config.configDir, "auth.json"),
+    authPath: regularPiAuthPath(),
     modelsPath: config.modelsPath,
   });
   const providers = loginProviders(runtime.getProviders());
   const provider = await selectProvider(providers, requestedProvider, terminal);
   const method = await selectAuthType(provider, terminal);
   await runtime.login(provider.id, method, createAuthInteraction(terminal));
-  const profile = grant === undefined ? "Pi Reviewer" : "regular Pi";
-  terminal.write(terminalText(`Authenticated ${provider.name} in the ${profile} profile.\n`));
+  terminal.write(terminalText(`Authenticated ${provider.name} in the regular Pi profile.\n`));
 }
 
 function loginProviders(providers: readonly LoginProvider[]): readonly LoginProvider[] {

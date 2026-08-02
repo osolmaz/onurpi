@@ -17,10 +17,11 @@ afterEach(async () => {
 });
 
 describe("review model listing", () => {
-  it("uses the app model catalog with its resolved auth profile", async () => {
+  it("uses the app model catalog with regular Pi authentication", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-models-"));
     cleanup.push(root);
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "regular-pi"));
     const loaded = await loadReviewerApp({ packageRoot, piCommand: [process.execPath] });
     const stateDir = path.join(root, "reviewer");
     const app = {
@@ -28,10 +29,10 @@ describe("review model listing", () => {
       stateDir,
       sessionDir: path.join(stateDir, "sessions"),
     };
-    const configDir = path.join(stateDir, "pi-config-runtime");
-    await mkdir(configDir, { recursive: true });
+    const authDir = path.join(root, "regular-pi");
+    await mkdir(authDir, { recursive: true });
     await writeFile(
-      path.join(configDir, "auth.json"),
+      path.join(authDir, "auth.json"),
       JSON.stringify({ anthropic: { type: "api_key", key: "test-key" } }),
       { mode: 0o600 },
     );

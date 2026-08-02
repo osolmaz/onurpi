@@ -44,6 +44,7 @@ export type ReviewOutput = {
 
 export type UserConfig = {
   readonly version: 1;
+  readonly auth: "pi";
   readonly model?: string;
   readonly thinking?: ThinkingLevel;
 };

@@ -127,7 +127,6 @@ npm run build --workspace @osolmaz/pi-reviewer
 npm link --workspace @osolmaz/pi-reviewer
 pi-reviewer config set model openai-codex/gpt-5.6-terra
 pi-reviewer config set thinking high
-pi-reviewer config set auth pi
 pi-reviewer --base main
 ```
 
