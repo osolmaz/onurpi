@@ -38,12 +38,14 @@ describe("Pi Must Win adapter", () => {
     } as unknown as ExtensionAPI;
 
     onurPiMustWin(pi);
+    environmentHandler?.(undefined);
     const event = {
       command: "git status",
       cwd: "/repo",
       shell: "bash",
       model: { id: "model-id", name: "", provider: "provider" },
       environment: {},
+      reject: vi.fn(),
     };
     environmentHandler?.(event);
     expect(event.environment).toMatchObject({
@@ -54,6 +56,15 @@ describe("Pi Must Win adapter", () => {
       { model: { id: "model-id", name: "Model Name", provider: "provider" } },
     );
     expect(wrapSpy.mock.instances[0]).toBe(environmentSpy.mock.instances[0]);
+
+    const failure = new Error("attribution failed");
+    environmentSpy.mockImplementationOnce(() => {
+      throw failure;
+    });
+    const rejectedEvent = { ...event, environment: {}, reject: vi.fn() };
+    environmentHandler?.(rejectedEvent);
+    expect(rejectedEvent.reject).toHaveBeenCalledWith(failure);
+
     for (const handler of handlers.get("session_shutdown") ?? []) handler();
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
@@ -65,6 +76,7 @@ describe("Pi Must Win adapter", () => {
       shell: "/bin/bash",
       model: { id: "model-id", name: "Model Name", provider: "provider" },
       environment: { KEEP_ME: "yes" },
+      reject: vi.fn(),
     };
 
     expect(isCommandEnvironmentEvent(event)).toBe(true);

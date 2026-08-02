@@ -1,4 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -124,6 +126,7 @@ describe("OnurPi package loading", () => {
     expect(packages).not.toEqual(
       expect.arrayContaining([
         "npm:pi-huggingface-oauth@0.1.1",
+        "npm:@osolmaz/pi-workflows@0.2.0",
         "git:github.com/osolmaz/pi-workflows",
         "git:github.com/osolmaz/pi-must-win",
         "npm:pi-must-win",
@@ -131,6 +134,30 @@ describe("OnurPi package loading", () => {
         "git:github.com/osolmaz/pi-demo-mode",
       ]),
     );
+  });
+
+  it("removes the scoped workflow source during live settings migration", () => {
+    const home = mkdtempSync(join(tmpdir(), "onurpi-settings-"));
+    try {
+      const settingsPath = join(home, ".pi", "agent", "settings.json");
+      mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+      writeFileSync(
+        settingsPath,
+        `${JSON.stringify({ packages: ["npm:@osolmaz/pi-workflows@0.2.0", "npm:third-party"] })}\n`,
+      );
+      execFileSync(process.execPath, [join(root, "scripts", "sync-settings.ts"), "reset"], {
+        env: { ...process.env, HOME: home, USERPROFILE: home },
+      });
+      const normalized: unknown = JSON.parse(readFileSync(settingsPath, "utf8"));
+      if (typeof normalized !== "object" || normalized === null || Array.isArray(normalized)) {
+        throw new Error("Expected normalized settings");
+      }
+      const packages = (normalized as { packages?: unknown }).packages;
+      expect(packages).toEqual(expect.arrayContaining(["npm:third-party"]));
+      expect(packages).not.toEqual(expect.arrayContaining(["npm:@osolmaz/pi-workflows@0.2.0"]));
+    } finally {
+      rmSync(home, { force: true, recursive: true });
+    }
   });
 
   it("runs Loop Guard before Goal settlement handlers", () => {

@@ -298,13 +298,20 @@ import {
 
 const unsubscribe = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
   if (!isCommandEnvironmentEvent(value)) return;
-  value.environment["EXAMPLE"] = "value";
+  try {
+    value.environment["EXAMPLE"] = "value";
+  } catch (error) {
+    value.reject(error);
+  }
 });
 ```
 
-Listeners run synchronously. Unified Exec spawns the child with `event.environment` after every
-listener returns. A listener error stops the command before spawn. The integration package must
-validate event-bus values and call the returned unsubscribe function during `session_shutdown`.
+Listeners must finish synchronously. Unified Exec spawns the child with `event.environment` after
+every listener returns. Call `event.reject(error)` to stop the command before spawn when an
+integration cannot prepare a valid environment. Pi's shared event bus logs and swallows thrown or
+rejected handler errors, so throwing from the listener is not enough. The integration package must
+validate event-bus values, catch its own failures, and call the returned unsubscribe function during
+`session_shutdown`.
 
 ## TUI rendering
 

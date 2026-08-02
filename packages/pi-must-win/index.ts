@@ -30,7 +30,12 @@ export default function onurPiMustWin(pi: ExtensionAPI): void {
   const session = new CommitAttributionSession();
   piMustWin(pi, { commitAttributionSession: session });
   const unsubscribe = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
-    applyCommitAttribution(value, session, VERSION);
+    if (!isCommandEnvironmentEvent(value)) return;
+    try {
+      applyCommitAttribution(value, session, VERSION);
+    } catch (error) {
+      value.reject(error);
+    }
   });
   pi.on("session_shutdown", () => {
     unsubscribe();

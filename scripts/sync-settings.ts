@@ -25,6 +25,7 @@ const REPLACED_PACKAGE_SOURCES = [
   /^npm:pi-unified-exec(?:@.*)?$/,
   /^npm:@narumitw\/pi-codex-usage(?:@.*)?$/,
   /^npm:pi-huggingface-oauth(?:@.*)?$/,
+  /^npm:@osolmaz\/pi-workflows(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-workflows(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-must-win(?:@.*)?$/,
   /^npm:pi-must-win(?:@.*)?$/,

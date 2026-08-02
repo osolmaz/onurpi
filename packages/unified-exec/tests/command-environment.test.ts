@@ -4,6 +4,7 @@ import {
   COMMAND_ENVIRONMENT_EVENT,
   commandEnvironmentEvent,
   isCommandEnvironmentEvent,
+  throwIfCommandEnvironmentRejected,
 } from "../src/command-environment.ts";
 
 describe("command environment event", () => {
@@ -18,16 +19,27 @@ describe("command environment event", () => {
     );
 
     expect(COMMAND_ENVIRONMENT_EVENT).toBe("unified-exec:before-spawn");
-    expect(event).toEqual({
+    expect(event).toMatchObject({
       command: "git status",
       cwd: "/repo",
       shell: "/bin/bash",
       model: { id: "model-id", name: "Model Name", provider: "provider" },
       environment: { KEEP_ME: "yes" },
     });
+    expect(typeof event.reject).toBe("function");
     event.environment["ADDED"] = "true";
     expect(baseEnvironment).toEqual({ KEEP_ME: "yes" });
     expect(isCommandEnvironmentEvent(event)).toBe(true);
+
+    const failure = new Error("policy failed");
+    event.reject(failure);
+    expect(() => throwIfCommandEnvironmentRejected(event)).toThrow(failure);
+
+    const stringRejected = commandEnvironmentEvent("git status", "/repo", "bash", undefined, {});
+    stringRejected.reject("blocked");
+    expect(() => throwIfCommandEnvironmentRejected(stringRejected)).toThrow(
+      "unified-exec: child environment rejected: blocked",
+    );
   });
 
   it("rejects malformed event-bus values", () => {
@@ -40,6 +52,7 @@ describe("command environment event", () => {
         shell: "bash",
         model: { id: "id", name: 1, provider: "provider" },
         environment: {},
+        reject: () => undefined,
       }),
     ).toBe(false);
     expect(
@@ -49,6 +62,16 @@ describe("command environment event", () => {
         shell: "bash",
         model: undefined,
         environment: { BAD: 1 },
+        reject: () => undefined,
+      }),
+    ).toBe(false);
+    expect(
+      isCommandEnvironmentEvent({
+        command: "git status",
+        cwd: "/repo",
+        shell: "bash",
+        model: undefined,
+        environment: {},
       }),
     ).toBe(false);
   });
