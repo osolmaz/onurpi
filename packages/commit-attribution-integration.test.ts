@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -36,6 +36,8 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
   execFileSync("git", ["config", "user.email", "tester@example.com"], {
     cwd: attributedDirectory,
   });
+  writeFileSync(join(attributedDirectory, "file"), "test\n");
+  execFileSync("git", ["add", "file"], { cwd: attributedDirectory });
   const attribution = session();
   const runtime = createRuntimeState({
     send: () => undefined,
@@ -47,7 +49,7 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
   const result = await runExecCommand(
     runtime,
     {
-      cmd: "set -euo pipefail; echo test > file; git add file; git commit -q -m integrated; git log -1 --format=%B",
+      cmd: "git commit -q -m integrated",
       on_exit: "none",
       tty: false,
       yield_time_ms: 30_000,
@@ -58,8 +60,13 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
     { id: "model-id", name: "Model Name", provider: "provider" },
   );
 
-  expect(result.output).toContain("Co-Authored-By: Model Name <noreply@pi.dev>");
-  expect(result.output).toContain("Generated-By: pi 0.83.0 (https://pi.dev)");
+  expect(result.exit_code).toBe(0);
+  const attributedMessage = execFileSync("git", ["log", "-1", "--format=%B"], {
+    cwd: attributedDirectory,
+    encoding: "utf8",
+  });
+  expect(attributedMessage).toContain("Co-Authored-By: Model Name <noreply@pi.dev>");
+  expect(attributedMessage).toContain("Generated-By: pi 0.83.0 (https://pi.dev)");
 
   const terminalDirectory = mkdtempSync(join(tmpdir(), "onurpi-terminal-"));
   directories.push(terminalDirectory);
@@ -68,9 +75,9 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
   execFileSync("git", ["config", "user.email", "tester@example.com"], {
     cwd: terminalDirectory,
   });
-  execFileSync("bash", ["-lc", "echo test > file; git add file; git commit -q -m terminal"], {
-    cwd: terminalDirectory,
-  });
+  writeFileSync(join(terminalDirectory, "file"), "test\n");
+  execFileSync("git", ["add", "file"], { cwd: terminalDirectory });
+  execFileSync("git", ["commit", "-q", "-m", "terminal"], { cwd: terminalDirectory });
   const message = execFileSync("git", ["log", "-1", "--format=%B"], {
     cwd: terminalDirectory,
     encoding: "utf8",
