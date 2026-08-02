@@ -1,8 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import path from "node:path";
 
-import { getPiAuthGrant, writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
+import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
+import { regularPiAuthPath } from "./auth-path.js";
 import { PiEventCollector } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import { selectAppModel } from "./app.js";
@@ -25,7 +25,6 @@ export type RunReviewInput = {
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
   const app = selectAppModel(input.app, input.selection);
   const runtime = await writePiRuntimeConfig(app);
-  const grant = await getPiAuthGrant(app.id);
   const extension = app.extensions?.[0];
   if (extension === undefined) throw new Error("Pi Reviewer extension is not configured");
   if (app.systemPrompt === undefined)
@@ -34,7 +33,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     version: 1,
     cwd: input.cwd,
     prompt: input.prompt,
-    authPath: grant?.authFile ?? path.join(runtime.configDir, "auth.json"),
+    authPath: regularPiAuthPath(),
     modelsPath: runtime.modelsPath,
     configDir: runtime.configDir,
     extensionPath: extension.path,

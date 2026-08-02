@@ -1,13 +1,12 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { grantPiAuth } from "@osolmaz/pi-factory";
-
 import { loadReviewerApp } from "../src/app.js";
+import { regularPiAuthPath } from "../src/auth-path.js";
 import { loginReviewerApp, type AuthTerminal } from "../src/auth.js";
 
 const cleanup: string[] = [];
@@ -32,10 +31,11 @@ function terminal(answers: string[]): AuthTerminal & { output: string[] } {
 }
 
 describe("Pi Reviewer authentication", () => {
-  it("uses Pi's public model runtime with app-scoped credential paths", async () => {
+  it("uses regular Pi credentials with app-local model paths", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-auth-"));
     cleanup.push(root);
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "regular-pi"));
     const loaded = await loadReviewerApp(appOptions);
     const app = {
       ...loaded,
@@ -46,8 +46,10 @@ describe("Pi Reviewer authentication", () => {
     let receivedProvider = "";
     let receivedMethod = "";
     let authPath = "";
+    let modelsPath = "";
     await loginReviewerApp(app, "openai-codex", ui, (paths) => {
       authPath = paths.authPath;
+      modelsPath = paths.modelsPath;
       return Promise.resolve({
         getProviders: () => [{ id: "openai-codex", name: "OpenAI Codex", auth: { oauth: {} } }],
         login: async (provider, method, interaction) => {
@@ -72,45 +74,18 @@ describe("Pi Reviewer authentication", () => {
 
     expect(receivedProvider).toBe("openai-codex");
     expect(receivedMethod).toBe("oauth");
-    expect(authPath).toBe(path.join(root, "state", "pi-config-runtime", "auth.json"));
+    expect(authPath).toBe(path.join(root, "regular-pi", "auth.json"));
+    expect(modelsPath).toBe(path.join(root, "state", "pi-config-runtime", "models.json"));
     expect(ui.output.join("")).toContain("ABCD-EFGH");
     expect(ui.output.join("")).toContain("Continue in the browser");
     expect(ui.output.join("")).toContain("Waiting");
-    expect(ui.output.join("")).toContain("Authenticated OpenAI Codex");
+    expect(ui.output.join("")).toContain("Authenticated OpenAI Codex in the regular Pi profile");
   });
 
-  it("uses the granted regular Pi auth file without changing app model paths", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-shared-auth-"));
-    cleanup.push(root);
-    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
-    const authFile = path.join(root, "pi", "auth.json");
-    await mkdir(path.dirname(authFile), { recursive: true });
-    await writeFile(authFile, "{}\n", { mode: 0o600 });
-    const canonicalAuthFile = await realpath(authFile);
-    await grantPiAuth("pi-reviewer", authFile);
-    const loaded = await loadReviewerApp(appOptions);
-    const app = {
-      ...loaded,
-      stateDir: path.join(root, "reviewer"),
-      sessionDir: path.join(root, "reviewer", "sessions"),
-    };
-    let receivedAuthPath = "";
-    let receivedModelsPath = "";
-    const ui = terminal([]);
-    await loginReviewerApp(app, "openai-codex", ui, (paths) => {
-      receivedAuthPath = paths.authPath;
-      receivedModelsPath = paths.modelsPath;
-      return Promise.resolve({
-        getProviders: () => [{ id: "openai-codex", name: "OpenAI Codex", auth: { oauth: {} } }],
-        login: () => Promise.resolve({}),
-      });
-    });
-
-    expect(receivedAuthPath).toBe(canonicalAuthFile);
-    expect(receivedModelsPath).toBe(
-      path.join(root, "reviewer", "pi-config-runtime", "models.json"),
+  it("resolves auth.json from Pi's agent directory", () => {
+    expect(regularPiAuthPath(path.join("root", "pi-agent"))).toBe(
+      path.join("root", "pi-agent", "auth.json"),
     );
-    expect(ui.output.join("")).toContain("regular Pi profile");
   });
 
   it("selects providers and API-key methods without exposing the secret", async () => {

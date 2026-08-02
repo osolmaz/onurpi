@@ -27,23 +27,14 @@ The optional user config lives at `~/.config/pi-reviewer/config.json`. A command
 pi-reviewer --model openai-codex/gpt-5.6-sol --thinking high --base main
 ```
 
-Use the same credentials as regular Pi with one saved setting:
+Pi Reviewer uses regular Pi's canonical `auth.json` directly:
 
 ```bash
-pi-reviewer config set auth pi
 pi-reviewer models gpt-5.6
-```
-
-Once saved, regular Pi's canonical `auth.json` supplies credentials for every later review. Pi Reviewer still keeps separate model settings, prompts, tools, and session policy. OAuth refreshes write to the canonical auth file without copying credentials.
-
-Use an isolated Reviewer login instead when needed:
-
-```bash
-pi-reviewer config set auth isolated
 pi-reviewer login openai-codex
 ```
 
-`pi-reviewer config reset` also returns authentication to the isolated profile.
+Reviewer config records `auth: "pi"`. Model settings, prompts, tools, and session policy remain isolated. Login and OAuth refreshes update regular Pi's canonical auth file without copying credentials.
 
 ## Review
 

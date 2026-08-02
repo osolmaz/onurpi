@@ -1,16 +1,15 @@
-import path from "node:path";
-
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { getPiAuthGrant, writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
+import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
+
+import { regularPiAuthPath } from "./auth-path.js";
 
 export async function listReviewerModels(
   app: PiAppDefinition,
   search?: string,
 ): Promise<readonly string[]> {
   const config = await writePiRuntimeConfig(app);
-  const grant = await getPiAuthGrant(app.id);
   const runtime = await ModelRuntime.create({
-    authPath: grant?.authFile ?? path.join(config.configDir, "auth.json"),
+    authPath: regularPiAuthPath(),
     modelsPath: config.modelsPath,
     allowModelNetwork: false,
   });

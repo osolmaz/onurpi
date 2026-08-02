@@ -1,12 +1,10 @@
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { grantPiAuth } from "@osolmaz/pi-factory";
 
 import { loadReviewerApp, selectAppModel } from "../src/app.js";
 import { runReview } from "../src/runner.js";
@@ -93,6 +91,7 @@ describe("Pi Reviewer app", () => {
       },
     };
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "regular-pi"));
     const previousOffline = process.env["PI_OFFLINE"];
     process.env["PI_OFFLINE"] = "0";
     const result = await runReview({
@@ -114,19 +113,15 @@ describe("Pi Reviewer app", () => {
       prompt: "Review the change",
       cwd: fake.root,
     });
-    expect(request["authPath"]).toBe(path.join(stateDir, "pi-config-runtime", "auth.json"));
+    expect(request["authPath"]).toBe(path.join(fake.root, "regular-pi", "auth.json"));
     expect(await readFile(fake.offlineFile, "utf8")).toBe("1");
     await expect(readFile(path.join(stateDir, "sessions", "session.jsonl"))).rejects.toThrow();
   });
 
-  it("passes a saved Pi auth grant to the worker while keeping app config isolated", async () => {
+  it("passes regular Pi auth to the worker while keeping app config isolated", async () => {
     const fake = await fakePi();
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
-    const authFile = path.join(fake.root, "pi", "auth.json");
-    await mkdir(path.dirname(authFile), { recursive: true });
-    await writeFile(authFile, "{}\n", { mode: 0o600 });
-    const canonicalAuthFile = await realpath(authFile);
-    await grantPiAuth("pi-reviewer", authFile);
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "regular-pi"));
     const loaded = await loadReviewerApp({ packageRoot, piCommand: fake.command });
     const stateDir = path.join(fake.root, "reviewer-state");
     const app = {
@@ -148,7 +143,7 @@ describe("Pi Reviewer app", () => {
     });
 
     const request = JSON.parse(await readFile(fake.argsFile, "utf8")) as Record<string, unknown>;
-    expect(request["authPath"]).toBe(canonicalAuthFile);
+    expect(request["authPath"]).toBe(path.join(fake.root, "regular-pi", "auth.json"));
     expect(request["modelsPath"]).toBe(path.join(stateDir, "pi-config-runtime", "models.json"));
     expect(request["configDir"]).toBe(path.join(stateDir, "pi-config-runtime"));
   });

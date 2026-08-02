@@ -2,8 +2,6 @@
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { getPiAuthGrant, grantPiAuth, revokePiAuth } from "@osolmaz/pi-factory";
-
 import { loadReviewerApp } from "./app.js";
 import { parseArgs, parseModel, reviewUsage } from "./args.js";
 import { loginReviewerApp } from "./auth.js";
@@ -43,20 +41,13 @@ async function runUtilityCommand(command: UtilityCommand): Promise<number> {
 
 async function runConfigCommand(command: ConfigCommand): Promise<number> {
   switch (command.kind) {
-    case "config-show": {
-      const app = await loadReviewerApp();
-      const config = await loadConfig();
-      const auth = (await getPiAuthGrant(app.id)) === undefined ? "isolated" : "pi";
-      process.stdout.write(`${JSON.stringify({ ...config, auth }, null, 2)}\n`);
+    case "config-show":
+      process.stdout.write(`${JSON.stringify(await loadConfig(), null, 2)}\n`);
       return 0;
-    }
-    case "config-reset": {
-      const app = await loadReviewerApp();
-      await revokePiAuth(app.id);
+    case "config-reset":
       await resetConfig();
       process.stdout.write("Pi Reviewer defaults reset.\n");
       return 0;
-    }
     case "config-set-model":
       process.stdout.write(`${JSON.stringify(await setConfigModel(command.model), null, 2)}\n`);
       return 0;
@@ -65,13 +56,6 @@ async function runConfigCommand(command: ConfigCommand): Promise<number> {
         `${JSON.stringify(await setConfigThinking(command.thinking), null, 2)}\n`,
       );
       return 0;
-    case "config-set-auth": {
-      const app = await loadReviewerApp();
-      if (command.auth === "pi") await grantPiAuth(app.id);
-      else await revokePiAuth(app.id);
-      process.stdout.write(`Pi Reviewer authentication: ${command.auth}\n`);
-      return 0;
-    }
   }
 }
 
@@ -138,7 +122,6 @@ function help(): string {
     "commands:",
     "  pi-reviewer config set model PROVIDER/MODEL",
     "  pi-reviewer config set thinking LEVEL",
-    "  pi-reviewer config set auth <pi|isolated>",
     "  pi-reviewer config show",
     "  pi-reviewer config reset",
     "  pi-reviewer login [provider]",
