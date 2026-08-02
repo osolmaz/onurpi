@@ -3,7 +3,11 @@ import {
   collectedOutputFromBytes,
   collectOutputUntilDeadline,
 } from "./collect.ts";
-import { commandEnvironmentEvent, type CommandEnvironmentModel } from "./command-environment.ts";
+import {
+  commandEnvironmentEvent,
+  throwIfCommandEnvironmentRejected,
+  type CommandEnvironmentModel,
+} from "./command-environment.ts";
 import {
   DEFAULT_EXEC_YIELD_MS,
   EARLY_EXIT_GRACE_PERIOD_MS,
@@ -86,9 +90,10 @@ function spawn(
   prepared: PreparedCommand,
   model: CommandEnvironmentModel | undefined,
 ): ExecSession {
-  const id = runtime.store.allocateId();
   const environmentEvent = commandEnvironmentEvent(args.cmd, prepared.cwd, prepared.shell, model);
   runtime.prepareEnvironment(environmentEvent);
+  throwIfCommandEnvironmentRejected(environmentEvent);
+  const id = runtime.store.allocateId();
   const session = ExecSession.spawn(id, {
     command: prepared.command,
     cwd: prepared.cwd,

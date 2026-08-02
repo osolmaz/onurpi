@@ -138,9 +138,9 @@ describe("runtime integration", () => {
     assert.equal(typeof observed?.shell, "string");
   });
 
-  it("fails before spawn when an environment listener fails", async () => {
-    const { runtime } = makeRuntime(() => {
-      throw new Error("environment listener failed");
+  it("fails before spawn when an environment listener rejects", async () => {
+    const { runtime } = makeRuntime((event) => {
+      event.reject(new Error("environment listener failed"));
     });
 
     await assert.rejects(
@@ -149,6 +149,7 @@ describe("runtime integration", () => {
     );
     assert.equal(runtime.store.size, 0);
     assert.equal(runtime.pendingSessions.size, 0);
+    assert.equal(runtime.store.allocateId(), 1, "rejection happens before session allocation");
   });
 
   it("backgrounds a long process and observes its final result directly", async () => {
