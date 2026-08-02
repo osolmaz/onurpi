@@ -18,7 +18,7 @@ export async function loadReviewerApp(options: AppOptions = {}): Promise<PiAppDe
   const app = await manifestToDefinition(loaded.manifest, loaded.appRoot);
   return {
     ...app,
-    piCommand: options.piCommand ?? resolvePiCommand(),
+    piCommand: options.piCommand ?? resolveWorkerCommand(),
     forwardedArgs: ["--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes"],
   };
 }
@@ -49,9 +49,8 @@ async function findPackageRoot(start: string): Promise<string> {
   }
 }
 
-function resolvePiCommand(): readonly string[] {
-  const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-  return [process.execPath, path.join(path.dirname(entry), "cli.js")];
+function resolveWorkerCommand(): readonly string[] {
+  return [process.execPath, path.join(path.dirname(fileURLToPath(import.meta.url)), "worker.js")];
 }
 
 async function exists(file: string): Promise<boolean> {

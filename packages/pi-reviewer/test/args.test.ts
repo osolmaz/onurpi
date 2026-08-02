@@ -37,6 +37,14 @@ describe("review arguments", () => {
       kind: "config-set-thinking",
       thinking: "xhigh",
     });
+    expect(parseArgs(["config", "set", "auth", "pi"])).toEqual({
+      kind: "config-set-auth",
+      auth: "pi",
+    });
+    expect(parseArgs(["config", "set", "auth", "isolated"])).toEqual({
+      kind: "config-set-auth",
+      auth: "isolated",
+    });
     expect(parseArgs(["login", "openai-codex"])).toEqual({
       kind: "login",
       provider: "openai-codex",
@@ -54,6 +62,7 @@ describe("review arguments", () => {
     expect(() => parseArgs(["--title", "title", "--base", "main"])).toThrow("--title requires");
     expect(() => parseArgs(["--unknown"])).toThrow("unknown option");
     expect(() => parseArgs(["config", "set", "other", "x"])).toThrow("config key");
+    expect(() => parseArgs(["config", "set", "auth", "copied"])).toThrow("config key");
     expect(() => parseArgs(["config", "set"])).toThrow("usage");
     expect(() => parseArgs(["login", "a", "b"])).toThrow("usage");
     expect(() => parseArgs(["models", "a", "b"])).toThrow("usage");

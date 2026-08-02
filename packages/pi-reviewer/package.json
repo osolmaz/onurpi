@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.83.0",
-    "@osolmaz/pi-factory": "git+https://github.com/osolmaz/pi-factory.git#f2d998f5eaf529799e57e6ba6a0dfdf88a44d616",
+    "@osolmaz/pi-factory": "git+https://github.com/osolmaz/pi-factory.git#5aad746ae0be96d600c0891a30cb1282a4e5e4a1",
     "typebox": "1.3.9"
   },
   "devDependencies": {

@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { grantPiAuth } from "@osolmaz/pi-factory";
 
 import { loadReviewerApp, selectAppModel } from "../src/app.js";
 import { runReview } from "../src/runner.js";
@@ -31,6 +33,7 @@ const OUTPUT = {
 };
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
 });
 
@@ -45,11 +48,12 @@ async function fakePi(
   await writeFile(
     script,
     `import { writeFileSync } from "node:fs";
-writeFileSync(process.env.PI_REVIEWER_ARGS_FILE, JSON.stringify(process.argv.slice(2)));
+let input = "";
+for await (const chunk of process.stdin) input += chunk;
+writeFileSync(process.env.PI_REVIEWER_ARGS_FILE, input);
 writeFileSync(process.env.PI_REVIEWER_OFFLINE_FILE, process.env.PI_OFFLINE ?? "");
 if (${String(exitCode)} !== 0) process.exit(${String(exitCode)});
 const output = process.env.PI_REVIEWER_OUTPUT;
-console.log(JSON.stringify({type:"session", version:3, id:"fake", cwd:process.cwd()}));
 console.log(JSON.stringify({type:"message_end", message:{role:"assistant", stopReason:"stop", content:[{type:"text", text:output}]}}));
 console.log(JSON.stringify({type:"agent_end", messages:[]}));
 `,
@@ -88,6 +92,7 @@ describe("Pi Reviewer app", () => {
         PI_REVIEWER_OUTPUT: JSON.stringify(OUTPUT),
       },
     };
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
     const previousOffline = process.env["PI_OFFLINE"];
     process.env["PI_OFFLINE"] = "0";
     const result = await runReview({
@@ -100,14 +105,52 @@ describe("Pi Reviewer app", () => {
       else process.env["PI_OFFLINE"] = previousOffline;
     });
     expect(result.findings[0]?.priority).toBe(1);
-    const args = JSON.parse(await readFile(fake.argsFile, "utf8")) as string[];
-    expect(args).toContain("--no-session");
-    expect(args).toContain("openai-codex");
-    expect(args).toContain("external-review-model");
-    expect(args).toContain("high");
-    expect(args).toContain("Review the change");
+    const request = JSON.parse(await readFile(fake.argsFile, "utf8")) as Record<string, unknown>;
+    expect(request).toMatchObject({
+      version: 1,
+      provider: "openai-codex",
+      model: "external-review-model",
+      thinking: "high",
+      prompt: "Review the change",
+      cwd: fake.root,
+    });
+    expect(request["authPath"]).toBe(path.join(stateDir, "pi-config-runtime", "auth.json"));
     expect(await readFile(fake.offlineFile, "utf8")).toBe("1");
     await expect(readFile(path.join(stateDir, "sessions", "session.jsonl"))).rejects.toThrow();
+  });
+
+  it("passes a saved Pi auth grant to the worker while keeping app config isolated", async () => {
+    const fake = await fakePi();
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(fake.root, "factory-state"));
+    const authFile = path.join(fake.root, "pi", "auth.json");
+    await mkdir(path.dirname(authFile), { recursive: true });
+    await writeFile(authFile, "{}\n", { mode: 0o600 });
+    const canonicalAuthFile = await realpath(authFile);
+    await grantPiAuth("pi-reviewer", authFile);
+    const loaded = await loadReviewerApp({ packageRoot, piCommand: fake.command });
+    const stateDir = path.join(fake.root, "reviewer-state");
+    const app = {
+      ...loaded,
+      stateDir,
+      sessionDir: path.join(stateDir, "sessions"),
+      env: {
+        PI_REVIEWER_ARGS_FILE: fake.argsFile,
+        PI_REVIEWER_OFFLINE_FILE: fake.offlineFile,
+        PI_REVIEWER_OUTPUT: JSON.stringify(OUTPUT),
+      },
+    };
+
+    await runReview({
+      app,
+      selection: { provider: "openai-codex", model: "external-review-model", thinking: "high" },
+      cwd: fake.root,
+      prompt: "Review shared auth",
+    });
+
+    const request = JSON.parse(await readFile(fake.argsFile, "utf8")) as Record<string, unknown>;
+    expect(request["authPath"]).toBe(canonicalAuthFile);
+    expect(request["modelsPath"]).toBe(path.join(stateDir, "pi-config-runtime", "models.json"));
+    expect(request["configDir"]).toBe(path.join(stateDir, "pi-config-runtime"));
   });
 
   it("surfaces child failure instead of returning a clean review", async () => {
