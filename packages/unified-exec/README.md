@@ -282,6 +282,30 @@ only modified the built-in `bash` tool. Unified Exec bounds each attached tool c
 underlying process intentionally remains alive for later polls or input. Live processes are capped
 by the session store and terminated when Pi shuts down.
 
+## Child environment event
+
+Unified Exec emits `unified-exec:before-spawn` through Pi's shared event bus immediately before it
+starts a child process. The event contains the command, working directory, resolved shell, active
+model identity, and a writable copy of the child environment.
+
+Integration packages can subscribe without changing the `exec_command` schema:
+
+```ts
+import {
+  COMMAND_ENVIRONMENT_EVENT,
+  isCommandEnvironmentEvent,
+} from "@onurpi/unified-exec/command-environment";
+
+const unsubscribe = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
+  if (!isCommandEnvironmentEvent(value)) return;
+  value.environment["EXAMPLE"] = "value";
+});
+```
+
+Listeners run synchronously. Unified Exec spawns the child with `event.environment` after every
+listener returns. A listener error stops the command before spawn. The integration package must
+validate event-bus values and call the returned unsubscribe function during `session_shutdown`.
+
 ## TUI rendering
 
 Custom `renderCall` and `renderResult` mirror pi's built-in `bash` tool styling and add

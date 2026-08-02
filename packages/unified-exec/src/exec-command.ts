@@ -3,6 +3,7 @@ import {
   collectedOutputFromBytes,
   collectOutputUntilDeadline,
 } from "./collect.ts";
+import { commandEnvironmentEvent, type CommandEnvironmentModel } from "./command-environment.ts";
 import {
   DEFAULT_EXEC_YIELD_MS,
   EARLY_EXIT_GRACE_PERIOD_MS,
@@ -83,12 +84,15 @@ function spawn(
   runtime: ExtensionRuntime,
   args: ExecCommandArgs,
   prepared: PreparedCommand,
+  model: CommandEnvironmentModel | undefined,
 ): ExecSession {
   const id = runtime.store.allocateId();
+  const environmentEvent = commandEnvironmentEvent(args.cmd, prepared.cwd, prepared.shell, model);
+  runtime.prepareEnvironment(environmentEvent);
   const session = ExecSession.spawn(id, {
     command: prepared.command,
     cwd: prepared.cwd,
-    env: process.env,
+    env: environmentEvent.environment,
     tty: prepared.tty,
     displayCommand: args.cmd,
     shell: prepared.shell,
@@ -238,10 +242,11 @@ export async function runExecCommand(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   cwd: string,
+  model?: CommandEnvironmentModel | undefined,
 ): Promise<FinalResponseDetails> {
   if (runtime.shuttingDown) throw new Error("unified-exec: session is shutting down");
   const prepared = prepareCommand(runtime, args, cwd);
-  const session = spawn(runtime, args, prepared);
+  const session = spawn(runtime, args, prepared, model);
   if (session.failureMessage) {
     return finalizeResponse({
       wallTimeSec: 0,

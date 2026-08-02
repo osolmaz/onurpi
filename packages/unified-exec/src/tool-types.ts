@@ -7,6 +7,7 @@ import type {
 import type { TSchema } from "typebox";
 
 import type { CompletionCoordinator, OnExitPolicy } from "./completion.ts";
+import type { PrepareCommandEnvironment } from "./command-environment.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { ExecSession } from "./session.ts";
 
@@ -114,6 +115,7 @@ export type ExtensionRuntime = {
   warnedShellFallback: boolean;
   notifiedBashSource: boolean;
   pendingSessions: Set<ExecSession>;
+  prepareEnvironment: PrepareCommandEnvironment;
   shuttingDown: boolean;
   agentActivity: AgentActivity;
 };

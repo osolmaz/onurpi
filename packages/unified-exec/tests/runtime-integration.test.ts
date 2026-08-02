@@ -4,6 +4,11 @@ import { readFile, stat } from "node:fs/promises";
 import { afterEach, describe, it } from "vitest";
 
 import type { WakeMessage } from "../src/completion.ts";
+import type {
+  CommandEnvironmentEvent,
+  CommandEnvironmentModel,
+  PrepareCommandEnvironment,
+} from "../src/command-environment.ts";
 import { runExecCommand } from "../src/exec-command.ts";
 import { isPtyAvailable } from "../src/pty.ts";
 import { createRuntimeState } from "../src/runtime.ts";
@@ -14,13 +19,17 @@ import { runWriteStdin } from "../src/write-stdin.ts";
 
 const runtimes: ExtensionRuntime[] = [];
 
-function makeRuntime(): { runtime: ExtensionRuntime; messages: WakeMessage[] } {
+function makeRuntime(prepareEnvironment?: PrepareCommandEnvironment): {
+  runtime: ExtensionRuntime;
+  messages: WakeMessage[];
+} {
   const messages: WakeMessage[] = [];
   const runtime = createRuntimeState({
     send: (message) => {
       messages.push(message);
     },
     coordinator: { debounceMs: 5 },
+    ...(prepareEnvironment ? { prepareEnvironment } : {}),
   });
   runtimes.push(runtime);
   return { runtime, messages };
@@ -44,7 +53,12 @@ async function waitUntil(predicate: () => boolean, timeoutMs = 3000): Promise<vo
 async function start(
   runtime: ExtensionRuntime,
   command: string,
-  options: Readonly<{ onExit?: "none" | "wake"; tty?: boolean; yieldMs?: number }> = {},
+  options: Readonly<{
+    model?: CommandEnvironmentModel;
+    onExit?: "none" | "wake";
+    tty?: boolean;
+    yieldMs?: number;
+  }> = {},
 ): Promise<FinalResponseDetails> {
   return runExecCommand(
     runtime,
@@ -57,6 +71,7 @@ async function start(
     undefined,
     undefined,
     process.cwd(),
+    options.model,
   );
 }
 
@@ -101,6 +116,39 @@ describe("runtime integration", () => {
       const metadata = await stat(result.log_path);
       assert.equal(metadata.mode & 0o777, 0o600);
     }
+  });
+
+  it("applies synchronous child environment listeners before spawn", async () => {
+    let observed: CommandEnvironmentEvent | undefined;
+    const { runtime } = makeRuntime((event) => {
+      observed = event;
+      event.environment["UNIFIED_EXEC_EVENT_TEST"] = "attributed";
+    });
+    const model = { id: "model-id", name: "Model Name", provider: "provider" };
+    const result = await start(
+      runtime,
+      'node -e "console.log(process.env.UNIFIED_EXEC_EVENT_TEST)"',
+      { model, yieldMs: 30_000 },
+    );
+
+    assert.match(result.output, /attributed/);
+    assert.equal(observed?.command.includes("UNIFIED_EXEC_EVENT_TEST"), true);
+    assert.equal(observed?.cwd, process.cwd());
+    assert.equal(observed?.model, model);
+    assert.equal(typeof observed?.shell, "string");
+  });
+
+  it("fails before spawn when an environment listener fails", async () => {
+    const { runtime } = makeRuntime(() => {
+      throw new Error("environment listener failed");
+    });
+
+    await assert.rejects(
+      start(runtime, "node -e \"console.log('must not run')\""),
+      /environment listener failed/,
+    );
+    assert.equal(runtime.store.size, 0);
+    assert.equal(runtime.pendingSessions.size, 0);
   });
 
   it("backgrounds a long process and observes its final result directly", async () => {
