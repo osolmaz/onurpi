@@ -242,7 +242,7 @@ export async function runExecCommand(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   cwd: string,
-  model?: CommandEnvironmentModel | undefined,
+  model?: CommandEnvironmentModel,
 ): Promise<FinalResponseDetails> {
   if (runtime.shuttingDown) throw new Error("unified-exec: session is shutting down");
   const prepared = prepareCommand(runtime, args, cwd);

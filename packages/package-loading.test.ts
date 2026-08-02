@@ -64,6 +64,12 @@ const externalPackages = [
     source: "0.3.0",
   },
   {
+    directory: "regrafter-driver",
+    dependency: "pi-regraft-source",
+    source:
+      "https://codeload.github.com/osolmaz/pi-regraft/tar.gz/ed3f4cfa0d3bccca5a5ad51154ca39ade2b8f411",
+  },
+  {
     directory: "workflows",
     dependency: "@osolmaz/pi-workflows",
     source: "0.2.0",

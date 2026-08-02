@@ -31,16 +31,19 @@ function isCommandEnvironmentModel(value: unknown): value is CommandEnvironmentM
   );
 }
 
-export function isCommandEnvironmentEvent(value: unknown): value is CommandEnvironmentEvent {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const event = value as Record<string, unknown>;
+function hasCommandMetadata(event: Record<string, unknown>): boolean {
   return (
     typeof event["command"] === "string" &&
     typeof event["cwd"] === "string" &&
-    typeof event["shell"] === "string" &&
-    (event["model"] === undefined || isCommandEnvironmentModel(event["model"])) &&
-    isProcessEnvironment(event["environment"])
+    typeof event["shell"] === "string"
   );
+}
+
+export function isCommandEnvironmentEvent(value: unknown): value is CommandEnvironmentEvent {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const event = value as Record<string, unknown>;
+  const validModel = event["model"] === undefined || isCommandEnvironmentModel(event["model"]);
+  return hasCommandMetadata(event) && validModel && isProcessEnvironment(event["environment"]);
 }
 
 export function commandEnvironmentEvent(
