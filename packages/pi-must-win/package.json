@@ -1,0 +1,22 @@
+{
+  "name": "@onurpi/pi-must-win",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Pi Must Win extension and Unified Exec attribution adapter",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@onurpi/unified-exec": "0.1.0",
+    "pi-must-win": "https://codeload.github.com/osolmaz/pi-must-win/tar.gz/8721f01745987736837b135a912c5ebdae5d75b2"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

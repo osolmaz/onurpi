@@ -25,11 +25,11 @@
       "./packages/plan-checklist/index.ts",
       "./packages/unified-exec/index.ts",
       "./packages/yarp/index.ts",
-      "./node_modules/pi-huggingface-oauth/index.ts",
-      "./node_modules/pi-must-win/index.ts",
-      "./node_modules/pi-regraft/extensions/regraft.ts",
-      "./node_modules/pi-workflows/src/extension/index.ts",
-      "./node_modules/pi-demo-mode/extensions/demo-mode.ts"
+      "./packages/huggingface-oauth/index.ts",
+      "./packages/pi-must-win/index.ts",
+      "./packages/regrafter-driver/index.ts",
+      "./packages/workflows/index.ts",
+      "./packages/demo-mode/index.ts"
     ],
     "skills": [
       "./packages/goal/skills",
@@ -39,20 +39,6 @@
       "./packages/onur-theme/themes/onur-dark.json"
     ]
   },
-  "dependencies": {
-    "pi-demo-mode": "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75",
-    "pi-huggingface-oauth": "0.1.1",
-    "pi-must-win": "0.2.0",
-    "pi-regraft": "0.3.0",
-    "pi-workflows": "https://codeload.github.com/osolmaz/pi-workflows/tar.gz/630622e44fcd486690b6bcb923b4d18dc516723e"
-  },
-  "bundledDependencies": [
-    "pi-demo-mode",
-    "pi-huggingface-oauth",
-    "pi-must-win",
-    "pi-regraft",
-    "pi-workflows"
-  ],
   "scripts": {
     "settings:sync": "node scripts/sync-settings.ts sync",
     "settings:reset": "node scripts/sync-settings.ts reset",

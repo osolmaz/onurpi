@@ -2,9 +2,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
+import extension from "./index.ts";
 
 const root = import.meta.dirname;
 const skill = readFileSync(join(root, "skills", "regrafter", "SKILL.md"), "utf8");
+
+it("exports the pinned Regraft extension factory", () => {
+  expect(extension).toBeTypeOf("function");
+});
 
 it("keeps delegation explicit and preserves repository ownership", () => {
   expect(skill).toContain("user explicitly asks");
