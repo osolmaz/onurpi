@@ -7,10 +7,13 @@ import {
 import piMustWin, { CommitAttributionSession } from "pi-must-win/index.ts";
 
 export { isCommandEnvironmentEvent } from "@onurpi/unified-exec/command-environment";
+export { CommitAttributionSession } from "pi-must-win/index.ts";
 
 function modelName(event: CommandEnvironmentEvent): string {
   const model = event.model;
-  return model ? model.name || `${model.provider}/${model.id}` : "unknown";
+  if (!model) return "unknown";
+  if (model.name) return model.name;
+  return `${model.provider}/${model.id}`;
 }
 
 export function applyCommitAttribution(

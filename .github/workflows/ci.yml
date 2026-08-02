@@ -105,6 +105,16 @@ jobs:
       - name: Check @onurpi/yarp package with Slophammer
         working-directory: packages/yarp
         run: npm run slophammer
+      - name: Check external extension wrappers
+        run: |
+          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
+            npm run check --workspace "@onurpi/$package"
+          done
+      - name: Check external extension wrappers with Slophammer
+        run: |
+          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
+            npm run slophammer --workspace "@onurpi/$package"
+          done
       - name: Check @osolmaz/pi-reviewer package
         working-directory: packages/pi-reviewer
         run: npm run check
@@ -202,3 +212,8 @@ jobs:
       - name: Mutate @onurpi/yarp package
         working-directory: packages/yarp
         run: npm run mutate
+      - name: Mutate external extension wrappers
+        run: |
+          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
+            npm run mutate --workspace "@onurpi/$package"
+          done
