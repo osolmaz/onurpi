@@ -87,6 +87,7 @@ describe("review output", () => {
     expect(progress).not.toContain("\u001b");
     expect(progress).not.toContain("\u0007");
     expect(progress).toContain("�");
+    expect(progress.endsWith("\n")).toBe(true);
   });
 
   it("accepts one JSON object surrounded by incidental text", () => {

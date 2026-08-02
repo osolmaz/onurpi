@@ -2,13 +2,14 @@
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { runPiCommand } from "@osolmaz/pi-factory";
+import { getPiAuthGrant, grantPiAuth, revokePiAuth } from "@osolmaz/pi-factory";
 
 import { loadReviewerApp } from "./app.js";
 import { parseArgs, parseModel, reviewUsage } from "./args.js";
 import { loginReviewerApp } from "./auth.js";
 import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./config.js";
 import { resolveTarget } from "./git-target.js";
+import { listReviewerModels } from "./models.js";
 import { renderReview } from "./render.js";
 import { runReview } from "./runner.js";
 import { terminalText } from "./terminal-text.js";
@@ -22,23 +23,40 @@ export async function main(args: readonly string[]): Promise<number> {
   return await runUtilityCommand(command);
 }
 
-async function runUtilityCommand(
-  command: Exclude<ReturnType<typeof parseArgs>, { kind: "review" | "login" | "models" }>,
-): Promise<number> {
+type UtilityCommand = Exclude<
+  ReturnType<typeof parseArgs>,
+  { kind: "review" | "login" | "models" }
+>;
+type ConfigCommand = Exclude<UtilityCommand, { kind: "help" | "version" }>;
+
+async function runUtilityCommand(command: UtilityCommand): Promise<number> {
+  if (command.kind === "help") {
+    process.stdout.write(help());
+    return 0;
+  }
+  if (command.kind === "version") {
+    process.stdout.write("0.1.0\n");
+    return 0;
+  }
+  return await runConfigCommand(command);
+}
+
+async function runConfigCommand(command: ConfigCommand): Promise<number> {
   switch (command.kind) {
-    case "help":
-      process.stdout.write(help());
+    case "config-show": {
+      const app = await loadReviewerApp();
+      const config = await loadConfig();
+      const auth = (await getPiAuthGrant(app.id)) === undefined ? "isolated" : "pi";
+      process.stdout.write(`${JSON.stringify({ ...config, auth }, null, 2)}\n`);
       return 0;
-    case "version":
-      process.stdout.write("0.1.0\n");
-      return 0;
-    case "config-show":
-      process.stdout.write(`${JSON.stringify(await loadConfig(), null, 2)}\n`);
-      return 0;
-    case "config-reset":
+    }
+    case "config-reset": {
+      const app = await loadReviewerApp();
+      await revokePiAuth(app.id);
       await resetConfig();
       process.stdout.write("Pi Reviewer defaults reset.\n");
       return 0;
+    }
     case "config-set-model":
       process.stdout.write(`${JSON.stringify(await setConfigModel(command.model), null, 2)}\n`);
       return 0;
@@ -47,6 +65,13 @@ async function runUtilityCommand(
         `${JSON.stringify(await setConfigThinking(command.thinking), null, 2)}\n`,
       );
       return 0;
+    case "config-set-auth": {
+      const app = await loadReviewerApp();
+      if (command.auth === "pi") await grantPiAuth(app.id);
+      else await revokePiAuth(app.id);
+      process.stdout.write(`Pi Reviewer authentication: ${command.auth}\n`);
+      return 0;
+    }
   }
 }
 
@@ -56,9 +81,11 @@ async function runLogin(provider: string | undefined): Promise<number> {
 }
 
 async function runModels(search: string | undefined): Promise<number> {
-  const app = await loadReviewerApp();
-  const args = search === undefined ? ["--list-models"] : ["--list-models", search];
-  return await runPiCommand(app, args, process.cwd());
+  const models = await listReviewerModels(await loadReviewerApp(), search);
+  process.stdout.write(
+    models.length === 0 ? "No matching authenticated models.\n" : `${models.join("\n")}\n`,
+  );
+  return 0;
 }
 
 async function runReviewCommand(request: ReviewRequest): Promise<number> {
@@ -111,6 +138,7 @@ function help(): string {
     "commands:",
     "  pi-reviewer config set model PROVIDER/MODEL",
     "  pi-reviewer config set thinking LEVEL",
+    "  pi-reviewer config set auth <pi|isolated>",
     "  pi-reviewer config show",
     "  pi-reviewer config reset",
     "  pi-reviewer login [provider]",

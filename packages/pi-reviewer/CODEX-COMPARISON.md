@@ -8,7 +8,7 @@ Pi Reviewer follows standalone `codex review` at OpenAI Codex commit `fa1d4c40d0
 | Base branch            | `--base <branch>`                           | `--base <branch>`                                |
 | Commit                 | `--commit <sha>`                            | `--commit <sha>`                                 |
 | Custom instructions    | Positional prompt                           | Positional prompt                                |
-| Isolation              | Fresh Codex review task                     | Fresh Pi process with `--no-session`             |
+| Isolation              | Fresh Codex review task                     | Fresh child Pi worker with an in-memory session  |
 | Model selection        | Codex `review_model` or active model        | External user config or `--model provider/model` |
 | Thinking level         | Codex configuration                         | External user config or `--thinking`             |
 | Project instructions   | Codex project instruction discovery         | Pi `AGENTS.md` context discovery                 |

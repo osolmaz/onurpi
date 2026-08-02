@@ -1,15 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import path from "node:path";
 
-import {
-  createPiLaunchPlan,
-  writePiRuntimeConfig,
-  type PiAppDefinition,
-} from "@osolmaz/pi-factory";
+import { getPiAuthGrant, writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
 import { PiEventCollector } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import { selectAppModel } from "./app.js";
 import type { ModelSelection, ReviewOutput } from "./types.js";
+import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
 const MAX_RUNTIME_MS = 10 * 60_000;
 const MAX_INACTIVITY_MS = 2 * 60_000;
@@ -27,34 +25,52 @@ export type RunReviewInput = {
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
   const app = selectAppModel(input.app, input.selection);
   const runtime = await writePiRuntimeConfig(app);
-  const plan = await createPiLaunchPlan(app, runtime, {
+  const grant = await getPiAuthGrant(app.id);
+  const extension = app.extensions?.[0];
+  if (extension === undefined) throw new Error("Pi Reviewer extension is not configured");
+  if (app.systemPrompt === undefined)
+    throw new Error("Pi Reviewer system prompt is not configured");
+  const request: ReviewWorkerRequest = {
+    version: 1,
     cwd: input.cwd,
-    mode: "json",
-    noSession: true,
+    prompt: input.prompt,
+    authPath: grant?.authFile ?? path.join(runtime.configDir, "auth.json"),
+    modelsPath: runtime.modelsPath,
+    configDir: runtime.configDir,
+    extensionPath: extension.path,
+    systemPrompt: app.systemPrompt,
     provider: input.selection.provider,
     model: input.selection.model,
     thinking: input.selection.thinking,
-    messages: [input.prompt],
-  });
-  const finalText = await executePlan(plan.command, plan.args, plan.cwd, plan.env, input.stderr);
+    tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
+  };
+  const finalText = await executeWorker(app.piCommand, request, app.env, input.stderr);
   return parseReviewOutput(finalText);
 }
 
-async function executePlan(
-  command: string,
-  args: readonly string[],
-  cwd: string | undefined,
-  env: Readonly<Record<string, string>>,
+async function executeWorker(
+  command: readonly string[],
+  request: ReviewWorkerRequest,
+  appEnv: Readonly<Record<string, string>> | undefined,
   stderr: NodeJS.WritableStream | undefined,
 ): Promise<string> {
-  const child = spawn(command, args, {
-    cwd,
-    env: { ...process.env, ...env, PI_OFFLINE: "1" },
+  const [program, ...args] = command;
+  if (program === undefined) throw new Error("Pi Reviewer worker command is empty");
+  const child = spawn(program, args, {
+    cwd: request.cwd,
+    env: {
+      ...process.env,
+      ...appEnv,
+      PI_OFFLINE: "1",
+      PI_REVIEWER_WORKER: "1",
+      PI_SKIP_VERSION_CHECK: "1",
+      PI_TELEMETRY: "0",
+    },
     shell: false,
     detached: process.platform !== "win32",
     stdio: ["pipe", "pipe", "pipe"],
   });
-  child.stdin.end();
+  child.stdin.end(JSON.stringify(request));
   return await collectChild(child, stderr);
 }
 

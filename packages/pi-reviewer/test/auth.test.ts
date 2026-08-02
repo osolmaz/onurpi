@@ -1,9 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { grantPiAuth } from "@osolmaz/pi-factory";
 
 import { loadReviewerApp } from "../src/app.js";
 import { loginReviewerApp, type AuthTerminal } from "../src/auth.js";
@@ -13,6 +15,7 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const appOptions = { packageRoot, piCommand: [process.execPath] };
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
 });
 
@@ -32,6 +35,7 @@ describe("Pi Reviewer authentication", () => {
   it("uses Pi's public model runtime with app-scoped credential paths", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-auth-"));
     cleanup.push(root);
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
     const loaded = await loadReviewerApp(appOptions);
     const app = {
       ...loaded,
@@ -75,9 +79,44 @@ describe("Pi Reviewer authentication", () => {
     expect(ui.output.join("")).toContain("Authenticated OpenAI Codex");
   });
 
+  it("uses the granted regular Pi auth file without changing app model paths", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-shared-auth-"));
+    cleanup.push(root);
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
+    const authFile = path.join(root, "pi", "auth.json");
+    await mkdir(path.dirname(authFile), { recursive: true });
+    await writeFile(authFile, "{}\n", { mode: 0o600 });
+    const canonicalAuthFile = await realpath(authFile);
+    await grantPiAuth("pi-reviewer", authFile);
+    const loaded = await loadReviewerApp(appOptions);
+    const app = {
+      ...loaded,
+      stateDir: path.join(root, "reviewer"),
+      sessionDir: path.join(root, "reviewer", "sessions"),
+    };
+    let receivedAuthPath = "";
+    let receivedModelsPath = "";
+    const ui = terminal([]);
+    await loginReviewerApp(app, "openai-codex", ui, (paths) => {
+      receivedAuthPath = paths.authPath;
+      receivedModelsPath = paths.modelsPath;
+      return Promise.resolve({
+        getProviders: () => [{ id: "openai-codex", name: "OpenAI Codex", auth: { oauth: {} } }],
+        login: () => Promise.resolve({}),
+      });
+    });
+
+    expect(receivedAuthPath).toBe(canonicalAuthFile);
+    expect(receivedModelsPath).toBe(
+      path.join(root, "reviewer", "pi-config-runtime", "models.json"),
+    );
+    expect(ui.output.join("")).toContain("regular Pi profile");
+  });
+
   it("selects providers and API-key methods without exposing the secret", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-auth-select-"));
     cleanup.push(root);
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
     const loaded = await loadReviewerApp(appOptions);
     const app = {
       ...loaded,
@@ -116,6 +155,7 @@ describe("Pi Reviewer authentication", () => {
   it("rejects providers without interactive login", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-auth-missing-"));
     cleanup.push(root);
+    vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
     const loaded = await loadReviewerApp(appOptions);
     const app = {
       ...loaded,
