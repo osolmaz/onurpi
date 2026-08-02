@@ -16,8 +16,7 @@
     ]
   },
   "dependencies": {
-    "pi-regraft": "0.3.0",
-    "pi-regraft-source": "https://codeload.github.com/osolmaz/pi-regraft/tar.gz/ed3f4cfa0d3bccca5a5ad51154ca39ade2b8f411"
+    "pi-regraft": "0.4.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
