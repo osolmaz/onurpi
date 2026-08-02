@@ -74,8 +74,7 @@ function packageNamesForResource(entries: unknown, resourceType: string): string
     if (typeof entry !== "string") throw new Error(`Non-string entry in pi.${resourceType}`);
     const match = /^\.\/packages\/([^/]+)\//.exec(entry);
     if (match?.[1]) return [match[1]];
-    if (entry.startsWith("./node_modules/")) return [];
-    throw new Error(`Unexpected pi.${resourceType} entry: ${entry}`);
+    throw new Error(`Every pi.${resourceType} entry must belong to packages/<name>: ${entry}`);
   });
 }
 

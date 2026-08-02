@@ -3,6 +3,9 @@
 - Read the installed Pi documentation and relevant examples completely before changing an extension.
 - Keep each extension independent under `packages/<name>/` with a Pi manifest, entry point, tests,
   and README; also register development entry points in the root Pi manifest.
+- Follow `docs/adding-packages.md` for package adoption. Root Pi resources must point into
+  `packages/<name>` and must never load extension entry points directly from root `node_modules`.
+- Keep wrapper packages private unless the user separately approves an npm release.
 - Use strict TypeScript. Do not use explicit `any`, unsafe casts, or unchecked external input.
 - Keep only reviewed global settings in `settings.json`. Never copy Pi authentication, sessions,
   trust decisions, or provider state into this repository.

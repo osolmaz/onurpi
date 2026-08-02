@@ -1,0 +1,22 @@
+{
+  "name": "@onurpi/huggingface-oauth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Hugging Face OAuth extension for OnurPi",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "pi-huggingface-oauth": "0.1.1"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

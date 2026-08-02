@@ -1,0 +1,21 @@
+{
+  "name": "@onurpi/demo-mode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Pi Demo Mode extension for OnurPi",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "pi-demo-mode": "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

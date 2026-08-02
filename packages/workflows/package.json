@@ -1,0 +1,22 @@
+{
+  "name": "@onurpi/workflows",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Pi Workflows extension for OnurPi",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@osolmaz/pi-workflows": "0.2.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  }
+}

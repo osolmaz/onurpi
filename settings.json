@@ -16,7 +16,11 @@
     "../../repos/onurpi/packages/plan-checklist",
     "../../repos/onurpi/packages/unified-exec",
     "../../repos/onurpi/packages/yarp",
+    "../../repos/onurpi/packages/huggingface-oauth",
+    "../../repos/onurpi/packages/pi-must-win",
     "../../repos/onurpi/packages/regrafter-driver",
+    "../../repos/onurpi/packages/workflows",
+    "../../repos/onurpi/packages/demo-mode",
     "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.83.0",
