@@ -21,7 +21,7 @@ describe("review model listing", () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-models-"));
     cleanup.push(root);
     vi.stubEnv("PI_FACTORY_STATE_DIR", path.join(root, "factory"));
-    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "regular-pi"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", path.join(root, "overridden-agent"));
     const loaded = await loadReviewerApp({ packageRoot, piCommand: [process.execPath] });
     const stateDir = path.join(root, "reviewer");
     const app = {
@@ -37,7 +37,7 @@ describe("review model listing", () => {
       { mode: 0o600 },
     );
 
-    const models = await listReviewerModels(app, "claude");
+    const models = await listReviewerModels(app, "claude", path.join(authDir, "auth.json"));
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((model) => model.startsWith("anthropic/"))).toBe(true);
   });
