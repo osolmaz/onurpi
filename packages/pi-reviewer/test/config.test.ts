@@ -65,7 +65,7 @@ describe("user config", () => {
     expect(() => validateConfig([])).toThrow("JSON object");
     expect(() => validateConfig({ version: 2 })).toThrow("version must be 1");
     expect(() => validateConfig({ version: 1, auth: "pi", extra: true })).toThrow("unknown field");
-    expect(() => validateConfig({ version: 1 })).toThrow("auth must be pi");
+    expect(validateConfig({ version: 1 })).toEqual({ version: 1, auth: "pi" });
     expect(() => validateConfig({ version: 1, auth: "isolated" })).toThrow("auth must be pi");
     expect(() => validateConfig({ version: 1, auth: "pi", model: 1 })).toThrow(
       "model must be a string",
