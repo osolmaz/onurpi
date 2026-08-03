@@ -56,6 +56,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
   onPasteImage?: () => void;
   private readonly callbacks: ShortcutCallbacks;
   private changeHandler: ((text: string) => void) | undefined;
+  private shortcutSubmission = false;
   private submitHandler: ((text: string) => void) | undefined;
 
   constructor(base: EditorComponent, callbacks: ShortcutCallbacks) {
@@ -131,14 +132,14 @@ export class TurnFoldShortcutEditor implements EditorComponent {
       this.callbacks.cancel();
       return;
     }
-    const draft = this.base.getText();
+    this.shortcutSubmission = true;
     try {
       submit(TOGGLE_COMMAND);
     } catch (error) {
       this.callbacks.cancel();
       throw error;
     } finally {
-      this.base.setText(draft);
+      this.shortcutSubmission = false;
     }
   }
 
@@ -147,6 +148,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
   }
 
   setText(text: string): void {
+    if (this.shortcutSubmission && text === "") return;
     this.base.setText(text);
   }
 
