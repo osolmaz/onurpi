@@ -3,7 +3,7 @@
 - Repository: https://github.com/osolmaz/yarp
 - Commit: `29dce0333b5f4da8b901f95f2c049af7e1c45bcf`
 - Retrieved: 2026-08-03
-- License: MIT
+- License: no license file or package license declared at the reviewed commit
 - Local changes: none; `index.ts` only re-exports the pinned upstream extension
 
 ## Review
