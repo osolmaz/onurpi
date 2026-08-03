@@ -16,6 +16,7 @@ class FakeEditor implements EditorComponent {
   onPasteImage?: () => void;
   onChange?: (text: string) => void;
   onSubmit?: (text: string) => void;
+  setTextCalls: string[] = [];
   text = "";
   wantsKeyRelease = true;
 
@@ -36,6 +37,7 @@ class FakeEditor implements EditorComponent {
   }
 
   setText(text: string): void {
+    this.setTextCalls.push(text);
     this.text = text;
   }
 }
@@ -56,7 +58,7 @@ describe("TurnFoldShortcutEditor", () => {
     const { base, editor, request } = shortcutEditor();
     base.text = "unfinished draft";
     const submit = vi.fn(() => {
-      base.setText("");
+      editor.setText("");
     });
     editor.onSubmit = submit;
 
@@ -64,6 +66,7 @@ describe("TurnFoldShortcutEditor", () => {
 
     expect(request).toHaveBeenCalledOnce();
     expect(submit).toHaveBeenCalledWith("/turn-fold toggle");
+    expect(base.setTextCalls).toEqual([]);
     expect(base.text).toBe("unfinished draft");
   });
 
@@ -87,7 +90,7 @@ describe("TurnFoldShortcutEditor", () => {
     const second = shortcutEditor();
     second.base.text = "draft";
     second.editor.onSubmit = () => {
-      second.base.setText("");
+      second.editor.setText("");
       throw new Error("submit failed");
     };
     expect(() => {
