@@ -1,13 +1,14 @@
 # YARP
 
 This package loads the YARP Pi extension from a pinned upstream commit. YARP archives every Pi tool
-call in one private local SQLite database. It also wraps a strict allowlist of developer commands
-and removes the middle of long output before it enters Pi's context, while retaining exact raw
-stdout and stderr for recovery.
+call in one private local SQLite database. It applies typed summaries to reviewed developer
+commands, then caps remaining result text at 5,120 UTF-8 bytes by default. Exact recovery stays
+available through the local archive.
 
-Unsupported commands and rewrite failures run unchanged. Initial archive failures block execution so
-a tool call cannot run without its input record. Post-execution archive failures remain visible and
-restore raw shell output when possible.
+Unsupported commands and rewrite failures execute unchanged. Initial archive failures block
+execution so a tool call cannot run without its input record. Post-execution archive failures remain
+visible and restore raw shell output when possible. A generic cap is applied only after its recovery
+source commits.
 
 ## Binary
 
@@ -16,7 +17,7 @@ The extension requires the matching `yarp` binary on `PATH`:
 ```sh
 cargo install \
   --git https://github.com/osolmaz/yarp.git \
-  --rev 0d29a076d1066015b8b291fa32063fd8ff926e51 \
+  --rev 29dce0333b5f4da8b901f95f2c049af7e1c45bcf \
   --locked
 ```
 
@@ -24,8 +25,9 @@ The archive is stored at `~/.local/share/yarp/tool-calls.sqlite3`. Use `yarp arc
 `yarp archive verify`, and `yarp archive prune --before <UTC timestamp>` to inspect or prune it
 without printing stored payloads.
 
-Set `YARP_DISABLED=1` to disable command rewriting while keeping archival active. Set
-`YARP_ARCHIVE_DISABLED=1` to disable archival.
+`YARP_OUTPUT_CAP_BYTES` sets an exact text budget from 1,024 through 16,777,216 bytes. Set it to `0`
+to disable only the generic cap. `YARP_DISABLED=1` disables rewriting and pruning while keeping
+archival active. `YARP_ARCHIVE_DISABLED=1` disables archival and therefore the generic cap.
 
 ## Pi contract
 
