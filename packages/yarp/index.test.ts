@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_OUTPUT_CAP_BYTES } from "yarp-cli/hooks/pi/output-cap.ts";
+import {
+  DEFAULT_OUTPUT_CAP_BYTES,
+  DEFAULT_RECOVERY_CAP_BYTES,
+  DEFAULT_RECOVERY_CAP_LINES,
+} from "yarp-cli/hooks/pi/configuration.ts";
 import yarpExtension, { commandBinding } from "yarp-cli/hooks/pi/yarp.ts";
 import exportedExtension from "./index.js";
 
@@ -8,8 +12,10 @@ describe("YARP package", () => {
     expect(exportedExtension).toBe(yarpExtension);
   });
 
-  it("loads the reviewed global output cap", () => {
+  it("loads the reviewed output limits", () => {
     expect(DEFAULT_OUTPUT_CAP_BYTES).toBe(5 * 1024);
+    expect(DEFAULT_RECOVERY_CAP_BYTES).toBe(32 * 1024);
+    expect(DEFAULT_RECOVERY_CAP_LINES).toBe(1_900);
   });
 
   it("rewrites the command fields used by both shell tools", () => {
