@@ -355,8 +355,17 @@ function registerSessionEvents(
       return;
     }
     runtime.restoreEditor = installTurnFoldShortcutEditor(ctx, {
-      cancel: () => {
+      cancel: (error) => {
         shortcut.cancel();
+        if (error !== undefined) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : "Unknown error";
+          ctx.ui.notify(`Turn Fold toggle failed: ${message}`, "error");
+        }
       },
       request: () =>
         shortcut.request(ctx.isIdle(), (message, level) => {
