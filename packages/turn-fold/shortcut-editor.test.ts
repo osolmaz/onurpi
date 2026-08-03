@@ -6,9 +6,14 @@ import { ToggleShortcutController, TurnFoldShortcutEditor } from "./shortcut-edi
 const TOGGLE_KEY = "\x1b[111;6u";
 
 class FakeEditor implements EditorComponent {
+  actionHandlers = new Map<string, () => void>();
   borderColor?: (text: string) => string;
   focused = false;
   inputs: string[] = [];
+  onCtrlD?: () => void;
+  onEscape?: () => void;
+  onExtensionShortcut?: (data: string) => boolean;
+  onPasteImage?: () => void;
   onChange?: (text: string) => void;
   onSubmit?: (text: string) => void;
   text = "";
@@ -104,6 +109,28 @@ describe("TurnFoldShortcutEditor", () => {
     expect(editor.getText()).toBe("text");
     expect(editor.wantsKeyRelease).toBe(true);
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it("copies Pi app actions and extension shortcuts to the wrapped custom editor", () => {
+    const { base, editor } = shortcutEditor();
+    const action = vi.fn();
+    const onCtrlD = vi.fn();
+    const onEscape = vi.fn();
+    const onExtensionShortcut = vi.fn(() => true);
+    const onPasteImage = vi.fn();
+    editor.actionHandlers.set("app.clear", action);
+    editor.onCtrlD = onCtrlD;
+    editor.onEscape = onEscape;
+    editor.onExtensionShortcut = onExtensionShortcut;
+    editor.onPasteImage = onPasteImage;
+
+    editor.handleInput("x");
+
+    expect(base.actionHandlers.get("app.clear")).toBe(action);
+    expect(base.onCtrlD).toBe(onCtrlD);
+    expect(base.onEscape).toBe(onEscape);
+    expect(base.onExtensionShortcut).toBe(onExtensionShortcut);
+    expect(base.onPasteImage).toBe(onPasteImage);
   });
 });
 
