@@ -1,4 +1,5 @@
 import {
+  type AppKeybinding,
   CustomEditor,
   type ExtensionContext,
   type KeybindingsManager,
@@ -47,7 +48,12 @@ export class ToggleShortcutController {
 }
 
 export class TurnFoldShortcutEditor implements EditorComponent {
+  readonly actionHandlers = new Map<AppKeybinding, () => void>();
   readonly base: EditorComponent;
+  onCtrlD?: () => void;
+  onEscape?: () => void;
+  onExtensionShortcut?: (data: string) => boolean;
+  onPasteImage?: () => void;
   private readonly callbacks: ShortcutCallbacks;
   private changeHandler: ((text: string) => void) | undefined;
   private submitHandler: ((text: string) => void) | undefined;
@@ -114,6 +120,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
   }
 
   handleInput(data: string): void {
+    this.syncActionHandlers();
     if (!matchesKey(data, TOGGLE_SHORTCUT)) {
       this.base.handleInput(data);
       return;
@@ -165,6 +172,20 @@ export class TurnFoldShortcutEditor implements EditorComponent {
 
   setAutocompleteMaxVisible(maxVisible: number): void {
     this.base.setAutocompleteMaxVisible?.(maxVisible);
+  }
+
+  private syncActionHandlers(): void {
+    const baseHandlers: unknown = Reflect.get(this.base, "actionHandlers");
+    if (baseHandlers instanceof Map) {
+      baseHandlers.clear();
+      for (const [action, handler] of this.actionHandlers) baseHandlers.set(action, handler);
+    }
+    if (this.onCtrlD) Reflect.set(this.base, "onCtrlD", this.onCtrlD);
+    if (this.onEscape) Reflect.set(this.base, "onEscape", this.onEscape);
+    if (this.onExtensionShortcut) {
+      Reflect.set(this.base, "onExtensionShortcut", this.onExtensionShortcut);
+    }
+    if (this.onPasteImage) Reflect.set(this.base, "onPasteImage", this.onPasteImage);
   }
 }
 
