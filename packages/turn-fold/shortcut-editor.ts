@@ -17,9 +17,14 @@ const TOGGLE_COMMAND = "/turn-fold toggle";
 const TOGGLE_SHORTCUT = "ctrl+shift+o";
 
 type ShortcutCallbacks = {
-  cancel: () => void;
+  cancel: (error?: unknown) => void;
   request: () => boolean;
 };
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null) return false;
+  return typeof Reflect.get(value, "then") === "function";
+}
 
 export class ToggleShortcutController {
   private pending = false;
@@ -57,7 +62,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
   private readonly callbacks: ShortcutCallbacks;
   private changeHandler: ((text: string) => void) | undefined;
   private shortcutSubmission = false;
-  private submitHandler: ((text: string) => void) | undefined;
+  private submitHandler: ((text: string) => unknown) | undefined;
 
   constructor(base: EditorComponent, callbacks: ShortcutCallbacks) {
     this.base = base;
@@ -134,9 +139,14 @@ export class TurnFoldShortcutEditor implements EditorComponent {
     }
     this.shortcutSubmission = true;
     try {
-      submit(TOGGLE_COMMAND);
+      const result = submit(TOGGLE_COMMAND);
+      if (isPromiseLike(result)) {
+        void Promise.resolve(result).catch((error: unknown) => {
+          this.callbacks.cancel(error);
+        });
+      }
     } catch (error) {
-      this.callbacks.cancel();
+      this.callbacks.cancel(error);
       throw error;
     } finally {
       this.shortcutSubmission = false;

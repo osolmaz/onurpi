@@ -100,6 +100,19 @@ describe("TurnFoldShortcutEditor", () => {
     expect(second.base.text).toBe("draft");
   });
 
+  it("clears the pending guard after asynchronous submission failure", async () => {
+    const { cancel, editor } = shortcutEditor();
+    const failure = new Error("async submit failed");
+    const submit: (text: string) => unknown = () => Promise.reject(failure);
+    editor.onSubmit = submit;
+
+    editor.handleInput(TOGGLE_KEY);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(cancel).toHaveBeenCalledWith(failure);
+  });
+
   it("delegates other input and editor state to the wrapped editor", () => {
     const { base, editor, request } = shortcutEditor();
 
