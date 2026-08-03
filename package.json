@@ -11,12 +11,12 @@
   ],
   "pi": {
     "extensions": [
+      "./packages/prompt-queue/index.ts",
       "./packages/turn-fold/index.ts",
       "./packages/loop-guard/index.ts",
       "./packages/goal/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
-      "./packages/prompt-queue/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
       "./packages/startup-model/index.ts",

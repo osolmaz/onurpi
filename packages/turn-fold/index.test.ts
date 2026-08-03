@@ -53,9 +53,12 @@ function context(
   branch: readonly unknown[] = entries,
   sessionFile: string | null = "/tmp/turn-fold-session.jsonl",
 ) {
+  let editorFactory: unknown;
   return {
     cwd: "/workspace/project",
+    hasPendingMessages: vi.fn(() => false),
     hasUI: true,
+    isIdle: vi.fn(() => true),
     mode: "tui",
     reload: vi.fn(() => Promise.resolve()),
     switchSession: vi.fn(() => Promise.resolve({ cancelled: false })),
@@ -67,8 +70,12 @@ function context(
     },
     ui: {
       confirm: vi.fn(() => Promise.resolve(true)),
+      getEditorComponent: vi.fn(() => editorFactory),
       notify: vi.fn(),
       select: vi.fn(() => Promise.resolve(undefined)),
+      setEditorComponent: vi.fn((factory: unknown) => {
+        editorFactory = factory;
+      }),
       theme: undefined,
     },
     waitForIdle: vi.fn(() => Promise.resolve()),
@@ -343,6 +350,23 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
 });
 
 describe("Turn Fold mode isolation", () => {
+  it("installs and restores the TUI keyboard editor wrapper", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    turnFold(extension.pi);
+
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+    expect(ctx.ui.getEditorComponent()).toBeTypeOf("function");
+
+    await emit(
+      extension.handlers,
+      "session_shutdown",
+      { reason: "quit", type: "session_shutdown" },
+      ctx,
+    );
+    expect(ctx.ui.getEditorComponent()).toBeUndefined();
+  });
+
   it("leaves session replay untouched outside TUI mode", async () => {
     const extension = extensionHarness();
     const entries = [{ id: "entry", type: "custom" }];

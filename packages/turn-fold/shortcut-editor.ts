@@ -1,0 +1,188 @@
+import {
+  CustomEditor,
+  type ExtensionContext,
+  type KeybindingsManager,
+} from "@earendil-works/pi-coding-agent";
+import {
+  isFocusable,
+  matchesKey,
+  type AutocompleteProvider,
+  type EditorComponent,
+  type EditorTheme,
+  type TUI,
+} from "@earendil-works/pi-tui";
+
+const TOGGLE_COMMAND = "/turn-fold toggle";
+const TOGGLE_SHORTCUT = "ctrl+shift+o";
+
+type ShortcutCallbacks = {
+  cancel: () => void;
+  request: () => boolean;
+};
+
+export class ToggleShortcutController {
+  private pending = false;
+
+  request(idle: boolean, notify: (message: string, level: "info") => void): boolean {
+    if (this.pending) {
+      notify("Turn Fold toggle already queued.", "info");
+      return false;
+    }
+    this.pending = true;
+    if (!idle) notify("Turn Fold toggle queued until the current response finishes.", "info");
+    return true;
+  }
+
+  cancel(): void {
+    this.pending = false;
+  }
+
+  async run(action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+    } finally {
+      this.pending = false;
+    }
+  }
+}
+
+export class TurnFoldShortcutEditor implements EditorComponent {
+  readonly base: EditorComponent;
+  private readonly callbacks: ShortcutCallbacks;
+  private changeHandler: ((text: string) => void) | undefined;
+  private submitHandler: ((text: string) => void) | undefined;
+
+  constructor(base: EditorComponent, callbacks: ShortcutCallbacks) {
+    this.base = base;
+    this.callbacks = callbacks;
+    this.changeHandler = base.onChange;
+    this.submitHandler = base.onSubmit;
+    base.onChange = (text) => {
+      this.changeHandler?.(text);
+    };
+    base.onSubmit = (text) => {
+      this.submitHandler?.(text);
+    };
+  }
+
+  get focused(): boolean {
+    return isFocusable(this.base) && this.base.focused;
+  }
+
+  set focused(value: boolean) {
+    if (isFocusable(this.base)) this.base.focused = value;
+  }
+
+  get wantsKeyRelease(): boolean {
+    return this.base.wantsKeyRelease ?? false;
+  }
+
+  get onSubmit(): (text: string) => void {
+    return (text) => {
+      this.submitHandler?.(text);
+    };
+  }
+
+  set onSubmit(handler: (text: string) => void) {
+    this.submitHandler = handler;
+  }
+
+  get onChange(): (text: string) => void {
+    return (text) => {
+      this.changeHandler?.(text);
+    };
+  }
+
+  set onChange(handler: (text: string) => void) {
+    this.changeHandler = handler;
+  }
+
+  get borderColor(): (text: string) => string {
+    return this.base.borderColor ?? ((text) => text);
+  }
+
+  set borderColor(handler: (text: string) => string) {
+    this.base.borderColor = handler;
+  }
+
+  render(width: number): string[] {
+    return this.base.render(width);
+  }
+
+  invalidate(): void {
+    this.base.invalidate();
+  }
+
+  handleInput(data: string): void {
+    if (!matchesKey(data, TOGGLE_SHORTCUT)) {
+      this.base.handleInput(data);
+      return;
+    }
+    if (!this.callbacks.request()) return;
+    const submit = this.submitHandler;
+    if (!submit) {
+      this.callbacks.cancel();
+      return;
+    }
+    const draft = this.base.getText();
+    try {
+      submit(TOGGLE_COMMAND);
+    } catch (error) {
+      this.callbacks.cancel();
+      throw error;
+    } finally {
+      this.base.setText(draft);
+    }
+  }
+
+  getText(): string {
+    return this.base.getText();
+  }
+
+  setText(text: string): void {
+    this.base.setText(text);
+  }
+
+  addToHistory(text: string): void {
+    this.base.addToHistory?.(text);
+  }
+
+  insertTextAtCursor(text: string): void {
+    this.base.insertTextAtCursor?.(text);
+  }
+
+  getExpandedText(): string {
+    return this.base.getExpandedText?.() ?? this.base.getText();
+  }
+
+  setAutocompleteProvider(provider: AutocompleteProvider): void {
+    this.base.setAutocompleteProvider?.(provider);
+  }
+
+  setPaddingX(padding: number): void {
+    this.base.setPaddingX?.(padding);
+  }
+
+  setAutocompleteMaxVisible(maxVisible: number): void {
+    this.base.setAutocompleteMaxVisible?.(maxVisible);
+  }
+}
+
+export function installTurnFoldShortcutEditor(
+  ctx: ExtensionContext,
+  callbacks: ShortcutCallbacks,
+): () => void {
+  const previous = ctx.ui.getEditorComponent();
+  const factory = (
+    tui: TUI,
+    theme: EditorTheme,
+    keybindings: KeybindingsManager,
+  ): EditorComponent => {
+    const base = previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
+    return new TurnFoldShortcutEditor(base, callbacks);
+  };
+  ctx.ui.setEditorComponent(factory);
+  return () => {
+    if (ctx.ui.getEditorComponent() === factory) ctx.ui.setEditorComponent(previous);
+  };
+}

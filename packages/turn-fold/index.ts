@@ -24,6 +24,7 @@ import {
 } from "./transcript-window-adapter.ts";
 import { showHistoryViewer } from "./history-viewer.ts";
 import { isTurnFoldMode, type TurnFoldMode } from "./mode.ts";
+import { installTurnFoldShortcutEditor, ToggleShortcutController } from "./shortcut-editor.ts";
 import { nearestRunStartIndex, RunBoundaryRecorder } from "./run-boundary.ts";
 import {
   compactionWindowCount,
@@ -278,6 +279,7 @@ async function handleCommand(
 function registerControls(
   pi: ExtensionAPI,
   state: TurnFoldState,
+  shortcut: ToggleShortcutController,
   getConfiguration: GetConfiguration,
   applyConfiguration: ApplyConfiguration,
   getSourceEntries: () => BranchEntries,
@@ -285,8 +287,11 @@ function registerControls(
   pi.registerCommand("turn-fold", {
     description: "Control transcript folding and loaded compaction windows.",
     getArgumentCompletions: argumentCompletions,
-    handler: (args, ctx) =>
-      handleCommand(args, ctx, state, getConfiguration, applyConfiguration, getSourceEntries),
+    handler: (args, ctx) => {
+      const action = () =>
+        handleCommand(args, ctx, state, getConfiguration, applyConfiguration, getSourceEntries);
+      return args.trim().toLowerCase() === "toggle" ? shortcut.run(action) : action();
+    },
   });
 }
 
@@ -295,6 +300,7 @@ type TurnFoldRuntime = {
   configuration: TurnFoldConfiguration;
   currentTheme: Theme | undefined;
   lastSourceEntries: BranchEntries;
+  restoreEditor: () => void;
   runBoundaries: RunBoundaryRecorder;
 };
 
@@ -328,6 +334,7 @@ function transcriptProjector(
 function registerSessionEvents(
   pi: ExtensionAPI,
   state: TurnFoldState,
+  shortcut: ToggleShortcutController,
   runtime: TurnFoldRuntime,
   registry: EphemeralCompactionRegistry,
   applyConfiguration: ApplyConfiguration,
@@ -341,10 +348,21 @@ function registerSessionEvents(
     runtime.lastSourceEntries = selectTranscriptEntries(branch, runtime.configuration.windows);
     state.setWorkingDirectory(ctx.cwd);
     applyConfiguration(runtime.configuration, false);
+    runtime.restoreEditor();
+    runtime.restoreEditor = () => undefined;
     if (ctx.mode !== "tui") {
       runtime.adapter = undefined;
       return;
     }
+    runtime.restoreEditor = installTurnFoldShortcutEditor(ctx, {
+      cancel: () => {
+        shortcut.cancel();
+      },
+      request: () =>
+        shortcut.request(ctx.isIdle(), (message, level) => {
+          ctx.ui.notify(message, level);
+        }),
+    });
     runtime.adapter = installTranscriptWindowAdapter(
       ctx.sessionManager,
       runtime.configuration.windows,
@@ -374,6 +392,8 @@ function registerSessionEvents(
     runtime.runBoundaries.reset();
     runtime.adapter?.restore();
     runtime.adapter = undefined;
+    runtime.restoreEditor();
+    runtime.restoreEditor = () => undefined;
     closeCompactionRegistry(registry, event.reason);
     restorePatches();
   });
@@ -433,12 +453,14 @@ function registerAgentEvents(
 
 export default function turnFold(pi: ExtensionAPI): void {
   const state = new TurnFoldState();
+  const shortcut = new ToggleShortcutController();
   const registry = processCompactionRegistry();
   const runtime: TurnFoldRuntime = {
     adapter: undefined,
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
     currentTheme: undefined,
     lastSourceEntries: [],
+    restoreEditor: () => undefined,
     runBoundaries: new RunBoundaryRecorder((customType, data) => {
       pi.appendEntry(customType, data);
     }),
@@ -453,10 +475,11 @@ export default function turnFold(pi: ExtensionAPI): void {
   registerControls(
     pi,
     state,
+    shortcut,
     () => runtime.configuration,
     applyConfiguration,
     () => runtime.lastSourceEntries,
   );
-  registerSessionEvents(pi, state, runtime, registry, applyConfiguration, restorePatches);
+  registerSessionEvents(pi, state, shortcut, runtime, registry, applyConfiguration, restorePatches);
   registerAgentEvents(pi, state, runtime);
 }
