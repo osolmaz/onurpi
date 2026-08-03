@@ -18,7 +18,8 @@ The extension requires the matching `yarp` binary on `PATH`:
 cargo install \
   --git https://github.com/osolmaz/yarp.git \
   --rev 29dce0333b5f4da8b901f95f2c049af7e1c45bcf \
-  --locked
+  --locked \
+  yarp-cli
 ```
 
 The archive is stored at `~/.local/share/yarp/tool-calls.sqlite3`. Use `yarp archive stats`,
