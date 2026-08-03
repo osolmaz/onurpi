@@ -3,16 +3,18 @@
 | Item          | Reviewed value                                                  |
 | ------------- | --------------------------------------------------------------- |
 | Repository    | https://github.com/osolmaz/yarp                                 |
-| Commit        | `020033f67debc328710cf9233043606b17564d91`                      |
+| Commit        | `e729a6521d5bcf850641f069a458decb3e143d7a`                      |
 | Retrieved     | 2026-08-03                                                      |
-| License       | No license file or package license declared                     |
+| License       | MIT                                                             |
 | Local changes | None. `index.ts` only re-exports the pinned upstream extension. |
 
 ## Review
 
 The review covered the Pi extension, strict configuration and shell-plan parsers, generic and
 recovery output limits, ingest and result clients, bundled skill, SQLite schema and archive
-implementation, command runner, CLI parsing, tests, package metadata, and archive specification.
+implementation, command runner, CLI parsing, tests, package metadata, release workflow, and archive
+specification. `yarp-cli` is the only published crate; rule-pack parsing and compilation are an
+internal module.
 
 The extension uses Pi's documented `tool_execution_start`, `tool_call`, `tool_result`,
 `tool_execution_end`, `message_end`, session lifecycle, and `pi.exec` APIs. It does not modify Pi
