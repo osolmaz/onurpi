@@ -153,6 +153,14 @@ describe("OnurPi package loading", () => {
     }
   });
 
+  it("loads Prompt Queue before Turn Fold so the shortcut wraps the active editor", () => {
+    const extensions = resourceManifest()["extensions"];
+    if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
+    expect(extensions.indexOf("./packages/prompt-queue/index.ts")).toBeLessThan(
+      extensions.indexOf("./packages/turn-fold/index.ts"),
+    );
+  });
+
   it("runs Loop Guard before Goal settlement handlers", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");

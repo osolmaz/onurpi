@@ -156,7 +156,7 @@ The extension provides these commands:
 /turn-fold windows reset
 ```
 
-Mode changes use `/turn-fold toggle`. In TUI mode, Turn Fold resumes the current session through Pi's public command context so the transcript is rebuilt only after the new projection adapter is installed. `Ctrl+O` remains Pi's tool-output expansion control.
+Mode changes use `/turn-fold toggle`. `Ctrl+Shift+O` MUST submit that command through Pi's active editor without replacing draft text. During a response, the command MUST wait for Pi to settle, and repeated shortcut presses MUST NOT start extra toggles. In TUI mode, Turn Fold resumes the current session through Pi's public command context so the transcript is rebuilt only after the new projection adapter is installed. `Ctrl+O` remains Pi's tool-output expansion control.
 
 ## Compatibility boundary
 
@@ -179,6 +179,7 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Compaction handling performs no Pi session or sidecar writes.
 - Expanded mode restores Pi's original compaction rows and spacing.
 - Compact and expanded mode switching updates the existing transcript.
+- `Ctrl+Shift+O` submits the toggle command through the active editor, preserves draft text, waits safely while busy, suppresses duplicate pending toggles, and recovers after dispatch failure.
 - Exact, relative, reset, and confirmed `all` window changes rebuild the expected user-anchored range.
 - Cancelling `all` and invalid arguments leave the transcript unchanged.
 - Successful edit results aggregate exact patch line totals and unique files without double counting repeated tool-call IDs.
