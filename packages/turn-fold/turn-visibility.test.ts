@@ -11,6 +11,44 @@ function assistantMessage(timestamp: number, text: string): Record<string, unkno
   };
 }
 
+it("keeps custom-prompt runs visible when their projected entries are displayed", () => {
+  const state = new TurnFoldState();
+  const assistant = {};
+  const assistantHistory = assistantMessage(110, "Goal continuation");
+  const entries = [
+    {
+      content: "Continue the active goal.",
+      customType: "pi-goal-event",
+      details: { kind: "continuation" },
+      display: true,
+      id: "goal-prompt",
+      type: "custom_message",
+    },
+    { id: "goal-answer", message: assistantHistory, type: "message" },
+  ];
+
+  state.applyHistoryProjection(entries, entries);
+  state.associateAssistant(assistant, assistantHistory);
+
+  expect(state.viewFor(assistant)?.display).not.toBe("hidden");
+});
+
+it("does not make a group visible from non-rendering custom metadata alone", () => {
+  const state = new TurnFoldState();
+  const assistant = {};
+  const assistantHistory = assistantMessage(110, "Answer");
+  const entries = [
+    { id: "user", message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
+    { id: "answer", message: assistantHistory, type: "message" },
+    { customType: "metadata", data: {}, id: "metadata", type: "custom" },
+  ];
+
+  state.applyHistoryProjection(entries, [entries[2]]);
+  state.associateAssistant(assistant, assistantHistory);
+
+  expect(state.viewFor(assistant)?.display).toBe("hidden");
+});
+
 it("hides and restores loaded groups without rebuilding component associations", () => {
   const state = new TurnFoldState();
   const firstUser = {};

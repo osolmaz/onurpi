@@ -414,6 +414,38 @@ describe("Turn Fold configuration commands", () => {
     expect(historyViewerMock.entries[0]?.map(entryId)).toEqual(["user", "hidden", "final"]);
   });
 
+  it("keeps the history viewer inside the configured pre-compaction scope", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "before", message: { content: "Old", role: "user" }, type: "message" },
+      {
+        firstKeptEntryId: "after",
+        id: "compaction",
+        summary: "Summary",
+        tokensBefore: 100,
+        type: "compaction",
+      },
+      { id: "after", message: { content: "New", role: "user" }, type: "message" },
+      {
+        customType: "onurpi-turn-fold-config",
+        data: { density: "compact", preCompaction: "hide", windows: "all" },
+        id: "configuration",
+        type: "custom",
+      },
+    ];
+    const ctx = context([], branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "history", ctx);
+
+    expect(historyViewerMock.entries.at(-1)?.map(entryId)).toEqual([
+      "compaction",
+      "after",
+      "configuration",
+    ]);
+  });
+
   it("persists widening requests and reports that a restart is required", async () => {
     const extension = extensionHarness();
     const branch = [
