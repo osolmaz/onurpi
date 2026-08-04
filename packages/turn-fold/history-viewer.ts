@@ -13,6 +13,7 @@ import { HistoryEntryRenderer } from "./history-renderer.ts";
 type HistoryPosition = Readonly<{
   entryIndex: number;
   lineOffset: number;
+  segmentIndex: number;
 }>;
 
 type ExplorerTui = Pick<TUI, "requestRender" | "terminal">;
@@ -61,7 +62,7 @@ export class HistoryViewport {
     const lines: string[] = [];
     let position: HistoryPosition | undefined = this.top;
     while (position && lines.length < this.viewportHeight) {
-      const block = this.block(position.entryIndex);
+      const block = this.block(position.entryIndex, position.segmentIndex);
       lines.push(block[position.lineOffset] ?? "");
       position = this.next(position);
     }
@@ -71,16 +72,23 @@ export class HistoryViewport {
 
   private resize(width: number, height: number): void {
     const wasAtNewest = this.top ? this.viewportEndsAtNewest(this.top) : true;
-    const widthChanged = this.width !== Math.max(1, width);
-    this.width = Math.max(1, width);
-    this.viewportHeight = Math.max(1, height);
+    const nextWidth = Math.max(1, width);
+    const nextHeight = Math.max(1, height);
+    const layoutChanged = this.width !== nextWidth || this.viewportHeight !== nextHeight;
+    this.width = nextWidth;
+    this.viewportHeight = nextHeight;
     if (!this.top || wasAtNewest) {
       this.top = this.newestTop();
-    } else if (widthChanged) {
-      const block = this.block(this.top.entryIndex);
+    } else if (layoutChanged) {
+      const segmentIndex = Math.min(
+        this.top.segmentIndex,
+        this.segmentCount(this.top.entryIndex) - 1,
+      );
+      const block = this.block(this.top.entryIndex, segmentIndex);
       this.top = {
         entryIndex: this.top.entryIndex,
         lineOffset: Math.min(this.top.lineOffset, block.length - 1),
+        segmentIndex,
       };
     }
   }
@@ -117,7 +125,7 @@ export class HistoryViewport {
 
   moveToOldest(): void {
     this.ensurePosition();
-    this.top = { entryIndex: this.range.startIndex, lineOffset: 0 };
+    this.top = { entryIndex: this.range.startIndex, lineOffset: 0, segmentIndex: 0 };
   }
 
   moveToNewest(): void {
@@ -134,14 +142,16 @@ export class HistoryViewport {
       this.detailedEntries.add(entryIndex);
     }
     this.renderer.clear();
-    const block = this.block(entryIndex);
+    const segmentIndex = Math.min(current.segmentIndex, this.segmentCount(entryIndex) - 1);
+    const block = this.block(entryIndex, segmentIndex);
     this.top = {
       entryIndex,
       lineOffset: Math.min(current.lineOffset, block.length - 1),
+      segmentIndex,
     };
   }
 
-  private block(entryIndex: number): readonly string[] {
+  private block(entryIndex: number, segmentIndex: number): readonly string[] {
     const entry = this.range.index.entries[entryIndex];
     if (entry === undefined) return [""];
     return this.renderer.render(
@@ -149,6 +159,20 @@ export class HistoryViewport {
       entryIndex,
       this.width,
       this.detailedEntries.has(entryIndex),
+      segmentIndex,
+      this.viewportHeight + 4,
+    );
+  }
+
+  private segmentCount(entryIndex: number): number {
+    const entry = this.range.index.entries[entryIndex];
+    if (entry === undefined) return 1;
+    return this.renderer.segmentCount(
+      entry,
+      entryIndex,
+      this.width,
+      this.detailedEntries.has(entryIndex),
+      this.viewportHeight + 4,
     );
   }
 
@@ -159,10 +183,12 @@ export class HistoryViewport {
 
   private newestTop(): HistoryPosition {
     const lastEntryIndex = Math.max(this.range.startIndex, this.range.index.entries.length - 1);
-    const lastBlock = this.block(lastEntryIndex);
+    const segmentIndex = this.segmentCount(lastEntryIndex) - 1;
+    const lastBlock = this.block(lastEntryIndex, segmentIndex);
     let position: HistoryPosition = {
       entryIndex: lastEntryIndex,
       lineOffset: Math.max(0, lastBlock.length - 1),
+      segmentIndex,
     };
     for (let index = 1; index < this.viewportHeight; index += 1) {
       const previous = this.previous(position);
@@ -173,23 +199,34 @@ export class HistoryViewport {
   }
 
   private next(position: HistoryPosition): HistoryPosition | undefined {
-    const block = this.block(position.entryIndex);
+    const block = this.block(position.entryIndex, position.segmentIndex);
     if (position.lineOffset + 1 < block.length) {
-      return { entryIndex: position.entryIndex, lineOffset: position.lineOffset + 1 };
+      return { ...position, lineOffset: position.lineOffset + 1 };
+    }
+    if (position.segmentIndex + 1 < this.segmentCount(position.entryIndex)) {
+      return { ...position, lineOffset: 0, segmentIndex: position.segmentIndex + 1 };
     }
     if (position.entryIndex + 1 >= this.range.index.entries.length) return undefined;
-    return { entryIndex: position.entryIndex + 1, lineOffset: 0 };
+    return { entryIndex: position.entryIndex + 1, lineOffset: 0, segmentIndex: 0 };
   }
 
   private previous(position: HistoryPosition): HistoryPosition | undefined {
-    if (position.lineOffset > 0) {
-      return { entryIndex: position.entryIndex, lineOffset: position.lineOffset - 1 };
+    if (position.lineOffset > 0) return { ...position, lineOffset: position.lineOffset - 1 };
+    if (position.segmentIndex > 0) {
+      const segmentIndex = position.segmentIndex - 1;
+      return {
+        ...position,
+        lineOffset: Math.max(0, this.block(position.entryIndex, segmentIndex).length - 1),
+        segmentIndex,
+      };
     }
     if (position.entryIndex <= this.range.startIndex) return undefined;
     const previousEntryIndex = position.entryIndex - 1;
+    const segmentIndex = this.segmentCount(previousEntryIndex) - 1;
     return {
       entryIndex: previousEntryIndex,
-      lineOffset: Math.max(0, this.block(previousEntryIndex).length - 1),
+      lineOffset: Math.max(0, this.block(previousEntryIndex, segmentIndex).length - 1),
+      segmentIndex,
     };
   }
 
