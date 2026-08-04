@@ -23,8 +23,8 @@ time.
 
 The branch now keeps the main transcript compact, removes persisted density, and opens a public-API
 Pi overlay for detailed history. The explorer indexes message metadata without reading bodies,
-renders viewport-near Markdown and summaries through a bounded cache, preserves the visible
-position while admitting older windows, and closes through the shortcut or session lifecycle.
+renders viewport-near Markdown and summaries through a bounded cache, preserves the visible position
+while admitting older windows, and closes through the shortcut or session lifecycle.
 
 The Turn Fold package passes 189 tests, lint, TypeScript, coverage, dry checks, and diff checks. An
 isolated PTY test opened at 3 of 13 windows, loaded 6 of 13, preserved the editor draft, appended no
