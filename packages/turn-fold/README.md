@@ -53,11 +53,15 @@ The package is private and is not published yet.
 
 Use `/turn-fold toggle` or `Ctrl+Shift+O` to switch modes. The shortcut submits the same command
 through Pi's editor while preserving any draft text. During a response, the command waits for Pi to
-settle; repeated shortcut presses do not queue extra toggles. Turn Fold then stores the new
-configuration and resumes the current session so Pi rebuilds the transcript through the new
-projection. `Ctrl+O` remains Pi's separate tool-output detail toggle. While its editor wrapper is
-active, Turn Fold enables Pi TUI's public shrink-clearing behavior so compact mode removes rows left
-by the longer expanded transcript. It restores the previous TUI value when the extension unloads.
+settle; repeated shortcut presses do not queue extra toggles. Turn Fold stores the new configuration.
+Expansion resumes the current session so hidden rows can return. Compaction folds the currently
+loaded components in place, avoiding a replacement replay that would restore Pi's native rows
+before the new extension projection is bound. Running `compact` while it is already selected
+refreshes those components after a Pi reload. `Ctrl+O` remains Pi's separate tool-output detail
+toggle. While its editor wrapper is active, Turn Fold enables Pi TUI's public shrink-clearing
+behavior so compact mode removes rows left by the longer expanded transcript. It reasserts that
+behavior before compaction because Pi reapplies settings after extension startup during `/reload`,
+and restores the previous TUI value when the extension unloads.
 This can cause a brief full-redraw flicker when content shrinks. Turn Fold does not write terminal
 escape sequences or persist a global setting. A TUI started with `--no-session` keeps its startup
 projection and rejects replay-setting changes because Pi has no public in-memory transcript rebuild

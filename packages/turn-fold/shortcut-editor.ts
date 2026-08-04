@@ -214,10 +214,15 @@ export class TurnFoldShortcutEditor implements EditorComponent {
   }
 }
 
+export type TurnFoldShortcutInstallation = {
+  ensureShrinkClearing: () => void;
+  restore: () => void;
+};
+
 export function installTurnFoldShortcutEditor(
   ctx: ExtensionContext,
   callbacks: ShortcutCallbacks,
-): () => void {
+): TurnFoldShortcutInstallation {
   const previous = ctx.ui.getEditorComponent();
   const shrinkRestorers = new Map<TUI, () => void>();
   const factory = (
@@ -232,9 +237,14 @@ export function installTurnFoldShortcutEditor(
     return new TurnFoldShortcutEditor(base, callbacks);
   };
   ctx.ui.setEditorComponent(factory);
-  return () => {
-    if (ctx.ui.getEditorComponent() === factory) ctx.ui.setEditorComponent(previous);
-    for (const restore of shrinkRestorers.values()) restore();
-    shrinkRestorers.clear();
+  return {
+    ensureShrinkClearing: () => {
+      for (const tui of shrinkRestorers.keys()) tui.setClearOnShrink(true);
+    },
+    restore: () => {
+      if (ctx.ui.getEditorComponent() === factory) ctx.ui.setEditorComponent(previous);
+      for (const restore of shrinkRestorers.values()) restore();
+      shrinkRestorers.clear();
+    },
   };
 }

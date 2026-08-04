@@ -124,10 +124,21 @@ async function applyMode(
   configuration: TurnFoldConfiguration,
   applyConfiguration: ApplyConfiguration,
 ): Promise<void> {
-  if (mode === configuration.mode) return;
+  if (mode === configuration.mode) {
+    if (mode === "compact") {
+      await ctx.waitForIdle();
+      applyConfiguration(configuration, false);
+      ctx.ui.notify("Turn Fold: compact", "info");
+    }
+    return;
+  }
   await ctx.waitForIdle();
-  if (!canRebuildTranscript(ctx)) return;
+  if (mode === "expanded" && !canRebuildTranscript(ctx)) return;
   applyConfiguration({ ...configuration, mode }, true);
+  if (mode === "compact") {
+    ctx.ui.notify("Turn Fold: compact", "info");
+    return;
+  }
   await reloadTranscript(ctx);
 }
 
@@ -299,10 +310,37 @@ type TurnFoldRuntime = {
   adapter: TranscriptWindowAdapter | undefined;
   configuration: TurnFoldConfiguration;
   currentTheme: Theme | undefined;
+  ensureShrinkClearing: () => void;
   lastSourceEntries: BranchEntries;
   restoreEditor: () => void;
   runBoundaries: RunBoundaryRecorder;
 };
+
+function applyTranscriptProjection(
+  entries: BranchEntries,
+  state: TurnFoldState,
+  runtime: TurnFoldRuntime,
+  ctx: ExtensionContext,
+  registry: EphemeralCompactionRegistry,
+): BranchEntries {
+  const branch = ctx.sessionManager.getBranch();
+  const associations = compactionAssociationsForBranch(branch, ctx, registry);
+  const projection = projectTranscriptEntries(entries, {
+    activeRun: state.hasActive(),
+    attachedCompactionEntryIds: new Set(associations.keys()),
+    mode: runtime.configuration.mode,
+  });
+  state.setWorkingDirectory(ctx.cwd);
+  state.applyHistoryProjection(
+    projection.sourceEntries,
+    projection.displayEntries,
+    associations,
+    projection.omittedRunCount,
+    projection.oldestRetainedEntryId,
+  );
+  runtime.lastSourceEntries = projection.sourceEntries;
+  return projection.displayEntries;
+}
 
 function transcriptProjector(
   state: TurnFoldState,
@@ -310,25 +348,7 @@ function transcriptProjector(
   ctx: ExtensionContext,
   registry: EphemeralCompactionRegistry,
 ): (entries: BranchEntries) => BranchEntries {
-  return (entries) => {
-    const branch = ctx.sessionManager.getBranch();
-    const associations = compactionAssociationsForBranch(branch, ctx, registry);
-    const projection = projectTranscriptEntries(entries, {
-      activeRun: state.hasActive(),
-      attachedCompactionEntryIds: new Set(associations.keys()),
-      mode: runtime.configuration.mode,
-    });
-    state.setWorkingDirectory(ctx.cwd);
-    state.applyHistoryProjection(
-      projection.sourceEntries,
-      projection.displayEntries,
-      associations,
-      projection.omittedRunCount,
-      projection.oldestRetainedEntryId,
-    );
-    runtime.lastSourceEntries = projection.sourceEntries;
-    return projection.displayEntries;
-  };
+  return (entries) => applyTranscriptProjection(entries, state, runtime, ctx, registry);
 }
 
 function registerSessionEvents(
@@ -346,15 +366,16 @@ function registerSessionEvents(
     const branch = ctx.sessionManager.getBranch();
     runtime.configuration = configurationFromBranch(branch);
     runtime.lastSourceEntries = selectTranscriptEntries(branch, runtime.configuration.windows);
-    state.setWorkingDirectory(ctx.cwd);
+    applyTranscriptProjection(runtime.lastSourceEntries, state, runtime, ctx, registry);
     applyConfiguration(runtime.configuration, false);
     runtime.restoreEditor();
+    runtime.ensureShrinkClearing = () => undefined;
     runtime.restoreEditor = () => undefined;
     if (ctx.mode !== "tui") {
       runtime.adapter = undefined;
       return;
     }
-    runtime.restoreEditor = installTurnFoldShortcutEditor(ctx, {
+    const shortcutInstallation = installTurnFoldShortcutEditor(ctx, {
       cancel: (error) => {
         shortcut.cancel();
         if (error !== undefined) {
@@ -372,6 +393,8 @@ function registerSessionEvents(
           ctx.ui.notify(message, level);
         }),
     });
+    runtime.ensureShrinkClearing = shortcutInstallation.ensureShrinkClearing;
+    runtime.restoreEditor = shortcutInstallation.restore;
     runtime.adapter = installTranscriptWindowAdapter(
       ctx.sessionManager,
       runtime.configuration.windows,
@@ -402,6 +425,7 @@ function registerSessionEvents(
     runtime.adapter?.restore();
     runtime.adapter = undefined;
     runtime.restoreEditor();
+    runtime.ensureShrinkClearing = () => undefined;
     runtime.restoreEditor = () => undefined;
     closeCompactionRegistry(registry, event.reason);
     restorePatches();
@@ -468,6 +492,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     adapter: undefined,
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
     currentTheme: undefined,
+    ensureShrinkClearing: () => undefined,
     lastSourceEntries: [],
     restoreEditor: () => undefined,
     runBoundaries: new RunBoundaryRecorder((customType, data) => {
@@ -478,7 +503,8 @@ export default function turnFold(pi: ExtensionAPI): void {
   const applyConfiguration = (next: TurnFoldConfiguration, persist: boolean): void => {
     runtime.configuration = next;
     runtime.adapter?.setValue(next.windows);
-    if (state.getMode() !== next.mode) state.setMode(next.mode);
+    if (next.mode === "compact") runtime.ensureShrinkClearing();
+    state.setMode(next.mode);
     if (persist) pi.appendEntry(TURN_FOLD_CONFIG_ENTRY, next);
   };
   registerControls(

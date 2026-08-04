@@ -420,7 +420,51 @@ describe("Turn Fold window commands", () => {
     expect(ctx.switchSession).toHaveBeenCalledWith("/tmp/turn-fold-session.jsonl");
     expect(ctx.reload).not.toHaveBeenCalled();
   });
+});
 
+describe("Turn Fold compact commands", () => {
+  it("compacts the loaded transcript in place without replacing the session", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      {
+        customType: "onurpi-turn-fold-config",
+        data: { mode: "expanded", windows: 3 },
+        id: "expanded-config",
+        type: "custom",
+      },
+    ];
+    const ctx = context([], branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "compact", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      mode: "compact",
+      windows: 3,
+    });
+    expect(ctx.waitForIdle).toHaveBeenCalledOnce();
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Turn Fold: compact", "info");
+    expect(ctx.switchSession).not.toHaveBeenCalled();
+    expect(ctx.reload).not.toHaveBeenCalled();
+  });
+
+  it("refreshes an already compact transcript after Pi reloads its native rows", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "compact", ctx);
+
+    expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(ctx.waitForIdle).toHaveBeenCalledOnce();
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Turn Fold: compact", "info");
+    expect(ctx.switchSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("Turn Fold window commands", () => {
   it("fails closed when replay cannot be rebuilt in a TUI no-session run", async () => {
     const extension = extensionHarness();
     const ctx = context([], [], null);
