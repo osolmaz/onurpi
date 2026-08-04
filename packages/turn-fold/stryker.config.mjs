@@ -7,6 +7,7 @@ export default {
     "density.ts",
     "history-scope.ts",
     "projection-plan.ts",
+    "restart-marker.ts",
     "run-boundary.ts",
     "transcript-window-adapter.ts",
     "transcript-windows.ts",

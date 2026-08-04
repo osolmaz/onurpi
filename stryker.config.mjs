@@ -9,6 +9,7 @@ export default {
     "packages/turn-fold/density.ts",
     "packages/turn-fold/history-scope.ts",
     "packages/turn-fold/projection-plan.ts",
+    "packages/turn-fold/restart-marker.ts",
     "packages/turn-fold/transcript-window-adapter.ts",
     "packages/turn-fold/transcript-windows.ts",
     "packages/turn-fold/tool-padding.ts",

@@ -30,6 +30,11 @@ import {
   selectPreCompactionEntries,
 } from "./history-scope.ts";
 import { installTurnFoldShortcutEditor, ToggleShortcutController } from "./shortcut-editor.ts";
+import {
+  clearRestartMarker,
+  matchingRestartMarker,
+  rememberRestartMarker,
+} from "./restart-marker.ts";
 import { nearestRunStartIndex, RunBoundaryRecorder } from "./run-boundary.ts";
 import {
   compactionWindowCount,
@@ -445,17 +450,20 @@ function startSession(
   const branch = ctx.sessionManager.getBranch();
   const associations = compactionAssociationsForBranch(branch, ctx, registry);
   runtime.configuration = configurationFromBranch(branch);
-  runtime.appliedConfiguration = runtime.configuration;
+  const sessionKey = sessionRegistryKey(ctx);
+  const matchingMarker = matchingRestartMarker(sessionKey, runtime.configuration);
+  runtime.appliedConfiguration = matchingMarker?.applied ?? runtime.configuration;
   const plan = planTranscriptProjection(
     branch,
-    runtime.configuration,
+    runtime.appliedConfiguration,
     projectionOptions(state, associations),
   );
   applyProjectionPlanToState(plan, state, associations, ctx);
-  state.setDensity(runtime.configuration.density);
+  state.setDensity(runtime.appliedConfiguration.density);
   runtime.knownEntryIds = entryIds(branch);
   runtime.loadedEntryIds = new Set(plan.requiredEntryIds);
-  runtime.restartRequired = !canApplyProjectionInPlace(plan, runtime.loadedEntryIds);
+  runtime.restartRequired =
+    matchingMarker !== undefined || !canApplyProjectionInPlace(plan, runtime.loadedEntryIds);
   runtime.restoreEditor();
   runtime.ensureShrinkClearing = () => undefined;
   runtime.restoreEditor = () => undefined;
@@ -485,7 +493,7 @@ function startSession(
   runtime.restoreEditor = shortcutInstallation.restore;
   runtime.adapter = installTranscriptWindowAdapter(
     ctx.sessionManager,
-    runtime.configuration.windows,
+    runtime.appliedConfiguration.windows,
     transcriptProjector(state, runtime, ctx, registry),
     (error) => {
       ctx.ui.notify(`Turn Fold projection disabled: ${error.message}`, "warning");
@@ -621,6 +629,10 @@ export default function turnFold(pi: ExtensionAPI): void {
 
     if (!canApplyInPlace) {
       runtime.restartRequired = true;
+      rememberRestartMarker(sessionRegistryKey(ctx), {
+        applied: runtime.appliedConfiguration,
+        requested: next,
+      });
       ctx.ui.notify(
         `${formatStatus(next, true)}. Restart Pi to load omitted transcript entries; /reload is not enough.`,
         "warning",
@@ -629,6 +641,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     }
 
     runtime.appliedConfiguration = next;
+    clearRestartMarker(sessionRegistryKey(ctx));
     runtime.adapter?.setValue(next.windows);
     runtime.restartRequired = false;
     runtime.ensureShrinkClearing();
