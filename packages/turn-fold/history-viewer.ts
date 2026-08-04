@@ -88,7 +88,8 @@ export class HistoryViewport {
   moveBackward(lines: number): void {
     this.ensurePosition();
     let loadedOlder = false;
-    for (let index = 0; index < Math.max(1, lines); index += 1) {
+    let movementLimit = Math.max(1, lines);
+    for (let index = 0; index < movementLimit; index += 1) {
       const previous = this.previous(this.ensurePosition());
       if (previous) {
         this.top = previous;
@@ -96,6 +97,7 @@ export class HistoryViewport {
       }
       if (loadedOlder || !this.range.loadOlder()) break;
       loadedOlder = true;
+      if (movementLimit > 1) movementLimit -= 1;
       const older = this.previous(this.ensurePosition());
       if (!older) break;
       this.top = older;
