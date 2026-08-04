@@ -18,7 +18,7 @@ One command handles exact limits, relative changes, full history, and reset:
 
 After Pi becomes idle, every successful change persists the complete Turn Fold configuration. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
 
-Changing from a numeric value to `all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports density, pre-compaction visibility, windows, and pending restart state. A change applies in place when its required entries are already loaded and every omitted component is managed by Turn Fold. A wider range, or a range change that enters or leaves another extension's custom entry, is saved and takes effect after a full Pi restart; `/reload` is not enough.
+Changing from a numeric value to `all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports density, pre-compaction visibility, windows, and pending restart state. A change applies in place when its required entries are already loaded and every omitted component is managed by Turn Fold. A wider range, or a range change that enters or leaves an unpatched custom entry, custom message, or branch summary, is saved and takes effect after a full Pi restart; `/reload` is not enough.
 
 Compact and expanded densities operate on the same selected history scope. `pre-compaction show` preserves the selected range, while `hide` starts it at the newest compaction boundary.
 
