@@ -129,7 +129,9 @@ The explorer MUST support `Up` and `Ctrl+P` for one line backward, `Down` and `C
 
 Search and jump fields MUST support arrows plus `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Ctrl+K`, `Ctrl+U`, `Ctrl+Y`, `Ctrl+F`, `Ctrl+B`, `Alt+F`, `Alt+B`, `Alt+D`, `Alt+Backspace`, Home, End, Delete, Backspace, and `Ctrl+D`. Modified keys with no binding MUST NOT insert raw control text.
 
-`?` MUST show a complete key reference without changing the viewport. `?`, `q`, or `Esc` returns from help. In normal browsing, `q` or `Esc` closes the explorer when no active search needs clearing. `Ctrl+Shift+O` MUST close from every explorer screen.
+`?` MUST show a complete key reference without changing the viewport. `?`, `q`, or `Esc` returns from help, and help content MUST remain readable on short terminals through line or wheel scrolling. In normal browsing, `q` or `Esc` closes the explorer when no active search needs clearing. `Ctrl+Shift+O` MUST close from every explorer screen.
+
+While the explorer is open, Turn Fold MAY enable terminal mouse reporting through Pi's public terminal write API so the mouse wheel scrolls the overlay. This is a bounded exception to the no-escape-sequences rule. The explorer MUST enable only `?1002` with SGR `?1006` when it opens, MUST restore them exactly once for every close path including session shutdown, and MUST NOT persist or change any other terminal state. Wheel input MUST scroll three lines per notch, scroll help content while help is open, and ignore clicks, releases, motion, and horizontal wheel codes.
 
 User and assistant content MUST use Pi's public Markdown and theme APIs. User, assistant, thinking, tool, error, compaction and custom presentations MUST use the corresponding public Pi theme colors and stable Turn Fold labels. Tool summaries SHOULD emphasize the tool name and common command, query, URL or file-path arguments. The sticky header MUST report the focused role, local timestamp, entry position, current compaction window, filter, search progress, and navigation counts. The explorer MUST NOT import Pi's private transcript component classes.
 

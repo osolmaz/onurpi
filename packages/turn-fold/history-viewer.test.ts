@@ -6,6 +6,13 @@ import { HistoryViewport } from "./history-viewport.ts";
 
 initTheme("dark", false);
 
+function fakeTui(rows: number): {
+  requestRender: ReturnType<typeof vi.fn>;
+  terminal: { rows: number; write: ReturnType<typeof vi.fn> };
+} {
+  return { requestRender: vi.fn(), terminal: { rows, write: vi.fn() } };
+}
+
 const theme = {
   bg: (_color: string, text: string) => text,
   bold: (text: string) => text,
@@ -273,14 +280,70 @@ describe("Turn Fold history viewport controls", () => {
   });
 });
 
+describe("Turn Fold history explorer mouse support", () => {
+  it("enables SGR mouse tracking on open and restores it once on close", () => {
+    const tui = fakeTui(20);
+    const close = vi.fn();
+    const explorer = new HistoryExplorer(tui, theme, history(3), close);
+
+    expect(tui.terminal.write).toHaveBeenCalledTimes(1);
+    expect(tui.terminal.write).toHaveBeenCalledWith("\u001b[?1002h\u001b[?1006h");
+
+    explorer.close();
+    explorer.close();
+
+    expect(tui.terminal.write).toHaveBeenCalledTimes(2);
+    expect(tui.terminal.write).toHaveBeenLastCalledWith("\u001b[?1002l\u001b[?1006l");
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("scrolls the transcript with wheel input in browse mode", () => {
+    const tui = fakeTui(20);
+    const explorer = new HistoryExplorer(tui, theme, history(10), vi.fn());
+    const newest = explorer.render(80).join("\n");
+
+    explorer.handleInput("\u001b[<64;10;5M");
+    const scrolled = explorer.render(80).join("\n");
+    explorer.handleInput("\u001b[<65;10;5M");
+
+    expect(scrolled).not.toBe(newest);
+    expect(explorer.render(80).join("\n")).toBe(newest);
+    expect(tui.requestRender).toHaveBeenCalledTimes(2);
+  });
+
+  it("scrolls help with wheel input while help is open", () => {
+    const explorer = new HistoryExplorer(fakeTui(16), theme, history(3), vi.fn());
+    explorer.handleInput("?");
+    const first = explorer.render(100).join("\n");
+
+    explorer.handleInput("\u001b[<65;10;5M");
+    explorer.handleInput("\u001b[<65;10;5M");
+
+    expect(explorer.render(100).join("\n")).not.toBe(first);
+    explorer.handleInput("\u001b[<64;10;5M");
+    explorer.handleInput("\u001b[<64;10;5M");
+    expect(explorer.render(100).join("\n")).toBe(first);
+  });
+
+  it("ignores clicks, releases, motion, and horizontal wheel codes", () => {
+    const tui = fakeTui(20);
+    const explorer = new HistoryExplorer(tui, theme, history(5), vi.fn());
+    const before = explorer.render(80).join("\n");
+    tui.requestRender.mockClear();
+
+    explorer.handleInput("\u001b[<0;10;5M");
+    explorer.handleInput("\u001b[<64;10;5m");
+    explorer.handleInput("\u001b[<35;10;5M");
+    explorer.handleInput("\u001b[<66;10;5M");
+
+    expect(explorer.render(80).join("\n")).toBe(before);
+    expect(tui.requestRender).not.toHaveBeenCalled();
+  });
+});
+
 describe("Turn Fold history explorer", () => {
   it("renders an explicit empty state without claiming a compaction window", () => {
-    const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
-      theme,
-      [],
-      vi.fn(),
-    );
+    const explorer = new HistoryExplorer(fakeTui(20), theme, [], vi.fn());
 
     const rendered = explorer.render(80).join("\n");
 
@@ -290,7 +353,7 @@ describe("Turn Fold history explorer", () => {
 
   it("escapes transcript-controlled labels in the sticky title", () => {
     const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      fakeTui(20),
       theme,
       [{ customType: "other\u001b-extension", id: "custom", type: "custom" }],
       vi.fn(),
@@ -306,7 +369,7 @@ describe("Turn Fold history explorer", () => {
     const requestRender = vi.fn();
     const close = vi.fn();
     const explorer = new HistoryExplorer(
-      { requestRender, terminal: { rows: 20 } as never },
+      { ...fakeTui(20), requestRender },
       theme,
       history(7),
       close,
@@ -328,7 +391,7 @@ describe("Turn Fold history explorer", () => {
     vi.useFakeTimers();
     const close = vi.fn();
     const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      fakeTui(20),
       theme,
       [assistant("one", "Nothing"), assistant("two", "Needle here")],
       close,
@@ -352,7 +415,7 @@ describe("Turn Fold history explorer", () => {
     const requestRender = vi.fn();
     const close = vi.fn();
     const explorer = new HistoryExplorer(
-      { requestRender, terminal: { rows: 20 } as never },
+      { ...fakeTui(20), requestRender },
       theme,
       Array.from({ length: 1_000 }, (_, index) =>
         assistant(String(index), `entry ${String(index)}`),
@@ -375,7 +438,7 @@ describe("Turn Fold history explorer", () => {
 describe("Turn Fold history explorer controls", () => {
   it("filters, jumps, and navigates back without leaving the overlay", () => {
     const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      fakeTui(20),
       theme,
       [
         {
@@ -402,12 +465,7 @@ describe("Turn Fold history explorer controls", () => {
   });
 
   it("opens help and returns to the same transcript position", () => {
-    const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 24 } as never },
-      theme,
-      history(4),
-      vi.fn(),
-    );
+    const explorer = new HistoryExplorer(fakeTui(24), theme, history(4), vi.fn());
     const before = explorer.render(100).join("\n");
 
     explorer.handleInput("?");
@@ -418,12 +476,7 @@ describe("Turn Fold history explorer controls", () => {
   });
 
   it("fits compact chrome within very short terminals", () => {
-    const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 6 } as never },
-      theme,
-      history(2),
-      vi.fn(),
-    );
+    const explorer = new HistoryExplorer(fakeTui(6), theme, history(2), vi.fn());
 
     expect(explorer.render(80)).toHaveLength(4);
   });
@@ -431,12 +484,7 @@ describe("Turn Fold history explorer controls", () => {
   it("closes with q, escape, or the same shortcut exactly once", () => {
     for (const key of ["q", "\u001b", "\u001b[111;6u"]) {
       const close = vi.fn();
-      const explorer = new HistoryExplorer(
-        { requestRender: vi.fn(), terminal: { rows: 20 } as never },
-        theme,
-        history(1),
-        close,
-      );
+      const explorer = new HistoryExplorer(fakeTui(20), theme, history(1), close);
 
       explorer.handleInput(key);
       explorer.close();
@@ -445,12 +493,7 @@ describe("Turn Fold history explorer controls", () => {
   });
 
   it("invalidates cached blocks on theme changes", () => {
-    const explorer = new HistoryExplorer(
-      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
-      theme,
-      history(2),
-      vi.fn(),
-    );
+    const explorer = new HistoryExplorer(fakeTui(20), theme, history(2), vi.fn());
 
     explorer.render(80);
     expect(() => {

@@ -5,6 +5,7 @@
 - Keep the main transcript compact and sparse. Render detailed history through documented Pi overlay and TUI APIs without adding private component imports.
 - Index history without reading message bodies, render only viewport-near entries, and keep explorer caches bounded.
 - Keep history search incremental and bounded. Search, filters, jump history, help state, and entry controls remain ephemeral and must not enter Pi's session.
+- The explorer's scoped mouse mode is the only allowed terminal escape write: `?1002`/`?1006` through Pi's public terminal write API, enabled on open and restored exactly once on every close path. Do not add other terminal writes.
 - Search and jump fields must preserve the expected readline and macOS terminal editing keys documented in the `text-input-keybindings` skill.
 - Derive aggregate and per-file diffstats only from successful finalized tool-result patches. Resolve relative patch paths against Pi's documented `ctx.cwd`. Do not inspect Git or snapshot files.
 - Retest component patches against each supported Pi release.

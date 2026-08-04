@@ -18,9 +18,28 @@ import { HistoryViewport } from "./history-viewport.ts";
 
 const SEARCH_STEP_ENTRIES = 250;
 const SEARCH_STEP_CHARACTERS = 256_000;
+const WHEEL_SCROLL_LINES = 3;
+const MOUSE_ENABLE_SEQUENCE = "\u001b[?1002h\u001b[?1006h";
+const MOUSE_DISABLE_SEQUENCE = "\u001b[?1002l\u001b[?1006l";
+const MOUSE_PREFIX = "\u001b[<";
 
 type ExplorerMode = "browse" | "filter" | "help" | "jump" | "search";
-type ExplorerTui = Pick<TUI, "requestRender" | "terminal">;
+type ExplorerTui = Pick<TUI, "requestRender"> & {
+  readonly terminal: Pick<TUI["terminal"], "rows" | "write">;
+};
+
+function mouseEventCode(data: string): string | undefined {
+  if (!data.startsWith(MOUSE_PREFIX) || data.length < 7 || !data.endsWith("M")) return undefined;
+  const fields = data.slice(MOUSE_PREFIX.length, -1).split(";");
+  if (fields.length !== 3 || fields.some((field) => !/^\d+$/u.test(field))) return undefined;
+  return fields[0];
+}
+
+function wheelDirection(data: string): -1 | 1 | undefined {
+  const code = mouseEventCode(data);
+  if (code === "64") return -1;
+  return code === "65" ? 1 : undefined;
+}
 
 export type HistoryExplorerLifecycle = Readonly<{
   closed: () => void;
@@ -82,6 +101,7 @@ export class HistoryExplorer implements Component {
   private jumpIndex: HistoryJumpIndex | undefined;
   private mode: ExplorerMode = "browse";
   private helpScroll = 0;
+  private mouseEnabled = false;
   private readonly search: HistorySearch;
   private searchSelected = false;
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -101,6 +121,7 @@ export class HistoryExplorer implements Component {
     this.closeCallback = close;
     this.viewport = new HistoryViewport(entries, theme);
     this.search = new HistorySearch(this.viewport.entries);
+    this.enableMouse();
   }
 
   handleInput(data: string): void {
@@ -108,6 +129,7 @@ export class HistoryExplorer implements Component {
       this.close();
       return;
     }
+    if (this.handleMouseInput(data)) return;
     if (this.mode === "help") {
       this.handleHelpInput(data);
       return;
@@ -155,7 +177,38 @@ export class HistoryExplorer implements Component {
     this.closed = true;
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = undefined;
+    this.disableMouse();
     this.closeCallback();
+  }
+
+  private enableMouse(): void {
+    if (this.mouseEnabled) return;
+    this.mouseEnabled = true;
+    this.tui.terminal.write(MOUSE_ENABLE_SEQUENCE);
+  }
+
+  private disableMouse(): void {
+    if (!this.mouseEnabled) return;
+    this.mouseEnabled = false;
+    this.tui.terminal.write(MOUSE_DISABLE_SEQUENCE);
+  }
+
+  private handleMouseInput(data: string): boolean {
+    const direction = wheelDirection(data);
+    if (direction === undefined) return false;
+    if (this.mode === "help") {
+      const limit = Math.max(0, helpLines().length - 1);
+      this.helpScroll = Math.min(
+        limit,
+        Math.max(0, this.helpScroll + direction * WHEEL_SCROLL_LINES),
+      );
+    } else if (direction < 0) {
+      this.viewport.moveBackward(WHEEL_SCROLL_LINES);
+    } else {
+      this.viewport.moveForward(WHEEL_SCROLL_LINES);
+    }
+    this.requestRender();
+    return true;
   }
 
   private handleBrowseInput(data: string): void {
