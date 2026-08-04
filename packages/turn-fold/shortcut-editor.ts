@@ -26,6 +26,19 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return typeof Reflect.get(value, "then") === "function";
 }
 
+export function enableTranscriptShrinkClearing(
+  tui: Pick<TUI, "getClearOnShrink" | "setClearOnShrink">,
+): () => void {
+  if (tui.getClearOnShrink()) return () => undefined;
+  tui.setClearOnShrink(true);
+  let restored = false;
+  return () => {
+    if (restored) return;
+    restored = true;
+    tui.setClearOnShrink(false);
+  };
+}
+
 export class ToggleShortcutController {
   private pending = false;
 
@@ -206,16 +219,22 @@ export function installTurnFoldShortcutEditor(
   callbacks: ShortcutCallbacks,
 ): () => void {
   const previous = ctx.ui.getEditorComponent();
+  const shrinkRestorers = new Map<TUI, () => void>();
   const factory = (
     tui: TUI,
     theme: EditorTheme,
     keybindings: KeybindingsManager,
   ): EditorComponent => {
+    if (!shrinkRestorers.has(tui)) {
+      shrinkRestorers.set(tui, enableTranscriptShrinkClearing(tui));
+    }
     const base = previous?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
     return new TurnFoldShortcutEditor(base, callbacks);
   };
   ctx.ui.setEditorComponent(factory);
   return () => {
     if (ctx.ui.getEditorComponent() === factory) ctx.ui.setEditorComponent(previous);
+    for (const restore of shrinkRestorers.values()) restore();
+    shrinkRestorers.clear();
   };
 }

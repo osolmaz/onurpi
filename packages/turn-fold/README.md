@@ -55,10 +55,11 @@ Use `/turn-fold toggle` or `Ctrl+Shift+O` to switch modes. The shortcut submits 
 through Pi's editor while preserving any draft text. During a response, the command waits for Pi to
 settle; repeated shortcut presses do not queue extra toggles. Turn Fold then stores the new
 configuration and resumes the current session so Pi rebuilds the transcript through the new
-projection. `Ctrl+O` remains Pi's separate tool-output detail toggle. OnurPi enables Pi's documented
-`terminal.clearOnShrink` setting so compact mode clears rows left by the longer expanded transcript.
+projection. `Ctrl+O` remains Pi's separate tool-output detail toggle. While its editor wrapper is
+active, Turn Fold enables Pi TUI's public shrink-clearing behavior so compact mode removes rows left
+by the longer expanded transcript. It restores the previous TUI value when the extension unloads.
 This can cause a brief full-redraw flicker when content shrinks. Turn Fold does not write terminal
-escape sequences or change settings at runtime. A TUI started with `--no-session` keeps its startup
+escape sequences or persist a global setting. A TUI started with `--no-session` keeps its startup
 projection and rejects replay-setting changes because Pi has no public in-memory transcript rebuild
 action.
 
