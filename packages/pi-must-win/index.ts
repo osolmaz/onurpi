@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -100,9 +100,21 @@ function normalizeRepoPath(value: string): string {
   return text;
 }
 
+/** Resolve symlinks when possible so logical config paths match Git's physical paths. */
+function resolveRealPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
 function matchesEntry(identity: RepoIdentity, entry: string): boolean {
   if (isPathEntry(entry)) {
-    return identity.repoPath !== undefined && normalizeRepoPath(entry) === identity.repoPath;
+    return (
+      identity.repoPath !== undefined &&
+      resolveRealPath(normalizeRepoPath(entry)) === resolveRealPath(identity.repoPath)
+    );
   }
   if (identity.urlKey === undefined) return false;
   const key = normalizeRepoUrl(entry);

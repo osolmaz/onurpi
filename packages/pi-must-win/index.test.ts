@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -162,6 +162,20 @@ describe("isRepoDisabled", () => {
       true,
     );
     expect(isRepoDisabled(identity, { disabledRepos: [join(homedir(), "other")] })).toBe(false);
+    expect(
+      isRepoDisabled(
+        { urlKey: undefined, repoPath: "/missing/onurpi-test-path" },
+        { disabledRepos: ["/missing/onurpi-test-path"] },
+      ),
+    ).toBe(true);
+  });
+
+  it("matches symlinked path entries against the physical clone path", () => {
+    const dir = tempDir();
+    const link = join(tempDir(), "link");
+    symlinkSync(dir, link);
+    const identity = { urlKey: undefined, repoPath: realpathSync(dir) };
+    expect(isRepoDisabled(identity, { disabledRepos: [link] })).toBe(true);
   });
 
   it("ignores entries whose identity side is unknown", () => {
@@ -184,14 +198,14 @@ describe("resolveRepoIdentity", () => {
 
   it("resolves the clone path without a remote", () => {
     const dir = initRepo();
-    expect(resolveRepoIdentity(dir)).toEqual({ urlKey: undefined, repoPath: dir });
+    expect(resolveRepoIdentity(dir)).toEqual({ urlKey: undefined, repoPath: realpathSync(dir) });
   });
 
   it("normalizes the origin URL and treats an empty URL as missing", () => {
     const dir = initRepo("git@github.com:OpenClaw/OpenClaw.git");
     expect(resolveRepoIdentity(dir)).toEqual({
       urlKey: "github.com/openclaw/openclaw",
-      repoPath: dir,
+      repoPath: realpathSync(dir),
     });
     const emptyRemote = initRepo("");
     expect(resolveRepoIdentity(emptyRemote).urlKey).toBeUndefined();
