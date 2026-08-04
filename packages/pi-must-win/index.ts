@@ -128,13 +128,12 @@ export function isRepoDisabled(identity: RepoIdentity, config: PiMustWinConfig):
 
 function git(args: string[], cwd: string): string | undefined {
   try {
-    const output = execFileSync("git", args, {
+    return execFileSync("git", args, {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 5000,
-    });
-    return output.trim() || undefined;
+    }).trim();
   } catch {
     return undefined;
   }
@@ -144,6 +143,7 @@ function git(args: string[], cwd: string): string | undefined {
 export function resolveRepoIdentity(cwd: string): RepoIdentity {
   const remote = git(["remote", "get-url", "origin"], cwd);
   const commonDir = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd);
+  // An empty URL key never matches a non-empty entry, so no special-casing is needed.
   return {
     urlKey: remote === undefined ? undefined : normalizeRepoUrl(remote),
     repoPath: commonDir === undefined ? undefined : normalizeRepoPath(commonDir),
