@@ -134,7 +134,7 @@ it("hides standalone compactions by entry identity when timestamps collide", () 
   expect(state.compactionVisibleFor(olderComponent)).toBe(false);
   expect(state.compactionVisibleFor(newerComponent)).toBe(true);
 
-  state.applyDisplayProjection("expanded", entries);
+  state.applyDisplayProjection(entries);
   expect(state.compactionVisibleFor(olderComponent)).toBe(true);
 });
 
@@ -158,14 +158,14 @@ it("hides and restores loaded groups without rebuilding component associations",
   state.associateAssistant(firstAssistant, firstMessage);
   state.associateUser(secondUser);
   state.associateAssistant(secondAssistant, secondMessage);
-  state.applyDisplayProjection("compact", entries.slice(2));
+  state.applyDisplayProjection(entries.slice(2));
 
   expect(state.userVisibleFor(firstUser)).toBe(false);
   expect(state.viewFor(firstAssistant)?.display).toBe("hidden");
   expect(state.userVisibleFor(secondUser)).toBe(true);
   expect(state.viewFor(secondAssistant)?.display).not.toBe("hidden");
 
-  state.applyDisplayProjection("compact", entries);
+  state.applyDisplayProjection(entries);
   expect(state.userVisibleFor(firstUser)).toBe(true);
   expect(state.viewFor(firstAssistant)?.display).not.toBe("hidden");
 });

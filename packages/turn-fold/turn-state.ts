@@ -4,7 +4,6 @@ import { CompactionVisibility } from "./compaction-visibility.ts";
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
-import { nextTranscriptDensity, type TranscriptDensity } from "./density.ts";
 import { historicalRunStarts, type RunBoundary } from "./run-boundary.ts";
 import {
   compactionGroupIndex,
@@ -150,7 +149,6 @@ export class TurnFoldState {
   private groups = new Map<string, TurnGroup>();
   private historicalGroupByEntryId = new Map<string, string>();
   private latestAssistantKeyByTimestamp = new Map<number, string>();
-  private density: TranscriptDensity = "compact";
   private pendingLiveCompactionGroups: (string | null)[] = [];
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
@@ -169,18 +167,6 @@ export class TurnFoldState {
     if (next === this.workingDirectory) return;
     this.workingDirectory = next;
     for (const group of this.groups.values()) this.markGroupChanged(group);
-  }
-
-  getDensity = (): TranscriptDensity => this.density;
-
-  setDensity(density: TranscriptDensity): void {
-    this.density = density;
-    this.invalidateAllComponents();
-  }
-
-  toggleDensity(): TranscriptDensity {
-    this.setDensity(nextTranscriptDensity(this.density));
-    return this.density;
   }
 
   loadHistory(
@@ -229,12 +215,10 @@ export class TurnFoldState {
   }
 
   applyDisplayProjection(
-    density: TranscriptDensity,
     entries: readonly unknown[],
     omittedRuns = 0,
     oldestRetainedEntryId?: string,
   ): void {
-    this.density = density;
     this.visibleGroupIds = new Set(projectedGroupIds(entries, this.historicalGroupByEntryId));
     this.compactionVisibility.apply(entries);
     if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
@@ -462,7 +446,6 @@ export class TurnFoldState {
       isRecentActivity: layout.recentActivities.has(component),
       isSettledSummaryAnchor: component === layout.settledSummaryAnchor,
       isStreamingSummaryAnchor: component === layout.streamingSummaryAnchor,
-      density: this.density,
       settled: group.settled,
     });
     return { display, summary: this.summary(group, layout, now) };

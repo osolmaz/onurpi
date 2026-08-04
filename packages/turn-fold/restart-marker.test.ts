@@ -2,17 +2,17 @@ import { afterEach, expect, it } from "vitest";
 
 import { clearRestartMarker, rememberRestartMarker, restartMarker } from "./restart-marker.ts";
 
-const compact = { density: "compact", preCompaction: "show", windows: "all" } as const;
-const expanded = { density: "expanded", preCompaction: "show", windows: "all" } as const;
+const allWindows = { preCompaction: "show", windows: "all" } as const;
+const oneWindow = { preCompaction: "show", windows: 1 } as const;
 
 afterEach(() => {
   clearRestartMarker();
 });
 
 it("keeps a pending configuration in process until it is cleared", () => {
-  rememberRestartMarker("session", { applied: compact, requested: expanded });
+  rememberRestartMarker("session", { applied: oneWindow, requested: allWindows });
 
-  expect(restartMarker("session")).toEqual({ applied: compact, requested: expanded });
+  expect(restartMarker("session")).toEqual({ applied: oneWindow, requested: allWindows });
   clearRestartMarker("session");
   expect(restartMarker("session")).toBeUndefined();
 });

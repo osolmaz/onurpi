@@ -110,9 +110,10 @@ Update `index.ts` to create the projection callback with the current working dir
 configuration, active mode, and process-local compaction associations. Session start, tree changes,
 window changes, and compaction rebuilds all use that callback.
 
-Compact mode returns sparse entries. The current mode change command calls `ctx.reload()` when
-moving between sparse replay and the temporary full expanded replay so Pi rebuilds the component
-tree from the correct projection.
+The compact transcript returns sparse entries. Detailed history now opens in the virtual explorer
+described in
+[2026-08-04-turn-fold-history-explorer-plan.md](2026-08-04-turn-fold-history-explorer-plan.md), so
+the main transcript no longer switches to full replay.
 
 Keep live rendering incremental. Pi's successful compaction path already clears the chat container
 and calls the adapted replay method, which removes hidden live-tail components. Do not patch
@@ -132,17 +133,16 @@ custom entries, and a branch where the oldest retained run ends in a tool result
 Do not add a second configuration version for the budget. It is a safety limit on the existing
 compact transcript contract. A future user setting requires a separate data-model review.
 
-### Paged history
+### Virtual history
 
-Add the on-demand viewer only after sparse compact replay passes its latency gate. The viewer should
-use `ctx.ui.custom()` and load one run or bounded page at a time from the source snapshot. It must
-discard old page components on navigation and close cleanly in TUI mode.
+The follow-up explorer uses `ctx.ui.custom()` and keeps the compact transcript sparse. It starts
+with three compaction windows, loads older windows in bounded groups, renders only viewport-near
+entries, and releases all viewer state on close.
 
-Non-TUI modes do not create the viewer. `/turn-fold expanded` can keep its temporary full-replay
-behavior until the viewer is complete, but compact replay must stay sparse throughout this stage.
-
-Once the viewer covers the raw-history use case, replace full expanded replay in place. Do not keep
-a second legacy expansion path.
+Non-TUI modes do not create the explorer. Persistent expanded replay has been removed rather than
+retained beside the bounded viewer.
+[2026-08-04-turn-fold-history-explorer-plan.md](2026-08-04-turn-fold-history-explorer-plan.md)
+records the replacement.
 
 ### Compatibility guard
 
@@ -162,9 +162,9 @@ Add tests for projection identity, ordering, final-row selection, tool-call pair
 omission, custom-entry pass-through, budget clipping, and fallback behavior. Extend render tests to
 prove that replay creates no component for hidden source entries.
 
-Run existing compact, expanded, timestamp, diffstat, interruption, failure, and run-boundary tests
-unchanged where their contract still applies. Keep the existing window-selection coverage as well.
-Update tests that currently expect hidden components to exist.
+Run existing compact transcript, timestamp, diffstat, interruption, failure, and run-boundary tests
+where their contract still applies. Keep the existing window-selection coverage as well. Update
+tests that currently expect hidden components to exist.
 
 Exercise TUI, RPC, JSON, print, and `--no-session`. Only TUI may install the replay projection or
 history viewer.
@@ -205,16 +205,16 @@ Ship the work as coherent slices on one branch:
 3. Snapshot cache and render simplification.
 4. Compact replay integration and latency benchmark.
 5. Projection budget.
-6. Paged history and replacement of full expanded replay.
+6. Virtual history and removal of full expanded replay.
 
 Each slice must preserve normal Pi session and model behavior. Stop before the next slice when the
 active slice fails the session or latency gates.
 
 ## Contract impact
 
-The sparse projection itself writes no session state. Existing `onurpi-turn-fold-run` and
-`onurpi-turn-fold-config` entries keep their current schema and behavior. No sidecar file or
-settings field is added.
+The sparse projection itself writes no session state. Existing `onurpi-turn-fold-run` entries keep
+their schema and behavior. Compact transcript configuration now stores strict
+`{ preCompaction, windows }` entries. The explorer adds no sidecar file or settings field.
 
 The implementation changes no Pi source. It continues to use the existing private
 `buildContextEntries()` adapter and adds no second private seam. Public APIs used by the later

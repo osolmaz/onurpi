@@ -9,11 +9,32 @@ import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 const renderPatchMock = vi.hoisted(() => ({ states: [] as unknown[] }));
-const historyViewerMock = vi.hoisted(() => ({ entries: [] as (readonly unknown[])[] }));
+const historyViewerMock = vi.hoisted(() => ({
+  closes: [] as ReturnType<typeof vi.fn>[],
+  defer: false,
+  entries: [] as (readonly unknown[])[],
+}));
 
 vi.mock("./history-viewer.ts", () => ({
-  showHistoryViewer: (_ctx: unknown, entries: readonly unknown[]) => {
+  showHistoryExplorer: (
+    _ctx: unknown,
+    entries: readonly unknown[],
+    lifecycle?: { closed: () => void; opened: (close: () => void) => void },
+  ) => {
     historyViewerMock.entries.push(entries);
+    if (!historyViewerMock.defer) {
+      lifecycle?.opened(() => undefined);
+      lifecycle?.closed();
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolvePromise) => {
+      const close = vi.fn(() => {
+        lifecycle?.closed();
+        resolvePromise();
+      });
+      historyViewerMock.closes.push(close);
+      lifecycle?.opened(close);
+    });
   },
 }));
 
@@ -115,6 +136,8 @@ async function runTurnFoldCommand(
 afterEach(() => {
   clearRestartMarker();
   renderPatchMock.states.length = 0;
+  historyViewerMock.closes.length = 0;
+  historyViewerMock.defer = false;
   historyViewerMock.entries.length = 0;
   vi.clearAllMocks();
 });
@@ -361,7 +384,7 @@ describe("Turn Fold ephemeral compaction lifecycle", () => {
   });
 });
 
-describe("Turn Fold density isolation", () => {
+describe("Turn Fold TUI isolation", () => {
   it("installs and restores the TUI keyboard editor wrapper", async () => {
     const extension = extensionHarness();
     const ctx = context();
@@ -379,7 +402,7 @@ describe("Turn Fold density isolation", () => {
     expect(ctx.ui.getEditorComponent()).toBeUndefined();
   });
 
-  it("leaves session replay untouched outside TUI density", async () => {
+  it("leaves session replay untouched outside TUI mode", async () => {
     const extension = extensionHarness();
     const entries = [{ id: "entry", type: "custom" }];
     const ctx = context(entries);
@@ -395,7 +418,7 @@ describe("Turn Fold density isolation", () => {
 });
 
 describe("Turn Fold configuration commands", () => {
-  it("opens paged history from the full selected source snapshot", async () => {
+  it("opens virtual history from the complete active branch", async () => {
     const extension = extensionHarness();
     const branch = [
       { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
@@ -416,7 +439,35 @@ describe("Turn Fold configuration commands", () => {
     expect(historyViewerMock.entries[0]?.map(entryId)).toEqual(["user", "hidden", "final"]);
   });
 
-  it("keeps the history viewer inside the configured pre-compaction scope", async () => {
+  it("opens history without persistence or restart and closes it on shutdown", async () => {
+    const extension = extensionHarness();
+    const branch = [{ id: "user", message: { content: "Prompt", role: "user" }, type: "message" }];
+    const ctx = context([], branch);
+    historyViewerMock.defer = true;
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    const opening = runTurnFoldCommand(extension.commands, "", ctx);
+    await Promise.resolve();
+
+    expect(extension.appendEntry).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).not.toHaveBeenCalledWith(
+      expect.stringContaining("restart required"),
+      expect.anything(),
+    );
+    expect(historyViewerMock.closes).toHaveLength(1);
+
+    await emit(
+      extension.handlers,
+      "session_shutdown",
+      { reason: "quit", type: "session_shutdown" },
+      ctx,
+    );
+    await opening;
+    expect(historyViewerMock.closes[0]).toHaveBeenCalledOnce();
+  });
+
+  it("keeps explorer history independent from the compact transcript scope", async () => {
     const extension = extensionHarness();
     const branch = [
       { id: "before", message: { content: "Old", role: "user" }, type: "message" },
@@ -430,7 +481,7 @@ describe("Turn Fold configuration commands", () => {
       { id: "after", message: { content: "New", role: "user" }, type: "message" },
       {
         customType: "onurpi-turn-fold-config",
-        data: { density: "compact", preCompaction: "hide", windows: "all" },
+        data: { preCompaction: "hide", windows: "all" },
         id: "configuration",
         type: "custom",
       },
@@ -442,6 +493,7 @@ describe("Turn Fold configuration commands", () => {
     await runTurnFoldCommand(extension.commands, "history", ctx);
 
     expect(historyViewerMock.entries.at(-1)?.map(entryId)).toEqual([
+      "before",
       "compaction",
       "after",
       "configuration",
@@ -450,124 +502,6 @@ describe("Turn Fold configuration commands", () => {
 });
 
 describe("Turn Fold projection transitions", () => {
-  it("persists widening requests and reports that a restart is required", async () => {
-    const extension = extensionHarness();
-    const branch = [
-      { id: "user", message: { content: "Prompt", role: "user", timestamp: 1 }, type: "message" },
-      { id: "middle", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
-      { id: "final", message: { content: [], role: "assistant", timestamp: 3 }, type: "message" },
-    ];
-    const ctx = context([], branch);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    await runTurnFoldCommand(extension.commands, "expanded", ctx);
-
-    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "expanded",
-      preCompaction: "show",
-      windows: "all",
-    });
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("restart required"),
-      "warning",
-    );
-    expect(ctx.switchSession).not.toHaveBeenCalled();
-    expect(ctx.reload).not.toHaveBeenCalled();
-  });
-
-  it("does not count native source entries omitted by the startup projection as loaded", async () => {
-    const extension = extensionHarness();
-    const branch = [
-      { id: "user", message: { content: "Prompt", role: "user", timestamp: 1 }, type: "message" },
-      { id: "middle", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
-      { id: "final", message: { content: [], role: "assistant", timestamp: 3 }, type: "message" },
-    ];
-    const ctx = context(branch, branch);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    await runTurnFoldCommand(extension.commands, "expanded", ctx);
-
-    expect(ctx.ui.notify).toHaveBeenLastCalledWith(
-      expect.stringContaining("restart required"),
-      "warning",
-    );
-  });
-
-  it("treats entries rendered by live turns as loaded for later narrowing", async () => {
-    const extension = extensionHarness();
-    const branch = [
-      { id: "user-1", message: { content: "First", role: "user", timestamp: 1 }, type: "message" },
-      {
-        id: "assistant-1",
-        message: { content: [], role: "assistant", stopReason: "stop", timestamp: 2 },
-        type: "message",
-      },
-      {
-        customType: "onurpi-turn-fold-config",
-        data: { density: "expanded", preCompaction: "show", windows: "all" },
-        id: "configuration",
-        type: "custom",
-      },
-    ];
-    const ctx = context(branch, branch);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-    branch.push(
-      { id: "user-2", message: { content: "Second", role: "user", timestamp: 3 }, type: "message" },
-      {
-        id: "assistant-2",
-        message: { content: [], role: "assistant", stopReason: "stop", timestamp: 4 },
-        type: "message",
-      },
-    );
-    await emit(extension.handlers, "agent_settled", { type: "agent_settled" }, ctx);
-
-    await runTurnFoldCommand(extension.commands, "compact", ctx);
-
-    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "compact",
-      preCompaction: "show",
-      windows: "all",
-    });
-    expect(ctx.ui.notify).toHaveBeenLastCalledWith(
-      "Turn fold: compact, pre-compaction show, windows all",
-      "info",
-    );
-  });
-
-  it("compacts a fully loaded transcript in place", async () => {
-    const extension = extensionHarness();
-    const config = {
-      customType: "onurpi-turn-fold-config",
-      data: { density: "expanded", preCompaction: "show", windows: "all" },
-      id: "config",
-      type: "custom",
-    };
-    const branch = [
-      { id: "user", message: { content: "Prompt", role: "user", timestamp: 1 }, type: "message" },
-      { id: "final", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
-      config,
-    ];
-    const ctx = context(branch, branch);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    await runTurnFoldCommand(extension.commands, "compact", ctx);
-
-    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "compact",
-      preCompaction: "show",
-      windows: "all",
-    });
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Turn fold: compact, pre-compaction show, windows all",
-      "info",
-    );
-    expect(ctx.switchSession).not.toHaveBeenCalled();
-  });
-
   it("hides loaded pre-compaction history in place", async () => {
     const extension = extensionHarness();
     const branch = [
@@ -582,7 +516,6 @@ describe("Turn Fold projection transitions", () => {
     await runTurnFoldCommand(extension.commands, "pre-compaction hide", ctx);
 
     expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "compact",
       preCompaction: "hide",
       windows: "all",
     });
@@ -598,7 +531,7 @@ describe("Turn Fold widening commands", () => {
     const extension = extensionHarness();
     const config = {
       customType: "onurpi-turn-fold-config",
-      data: { density: "expanded", preCompaction: "hide", windows: "all" },
+      data: { preCompaction: "hide", windows: "all" },
       id: "config",
       type: "custom",
     };
@@ -613,12 +546,11 @@ describe("Turn Fold widening commands", () => {
     await runTurnFoldCommand(extension.commands, "status", ctx);
 
     expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "expanded",
       preCompaction: "show",
       windows: "all",
     });
     expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Turn fold: expanded, pre-compaction show, windows all (restart required)",
+      "Turn fold: compact, pre-compaction show, windows all (restart required)",
       "info",
     );
   });
@@ -645,37 +577,16 @@ describe("Turn Fold relative and in-memory windows", () => {
     await runTurnFoldCommand(extension.commands, "windows -1", ctx);
 
     expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "compact",
       preCompaction: "show",
       windows: 2,
     });
-  });
-
-  it("rejects widening an in-memory TUI session", async () => {
-    const extension = extensionHarness();
-    const branch = [
-      { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
-      { id: "middle", message: { content: [], role: "assistant", timestamp: 1 }, type: "message" },
-      { id: "final", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
-    ];
-    const ctx = context([], branch, null);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    await runTurnFoldCommand(extension.commands, "expanded", ctx);
-
-    expect(extension.appendEntry).not.toHaveBeenCalled();
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Turn Fold widening requires a persisted session.",
-      "warning",
-    );
   });
 
   it("confirms an all-windows request when changing from a numeric value", async () => {
     const extension = extensionHarness();
     const config = {
       customType: "onurpi-turn-fold-config",
-      data: { density: "compact", preCompaction: "show", windows: 1 },
+      data: { preCompaction: "show", windows: 1 },
       id: "config",
       type: "custom",
     };
@@ -698,7 +609,6 @@ describe("Turn Fold relative and in-memory windows", () => {
       expect.stringContaining("6 active-branch entries"),
     );
     expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
-      density: "compact",
       preCompaction: "show",
       windows: "all",
     });
@@ -714,7 +624,7 @@ describe("Turn Fold configuration reporting", () => {
     const extension = extensionHarness();
     const config = {
       customType: "onurpi-turn-fold-config",
-      data: { density: "compact", preCompaction: "show", windows: 1 },
+      data: { preCompaction: "show", windows: 1 },
       id: "config",
       type: "custom",
     };

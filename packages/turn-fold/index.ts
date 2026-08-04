@@ -22,14 +22,9 @@ import {
   installTranscriptWindowAdapter,
   type TranscriptWindowAdapter,
 } from "./transcript-window-adapter.ts";
-import { showHistoryViewer } from "./history-viewer.ts";
-import { isTranscriptDensity, type TranscriptDensity } from "./density.ts";
-import {
-  isPreCompactionVisibility,
-  nextPreCompactionVisibility,
-  selectPreCompactionEntries,
-} from "./history-scope.ts";
-import { installTurnFoldShortcutEditor, ToggleShortcutController } from "./shortcut-editor.ts";
+import { showHistoryExplorer } from "./history-viewer.ts";
+import { isPreCompactionVisibility, nextPreCompactionVisibility } from "./history-scope.ts";
+import { HistoryShortcutController, installTurnFoldShortcutEditor } from "./shortcut-editor.ts";
 import {
   clearRestartMarker,
   matchingRestartMarker,
@@ -40,7 +35,6 @@ import {
   compactionWindowCount,
   formatTranscriptWindowValue,
   resolveWindowArgument,
-  selectTranscriptEntries,
 } from "./transcript-windows.ts";
 import {
   canApplyProjectionInPlace,
@@ -52,11 +46,6 @@ import {
 import { TurnFoldState } from "./turn-state.ts";
 
 const WINDOW_ARGUMENTS = ["1", "3", "+1", "-1", "all", "reset"] as const;
-
-const DENSITY_LABELS: readonly { label: string; density: TranscriptDensity }[] = [
-  { label: "Compact transcript", density: "compact" },
-  { label: "Expanded transcript", density: "expanded" },
-];
 
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 
@@ -131,36 +120,8 @@ async function renderInPlaceUpdate(ctx: ExtensionCommandContext): Promise<void> 
 }
 
 function formatStatus(configuration: TurnFoldConfiguration, restartRequired: boolean): string {
-  const status = `Turn fold: ${configuration.density}, pre-compaction ${configuration.preCompaction}, windows ${formatTranscriptWindowValue(configuration.windows)}`;
+  const status = `Turn fold: compact, pre-compaction ${configuration.preCompaction}, windows ${formatTranscriptWindowValue(configuration.windows)}`;
   return restartRequired ? `${status} (restart required)` : status;
-}
-
-async function applyDensity(
-  density: TranscriptDensity,
-  ctx: ExtensionCommandContext,
-  configuration: TurnFoldConfiguration,
-  requestConfiguration: RequestConfiguration,
-): Promise<void> {
-  await requestConfiguration({ ...configuration, density }, ctx, density !== configuration.density);
-}
-
-async function chooseDensity(
-  ctx: ExtensionCommandContext,
-  configuration: TurnFoldConfiguration,
-  requestConfiguration: RequestConfiguration,
-): Promise<void> {
-  if (!ctx.hasUI) {
-    ctx.ui.notify("Use /turn-fold compact|expanded in this mode.", "warning");
-    return;
-  }
-  const selection = await ctx.ui.select(
-    "Turn fold density",
-    DENSITY_LABELS.map(({ label }) => label),
-  );
-  const selectedDensity = DENSITY_LABELS.find(({ label }) => label === selection)?.density;
-  if (selectedDensity) {
-    await applyDensity(selectedDensity, ctx, configuration, requestConfiguration);
-  }
 }
 
 function windowCompletions(prefix: string): { label: string; value: string }[] {
@@ -202,7 +163,7 @@ async function confirmAllWindows(
   }
   return ctx.ui.confirm(
     "Load full transcript?",
-    `This will scan ${String(entries.length)} active-branch entries. Expanded density may require a restart and can slow editor input.`,
+    `This will scan ${String(entries.length)} active-branch entries for compact summaries and can increase startup work.`,
   );
 }
 
@@ -211,7 +172,7 @@ function argumentCompletions(prefix: string): { label: string; value: string }[]
   if (windows.length > 0) return windows;
   const preCompaction = preCompactionCompletions(prefix);
   if (preCompaction.length > 0) return preCompaction;
-  return ["compact", "expanded", "history", "pre-compaction", "status", "toggle", "windows"]
+  return ["history", "pre-compaction", "status", "windows"]
     .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
     .map((value) => ({ label: value, value }));
 }
@@ -263,23 +224,12 @@ async function applyPreCompactionArgument(
   );
 }
 
-async function handleInformationCommand(
+function handleInformationCommand(
   command: string,
   ctx: ExtensionCommandContext,
   configuration: TurnFoldConfiguration,
   restartRequired: boolean,
-): Promise<boolean> {
-  if (command === "history") {
-    const windowEntries = selectTranscriptEntries(
-      ctx.sessionManager.getBranch(),
-      configuration.windows,
-    );
-    await showHistoryViewer(
-      ctx,
-      selectPreCompactionEntries(windowEntries, configuration.preCompaction),
-    );
-    return true;
-  }
+): boolean {
   if (command === "status") {
     ctx.ui.notify(formatStatus(configuration, restartRequired), "info");
     return true;
@@ -298,26 +248,20 @@ async function handleInformationCommand(
   return false;
 }
 
+type OpenHistory = (ctx: ExtensionCommandContext) => Promise<void>;
+
 async function handleCommand(
   args: string,
   ctx: ExtensionCommandContext,
   getConfiguration: GetConfiguration,
   getRestartRequired: GetRestartRequired,
   requestConfiguration: RequestConfiguration,
+  openHistory: OpenHistory,
 ): Promise<void> {
   const command = args.trim().toLowerCase();
   const configuration = getConfiguration();
-  if (!command) return chooseDensity(ctx, configuration, requestConfiguration);
-  if (await handleInformationCommand(command, ctx, configuration, getRestartRequired())) return;
-  if (command === "toggle") {
-    const density = configuration.density === "compact" ? "expanded" : "compact";
-    await applyDensity(density, ctx, configuration, requestConfiguration);
-    return;
-  }
-  if (isTranscriptDensity(command)) {
-    await applyDensity(command, ctx, configuration, requestConfiguration);
-    return;
-  }
+  if (!command || command === "history") return openHistory(ctx);
+  if (handleInformationCommand(command, ctx, configuration, getRestartRequired())) return;
   const preCompaction = preCompactionArgument(command);
   if (preCompaction !== undefined) {
     await applyPreCompactionArgument(preCompaction, ctx, configuration, requestConfiguration);
@@ -329,25 +273,34 @@ async function handleCommand(
     return;
   }
   ctx.ui.notify(
-    "Usage: /turn-fold [compact|expanded|history|pre-compaction <show|hide|toggle>|status|toggle|windows <N|+N|-N|all|reset>]",
+    "Usage: /turn-fold [history|pre-compaction <show|hide|toggle>|status|windows <N|+N|-N|all|reset>]",
     "warning",
   );
 }
 
 function registerControls(
   pi: ExtensionAPI,
-  shortcut: ToggleShortcutController,
+  shortcut: HistoryShortcutController,
   getConfiguration: GetConfiguration,
   getRestartRequired: GetRestartRequired,
   requestConfiguration: RequestConfiguration,
+  openHistory: OpenHistory,
 ): void {
   pi.registerCommand("turn-fold", {
-    description: "Control transcript density, history scope, and compaction windows.",
+    description: "Open history or control the compact transcript scope.",
     getArgumentCompletions: argumentCompletions,
     handler: (args, ctx) => {
       const action = () =>
-        handleCommand(args, ctx, getConfiguration, getRestartRequired, requestConfiguration);
-      return args.trim().toLowerCase() === "toggle" ? shortcut.run(action) : action();
+        handleCommand(
+          args,
+          ctx,
+          getConfiguration,
+          getRestartRequired,
+          requestConfiguration,
+          openHistory,
+        );
+      const command = args.trim().toLowerCase();
+      return !command || command === "history" ? shortcut.run(action) : action();
     },
   });
 }
@@ -355,6 +308,7 @@ function registerControls(
 type TurnFoldRuntime = {
   adapter: TranscriptWindowAdapter | undefined;
   appliedConfiguration: TurnFoldConfiguration;
+  closeExplorer: (() => void) | undefined;
   configuration: TurnFoldConfiguration;
   currentTheme: Theme | undefined;
   ensureShrinkClearing: () => void;
@@ -374,11 +328,7 @@ function recordLoadedLiveEntries(runtime: TurnFoldRuntime, branch: BranchEntries
 }
 
 function sameConfiguration(left: TurnFoldConfiguration, right: TurnFoldConfiguration): boolean {
-  return (
-    left.density === right.density &&
-    left.preCompaction === right.preCompaction &&
-    left.windows === right.windows
-  );
+  return left.preCompaction === right.preCompaction && left.windows === right.windows;
 }
 
 function projectionOptions(
@@ -441,7 +391,7 @@ function transcriptProjector(
 function startSession(
   ctx: ExtensionContext,
   state: TurnFoldState,
-  shortcut: ToggleShortcutController,
+  shortcut: HistoryShortcutController,
   runtime: TurnFoldRuntime,
   registry: EphemeralCompactionRegistry,
 ): void {
@@ -459,7 +409,6 @@ function startSession(
     projectionOptions(state, associations),
   );
   applyProjectionPlanToState(plan, state, associations, ctx);
-  state.setDensity(runtime.appliedConfiguration.density);
   runtime.knownEntryIds = entryIds(branch);
   runtime.loadedEntryIds = new Set(plan.requiredEntryIds);
   runtime.restartRequired =
@@ -481,7 +430,7 @@ function startSession(
             : typeof error === "string"
               ? error
               : "Unknown error";
-        ctx.ui.notify(`Turn Fold toggle failed: ${message}`, "error");
+        ctx.ui.notify(`Turn Fold history failed: ${message}`, "error");
       }
     },
     request: () =>
@@ -504,12 +453,14 @@ function startSession(
 function registerSessionEvents(
   pi: ExtensionAPI,
   state: TurnFoldState,
-  shortcut: ToggleShortcutController,
+  shortcut: HistoryShortcutController,
   runtime: TurnFoldRuntime,
   registry: EphemeralCompactionRegistry,
   restorePatches: () => void,
 ): void {
   pi.on("session_start", (_event, ctx) => {
+    runtime.closeExplorer?.();
+    runtime.closeExplorer = undefined;
     startSession(ctx, state, shortcut, runtime, registry);
   });
   pi.on("session_compact", (event, ctx) => {
@@ -529,6 +480,8 @@ function registerSessionEvents(
     state.replaceCompactionAssociations(compactionAssociationsForBranch(branch, ctx, registry));
   });
   pi.on("session_shutdown", (event) => {
+    runtime.closeExplorer?.();
+    runtime.closeExplorer = undefined;
     runtime.runBoundaries.reset();
     runtime.adapter?.restore();
     runtime.adapter = undefined;
@@ -593,13 +546,32 @@ function registerAgentEvents(
   });
 }
 
+async function openHistoryForRuntime(
+  runtime: TurnFoldRuntime,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
+  await ctx.waitForIdle();
+  let activeClose: (() => void) | undefined;
+  await showHistoryExplorer(ctx, ctx.sessionManager.getBranch(), {
+    opened: (close) => {
+      runtime.closeExplorer?.();
+      activeClose = close;
+      runtime.closeExplorer = close;
+    },
+    closed: () => {
+      if (runtime.closeExplorer === activeClose) runtime.closeExplorer = undefined;
+    },
+  });
+}
+
 export default function turnFold(pi: ExtensionAPI): void {
   const state = new TurnFoldState();
-  const shortcut = new ToggleShortcutController();
+  const shortcut = new HistoryShortcutController();
   const registry = processCompactionRegistry();
   const runtime: TurnFoldRuntime = {
     adapter: undefined,
     appliedConfiguration: DEFAULT_TURN_FOLD_CONFIGURATION,
+    closeExplorer: undefined,
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
     currentTheme: undefined,
     ensureShrinkClearing: () => undefined,
@@ -646,7 +618,6 @@ export default function turnFold(pi: ExtensionAPI): void {
     runtime.restartRequired = false;
     runtime.ensureShrinkClearing();
     state.applyDisplayProjection(
-      next.density,
       plan.displayEntries,
       plan.omittedRunCount,
       plan.oldestRetainedEntryId,
@@ -660,6 +631,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     () => runtime.configuration,
     () => runtime.restartRequired,
     requestConfiguration,
+    (ctx) => openHistoryForRuntime(runtime, ctx),
   );
   registerSessionEvents(pi, state, shortcut, runtime, registry, restorePatches);
   registerAgentEvents(pi, state, runtime);

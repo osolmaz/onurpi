@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   enableTranscriptShrinkClearing,
-  ToggleShortcutController,
+  HistoryShortcutController,
   TurnFoldShortcutEditor,
 } from "./shortcut-editor.ts";
 
-const TOGGLE_KEY = "\x1b[111;6u";
+const HISTORY_KEY = "\x1b[111;6u";
 
 class FakeEditor implements EditorComponent {
   actionHandlers = new Map<string, () => void>();
@@ -93,7 +93,7 @@ describe("enableTranscriptShrinkClearing", () => {
 });
 
 describe("TurnFoldShortcutEditor", () => {
-  it("submits the toggle command without replacing the editor draft", () => {
+  it("submits the history command without replacing the editor draft", () => {
     const { base, editor, request } = shortcutEditor();
     base.text = "unfinished draft";
     const submit = vi.fn(() => {
@@ -101,29 +101,29 @@ describe("TurnFoldShortcutEditor", () => {
     });
     editor.onSubmit = submit;
 
-    editor.handleInput(TOGGLE_KEY);
+    editor.handleInput(HISTORY_KEY);
 
     expect(request).toHaveBeenCalledOnce();
-    expect(submit).toHaveBeenCalledWith("/turn-fold toggle");
+    expect(submit).toHaveBeenCalledWith("/turn-fold history");
     expect(base.setTextCalls).toEqual([]);
     expect(base.text).toBe("unfinished draft");
   });
 
-  it("suppresses dispatch when a toggle is already pending", () => {
+  it("suppresses dispatch when history is already pending", () => {
     const base = new FakeEditor();
     const request = vi.fn(() => false);
     const editor = new TurnFoldShortcutEditor(base, { cancel: vi.fn(), request });
     const submit = vi.fn();
     editor.onSubmit = submit;
 
-    editor.handleInput(TOGGLE_KEY);
+    editor.handleInput(HISTORY_KEY);
 
     expect(submit).not.toHaveBeenCalled();
   });
 
   it("cancels the pending guard when submit is unavailable or throws", () => {
     const first = shortcutEditor();
-    first.editor.handleInput(TOGGLE_KEY);
+    first.editor.handleInput(HISTORY_KEY);
     expect(first.cancel).toHaveBeenCalledOnce();
 
     const second = shortcutEditor();
@@ -133,7 +133,7 @@ describe("TurnFoldShortcutEditor", () => {
       throw new Error("submit failed");
     };
     expect(() => {
-      second.editor.handleInput(TOGGLE_KEY);
+      second.editor.handleInput(HISTORY_KEY);
     }).toThrow("submit failed");
     expect(second.cancel).toHaveBeenCalledOnce();
     expect(second.base.text).toBe("draft");
@@ -145,7 +145,7 @@ describe("TurnFoldShortcutEditor", () => {
     const submit: (text: string) => unknown = () => Promise.reject(failure);
     editor.onSubmit = submit;
 
-    editor.handleInput(TOGGLE_KEY);
+    editor.handleInput(HISTORY_KEY);
     await Promise.resolve();
     await Promise.resolve();
 
@@ -189,9 +189,9 @@ describe("TurnFoldShortcutEditor", () => {
   });
 });
 
-describe("ToggleShortcutController", () => {
-  it("queues one busy toggle and accepts another after cancellation", () => {
-    const controller = new ToggleShortcutController();
+describe("HistoryShortcutController", () => {
+  it("queues one busy history request and accepts another after cancellation", () => {
+    const controller = new HistoryShortcutController();
     const notify = vi.fn();
 
     expect(controller.request(false, notify)).toBe(true);
@@ -200,14 +200,14 @@ describe("ToggleShortcutController", () => {
     expect(controller.request(true, notify)).toBe(true);
 
     expect(notify).toHaveBeenCalledWith(
-      "Turn Fold toggle queued until the current response finishes.",
+      "Turn Fold history queued until the current response finishes.",
       "info",
     );
-    expect(notify).toHaveBeenCalledWith("Turn Fold toggle already queued.", "info");
+    expect(notify).toHaveBeenCalledWith("Turn Fold history already queued.", "info");
   });
 
   it("clears pending state when command execution succeeds or fails", async () => {
-    const controller = new ToggleShortcutController();
+    const controller = new HistoryShortcutController();
     const notify = vi.fn();
     controller.request(true, notify);
     await controller.run(() => Promise.resolve());

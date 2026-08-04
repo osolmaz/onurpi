@@ -12,62 +12,42 @@ function config(data: unknown) {
 }
 
 describe("Turn Fold configuration", () => {
-  it("validates the complete strict configuration shape", () => {
+  it("validates the strict compact-scope configuration shape", () => {
+    expect(isTurnFoldConfiguration({ preCompaction: "show", windows: 3 })).toBe(true);
+    expect(isTurnFoldConfiguration({ preCompaction: "hide", windows: "all" })).toBe(true);
+    expect(isTurnFoldConfiguration({ windows: 3 })).toBe(false);
+    expect(isTurnFoldConfiguration({ extra: true, preCompaction: "show", windows: 3 })).toBe(false);
     expect(isTurnFoldConfiguration({ density: "compact", preCompaction: "show", windows: 3 })).toBe(
-      true,
-    );
-    expect(
-      isTurnFoldConfiguration({
-        density: "expanded",
-        preCompaction: "hide",
-        windows: "all",
-      }),
-    ).toBe(true);
-    expect(isTurnFoldConfiguration({ density: "compact", windows: 3 })).toBe(false);
-    expect(
-      isTurnFoldConfiguration({
-        density: "compact",
-        extra: true,
-        preCompaction: "show",
-        windows: 3,
-      }),
-    ).toBe(false);
-    expect(isTurnFoldConfiguration({ density: "old", preCompaction: "show", windows: 3 })).toBe(
       false,
     );
-    expect(isTurnFoldConfiguration({ density: "compact", preCompaction: "old", windows: 3 })).toBe(
-      false,
-    );
-    expect(isTurnFoldConfiguration({ density: "compact", preCompaction: "show", windows: 0 })).toBe(
-      false,
-    );
+    expect(isTurnFoldConfiguration({ preCompaction: "old", windows: 3 })).toBe(false);
+    expect(isTurnFoldConfiguration({ preCompaction: "show", windows: 0 })).toBe(false);
     expect(isTurnFoldConfiguration(null)).toBe(false);
   });
 
   it("uses the latest valid active-branch entry", () => {
     expect(
       configurationFromBranch([
-        config({ density: "compact", preCompaction: "show", windows: 2 }),
-        config({ density: "expanded", preCompaction: "hide", windows: "all" }),
+        config({ preCompaction: "show", windows: 2 }),
+        config({ preCompaction: "hide", windows: "all" }),
       ]),
-    ).toEqual({ density: "expanded", preCompaction: "hide", windows: "all" });
+    ).toEqual({ preCompaction: "hide", windows: "all" });
   });
 
-  it("ignores unrelated, malformed, and superseded config entries", () => {
+  it("ignores unrelated, malformed, and superseded density entries", () => {
     expect(
       configurationFromBranch([
-        config({ density: "expanded", preCompaction: "show", windows: 5 }),
+        config({ preCompaction: "show", windows: 5 }),
         {
           customType: "other",
-          data: { density: "compact", preCompaction: "hide", windows: 1 },
+          data: { preCompaction: "hide", windows: 1 },
           type: "custom",
         },
-        config({ density: "compact", windows: "all" }),
+        config({ density: "compact", preCompaction: "hide", windows: "all" }),
         undefined,
       ]),
-    ).toEqual({ density: "expanded", preCompaction: "show", windows: 5 });
+    ).toEqual({ preCompaction: "show", windows: 5 });
     expect(configurationFromBranch([])).toEqual({
-      density: "compact",
       preCompaction: "show",
       windows: "all",
     });

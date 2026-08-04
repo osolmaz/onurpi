@@ -19,7 +19,8 @@ typescript:
       - packages/turn-fold/compaction-visibility.ts
       - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
-      - packages/turn-fold/density.ts
+      - packages/turn-fold/history-index.ts
+      - packages/turn-fold/history-renderer.ts
       - packages/turn-fold/history-scope.ts
       - packages/turn-fold/projection-plan.ts
       - packages/turn-fold/restart-marker.ts

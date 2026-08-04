@@ -1,5 +1,3 @@
-import type { TranscriptDensity } from "./density.ts";
-
 export type FoldDisplay =
   | "hidden"
   | "original"
@@ -13,7 +11,6 @@ export type FoldDisplayInput = {
   isRecentActivity: boolean;
   isSettledSummaryAnchor: boolean;
   isStreamingSummaryAnchor: boolean;
-  density: TranscriptDensity;
   settled: boolean;
 };
 
@@ -24,7 +21,6 @@ function settledDisplay(input: FoldDisplayInput): FoldDisplay {
 }
 
 export function foldDisplay(input: FoldDisplayInput): FoldDisplay {
-  if (input.density === "expanded") return "original";
   if (input.settled) return settledDisplay(input);
   if (input.isRecentActivity) return "original";
   return input.isStreamingSummaryAnchor ? "streaming-summary" : "hidden";

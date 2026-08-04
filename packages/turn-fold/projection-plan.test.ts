@@ -44,9 +44,8 @@ function ids(entries: readonly Entry[]): string[] {
 describe("transcript projection plans", () => {
   const branch = [entry("before"), entry("latest", "compaction"), entry("after")];
 
-  it("shows the full active branch for expanded, show, and all", () => {
+  it("shows pass-through entries for compact, show, and all", () => {
     const result = plan(branch, {
-      density: "expanded",
       preCompaction: "show",
       windows: "all",
     });
@@ -57,7 +56,6 @@ describe("transcript projection plans", () => {
 
   it("starts at the newest compaction when pre-compaction history is hidden", () => {
     const result = plan(branch, {
-      density: "expanded",
       preCompaction: "hide",
       windows: "all",
     });
@@ -69,14 +67,13 @@ describe("transcript projection plans", () => {
   it("does not require non-rendering custom metadata to be loaded as a component", () => {
     const metadata: Entry = {
       customType: "onurpi-turn-fold-config",
-      data: { density: "expanded", preCompaction: "show", windows: "all" },
+      data: { preCompaction: "show", windows: "all" },
       id: "config",
       parentId: null,
       timestamp: "2026-08-04T00:00:00.000Z",
       type: "custom",
     };
     const result = plan([entry("visible"), metadata], {
-      density: "expanded",
       preCompaction: "show",
       windows: "all",
     });
@@ -95,12 +92,10 @@ describe("transcript projection plans", () => {
     };
     const customBranch = [customEntry, entry("latest", "compaction"), entry("after")];
     const show = plan(customBranch, {
-      density: "expanded",
       preCompaction: "show",
       windows: "all",
     });
     const hide = plan(customBranch, {
-      density: "expanded",
       preCompaction: "hide",
       windows: "all",
     });
@@ -112,12 +107,10 @@ describe("transcript projection plans", () => {
 
   it("allows only projections whose displayed entries are already loaded", () => {
     const show = plan(branch, {
-      density: "expanded",
       preCompaction: "show",
       windows: "all",
     });
     const hide = plan(branch, {
-      density: "expanded",
       preCompaction: "hide",
       windows: "all",
     });

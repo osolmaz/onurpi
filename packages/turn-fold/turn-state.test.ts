@@ -156,9 +156,6 @@ describe("compact streaming", () => {
       assistantMessage(120, [{ text: "Second, still streaming", type: "text" }]),
     );
     expect(firstInvalidations).toBe(beforeTokenUpdate);
-    const beforeModeChange = firstInvalidations;
-    state.setDensity("expanded");
-    expect(firstInvalidations).toBeGreaterThan(beforeModeChange);
   });
 
   it("counts one assistant response across streaming tool-call updates", () => {
@@ -340,8 +337,6 @@ describe("edit diffstats", () => {
       ],
       files: 2,
     });
-    state.setDensity("expanded");
-    expect(state.viewFor(final, 200)?.display).toBe("original");
   });
 });
 
@@ -521,42 +516,6 @@ describe("ephemeral compactions", () => {
     state.associateCompaction(compaction, compactionMessage(120));
 
     expect(state.viewFor(compaction)).toBeUndefined();
-  });
-});
-
-describe("expanded transcript", () => {
-  it("shows every associated row before and after settlement", () => {
-    const state = new TurnFoldState();
-    const first = {};
-    const second = {};
-
-    state.setDensity("expanded");
-    state.ensureActive(100);
-    registerAssistant(state, first, assistantMessage(110, [{ text: "First", type: "text" }]));
-    registerAssistant(state, second, assistantMessage(120, [{ text: "Second", type: "text" }]));
-
-    expect(state.viewFor(first)?.display).toBe("original");
-    state.settleActive(130);
-    expect(state.viewFor(first)?.display).toBe("original");
-    expect(state.viewFor(second)?.display).toBe("original");
-  });
-
-  it("shows an attached compaction with Pi's original row", () => {
-    const state = new TurnFoldState();
-    const compaction = {};
-
-    state.setDensity("expanded");
-    state.ensureActive(100);
-    state.registerCompaction(compactionEntry("compact-expanded", 120), "threshold");
-    state.associateCompaction(compaction, compactionMessage(120));
-
-    expect(state.viewFor(compaction)?.display).toBe("original");
-  });
-
-  it("toggles back to compact density", () => {
-    const state = new TurnFoldState();
-    expect(state.toggleDensity()).toBe("expanded");
-    expect(state.toggleDensity()).toBe("compact");
   });
 });
 

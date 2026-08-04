@@ -13,8 +13,8 @@ import {
   type TUI,
 } from "@earendil-works/pi-tui";
 
-const TOGGLE_COMMAND = "/turn-fold toggle";
-const TOGGLE_SHORTCUT = "ctrl+shift+o";
+const HISTORY_COMMAND = "/turn-fold history";
+const HISTORY_SHORTCUT = "ctrl+shift+o";
 
 type ShortcutCallbacks = {
   cancel: (error?: unknown) => void;
@@ -39,16 +39,16 @@ export function enableTranscriptShrinkClearing(
   };
 }
 
-export class ToggleShortcutController {
+export class HistoryShortcutController {
   private pending = false;
 
   request(idle: boolean, notify: (message: string, level: "info") => void): boolean {
     if (this.pending) {
-      notify("Turn Fold toggle already queued.", "info");
+      notify("Turn Fold history already queued.", "info");
       return false;
     }
     this.pending = true;
-    if (!idle) notify("Turn Fold toggle queued until the current response finishes.", "info");
+    if (!idle) notify("Turn Fold history queued until the current response finishes.", "info");
     return true;
   }
 
@@ -140,7 +140,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
 
   handleInput(data: string): void {
     this.syncActionHandlers();
-    if (!matchesKey(data, TOGGLE_SHORTCUT)) {
+    if (!matchesKey(data, HISTORY_SHORTCUT)) {
       this.base.handleInput(data);
       return;
     }
@@ -152,7 +152,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
     }
     this.shortcutSubmission = true;
     try {
-      const result = submit(TOGGLE_COMMAND);
+      const result = submit(HISTORY_COMMAND);
       if (isPromiseLike(result)) {
         void Promise.resolve(result).catch((error: unknown) => {
           this.callbacks.cancel(error);
