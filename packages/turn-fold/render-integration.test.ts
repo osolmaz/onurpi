@@ -241,13 +241,9 @@ it("renders per-file diffstats beside paths only in compact summaries", () => {
   expect(visibleWidth(fileLine ?? "")).toBeLessThanOrEqual(120);
   expect(compact.indexOf("1 file +2 −1")).toBeLessThan(compact.indexOf(expectedPath));
   expect(compact.indexOf(expectedPath)).toBeLessThan(compact.indexOf("Final response"));
-  state.setDensity("expanded");
-  const expanded = frame(transcript);
-  expect(expanded).not.toContain("1 file +2 −1");
-  expect(expanded).not.toContain(expectedPath);
 });
 
-it("timestamps every visible user and assistant message in both modes", () => {
+it("timestamps every visible compact user and assistant message", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -269,13 +265,6 @@ it("timestamps every visible user and assistant message in both modes", () => {
   transcript.addChild(new AssistantMessageComponent(first, false, undefined, undefined, 0));
   transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
 
-  state.setDensity("expanded");
-  const expanded = frame(transcript);
-  expect(expanded.match(/08:01/gu)).toHaveLength(1);
-  expect(expanded.match(/08:02/gu)).toHaveLength(1);
-  expect(expanded.match(/08:03/gu)).toHaveLength(1);
-
-  state.setDensity("compact");
   const compact = frame(transcript);
   expect(compact.match(/08:01/gu)).toHaveLength(1);
   expect(compact).not.toContain("08:02");
@@ -327,12 +316,6 @@ it("folds an automatic compaction into the turn summary", () => {
   expect(compact).not.toContain("[compaction]");
   expect(compact).not.toContain("Compacted from 12,345 tokens");
   expect(compactionSpacer.render(120)).toEqual([]);
-
-  state.setDensity("expanded");
-  const expanded = frame(transcript);
-  expect(expanded).toContain("[compaction]");
-  expect(expanded).toContain("Compacted from 12,345 tokens");
-  expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
 it("folds both compaction rows emitted after a live automatic compaction", () => {
@@ -358,11 +341,6 @@ it("folds both compaction rows emitted after a live automatic compaction", () =>
   expect(compact).not.toContain("[compaction]");
   expect(rebuiltSpacer.render(120)).toEqual([]);
   expect(liveSpacer.render(120)).toEqual([]);
-
-  state.setDensity("expanded");
-  expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(2);
-  expect(rebuiltSpacer.render(120)).toEqual([""]);
-  expect(liveSpacer.render(120)).toEqual([""]);
 });
 
 it("keeps a manual idle compaction as a standalone row", () => {
@@ -409,7 +387,7 @@ it("hides standalone compaction rows outside the projected source", () => {
   expect(olderSpacer.render(120)).toEqual([]);
   expect(newerSpacer.render(120)).toEqual([""]);
 
-  state.applyDisplayProjection("expanded", [olderEntry, newerEntry]);
+  state.applyDisplayProjection([olderEntry, newerEntry]);
   expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(2);
   expect(olderSpacer.render(120)).toEqual([""]);
 });
@@ -508,9 +486,6 @@ it("compacts ten sequential tool calls while leaving the working line visible", 
   expect(settledFrame).toContain("Final response");
   expect(settledFrame).toContain("Worked for");
   expect(settledFrame.indexOf("Worked for")).toBeLessThan(settledFrame.indexOf("Final response"));
-
-  state.setDensity("expanded");
-  expect(toolNames(frame(transcript))).toHaveLength(10);
 });
 
 it("chooses the final historical tool on the first replay frame", () => {

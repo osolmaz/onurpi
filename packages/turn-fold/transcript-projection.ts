@@ -1,6 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import type { TranscriptDensity } from "./density.ts";
 import { historicalRunStarts } from "./run-boundary.ts";
 import { assistantSnapshot, messageFromEntry, stringField } from "./turn-message.ts";
 
@@ -32,7 +31,6 @@ export type TranscriptProjectionOptions = {
   activeRun: boolean;
   attachedCompactionEntryIds: ReadonlySet<string>;
   componentLimit?: number;
-  density: TranscriptDensity;
 };
 
 export type TranscriptProjection = {
@@ -395,15 +393,6 @@ export function projectTranscriptEntries(
   options: TranscriptProjectionOptions,
 ): TranscriptProjection {
   const sourceEntries = [...entries];
-  if (options.density === "expanded") {
-    return {
-      displayEntries: sourceEntries,
-      omittedRunCount: 0,
-      projectedComponentCount: sourceEntries.length,
-      sourceEntries,
-    };
-  }
-
   const { runs } = groupEntries(sourceEntries);
   const componentLimit = Math.max(1, options.componentLimit ?? DEFAULT_PROJECTED_COMPONENT_LIMIT);
   const owners = entryOwners(runs);

@@ -86,7 +86,7 @@ async function waitForRender(): Promise<void> {
 }
 
 describe("Turn Fold terminal shrinking", () => {
-  it("clears obsolete screen and scrollback rows when compact density shortens the transcript", async () => {
+  it("clears obsolete screen and scrollback rows when compact scope shortens the transcript", async () => {
     const terminal = new RecordingTerminal();
     const transcript = new MutableTranscript(128);
     const tui = new TUI(terminal);

@@ -2,7 +2,7 @@
 
 ## Status
 
-This document specifies the compact-density transcript projection implemented by Turn Fold. Earlier releases loaded every entry in the selected compaction windows into Pi's component tree and hid most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
+This document specifies Turn Fold's compact transcript projection and virtual history explorer. Earlier releases loaded every selected entry into Pi's component tree and hid most rows during rendering. The projection plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md). The explorer plan is in [../../docs/2026-08-04-turn-fold-history-explorer-plan.md](../../docs/2026-08-04-turn-fold-history-explorer-plan.md).
 
 ## Purpose
 
@@ -81,7 +81,7 @@ Source reduction produces one immutable display snapshot per run revision. A sna
 
 Successful finalized tool results update edit state once. Path resolution and per-file aggregation MUST NOT run from a component's `render(width)` method. Hidden-component lookups MUST NOT request a summary.
 
-A display component may cache formatted lines by run revision, width, expanded state, and theme identity. A stable editor keystroke MUST reuse the same run snapshot.
+A display component may cache formatted lines by run revision, width, detail state, and theme identity. A stable editor keystroke MUST reuse the same run snapshot.
 
 ## Projection budget
 
@@ -91,23 +91,25 @@ If the selected windows contain more settled runs than the budget allows, Turn F
 
 A single retained final message may exceed the ordinary byte estimate. Turn Fold may render a bounded preview in the main transcript and make the complete content available through the history viewer. It MUST NOT mutate or truncate the stored message.
 
-## Expanded history
+## Virtual history
 
-Compact projection remains active while the main editor is in use. Raw hidden activity opens through an on-demand paged history view. The viewer reads the source snapshot and creates components only for the current page plus a small overscan range.
+Compact projection remains active while the main editor is in use. `Ctrl+Shift+O` and `/turn-fold history` open hidden activity in a Pi overlay. The explorer reads a complete active-branch snapshot independently of the compact transcript's configured windows.
 
-The viewer MUST have an explicit close action and MUST release its page components on close. Changing pages MUST replace the previous page instead of accumulating components. Opening the viewer has no effect on model context or stored session data.
+The explorer indexes compaction boundaries without reading message bodies. It initially admits the newest three windows. One backward action at the admitted boundary adds at most three older windows, and repeated loads can reach the root. Range growth preserves the visible entry anchor.
 
-Until the paged viewer ships, expanded density may continue to use full selected-window replay as an explicitly requested diagnostic density. Compact density MUST never fall back to full replay merely to support expansion.
+The explorer formats only entries needed for the viewport. Render blocks use a bounded cache and bounded previews. Closing releases the branch index, admitted range, position, detail state, and cache. Opening and scrolling have no effect on model context, stored session data, or compact transcript configuration.
+
+The main transcript MUST remain sparse. Turn Fold MUST NOT retain full hidden transcript components merely to support history inspection.
 
 ## Compatibility checks
 
 The adapter uses one undocumented Pi method and therefore requires a tested Pi version range. Startup MUST verify that the method exists, is callable, and returns a branch-entry array for a smoke fixture. An unsupported shape disables sparse projection and leaves Pi's original method installed.
 
-The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, density change, shutdown restoration, and non-TUI isolation pass.
+The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, explorer open and close, shutdown restoration, and non-TUI isolation pass.
 
 ## Performance requirements
 
-The primary performance measure is key-to-echo latency in compact density after session replay. The release fixture includes the 44 MB session that exposed the problem, or a sanitized structural equivalent with the same large-run and edit-result shape.
+The primary performance measure is key-to-echo latency in the compact transcript after session replay. The release fixture includes the 44 MB session that exposed the problem, or a sanitized structural equivalent with the same large-run and edit-result shape.
 
 After warmup, at least ten measured runs MUST meet both limits:
 
@@ -124,4 +126,4 @@ The PTY key-to-echo test started ten fresh Pi processes and sent 20 distinct cha
 
 ## State impact
 
-Sparse projection adds no session entries and no sidecar files. Existing explicit run-boundary and configuration entries remain unchanged. The implementation adds no provider messages, labels, tool-result fields, session schema, or Pi source modification.
+Sparse projection and the history explorer add no session entries or sidecar files. Existing run-boundary entries remain unchanged. Compact transcript configuration uses the strict `{ preCompaction, windows }` shape. The implementation adds no provider messages, labels, tool-result fields, session schema, or Pi source modification.

@@ -141,7 +141,6 @@ function project(
   return projectTranscriptEntries(entries, {
     activeRun: false,
     attachedCompactionEntryIds: new Set(),
-    density: "compact",
     ...overrides,
   });
 }
@@ -358,15 +357,5 @@ describe("compact transcript projection budgets and boundaries", () => {
     ];
 
     expect(ids(project(entries).displayEntries)).toEqual(["boundary", "final"]);
-  });
-
-  it("passes the complete selected range through in expanded density", () => {
-    const entries: Entries = [
-      user("user", 100),
-      assistant("hidden", 110, [{ text: "Hidden", type: "text" }]),
-      assistant("final", 120, [{ text: "Done", type: "text" }]),
-    ];
-
-    expect(ids(project(entries, { density: "expanded" }).displayEntries)).toEqual(ids(entries));
   });
 });

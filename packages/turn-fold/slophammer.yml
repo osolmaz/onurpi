@@ -17,7 +17,8 @@ typescript:
       - compaction-visibility.ts
       - configuration.ts
       - fold-policy.ts
-      - density.ts
+      - history-index.ts
+      - history-renderer.ts
       - history-scope.ts
       - projection-plan.ts
       - restart-marker.ts

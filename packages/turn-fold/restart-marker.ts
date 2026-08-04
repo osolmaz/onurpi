@@ -7,10 +7,6 @@ export type RestartMarker = Readonly<{
   requested: TurnFoldConfiguration;
 }>;
 
-function isDensity(value: unknown): boolean {
-  return value === "compact" || value === "expanded";
-}
-
 function isPreCompaction(value: unknown): boolean {
   return value === "show" || value === "hide";
 }
@@ -23,7 +19,6 @@ function isConfiguration(value: unknown): value is TurnFoldConfiguration {
   return (
     typeof value === "object" &&
     value !== null &&
-    isDensity(Reflect.get(value, "density")) &&
     isPreCompaction(Reflect.get(value, "preCompaction")) &&
     isWindows(Reflect.get(value, "windows"))
   );
@@ -65,7 +60,6 @@ export function matchingRestartMarker(
   const marker = restartMarker(sessionKey);
   if (!marker) return undefined;
   if (
-    marker.requested.density === requested.density &&
     marker.requested.preCompaction === requested.preCompaction &&
     marker.requested.windows === requested.windows
   ) {

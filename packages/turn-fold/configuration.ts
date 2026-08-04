@@ -1,5 +1,3 @@
-import type { TranscriptDensity } from "./density.ts";
-import { isTranscriptDensity } from "./density.ts";
 import {
   DEFAULT_TRANSCRIPT_WINDOWS,
   isTranscriptWindowValue,
@@ -10,13 +8,11 @@ import { isPreCompactionVisibility, type PreCompactionVisibility } from "./histo
 export const TURN_FOLD_CONFIG_ENTRY = "onurpi-turn-fold-config";
 
 export type TurnFoldConfiguration = Readonly<{
-  density: TranscriptDensity;
   preCompaction: PreCompactionVisibility;
   windows: TranscriptWindowValue;
 }>;
 
 export const DEFAULT_TURN_FOLD_CONFIGURATION: TurnFoldConfiguration = {
-  density: "compact",
   preCompaction: "show",
   windows: DEFAULT_TRANSCRIPT_WINDOWS,
 };
@@ -29,9 +25,8 @@ export function isTurnFoldConfiguration(value: unknown): value is TurnFoldConfig
   if (!isRecord(value)) return false;
   const keys = Object.keys(value);
   return (
-    keys.length === 3 &&
-    keys.every((key) => key === "density" || key === "preCompaction" || key === "windows") &&
-    isTranscriptDensity(value["density"]) &&
+    keys.length === 2 &&
+    keys.every((key) => key === "preCompaction" || key === "windows") &&
     isPreCompactionVisibility(value["preCompaction"]) &&
     isTranscriptWindowValue(value["windows"])
   );

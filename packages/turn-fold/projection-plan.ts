@@ -74,7 +74,6 @@ export function planSelectedTranscriptProjection(
   const projection = projectTranscriptEntries(sourceEntries, {
     activeRun: options.activeRun,
     attachedCompactionEntryIds: options.attachedCompactionEntryIds,
-    density: configuration.density,
   });
   const componentEntries = projection.displayEntries.filter(requiresLoadedComponent);
   const requiredEntryIds = entryIds(componentEntries);

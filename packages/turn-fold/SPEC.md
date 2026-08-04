@@ -24,11 +24,11 @@ A **compaction window** is an active-branch range between compaction entries. Th
 
 ## Display invariants
 
-Turn Fold MUST apply configuration in this order: select windows, apply pre-compaction visibility, then apply compact or expanded density. A numeric range starts at the nearest persisted run boundary before its oldest compaction boundary and includes that boundary's prompt entry. A user message remains the fallback anchor for sessions that predate run boundaries. `all` selects the complete active branch. `show` preserves the selected range. `hide` removes entries before the newest compaction while retaining that compaction entry and everything after it.
+Turn Fold MUST apply compact transcript configuration in this order: select windows, then apply pre-compaction visibility. A numeric range starts at the nearest persisted run boundary before its oldest compaction boundary and includes that boundary's prompt entry. A user message remains the fallback anchor for sessions that predate run boundaries. `all` selects the complete active branch. `show` preserves the selected range. `hide` removes entries before the newest compaction while retaining that compaction entry and everything after it.
 
-Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content in both compact and expanded modes. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
+Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
-In compact density, every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
+Every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
 Turn Fold MUST leave Pi's working and compaction status indicators under Pi's control. The working indicator remains visible while Pi is running and does not count toward the three-row activity limit.
 
@@ -36,9 +36,9 @@ A summary line MUST fit the available terminal width. Turn Fold may truncate it 
 
 When an edit diffstat is present, Turn Fold MUST render every unique absolute file path directly below the summary line in first-edit order. Each path row ends with that file's cumulative addition and deletion counts. Path text uses `toolDiffContext`; the counters use `toolDiffAdded` and `toolDiffRemoved`. Each file occupies exactly one row before retained activity or final content. When the complete row exceeds the terminal width, Turn Fold truncates the path from the left while keeping the filename and counters visible. Control characters are escaped before rendering.
 
-## Compact density while streaming
+## Compact transcript while streaming
 
-Compact density shows at most the latest three activity rows in transcript order.
+The compact transcript shows at most the latest three activity rows in transcript order.
 
 When a turn has more than three activity rows, Turn Fold MUST replace all older activity with one streaming summary line. The line appears directly after the user message and before the retained activity rows.
 
@@ -62,7 +62,7 @@ Working...
 
 Turn Fold MUST invalidate existing transcript components whenever a new sequential activity changes the visible three-row window. Parallel tool rendering is not sufficient to verify this behavior.
 
-## Compact density after settlement
+## Compact transcript after settlement
 
 A settled compact turn MUST show one settled summary line followed by one final content row. Tool rows and intermediate assistant rows disappear.
 
@@ -79,7 +79,7 @@ Final assistant response
 
 The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
-Compact density MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
+The compact transcript MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
 
 The final content row is selected in this order:
 
@@ -113,21 +113,29 @@ Terminal provider and tool failures MUST leave a useful error row below the sett
 
 Stale partial assistant text MUST NOT replace a terminal tool error selected as the final content row.
 
-## Expanded density
+## History explorer
 
-Expanded density shows Pi's original transcript rows in their original order within the selected window range, including attached and standalone compaction rows. Turn Fold summary lines, edit diffstats, and edited-file path rows are hidden.
+The main transcript is always compact. `/turn-fold`, `/turn-fold history`, and `Ctrl+Shift+O` MUST open a Pi TUI history explorer without changing compact transcript configuration. Opening, scrolling, loading older history, and closing MUST NOT require a restart or append a session entry.
 
-A requested view MUST apply in place when every required entry is already present in the active component tree and every omitted component can be hidden by Turn Fold's public render integration. Narrowing and later restoration from that loaded, patchable set MUST NOT replace the session runtime. Entering or leaving a range containing an unpatched row, including a custom entry, custom message, or branch summary, MUST require a full restart because Turn Fold cannot safely patch its renderer. When a requested view needs omitted entries or cannot hide a loaded unpatched row, Turn Fold MUST persist the request, leave the current component tree intact, and report that a full Pi restart is required. `/reload` does not satisfy that requirement because Pi rebuilds transcript messages before extension projection is bound. `/turn-fold status` MUST report pending restart state. A single in-place configuration change MUST invalidate each affected component no more than once. While its editor wrapper is active, Turn Fold MUST enable Pi TUI's public shrink-clearing behavior so narrowing clears obsolete screen and scrollback rows. It MUST reassert shrink clearing before an in-place change because Pi reapplies settings during `/reload`, then restore the previous value when it unloads. Turn Fold MUST NOT emit terminal clearing sequences or persist a global Pi setting.
+The explorer MUST read one active-branch snapshot, omit Turn Fold's internal run and configuration rows, index compaction boundaries without reading message bodies, and initially admit the newest three compaction windows. A backward movement at the oldest admitted row MUST admit at most three older windows for that input and preserve the visible anchor. Repeated bounded loads MUST reach the branch root. The header MUST report admitted and total windows.
+
+The explorer MUST render only the viewport plus bounded overscan. It MUST cache a bounded number of entry blocks by entry identity, width, theme revision, and detail state. Large entries begin with a bounded terminal-safe preview and can show more only after an explicit `Enter`. The explorer MUST clear its index, scroll state, detail state, and render cache when it closes.
+
+The explorer MUST support `Up` and `Ctrl+P` for one line backward, `Down` and `Ctrl+N` for one line forward, `b` and optional Page Up for one screen backward, Space and optional Page Down for one screen forward, `g` and `G` for the admitted start and newest content, and `q`, `Esc`, or `Ctrl+Shift+O` to close. Page Up and Page Down MUST NOT be the only paths for any action.
+
+User and assistant content MUST use Pi's public Markdown and theme APIs. Tool results, compactions, custom rows, timestamps, and unknown entries MUST use stable Turn Fold presenters. The explorer MUST NOT import Pi's private transcript component classes.
+
+A requested compact scope MUST apply in place when every required entry is already present in the active component tree and every omitted component can be hidden by Turn Fold's render integration. When a compact scope needs omitted entries or cannot hide a loaded unpatched row, Turn Fold MUST persist the request, leave the current component tree intact, and report that a full Pi restart is required. This restart rule applies only to the compact main transcript. While its editor wrapper is active, Turn Fold MUST enable Pi TUI's public shrink-clearing behavior and restore the previous value when it unloads. Turn Fold MUST NOT emit terminal clearing sequences or persist a global Pi setting.
 
 ## History and reload
 
 Turn Fold reconstructs run groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. It pre-indexes run boundaries so a marker written after a run's first assistant response still anchors the earlier prompt entry. Its run index and Pi's TUI projection MUST use the same entry snapshot.
 
-Every configuration change MUST wait for Pi to become idle before updating the active view. Changing from a numeric window value to `all` MUST report the active-branch entry count and require confirmation because expanded full-branch rendering can slow editor input. Cancellation leaves the existing value and transcript unchanged. A TUI `--no-session` run MUST reject widening that requires omitted entries because the requested state cannot survive a full restart.
+Every compact configuration change MUST wait for Pi to become idle before updating the active view. Changing from a numeric window value to `all` MUST report the active-branch entry count and require confirmation because scanning the full branch can increase startup work. Cancellation leaves the existing value and transcript unchanged. A TUI `--no-session` run MUST reject compact widening that requires omitted entries because the requested state cannot survive a full restart.
 
 Turn Fold keeps attached compaction associations in process-local memory. The registry is keyed by Pi's session identity and exact compaction entry ID, and it retains the active turn's existing entry IDs so split turns can be restored without guessing. Associations are limited to compactions on the active branch. The registry survives `/reload` and is cleared when the Pi process exits. Turn Fold MUST NOT persist compaction associations in Pi's session or a sidecar store. After a full process restart, prior compactions remain standalone because Pi's stored compaction entries do not identify their trigger. Turn Fold MUST NOT infer automatic intent from timestamps or neighboring messages.
 
-The first rendered frame after reconstruction MUST obey the same compact-density rules as a live turn when its compaction association remains in the process registry. It MUST NOT briefly expose hidden intermediate rows, duplicate summaries, or choose an earlier tool as final output.
+The first rendered frame after reconstruction MUST obey the same compact transcript rules as a live turn when its compaction association remains in the process registry. It MUST NOT briefly expose hidden intermediate rows, duplicate summaries, or choose an earlier tool as final output.
 
 Distinct assistant messages remain distinct even when they share the same millisecond timestamp. Streaming updates for one assistant message still count as one message.
 
@@ -137,7 +145,7 @@ Elapsed time comes from persisted turn completion data when available. User and 
 
 Turn Fold MUST NOT delete, rewrite, reorder, or hide messages from Pi's stored session or model context. Compaction folding MUST NOT append custom messages, labels, tool-result metadata, or sidecar state.
 
-Run boundaries are the first explicit persistence exception. Turn Fold appends exactly one compact `onurpi-turn-fold-run` custom entry for each new fold run, never for retries within the same unsettled run. Configuration changes are the second exception and are stored as strict `{ density, preCompaction, windows }` custom entries. Density is `compact` or `expanded`, pre-compaction visibility is `show` or `hide`, and windows is a positive safe integer or `all`. Entries with missing, extra, or invalid fields are ignored. Defaults are compact density, pre-compaction messages shown, and all windows.
+Run boundaries are the first explicit persistence exception. Turn Fold appends exactly one compact `onurpi-turn-fold-run` custom entry for each new fold run, never for retries within the same unsettled run. Configuration changes are the second exception and are stored as strict `{ preCompaction, windows }` custom entries. Pre-compaction visibility is `show` or `hide`, and windows is a positive safe integer or `all`. Entries with missing, extra, or invalid fields are ignored. Defaults are pre-compaction messages shown and all compact transcript windows. Old entries containing density are ignored.
 
 ## Controls
 
@@ -145,12 +153,10 @@ The extension provides these commands:
 
 ```text
 /turn-fold
-/turn-fold compact
-/turn-fold expanded
+/turn-fold history
 /turn-fold pre-compaction show
 /turn-fold pre-compaction hide
 /turn-fold pre-compaction toggle
-/turn-fold toggle
 /turn-fold status
 /turn-fold windows 5
 /turn-fold windows +2
@@ -159,38 +165,40 @@ The extension provides these commands:
 /turn-fold windows reset
 ```
 
-Density changes use `/turn-fold toggle`. `Ctrl+Shift+O` MUST submit that command through Pi's active editor without replacing draft text. During a response, the command MUST wait for Pi to settle, and repeated shortcut presses MUST NOT start extra toggles. `pre-compaction toggle` switches only pre-compaction visibility. `Ctrl+O` remains Pi's tool-output expansion control.
+`Ctrl+Shift+O` MUST submit `/turn-fold history` through Pi's active editor without replacing draft text. During a response, the command MUST wait for Pi to settle, and repeated shortcut presses MUST NOT start extra requests. The explorer MUST handle the same shortcut directly to close. `pre-compaction toggle` switches only pre-compaction visibility. `Ctrl+O` remains Pi's tool-output expansion control.
 
 ## Compatibility boundary
 
 Turn Fold patches Pi's built-in transcript component renderers because supported Pi releases do not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
 
-[TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies compact density's sparse replay behavior. Hidden source entries contribute to summaries without becoming Pi components.
+[TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies the compact transcript's sparse replay behavior. Hidden source entries contribute to summaries without becoming Pi components. The history explorer uses only documented overlay, component, key matching, theme, and session branch APIs.
 
 ## Acceptance tests
 
 A release is conforming only when automated or PTY tests verify all of the following:
 
 - Ten sequential tool calls show one streaming summary, the latest three activities, and Pi's working indicator.
-- User and every visible assistant timestamp render in local time in compact and expanded modes without changing stored epoch values.
+- User and every visible assistant timestamp render in local time without changing stored epoch values.
 - Settlement leaves the summary directly below the user message and one final content row below it.
 - Interruption retains partial output or `Operation interrupted` below an interrupted summary.
 - Terminal tool failures retain the correct failed tool row and failure count.
 - Reload and history reconstruction produce the correct first frame for process-local associations.
-- Compact density hides attached automatic compaction rows and reports them in the turn summary.
+- The compact transcript hides attached automatic compaction rows and reports them in the turn summary.
 - Manual, unobserved, and post-restart compactions remain standalone.
 - Compaction handling performs no Pi session or sidecar writes.
-- Expanded density restores Pi's original compaction rows and spacing.
-- Density, pre-compaction visibility, and window changes apply in place when their required entries are loaded.
-- Widening beyond loaded entries persists the request, reports `restart required`, and loads after a full restart.
-- `Ctrl+Shift+O` submits the toggle command through the active editor, preserves draft text, waits safely while busy, suppresses duplicate pending toggles, and recovers after dispatch failure.
+- The explorer initially admits the newest three compaction windows and loads at most three older windows for one backward boundary action.
+- The explorer renders viewport-near entries through documented Pi TUI APIs and keeps its render cache bounded.
+- Explorer open, scroll, older-history loading, and close never require a restart or append session state.
+- Pre-compaction visibility and compact window changes apply in place when their required entries are loaded.
+- Compact scope widening beyond loaded entries persists the request, reports `restart required`, and loads after a full restart.
+- `Ctrl+Shift+O` submits the history command through the active editor, preserves draft text, waits safely while busy, suppresses duplicate pending requests, closes the explorer directly, and recovers after dispatch failure.
 - Exact, relative, reset, and confirmed `all` window changes select the expected user-anchored range.
 - `show` honors the selected windows; `hide` starts at the newest compaction boundary.
 - Cancelling `all` and invalid arguments leave the transcript unchanged.
 - Successful edit results aggregate exact patch line totals and unique files without double counting repeated tool-call IDs.
 - Failed or malformed edit results do not affect the summary.
 - Live and reconstructed turns produce the same edit diffstat from finalized tool-result messages.
-- Compact diffstats use Pi's addition and deletion colors and remain absent in expanded density.
+- Compact diffstats use Pi's addition and deletion colors.
 - Every compact diffstat lists unique absolute paths in first-edit order below the summary, shows cumulative colored counters beside each file, truncates long paths so each file fits one row, and escapes terminal controls.
 - Compact replay creates no component for hidden source entries and remains within its component budget.
 - Repeated unchanged renders perform no edit aggregation, path resolution, activity sorting, or assistant-content rescans.

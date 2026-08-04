@@ -1,175 +1,362 @@
-import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { matchesKey, Text, type Component } from "@earendil-works/pi-tui";
+import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import {
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+  type Component,
+  type TUI,
+} from "@earendil-works/pi-tui";
 
-import { isRecord, messageFromEntry, stringField } from "./turn-message.ts";
+import { createHistoryIndex, HistoryRange } from "./history-index.ts";
+import { HistoryEntryRenderer } from "./history-renderer.ts";
 
-const ENTRIES_PER_PAGE = 20;
-const ENTRY_CHARACTER_LIMIT = 2_000;
+type HistoryPosition = Readonly<{
+  entryIndex: number;
+  lineOffset: number;
+}>;
 
-function terminalSafe(value: string): string {
-  let safe = "";
-  for (const character of value) {
-    const codePoint = character.codePointAt(0);
-    if (
-      codePoint !== undefined &&
-      (codePoint <= 0x08 ||
-        (codePoint >= 0x0b && codePoint <= 0x1f) ||
-        (codePoint >= 0x7f && codePoint <= 0x9f))
-    ) {
-      safe += `\\x${codePoint.toString(16).padStart(2, "0")}`;
-    } else {
-      safe += character;
+type ExplorerTui = Pick<TUI, "requestRender" | "terminal">;
+
+export type HistoryExplorerLifecycle = Readonly<{
+  closed: () => void;
+  opened: (close: () => void) => void;
+}>;
+
+function padLine(value: string, width: number): string {
+  const truncated = truncateToWidth(value, width, "…", true);
+  return truncated + " ".repeat(Math.max(0, width - visibleWidth(truncated)));
+}
+
+export class HistoryViewport {
+  private readonly detailedEntries = new Set<number>();
+  private readonly range: HistoryRange;
+  private readonly renderer: HistoryEntryRenderer;
+  private top: HistoryPosition | undefined;
+  private viewportHeight = 1;
+  private width = 1;
+
+  constructor(entries: readonly unknown[], theme: Pick<Theme, "bold" | "fg">, cacheLimit?: number) {
+    this.range = new HistoryRange(createHistoryIndex(entries));
+    this.renderer = new HistoryEntryRenderer(theme, cacheLimit);
+  }
+
+  get admittedWindows(): number {
+    return this.range.admittedWindows;
+  }
+
+  get cachedBlocks(): number {
+    return this.renderer.cachedBlocks;
+  }
+
+  get totalWindows(): number {
+    return this.range.index.totalWindows;
+  }
+
+  invalidate(): void {
+    this.renderer.clear();
+  }
+
+  render(width: number, height: number): readonly string[] {
+    this.resize(width, height);
+    const lines: string[] = [];
+    let position: HistoryPosition | undefined = this.top;
+    while (position && lines.length < this.viewportHeight) {
+      const block = this.block(position.entryIndex);
+      lines.push(block[position.lineOffset] ?? "");
+      position = this.next(position);
+    }
+    while (lines.length < this.viewportHeight) lines.push("");
+    return lines;
+  }
+
+  private resize(width: number, height: number): void {
+    const wasAtNewest = this.top ? this.viewportEndsAtNewest(this.top) : true;
+    const widthChanged = this.width !== Math.max(1, width);
+    this.width = Math.max(1, width);
+    this.viewportHeight = Math.max(1, height);
+    if (!this.top || wasAtNewest) {
+      this.top = this.newestTop();
+    } else if (widthChanged) {
+      const block = this.block(this.top.entryIndex);
+      this.top = {
+        entryIndex: this.top.entryIndex,
+        lineOffset: Math.min(this.top.lineOffset, block.length - 1),
+      };
     }
   }
-  return safe;
-}
 
-function contentText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((item) => {
-      const type = stringField(item, "type");
-      if (type === "text") return stringField(item, "text") ?? "";
-      if (type === "thinking") return stringField(item, "thinking") ?? "";
-      if (type === "toolCall") {
-        return `[tool ${stringField(item, "name") ?? "unknown"} ${stringField(item, "id") ?? ""}]`;
+  moveBackward(lines: number): void {
+    this.ensurePosition();
+    let loadedOlder = false;
+    for (let index = 0; index < Math.max(1, lines); index += 1) {
+      const previous = this.previous(this.ensurePosition());
+      if (previous) {
+        this.top = previous;
+        continue;
       }
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
+      if (loadedOlder || !this.range.loadOlder()) break;
+      loadedOlder = true;
+      const older = this.previous(this.ensurePosition());
+      if (!older) break;
+      this.top = older;
+    }
+  }
+
+  moveForward(lines: number): void {
+    this.ensurePosition();
+    for (let index = 0; index < Math.max(1, lines); index += 1) {
+      const current = this.ensurePosition();
+      if (this.viewportEndsAtNewest(current)) break;
+      const next = this.next(current);
+      if (!next) break;
+      this.top = next;
+    }
+  }
+
+  moveToOldest(): void {
+    this.ensurePosition();
+    this.top = { entryIndex: this.range.startIndex, lineOffset: 0 };
+  }
+
+  moveToNewest(): void {
+    this.ensurePosition();
+    this.top = this.newestTop();
+  }
+
+  toggleCurrentEntry(): void {
+    const current = this.ensurePosition();
+    const entryIndex = current.entryIndex;
+    if (this.detailedEntries.has(entryIndex)) {
+      this.detailedEntries.delete(entryIndex);
+    } else {
+      this.detailedEntries.add(entryIndex);
+    }
+    this.renderer.clear();
+    const block = this.block(entryIndex);
+    this.top = {
+      entryIndex,
+      lineOffset: Math.min(current.lineOffset, block.length - 1),
+    };
+  }
+
+  private block(entryIndex: number): readonly string[] {
+    const entry = this.range.index.entries[entryIndex];
+    if (entry === undefined) return [""];
+    return this.renderer.render(
+      entry,
+      entryIndex,
+      this.width,
+      this.detailedEntries.has(entryIndex),
+    );
+  }
+
+  private ensurePosition(): HistoryPosition {
+    this.top ??= this.newestTop();
+    return this.top;
+  }
+
+  private newestTop(): HistoryPosition {
+    const lastEntryIndex = Math.max(this.range.startIndex, this.range.index.entries.length - 1);
+    const lastBlock = this.block(lastEntryIndex);
+    let position: HistoryPosition = {
+      entryIndex: lastEntryIndex,
+      lineOffset: Math.max(0, lastBlock.length - 1),
+    };
+    for (let index = 1; index < this.viewportHeight; index += 1) {
+      const previous = this.previous(position);
+      if (!previous) break;
+      position = previous;
+    }
+    return position;
+  }
+
+  private next(position: HistoryPosition): HistoryPosition | undefined {
+    const block = this.block(position.entryIndex);
+    if (position.lineOffset + 1 < block.length) {
+      return { entryIndex: position.entryIndex, lineOffset: position.lineOffset + 1 };
+    }
+    if (position.entryIndex + 1 >= this.range.index.entries.length) return undefined;
+    return { entryIndex: position.entryIndex + 1, lineOffset: 0 };
+  }
+
+  private previous(position: HistoryPosition): HistoryPosition | undefined {
+    if (position.lineOffset > 0) {
+      return { entryIndex: position.entryIndex, lineOffset: position.lineOffset - 1 };
+    }
+    if (position.entryIndex <= this.range.startIndex) return undefined;
+    const previousEntryIndex = position.entryIndex - 1;
+    return {
+      entryIndex: previousEntryIndex,
+      lineOffset: Math.max(0, this.block(previousEntryIndex).length - 1),
+    };
+  }
+
+  private viewportEndsAtNewest(top: HistoryPosition): boolean {
+    let position: HistoryPosition | undefined = top;
+    for (let index = 1; index < this.viewportHeight; index += 1) {
+      const next = this.next(position);
+      if (!next) return true;
+      position = next;
+    }
+    return this.next(position) === undefined;
+  }
 }
 
-function entryLabel(entry: unknown): string {
-  const type = stringField(entry, "type") ?? "entry";
-  const message = messageFromEntry(entry);
-  const role = stringField(message, "role");
-  if (role) return role;
-  if (type === "compaction") return "compaction";
-  if (type === "custom_message") return stringField(entry, "customType") ?? "custom message";
-  return stringField(entry, "customType") ?? type;
-}
-
-function entryBody(entry: unknown): string {
-  const message = messageFromEntry(entry);
-  if (isRecord(message)) return contentText(message["content"]);
-  if (!isRecord(entry)) return "";
-  if (entry["type"] === "compaction") return stringField(entry, "summary") ?? "";
-  if (entry["type"] === "custom_message") return stringField(entry, "content") ?? "";
-  return "";
-}
-
-export function historyEntryText(entry: unknown): string {
-  const id = stringField(entry, "id") ?? "unknown";
-  const fullBody = terminalSafe(entryBody(entry));
-  const body = fullBody.slice(0, ENTRY_CHARACTER_LIMIT);
-  const suffix = fullBody.length > ENTRY_CHARACTER_LIMIT ? "\n…" : "";
-  return `${entryLabel(entry)} ${id}${body ? `\n${body}${suffix}` : ""}`;
-}
-
-export function historyPageCount(entries: readonly unknown[]): number {
-  return Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE));
-}
-
-export function historyPage(entries: readonly unknown[], page: number): readonly string[] {
-  if (entries.length === 0) return ["No transcript entries in the selected range."];
-  const start = page * ENTRIES_PER_PAGE;
-  return entries.slice(start, start + ENTRIES_PER_PAGE).map((entry) => historyEntryText(entry));
-}
-
-function isNextPageKey(data: string): boolean {
-  return matchesKey(data, "right") || matchesKey(data, "pageDown") || data === "l";
-}
-
-function isPreviousPageKey(data: string): boolean {
-  return matchesKey(data, "left") || matchesKey(data, "pageUp") || data === "h";
-}
-
-export class HistoryViewer implements Component {
-  private page = 0;
-  private readonly entries: readonly unknown[];
-  private readonly pageCount: number;
-  private readonly requestRender: () => void;
-  private readonly close: () => void;
-  private readonly text: Text;
-  private readonly styleHint: (text: string) => string;
-  private readonly styleTitle: (text: string) => string;
+export class HistoryExplorer implements Component {
+  private closed = false;
+  private readonly closeCallback: () => void;
+  private readonly theme: Pick<Theme, "bold" | "fg">;
+  private readonly tui: ExplorerTui;
+  private readonly viewport: HistoryViewport;
 
   constructor(
+    tui: ExplorerTui,
+    theme: Pick<Theme, "bold" | "fg">,
     entries: readonly unknown[],
-    styleTitle: (text: string) => string,
-    styleHint: (text: string) => string,
-    requestRender: () => void,
     close: () => void,
   ) {
-    this.entries = entries;
-    this.pageCount = historyPageCount(entries);
-    this.styleTitle = styleTitle;
-    this.styleHint = styleHint;
-    this.requestRender = requestRender;
-    this.close = close;
-    this.text = new Text("", 1, 1);
-    this.updateText();
+    this.tui = tui;
+    this.theme = theme;
+    this.closeCallback = close;
+    this.viewport = new HistoryViewport(entries, theme);
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, "escape") || data === "q") {
+    if (this.isCloseInput(data)) {
       this.close();
       return;
     }
-    if (isNextPageKey(data)) {
-      this.setPage(Math.min(this.pageCount - 1, this.page + 1));
-      return;
-    }
-    if (isPreviousPageKey(data)) {
-      this.setPage(Math.max(0, this.page - 1));
+    if (
+      this.handleLineInput(data) ||
+      this.handleScreenInput(data) ||
+      this.handleBoundaryInput(data) ||
+      this.handleDetailInput(data)
+    ) {
+      this.tui.requestRender();
     }
   }
 
   invalidate(): void {
-    this.text.invalidate();
+    this.viewport.invalidate();
   }
 
   render(width: number): string[] {
-    return this.text.render(width);
-  }
-
-  private setPage(page: number): void {
-    if (page === this.page) return;
-    this.page = page;
-    this.updateText();
-    this.requestRender();
-  }
-
-  private updateText(): void {
-    const title = this.styleTitle(
-      `Turn Fold history ${String(this.page + 1)}/${String(this.pageCount)}`,
+    if (width < 4) return ["".padEnd(Math.max(0, width))];
+    const safeWidth = width;
+    const innerWidth = safeWidth - 2;
+    const body = this.viewport.render(innerWidth, this.contentHeight());
+    const border = this.theme.fg("border", `+${"-".repeat(innerWidth)}+`);
+    const row = (content: string) =>
+      `${this.theme.fg("border", "|")}${padLine(content, innerWidth)}${this.theme.fg("border", "|")}`;
+    const title = this.theme.bold(
+      this.theme.fg(
+        "accent",
+        ` Turn Fold history · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows`,
+      ),
     );
-    const hint = this.styleHint("←/→ or h/l page · q/esc close");
-    this.text.setText(`${title}\n${hint}\n\n${historyPage(this.entries, this.page).join("\n\n")}`);
+    const hint = this.theme.fg(
+      "dim",
+      " ↑/↓ or C-p/C-n line · b/space screen · g/G ends · enter details · q/esc/C-S-o close",
+    );
+    return [
+      border,
+      row(title),
+      row(hint),
+      row(this.theme.fg("border", "-".repeat(innerWidth))),
+      ...body.map(row),
+      border,
+    ];
+  }
+
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.closeCallback();
+  }
+
+  private isCloseInput(data: string): boolean {
+    return matchesKey(data, "escape") || matchesKey(data, "ctrl+shift+o") || data === "q";
+  }
+
+  private handleLineInput(data: string): boolean {
+    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p")) {
+      this.viewport.moveBackward(1);
+      return true;
+    }
+    if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
+      this.viewport.moveForward(1);
+      return true;
+    }
+    return false;
+  }
+
+  private handleScreenInput(data: string): boolean {
+    if (data === "b" || matchesKey(data, "pageUp")) {
+      this.viewport.moveBackward(this.contentHeight());
+      return true;
+    }
+    if (matchesKey(data, "space") || matchesKey(data, "pageDown")) {
+      this.viewport.moveForward(this.contentHeight());
+      return true;
+    }
+    return false;
+  }
+
+  private handleBoundaryInput(data: string): boolean {
+    if (data === "G" || matchesKey(data, "shift+g")) {
+      this.viewport.moveToNewest();
+      return true;
+    }
+    if (data === "g") {
+      this.viewport.moveToOldest();
+      return true;
+    }
+    return false;
+  }
+
+  private handleDetailInput(data: string): boolean {
+    if (!matchesKey(data, "enter")) return false;
+    this.viewport.toggleCurrentEntry();
+    return true;
+  }
+
+  private contentHeight(): number {
+    const overlayHeight = Math.max(8, Math.floor(this.tui.terminal.rows * 0.95));
+    return Math.max(3, overlayHeight - 5);
   }
 }
 
-export async function showHistoryViewer(
+export async function showHistoryExplorer(
   ctx: ExtensionCommandContext,
   entries: readonly unknown[],
+  lifecycle?: HistoryExplorerLifecycle,
 ): Promise<void> {
   if (ctx.mode !== "tui") {
-    ctx.ui.notify("Turn Fold history is available only in TUI density.", "warning");
+    ctx.ui.notify("Turn Fold history is available only in TUI mode.", "warning");
     return;
   }
-  await ctx.ui.custom<undefined>((tui, theme, _keybindings, done) => {
-    return new HistoryViewer(
-      entries,
-      (text) => theme.bold(theme.fg("accent", text)),
-      (text) => theme.fg("dim", text),
-      () => {
-        tui.requestRender();
+  try {
+    await ctx.ui.custom<undefined>(
+      (tui, theme, _keybindings, done) => {
+        const explorer = new HistoryExplorer(tui, theme, entries, () => {
+          done(undefined);
+        });
+        lifecycle?.opened(() => {
+          explorer.close();
+        });
+        return explorer;
       },
-      () => {
-        done(undefined);
+      {
+        overlay: true,
+        overlayOptions: {
+          anchor: "center",
+          margin: 1,
+          maxHeight: "95%",
+          width: "100%",
+        },
       },
     );
-  });
+  } finally {
+    lifecycle?.closed();
+  }
 }
