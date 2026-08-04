@@ -11,7 +11,7 @@ type BranchEntry = BranchEntries[number];
 export type TranscriptProjectionPlan = Readonly<{
   displayEntries: BranchEntries;
   hasUnidentifiedDisplayEntries: boolean;
-  oldestRetainedEntryId?: string;
+  oldestRetainedEntryId: string | undefined;
   omittedRunCount: number;
   requiredEntryIds: ReadonlySet<string>;
   sourceEntries: BranchEntries;
