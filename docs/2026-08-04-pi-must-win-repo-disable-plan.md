@@ -94,3 +94,11 @@ Merged in PR #55. The shipped design matches this plan, with hardening added dur
 One environment note: running the root test suite from inside a Pi session with Pi Must Win active
 fails the Unified Exec integration test, because the session exports the attribution hook
 environment to every command. CI and env-stripped local runs pass.
+
+## Upstream move
+
+The feature was moved into `osolmaz/pi-must-win` and released as `pi-must-win@0.4.0`, so standalone
+installations get the same behavior. Upstream owns the config file, identity resolution, and
+matching; the OnurPi wrapper now only consults the upstream predicate to skip its Unified Exec
+subscription and passes its options through. See
+[pi-must-win#3](https://github.com/osolmaz/pi-must-win/pull/3).
