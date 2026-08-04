@@ -260,9 +260,7 @@ export class TurnFoldState {
 
   hasActive = (): boolean => this.activeGroupId !== undefined;
 
-  activeId(): string | undefined {
-    return this.activeGroupId;
-  }
+  activeId = (): string | undefined => this.activeGroupId;
 
   ensureActive(startedAt = Date.now()): string {
     if (this.activeGroupId) return this.activeGroupId;
@@ -426,8 +424,7 @@ export class TurnFoldState {
     }
   }
 
-  compactionVisibleFor = (component: object): boolean =>
-    this.compactionVisibility.visible(component);
+  compactionVisibleFor = (target: object): boolean => this.compactionVisibility.visible(target);
 
   settleActive(endedAt = Date.now()): void {
     if (!this.activeGroupId) return;
@@ -453,7 +450,12 @@ export class TurnFoldState {
 
     const layout = this.layoutFor(group);
     if (!this.visibleGroupIds.has(group.id)) {
-      return { display: "hidden", summary: this.summary(group, layout, now) };
+      const retainedCompaction =
+        this.compactionComponentGroup.has(component) && this.compactionVisibleFor(component);
+      return {
+        display: retainedCompaction ? "original" : "hidden",
+        summary: this.summary(group, layout, now),
+      };
     }
     const display = foldDisplay({
       isFinalAnchor: component === layout.finalAnchor,
@@ -555,9 +557,8 @@ export class TurnFoldState {
     );
   }
 
-  private groupHasActivity(group: TurnGroup): boolean {
-    return group.assistantKeys.size > 0 || group.toolCallIds.size > 0;
-  }
+  private groupHasActivity = (group: TurnGroup): boolean =>
+    group.assistantKeys.size > 0 || group.toolCallIds.size > 0;
 
   private collectLayoutComponent(
     group: TurnGroup,
