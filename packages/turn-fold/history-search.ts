@@ -32,7 +32,7 @@ type ActiveEntry = {
 };
 
 function normalized(value: string): string {
-  return value.toLocaleLowerCase();
+  return value.toLowerCase();
 }
 
 function searchSection(

@@ -72,7 +72,7 @@ function numberedJump(normalized: string): HistoryJumpTarget | undefined {
 }
 
 export function parseHistoryJump(value: string): HistoryJumpTarget | undefined {
-  const normalized = value.trim().toLocaleLowerCase();
+  const normalized = value.trim().toLowerCase();
   if (normalized === "oldest" || normalized === "newest") return { kind: normalized };
   if (normalized.startsWith("@") && normalized.length > 1) {
     return { kind: "timestamp", value: normalized.slice(1) };

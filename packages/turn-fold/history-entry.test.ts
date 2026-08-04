@@ -112,6 +112,10 @@ describe("Turn Fold history entries", () => {
       message("assistant", [{ text: "Answer", type: "text" }]),
       message("assistant", [{ thinking: "Reason", type: "thinking" }]),
       message("assistant", [{ arguments: {}, id: "call", name: "read", type: "toolCall" }]),
+      message("assistant", [
+        { thinking: "Reason", type: "thinking" },
+        { arguments: {}, id: "call", name: "read", type: "toolCall" },
+      ]),
       message("toolResult", "done", { toolName: "exec" }),
       message("toolResult", "boom", { isError: true, toolName: "exec" }),
       { id: "c", type: "compaction" },
