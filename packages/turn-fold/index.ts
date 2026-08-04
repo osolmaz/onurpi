@@ -550,6 +550,10 @@ async function openHistoryForRuntime(
   runtime: TurnFoldRuntime,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
+  if (ctx.mode !== "tui") {
+    ctx.ui.notify("Turn Fold history is available only in TUI mode.", "warning");
+    return;
+  }
   await ctx.waitForIdle();
   let activeClose: (() => void) | undefined;
   await showHistoryExplorer(ctx, ctx.sessionManager.getBranch(), {

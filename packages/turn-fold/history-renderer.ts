@@ -27,6 +27,7 @@ type CachedBlock = Readonly<{
 }>;
 
 type PreparedEntry = Readonly<{
+  hasMore: boolean;
   presented: PresentedEntry;
   segments: readonly string[];
   truncated: boolean;
@@ -105,11 +106,18 @@ function presentEntry(entry: unknown): PresentedEntry {
   return nonMessageEntry(entry, stringField(entry, "type") ?? "entry");
 }
 
-function boundedBody(body: string, detailed: boolean): { text: string; truncated: boolean } {
+function boundedBody(
+  body: string,
+  detailed: boolean,
+  pageIndex: number,
+): { hasMore: boolean; text: string; truncated: boolean } {
   const limit = detailed ? DETAIL_CHARACTER_LIMIT : PREVIEW_CHARACTER_LIMIT;
+  const offset = detailed ? pageIndex * limit : 0;
+  const end = offset + limit;
   return {
-    text: terminalSafeHistoryText(body.slice(0, limit)),
-    truncated: body.length > limit,
+    hasMore: detailed && body.length > end,
+    text: terminalSafeHistoryText(body.slice(offset, end)),
+    truncated: body.length > end || (!detailed && body.length > limit),
   };
 }
 
@@ -154,9 +162,22 @@ function blockHeader(entry: PresentedEntry, width: number, theme: HistoryRenderT
   return truncateToWidth(`  ${theme.bold(theme.fg("accent", label))}${suffix}`, width);
 }
 
+function truncationLines(
+  prepared: PreparedEntry,
+  width: number,
+  theme: HistoryRenderTheme,
+): readonly string[] {
+  if (!prepared.truncated) return [];
+  const message = prepared.hasMore
+    ? "  … continue scrolling for more of this entry"
+    : "  … press Enter to show more of this entry";
+  return [truncateToWidth(theme.fg("warning", message), width)];
+}
+
 function renderedSegment(
   prepared: PreparedEntry,
   segmentIndex: number,
+  pageIndex: number,
   width: number,
   theme: HistoryRenderTheme,
 ): readonly string[] {
@@ -168,10 +189,12 @@ function renderedSegment(
     getMarkdownTheme(),
   );
   return [
-    ...(segmentIndex === 0 ? [blockHeader(prepared.presented, width, theme)] : []),
+    ...(pageIndex === 0 && segmentIndex === 0
+      ? [blockHeader(prepared.presented, width, theme)]
+      : []),
     ...markdown.render(width),
-    ...(prepared.truncated && segmentIndex === prepared.segments.length - 1
-      ? [truncateToWidth(theme.fg("warning", "  … press Enter to show more of this entry"), width)]
+    ...(segmentIndex === prepared.segments.length - 1
+      ? truncationLines(prepared, width, theme)
       : []),
     ...(segmentIndex === prepared.segments.length - 1 ? [""] : []),
   ];
@@ -197,14 +220,31 @@ export class HistoryEntryRenderer {
     this.prepared.clear();
   }
 
+  pageCount(entry: unknown, detailed: boolean): number {
+    if (!detailed) return 1;
+    return Math.max(1, Math.ceil(presentEntry(entry).body.length / DETAIL_CHARACTER_LIMIT));
+  }
+
   segmentCount(
     entry: unknown,
     entryIndex: number,
     width: number,
     detailed: boolean,
     lineBudget: number,
+    pageIndex = 0,
   ): number {
-    return this.prepare(entry, entryIndex, width, detailed, lineBudget).segments.length;
+    return this.prepare(entry, entryIndex, width, detailed, lineBudget, pageIndex).segments.length;
+  }
+
+  hasNextPage(
+    entry: unknown,
+    entryIndex: number,
+    width: number,
+    detailed: boolean,
+    lineBudget: number,
+    pageIndex: number,
+  ): boolean {
+    return this.prepare(entry, entryIndex, width, detailed, lineBudget, pageIndex).hasMore;
   }
 
   render(
@@ -214,12 +254,13 @@ export class HistoryEntryRenderer {
     detailed: boolean,
     segmentIndex = 0,
     lineBudget = 20,
+    pageIndex = 0,
   ): readonly string[] {
     const safeWidth = Math.max(1, width);
     const safeBudget = Math.max(4, lineBudget);
-    const prepared = this.prepare(entry, entryIndex, safeWidth, detailed, safeBudget);
+    const prepared = this.prepare(entry, entryIndex, safeWidth, detailed, safeBudget, pageIndex);
     const safeSegmentIndex = Math.min(Math.max(0, segmentIndex), prepared.segments.length - 1);
-    const key = `${String(entryIndex)}:${String(safeWidth)}:${detailed ? "detail" : "preview"}:${String(safeBudget)}:${String(safeSegmentIndex)}`;
+    const key = `${String(entryIndex)}:${String(safeWidth)}:${detailed ? "detail" : "preview"}:${String(safeBudget)}:${String(pageIndex)}:${String(safeSegmentIndex)}`;
     const cached = this.cache.get(key);
     if (cached) {
       this.cache.delete(key);
@@ -227,7 +268,7 @@ export class HistoryEntryRenderer {
       return cached.lines;
     }
 
-    const lines = renderedSegment(prepared, safeSegmentIndex, safeWidth, this.theme);
+    const lines = renderedSegment(prepared, safeSegmentIndex, pageIndex, safeWidth, this.theme);
     const block = { lines };
     this.cache.set(key, block);
     while (this.cache.size > this.cacheLimit) {
@@ -244,8 +285,9 @@ export class HistoryEntryRenderer {
     width: number,
     detailed: boolean,
     lineBudget: number,
+    pageIndex: number,
   ): PreparedEntry {
-    const key = `${String(entryIndex)}:${String(width)}:${detailed ? "detail" : "preview"}:${String(lineBudget)}`;
+    const key = `${String(entryIndex)}:${String(width)}:${detailed ? "detail" : "preview"}:${String(lineBudget)}:${String(pageIndex)}`;
     const cached = this.prepared.get(key);
     if (cached) {
       this.prepared.delete(key);
@@ -253,8 +295,9 @@ export class HistoryEntryRenderer {
       return cached;
     }
     const presented = presentEntry(entry);
-    const body = boundedBody(presented.body, detailed);
+    const body = boundedBody(presented.body, detailed, pageIndex);
     const prepared = {
+      hasMore: body.hasMore,
       presented,
       segments: bodySegments(body.text, width, lineBudget),
       truncated: body.truncated,

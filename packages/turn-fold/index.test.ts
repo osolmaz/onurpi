@@ -467,6 +467,22 @@ describe("Turn Fold configuration commands", () => {
     expect(historyViewerMock.closes[0]).toHaveBeenCalledOnce();
   });
 
+  it("rejects non-TUI history before waiting for an active response", async () => {
+    const extension = extensionHarness();
+    const ctx = context();
+    ctx.mode = "rpc";
+    turnFold(extension.pi);
+
+    await runTurnFoldCommand(extension.commands, "history", ctx);
+
+    expect(ctx.waitForIdle).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Turn Fold history is available only in TUI mode.",
+      "warning",
+    );
+    expect(historyViewerMock.entries).toHaveLength(0);
+  });
+
   it("keeps explorer history independent from the compact transcript scope", async () => {
     const extension = extensionHarness();
     const branch = [

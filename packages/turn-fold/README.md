@@ -60,7 +60,7 @@ Enter             show more or less of the current entry
 q / Esc           close
 ```
 
-The initial range contains the newest three compaction windows. Moving backward at the oldest admitted row loads three older windows and preserves the visible position. The header reports the admitted and total window counts. Loaded extent, scroll position, and detailed entries are discarded when the explorer closes.
+The initial range contains the newest three compaction windows. Moving backward at the oldest admitted row loads three older windows and preserves the visible position. The header reports the admitted and total window counts. Expanded entries continue through bounded detail pages, so scrolling can reach their full suffix without caching the full rendered body. Loaded extent, scroll position, and detailed entries are discarded when the explorer closes.
 
 `Ctrl+O` remains Pi's separate tool-output detail toggle.
 

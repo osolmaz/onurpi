@@ -13,6 +13,7 @@ import { HistoryEntryRenderer } from "./history-renderer.ts";
 type HistoryPosition = Readonly<{
   entryIndex: number;
   lineOffset: number;
+  pageIndex: number;
   segmentIndex: number;
 }>;
 
@@ -62,7 +63,7 @@ export class HistoryViewport {
     const lines: string[] = [];
     let position: HistoryPosition | undefined = this.top;
     while (position && lines.length < this.viewportHeight) {
-      const block = this.block(position.entryIndex, position.segmentIndex);
+      const block = this.block(position.entryIndex, position.segmentIndex, position.pageIndex);
       lines.push(block[position.lineOffset] ?? "");
       position = this.next(position);
     }
@@ -82,12 +83,13 @@ export class HistoryViewport {
     } else if (layoutChanged) {
       const segmentIndex = Math.min(
         this.top.segmentIndex,
-        this.segmentCount(this.top.entryIndex) - 1,
+        this.segmentCount(this.top.entryIndex, this.top.pageIndex) - 1,
       );
-      const block = this.block(this.top.entryIndex, segmentIndex);
+      const block = this.block(this.top.entryIndex, segmentIndex, this.top.pageIndex);
       this.top = {
         entryIndex: this.top.entryIndex,
         lineOffset: Math.min(this.top.lineOffset, block.length - 1),
+        pageIndex: this.top.pageIndex,
         segmentIndex,
       };
     }
@@ -125,7 +127,7 @@ export class HistoryViewport {
 
   moveToOldest(): void {
     this.ensurePosition();
-    this.top = { entryIndex: this.range.startIndex, lineOffset: 0, segmentIndex: 0 };
+    this.top = { entryIndex: this.range.startIndex, lineOffset: 0, pageIndex: 0, segmentIndex: 0 };
   }
 
   moveToNewest(): void {
@@ -142,16 +144,17 @@ export class HistoryViewport {
       this.detailedEntries.add(entryIndex);
     }
     this.renderer.clear();
-    const segmentIndex = Math.min(current.segmentIndex, this.segmentCount(entryIndex) - 1);
-    const block = this.block(entryIndex, segmentIndex);
+    const segmentIndex = Math.min(current.segmentIndex, this.segmentCount(entryIndex, 0) - 1);
+    const block = this.block(entryIndex, segmentIndex, 0);
     this.top = {
       entryIndex,
       lineOffset: Math.min(current.lineOffset, block.length - 1),
+      pageIndex: 0,
       segmentIndex,
     };
   }
 
-  private block(entryIndex: number, segmentIndex: number): readonly string[] {
+  private block(entryIndex: number, segmentIndex: number, pageIndex: number): readonly string[] {
     const entry = this.range.index.entries[entryIndex];
     if (entry === undefined) return [""];
     return this.renderer.render(
@@ -161,10 +164,17 @@ export class HistoryViewport {
       this.detailedEntries.has(entryIndex),
       segmentIndex,
       this.viewportHeight + 4,
+      pageIndex,
     );
   }
 
-  private segmentCount(entryIndex: number): number {
+  private pageCount(entryIndex: number): number {
+    const entry = this.range.index.entries[entryIndex];
+    if (entry === undefined) return 1;
+    return this.renderer.pageCount(entry, this.detailedEntries.has(entryIndex));
+  }
+
+  private segmentCount(entryIndex: number, pageIndex: number): number {
     const entry = this.range.index.entries[entryIndex];
     if (entry === undefined) return 1;
     return this.renderer.segmentCount(
@@ -173,6 +183,20 @@ export class HistoryViewport {
       this.width,
       this.detailedEntries.has(entryIndex),
       this.viewportHeight + 4,
+      pageIndex,
+    );
+  }
+
+  private hasNextPage(entryIndex: number, pageIndex: number): boolean {
+    const entry = this.range.index.entries[entryIndex];
+    if (entry === undefined) return false;
+    return this.renderer.hasNextPage(
+      entry,
+      entryIndex,
+      this.width,
+      this.detailedEntries.has(entryIndex),
+      this.viewportHeight + 4,
+      pageIndex,
     );
   }
 
@@ -183,11 +207,13 @@ export class HistoryViewport {
 
   private newestTop(): HistoryPosition {
     const lastEntryIndex = Math.max(this.range.startIndex, this.range.index.entries.length - 1);
-    const segmentIndex = this.segmentCount(lastEntryIndex) - 1;
-    const lastBlock = this.block(lastEntryIndex, segmentIndex);
+    const pageIndex = this.pageCount(lastEntryIndex) - 1;
+    const segmentIndex = this.segmentCount(lastEntryIndex, pageIndex) - 1;
+    const lastBlock = this.block(lastEntryIndex, segmentIndex, pageIndex);
     let position: HistoryPosition = {
       entryIndex: lastEntryIndex,
       lineOffset: Math.max(0, lastBlock.length - 1),
+      pageIndex,
       segmentIndex,
     };
     for (let index = 1; index < this.viewportHeight; index += 1) {
@@ -199,15 +225,18 @@ export class HistoryViewport {
   }
 
   private next(position: HistoryPosition): HistoryPosition | undefined {
-    const block = this.block(position.entryIndex, position.segmentIndex);
+    const block = this.block(position.entryIndex, position.segmentIndex, position.pageIndex);
     if (position.lineOffset + 1 < block.length) {
       return { ...position, lineOffset: position.lineOffset + 1 };
     }
-    if (position.segmentIndex + 1 < this.segmentCount(position.entryIndex)) {
+    if (position.segmentIndex + 1 < this.segmentCount(position.entryIndex, position.pageIndex)) {
       return { ...position, lineOffset: 0, segmentIndex: position.segmentIndex + 1 };
     }
+    if (this.hasNextPage(position.entryIndex, position.pageIndex)) {
+      return { ...position, lineOffset: 0, pageIndex: position.pageIndex + 1, segmentIndex: 0 };
+    }
     if (position.entryIndex + 1 >= this.range.index.entries.length) return undefined;
-    return { entryIndex: position.entryIndex + 1, lineOffset: 0, segmentIndex: 0 };
+    return { entryIndex: position.entryIndex + 1, lineOffset: 0, pageIndex: 0, segmentIndex: 0 };
   }
 
   private previous(position: HistoryPosition): HistoryPosition | undefined {
@@ -216,16 +245,34 @@ export class HistoryViewport {
       const segmentIndex = position.segmentIndex - 1;
       return {
         ...position,
-        lineOffset: Math.max(0, this.block(position.entryIndex, segmentIndex).length - 1),
+        lineOffset: Math.max(
+          0,
+          this.block(position.entryIndex, segmentIndex, position.pageIndex).length - 1,
+        ),
+        segmentIndex,
+      };
+    }
+    if (position.pageIndex > 0) {
+      const pageIndex = position.pageIndex - 1;
+      const segmentIndex = this.segmentCount(position.entryIndex, pageIndex) - 1;
+      return {
+        ...position,
+        lineOffset: Math.max(
+          0,
+          this.block(position.entryIndex, segmentIndex, pageIndex).length - 1,
+        ),
+        pageIndex,
         segmentIndex,
       };
     }
     if (position.entryIndex <= this.range.startIndex) return undefined;
     const previousEntryIndex = position.entryIndex - 1;
-    const segmentIndex = this.segmentCount(previousEntryIndex) - 1;
+    const pageIndex = this.pageCount(previousEntryIndex) - 1;
+    const segmentIndex = this.segmentCount(previousEntryIndex, pageIndex) - 1;
     return {
       entryIndex: previousEntryIndex,
-      lineOffset: Math.max(0, this.block(previousEntryIndex, segmentIndex).length - 1),
+      lineOffset: Math.max(0, this.block(previousEntryIndex, segmentIndex, pageIndex).length - 1),
+      pageIndex,
       segmentIndex,
     };
   }
