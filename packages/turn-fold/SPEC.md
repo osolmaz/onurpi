@@ -115,7 +115,7 @@ Stale partial assistant text MUST NOT replace a terminal tool error selected as 
 
 ## History explorer
 
-The main transcript is always compact. `/turn-fold`, `/turn-fold history`, and `Ctrl+Shift+O` MUST open a Pi TUI history explorer without changing compact transcript configuration. Opening, scrolling, loading older history, and closing MUST NOT require a restart or append a session entry.
+The main transcript is always compact. `/turn-fold`, `/turn-fold history`, and `Ctrl+Shift+O` MUST open a Pi TUI history explorer without changing compact transcript configuration. Opening, scrolling, loading older history, and closing MUST NOT require a restart or append a session entry. The explorer MUST present itself as a borderless full-screen view through the documented overlay mechanism with zero margins and full terminal height, with its own title and status rows instead of a boxed popup frame.
 
 The explorer MUST read one active-branch snapshot, omit Turn Fold's internal run and configuration rows, index compaction boundaries without reading message bodies, and initially admit the newest three compaction windows. A backward movement at the oldest admitted row MUST admit at most three older windows for that input and preserve the visible anchor. Repeated bounded loads MUST reach the branch root. The header MUST report admitted and total windows.
 

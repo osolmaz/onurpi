@@ -300,6 +300,7 @@ describe("Turn Fold history explorer mouse support", () => {
   it("scrolls the transcript with wheel input in browse mode", () => {
     const tui = fakeTui(20);
     const explorer = new HistoryExplorer(tui, theme, history(10), vi.fn());
+    const normalize = (frame: string) => frame.replace(/\d+ of 10 windows/u, "N of 10 windows");
     const newest = explorer.render(80).join("\n");
 
     explorer.handleInput("\u001b[<64;10;5M");
@@ -307,7 +308,7 @@ describe("Turn Fold history explorer mouse support", () => {
     explorer.handleInput("\u001b[<65;10;5M");
 
     expect(scrolled).not.toBe(newest);
-    expect(explorer.render(80).join("\n")).toBe(newest);
+    expect(normalize(explorer.render(80).join("\n"))).toBe(normalize(newest));
     expect(tui.requestRender).toHaveBeenCalledTimes(2);
   });
 
@@ -389,8 +390,9 @@ describe("Turn Fold history explorer", () => {
     );
 
     const rendered = explorer.render(80);
-    expect(rendered).toHaveLength(18);
+    expect(rendered).toHaveLength(20);
     expect(rendered.join("\n")).toContain("3 of 7 windows");
+    expect(rendered.join("\n")).not.toContain("+---");
     explorer.handleInput("b");
     explorer.handleInput(" ");
     explorer.handleInput("\u0010");
@@ -491,7 +493,8 @@ describe("Turn Fold history explorer controls", () => {
   it("fits compact chrome within very short terminals", () => {
     const explorer = new HistoryExplorer(fakeTui(6), theme, history(2), vi.fn());
 
-    expect(explorer.render(80)).toHaveLength(4);
+    expect(explorer.render(80)).toHaveLength(6);
+    expect(explorer.render(80).join("\n")).not.toContain("+---");
   });
 
   it("closes with q, escape, or the same shortcut exactly once", () => {
