@@ -24,7 +24,11 @@ import {
 } from "./transcript-window-adapter.ts";
 import { showHistoryViewer } from "./history-viewer.ts";
 import { isTranscriptDensity, type TranscriptDensity } from "./density.ts";
-import { isPreCompactionVisibility, nextPreCompactionVisibility } from "./history-scope.ts";
+import {
+  isPreCompactionVisibility,
+  nextPreCompactionVisibility,
+  selectPreCompactionEntries,
+} from "./history-scope.ts";
 import { installTurnFoldShortcutEditor, ToggleShortcutController } from "./shortcut-editor.ts";
 import { nearestRunStartIndex, RunBoundaryRecorder } from "./run-boundary.ts";
 import {
@@ -260,9 +264,13 @@ async function handleInformationCommand(
   restartRequired: boolean,
 ): Promise<boolean> {
   if (command === "history") {
+    const windowEntries = selectTranscriptEntries(
+      ctx.sessionManager.getBranch(),
+      configuration.windows,
+    );
     await showHistoryViewer(
       ctx,
-      selectTranscriptEntries(ctx.sessionManager.getBranch(), configuration.windows),
+      selectPreCompactionEntries(windowEntries, configuration.preCompaction),
     );
     return true;
   }
