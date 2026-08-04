@@ -1,5 +1,5 @@
 import type { HistoryIndex } from "./history-index.ts";
-import { historyEntryPresentation } from "./history-entry.ts";
+import { historyEntryKind, historyEntryTimestamp } from "./history-entry.ts";
 import type { HistorySearchMatch } from "./history-search.ts";
 
 const DEFAULT_NAVIGATION_LIMIT = 32;
@@ -109,7 +109,7 @@ function nearestTimestamp(
   if (!target) return undefined;
   let nearest: { distance: number; entryIndex: number; timestamp: number } | undefined;
   entries.forEach((entry, entryIndex) => {
-    const timestamp = historyEntryPresentation(entry).timestamp;
+    const timestamp = historyEntryTimestamp(entry);
     if (timestamp === undefined) return;
     const distance =
       "minute" in target
@@ -127,7 +127,7 @@ export class HistoryJumpIndex {
   constructor(index: HistoryIndex) {
     this.index = index;
     this.turnStarts = index.entries.flatMap((entry, entryIndex) =>
-      historyEntryPresentation(entry).kind === "user" ? [entryIndex] : [],
+      historyEntryKind(entry) === "user" ? [entryIndex] : [],
     );
   }
 

@@ -44,6 +44,30 @@ describe("Turn Fold history navigation", () => {
     expect(history.next(4)).toBeUndefined();
   });
 
+  it("builds jump metadata without reading message text", () => {
+    let textReads = 0;
+    const entries = [
+      {
+        id: "user",
+        message: {
+          get content(): unknown {
+            textReads += 1;
+            return "Question";
+          },
+          role: "user",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+      message("assistant", "assistant", 2),
+    ];
+
+    const jumps = new HistoryJumpIndex(createHistoryIndex(entries));
+
+    expect(jumps.totalTurns).toBe(1);
+    expect(textReads).toBe(0);
+  });
+
   it("resolves windows, turns, matches, and endpoints", () => {
     const index = createHistoryIndex([
       message("user-1", "user", 1),

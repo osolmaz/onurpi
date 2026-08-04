@@ -175,6 +175,19 @@ describe("Turn Fold history rendering", () => {
     expect(calls).toContain("fg:borderAccent");
   });
 
+  it("locates matches after terminal control characters in the right segment", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+    const prefix = "\u001b[31m".repeat(200);
+    const entry = assistant("controls", `${prefix}needle`);
+
+    const located = renderer.locate(entry, 80, state(), 20, "needle");
+    const rendered = renderer
+      .render(entry, 0, 80, state(), located.segmentIndex, 20, located.pageIndex)
+      .join("\n");
+
+    expect(rendered).toContain("needle");
+  });
+
   it("keeps its rendered-block cache bounded", () => {
     const renderer = new HistoryEntryRenderer(theme, 2);
 

@@ -332,13 +332,19 @@ export class HistoryEntryRenderer {
     const match = body.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
     if (match < 0) return { pageIndex: 0, segmentIndex: 0 };
     const pageIndex = state.detailed ? Math.floor(match / DETAIL_CHARACTER_LIMIT) : 0;
-    const pageOffset = state.detailed ? match % DETAIL_CHARACTER_LIMIT : match;
+    const rawPageOffset = state.detailed ? match % DETAIL_CHARACTER_LIMIT : match;
     const page = boundedBody(body, state.detailed, pageIndex).text;
+    const safePageOffset = terminalSafeHistoryText(
+      body.slice(
+        pageIndex * DETAIL_CHARACTER_LIMIT,
+        pageIndex * DETAIL_CHARACTER_LIMIT + rawPageOffset,
+      ),
+    ).length;
     const segments = bodySegments(page, width, lineBudget);
     let consumed = 0;
     for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
       consumed += segments[segmentIndex]?.length ?? 0;
-      if (pageOffset < consumed) return { pageIndex, segmentIndex };
+      if (safePageOffset < consumed) return { pageIndex, segmentIndex };
     }
     return { pageIndex, segmentIndex: Math.max(0, segments.length - 1) };
   }
