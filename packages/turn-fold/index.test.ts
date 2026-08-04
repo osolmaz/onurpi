@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import turnFold from "./index.ts";
+import { clearRestartMarker } from "./restart-marker.ts";
 import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
@@ -112,6 +113,7 @@ async function runTurnFoldCommand(
 }
 
 afterEach(() => {
+  clearRestartMarker();
   renderPatchMock.states.length = 0;
   historyViewerMock.entries.length = 0;
   vi.clearAllMocks();
@@ -620,7 +622,9 @@ describe("Turn Fold widening commands", () => {
       "info",
     );
   });
+});
 
+describe("Turn Fold relative and in-memory windows", () => {
   it("resolves relative windows after the active response settles", async () => {
     const extension = extensionHarness();
     const branch = [
