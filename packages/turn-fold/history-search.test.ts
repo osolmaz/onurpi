@@ -75,6 +75,26 @@ describe("Turn Fold history search", () => {
     expect(search.results[0]?.section).toBe("thinking");
   });
 
+  it("bounds filter-skipped entries across slices", () => {
+    const entries = Array.from({ length: 200 }, (_, index) =>
+      message(String(index), "user", "noise"),
+    );
+    entries.push(message("target", "assistant", "needle"));
+    const search = new HistorySearch(entries);
+    search.start("needle", "assistant");
+
+    search.step(50, 64_000);
+
+    expect(search.complete).toBe(false);
+    expect(search.progress.scannedEntries).toBeLessThanOrEqual(50);
+    let steps = 1;
+    while (!search.complete && steps < 20) {
+      search.step(50, 64_000);
+      steps += 1;
+    }
+    expect(search.results.map((result) => result.entryIndex)).toEqual([200]);
+  });
+
   it("wraps next and previous navigation", () => {
     const search = new HistorySearch([
       message("zero", "assistant", "needle"),
