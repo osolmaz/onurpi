@@ -206,8 +206,8 @@ function truncationLines(
 
 function literalHighlight(text: string, query: string, theme: HistoryRenderTheme): string {
   if (!query) return text;
-  const lowerText = text.toLocaleLowerCase();
-  const lowerQuery = query.toLocaleLowerCase();
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
   if (!lowerQuery) return text;
   const parts: string[] = [];
   let cursor = 0;
@@ -329,7 +329,7 @@ export class HistoryEntryRenderer {
   ): HistoryRenderLocation {
     const presentation = historyEntryPresentation(entry);
     const body = displayBody(presentation, state);
-    const match = body.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+    const match = body.toLowerCase().indexOf(query.toLowerCase());
     if (match < 0) return { pageIndex: 0, segmentIndex: 0 };
     const pageIndex = state.detailed ? Math.floor(match / DETAIL_CHARACTER_LIMIT) : 0;
     const rawPageOffset = state.detailed ? match % DETAIL_CHARACTER_LIMIT : match;

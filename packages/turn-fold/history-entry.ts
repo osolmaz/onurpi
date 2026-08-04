@@ -222,7 +222,6 @@ function contentItemVisibility(item: unknown): "text" | "toolCall" | undefined {
   const type = stringField(item, "type");
   if (type === "toolCall") return "toolCall";
   if (type === "text" && /\S/u.test(stringField(item, "text") ?? "")) return "text";
-  if (type === "thinking" && /\S/u.test(stringField(item, "thinking") ?? "")) return "text";
   return undefined;
 }
 
