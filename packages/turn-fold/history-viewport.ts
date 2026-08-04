@@ -46,6 +46,7 @@ function entryState(
 
 export class HistoryViewport {
   private readonly entryStates = new Map<number, HistoryEntryDisplayState>();
+  private readonly presentations = new Map<number, HistoryEntryPresentation>();
   private filterValue: HistoryFilter = "all";
   private focusEntryIndex: number | undefined;
   private readonly history = new BoundedNavigationHistory<HistoryLocation>();
@@ -103,10 +104,15 @@ export class HistoryViewport {
     if (entryIndex === undefined) return undefined;
     const entry = this.index.entries[entryIndex];
     if (entry === undefined) return undefined;
+    let presentation = this.presentations.get(entryIndex);
+    if (presentation === undefined) {
+      presentation = historyEntryPresentation(entry);
+      this.presentations.set(entryIndex, presentation);
+    }
     return {
       entryIndex,
       filter: this.filterValue,
-      presentation: historyEntryPresentation(entry),
+      presentation,
       totalEntries: this.index.entries.length,
       totalWindows: this.index.totalWindows,
       windowNumber: this.index.entryWindows[entryIndex] ?? 1,
