@@ -21,18 +21,21 @@ time.
 
 ## Implementation status
 
-The branch now keeps the main transcript compact, removes persisted density, and opens a public-API
-Pi overlay for detailed history. The explorer indexes message metadata without reading bodies,
-renders viewport-near Markdown and summaries through a bounded cache, preserves the visible position
-while admitting older windows, and closes through the shortcut or session lifecycle.
+The merged implementation keeps the main transcript compact, removes persisted density, and opens a
+public-API Pi overlay for detailed history. The explorer indexes message metadata without reading
+bodies, renders viewport-near Markdown and summaries through a bounded cache, preserves the visible
+position while admitting older windows, and closes through the shortcut or session lifecycle.
 
-The Turn Fold package passes 196 tests, lint, TypeScript, coverage, dry checks, and diff checks. An
-isolated PTY test opened at 3 of 13 windows, loaded 6 of 13, preserved the editor draft, appended no
-Turn Fold session state, and never requested a restart. Ten fresh-process compact latency runs
-measured 18.14 ms p50, 21.31 ms p95, 23.49 ms p99, and 30.11 ms maximum across 200 keypresses. The
-live Git Attribution session opened and closed the explorer inside Pi through `Ctrl+Shift+O` while
-preserving its draft. Workspace checks, Pi Reviewer, CI, canonical installation, and post-merge
-verification remain release gates.
+PR #53 merged at `a475602805f5c142533ce3a8dab3df47db352d56`. The Turn Fold package passes 196 tests.
+Workspace checks pass with 893 tests and one skip, and Slophammer reports no findings across 145
+production files. The final Pi Reviewer run reported no findings, and all required Linux, macOS and
+Windows checks passed.
+
+The post-merge PTY test opened at 3 of 13 windows, loaded 6 of 13, preserved the editor draft,
+appended no Turn Fold session state and never requested a restart. Ten fresh-process runs measured
+6.57 ms p50, 9.73 ms p95, 11.10 ms p99 and 12.82 ms maximum across 200 compact-editor keypresses.
+The canonical settings now load `../../repos/onurpi/packages/turn-fold`. The live Git Attribution
+session opened and closed the installed explorer through `Ctrl+Shift+O` and restored its draft.
 
 ## User requirements
 
