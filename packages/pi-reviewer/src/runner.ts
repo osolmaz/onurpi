@@ -9,7 +9,7 @@ import { selectAppModel } from "./app.js";
 import type { ModelSelection, ReviewOutput } from "./types.js";
 import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
-const MAX_RUNTIME_MS = 10 * 60_000;
+const MAX_RUNTIME_MS = 20 * 60_000;
 const MAX_INACTIVITY_MS = 2 * 60_000;
 const TERMINATION_GRACE_MS = 2_000;
 const MAX_STDERR_BYTES = 128 * 1024;
@@ -83,7 +83,7 @@ async function collectChild(
   let killTimer: NodeJS.Timeout | undefined;
   let inactivityTimer: NodeJS.Timeout;
   const absoluteTimer = setTimeout(() => {
-    terminate("review exceeded 10 minute limit");
+    terminate("review exceeded 20 minute limit");
   }, MAX_RUNTIME_MS);
   const resetInactivity = (): void => {
     clearTimeout(inactivityTimer);

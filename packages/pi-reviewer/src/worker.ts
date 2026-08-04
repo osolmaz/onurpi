@@ -8,6 +8,10 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 
+import {
+  canonicalModelsStorePath,
+  registerHuggingFaceOAuthProvider,
+} from "./huggingface-provider.js";
 import { terminalText } from "./terminal-text.js";
 import { readWorkerRequest, type ReviewWorkerRequest } from "./worker-protocol.js";
 
@@ -43,8 +47,10 @@ export async function createDefaultExecution(
   const modelRuntime = await ModelRuntime.create({
     authPath: request.authPath,
     modelsPath: request.modelsPath,
+    modelsStorePath: canonicalModelsStorePath(request.authPath),
     allowModelNetwork: false,
   });
+  await registerHuggingFaceOAuthProvider(modelRuntime);
   const model = modelRuntime.getModel(request.provider, request.model);
   if (model === undefined) {
     throw new Error(`review model not found: ${request.provider}/${request.model}`);
