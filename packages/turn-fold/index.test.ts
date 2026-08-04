@@ -445,7 +445,9 @@ describe("Turn Fold configuration commands", () => {
       "configuration",
     ]);
   });
+});
 
+describe("Turn Fold projection transitions", () => {
   it("persists widening requests and reports that a restart is required", async () => {
     const extension = extensionHarness();
     const branch = [
@@ -470,6 +472,25 @@ describe("Turn Fold configuration commands", () => {
     );
     expect(ctx.switchSession).not.toHaveBeenCalled();
     expect(ctx.reload).not.toHaveBeenCalled();
+  });
+
+  it("does not count native source entries omitted by the startup projection as loaded", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "user", message: { content: "Prompt", role: "user", timestamp: 1 }, type: "message" },
+      { id: "middle", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
+      { id: "final", message: { content: [], role: "assistant", timestamp: 3 }, type: "message" },
+    ];
+    const ctx = context(branch, branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "expanded", ctx);
+
+    expect(ctx.ui.notify).toHaveBeenLastCalledWith(
+      expect.stringContaining("restart required"),
+      "warning",
+    );
   });
 
   it("treats entries rendered by live turns as loaded for later narrowing", async () => {
@@ -602,7 +623,11 @@ describe("Turn Fold widening commands", () => {
 
   it("rejects widening an in-memory TUI session", async () => {
     const extension = extensionHarness();
-    const branch = [{ id: "user", message: { content: "Prompt", role: "user" }, type: "message" }];
+    const branch = [
+      { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
+      { id: "middle", message: { content: [], role: "assistant", timestamp: 1 }, type: "message" },
+      { id: "final", message: { content: [], role: "assistant", timestamp: 2 }, type: "message" },
+    ];
     const ctx = context([], branch, null);
     turnFold(extension.pi);
     await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
@@ -626,11 +651,13 @@ describe("Turn Fold widening commands", () => {
     };
     const branch = [
       { id: "before", message: { role: "user" }, type: "message" },
+      { id: "older", type: "compaction" },
+      { id: "between", message: { role: "user" }, type: "message" },
       { id: "latest", type: "compaction" },
       { id: "after", message: { role: "user" }, type: "message" },
       config,
     ];
-    const ctx = context([branch[1], branch[2], config], branch);
+    const ctx = context([branch[3], branch[4], config], branch);
     turnFold(extension.pi);
     await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
 
@@ -638,7 +665,7 @@ describe("Turn Fold widening commands", () => {
 
     expect(ctx.ui.confirm).toHaveBeenCalledWith(
       "Load full transcript?",
-      expect.stringContaining("4 active-branch entries"),
+      expect.stringContaining("6 active-branch entries"),
     );
     expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
       density: "compact",

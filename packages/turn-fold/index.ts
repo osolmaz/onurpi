@@ -442,7 +442,6 @@ function startSession(
   runtime.currentTheme = ctx.ui.theme;
   runtime.runBoundaries.reset();
   const branch = ctx.sessionManager.getBranch();
-  const nativeEntries = ctx.sessionManager.buildContextEntries();
   const associations = compactionAssociationsForBranch(branch, ctx, registry);
   runtime.configuration = configurationFromBranch(branch);
   runtime.appliedConfiguration = runtime.configuration;
@@ -453,11 +452,8 @@ function startSession(
   );
   applyProjectionPlanToState(plan, state, associations, ctx);
   state.setDensity(runtime.configuration.density);
-  const sourceEntryIds = entryIds(plan.sourceEntries);
   runtime.knownEntryIds = entryIds(branch);
-  runtime.loadedEntryIds = new Set(
-    [...entryIds(nativeEntries)].filter((id) => sourceEntryIds.has(id)),
-  );
+  runtime.loadedEntryIds = new Set(plan.requiredEntryIds);
   runtime.restartRequired = !canApplyProjectionInPlace(plan, runtime.loadedEntryIds);
   runtime.restoreEditor();
   runtime.ensureShrinkClearing = () => undefined;

@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 
+import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 function assistantMessage(timestamp: number, text: string): Record<string, unknown> {
@@ -25,6 +26,17 @@ it("keeps custom-prompt runs visible when their projected entries are displayed"
       type: "custom_message",
     },
     { id: "goal-answer", message: assistantHistory, type: "message" },
+    {
+      customType: TURN_FOLD_RUN_ENTRY,
+      data: {
+        promptEntryId: "goal-prompt",
+        runId: "goal-run",
+        startedAt: 100,
+        version: 1,
+      },
+      id: "goal-boundary",
+      type: "custom",
+    },
   ];
 
   state.applyHistoryProjection(entries, entries);
@@ -33,14 +45,14 @@ it("keeps custom-prompt runs visible when their projected entries are displayed"
   expect(state.viewFor(assistant)?.display).not.toBe("hidden");
 });
 
-it("does not make a group visible from non-rendering custom metadata alone", () => {
+it("does not make a group visible from pass-through metadata alone", () => {
   const state = new TurnFoldState();
   const assistant = {};
   const assistantHistory = assistantMessage(110, "Answer");
   const entries = [
     { id: "user", message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
     { id: "answer", message: assistantHistory, type: "message" },
-    { customType: "metadata", data: {}, id: "metadata", type: "custom" },
+    { id: "metadata", label: "checkpoint", type: "label" },
   ];
 
   state.applyHistoryProjection(entries, [entries[2]]);
