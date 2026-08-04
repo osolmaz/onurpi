@@ -33,6 +33,27 @@ function history(windowCount: number): unknown[] {
 }
 
 describe("Turn Fold history viewport", () => {
+  it("reaches the suffix of expanded entries through detailed pages", () => {
+    const entries = [
+      {
+        id: "huge",
+        message: {
+          content: `start-${"x".repeat(100_005)}-end`,
+          role: "assistant",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+
+    viewport.toggleCurrentEntry();
+    viewport.moveToNewest();
+
+    expect(viewport.render(80, 8).join("\n")).toContain("-end");
+  });
+
   it("renders only viewport-near entry bodies when opening large history", () => {
     let bodyReads = 0;
     const entries = Array.from({ length: 1_000 }, (_, index) => ({

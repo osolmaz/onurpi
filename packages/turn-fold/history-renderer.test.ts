@@ -52,6 +52,21 @@ describe("Turn Fold history rendering", () => {
     );
   });
 
+  it("pages through detailed entries beyond the per-page character bound", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+    const entry = assistant("huge", `start-${"x".repeat(100_005)}-end`);
+    const finalPage = renderer.pageCount(entry, true) - 1;
+    const firstPageLastSegment = renderer.segmentCount(entry, 0, 80, true, 20, 0) - 1;
+    const finalSegment = renderer.segmentCount(entry, 0, 80, true, 20, finalPage) - 1;
+
+    expect(renderer.render(entry, 0, 80, true, firstPageLastSegment, 20, 0).join("\n")).toContain(
+      "continue scrolling",
+    );
+    expect(renderer.render(entry, 0, 80, true, finalSegment, 20, finalPage).join("\n")).toContain(
+      "-end",
+    );
+  });
+
   it("renders only a bounded segment of multiline content", () => {
     const renderer = new HistoryEntryRenderer(theme);
     const entry = assistant(

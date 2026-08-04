@@ -26,7 +26,7 @@ Pi overlay for detailed history. The explorer indexes message metadata without r
 renders viewport-near Markdown and summaries through a bounded cache, preserves the visible position
 while admitting older windows, and closes through the shortcut or session lifecycle.
 
-The Turn Fold package passes 192 tests, lint, TypeScript, coverage, dry checks, and diff checks. An
+The Turn Fold package passes 195 tests, lint, TypeScript, coverage, dry checks, and diff checks. An
 isolated PTY test opened at 3 of 13 windows, loaded 6 of 13, preserved the editor draft, appended no
 Turn Fold session state, and never requested a restart. Ten fresh-process compact latency runs
 measured 18.14 ms p50, 21.31 ms p95, 23.49 ms p99, and 30.11 ms maximum across 200 keypresses. The
@@ -137,9 +137,10 @@ assistant text use the public Markdown renderer. Tool calls, tool results, compa
 entries, custom entries and timestamps use terminal-safe Turn Fold summaries, including unknown
 rows.
 
-Cache rendered blocks by entry identity, width, theme revision, and detail state. Keep the cache
-bounded with least-recently-used eviction. Normal rendering returns at most the viewport plus one
-screen of overscan. Large entries begin with a bounded preview and can be expanded explicitly.
+Cache rendered blocks by entry identity, width, theme revision, detail state, segment and detail
+page. Keep the cache bounded with least-recently-used eviction. Normal rendering returns at most the
+viewport plus one screen of overscan. Large entries begin with a bounded preview, expand explicitly
+and continue through bounded pages so their suffix remains reachable.
 
 ### Overlay lifecycle
 
