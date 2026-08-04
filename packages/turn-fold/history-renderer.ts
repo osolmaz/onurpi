@@ -1,34 +1,45 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Markdown, truncateToWidth } from "@earendil-works/pi-tui";
+import { Markdown, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-import { formatLocalTimestamp } from "./local-time.ts";
 import {
-  entryTimestamp,
-  isRecord,
-  messageFromEntry,
-  numberField,
-  stringField,
-} from "./turn-message.ts";
+  historyEntryPresentation,
+  type HistoryEntryKind,
+  type HistoryEntryPresentation,
+  type HistorySection,
+} from "./history-entry.ts";
+import { formatLocalTimestamp } from "./local-time.ts";
 
 const PREVIEW_CHARACTER_LIMIT = 4_000;
 const DETAIL_CHARACTER_LIMIT = 100_000;
 const DEFAULT_CACHE_LIMIT = 128;
+const PREPARED_CACHE_LIMIT = 8;
 
-export type HistoryRenderTheme = Pick<Theme, "bold" | "fg">;
+export type HistoryRenderTheme = Pick<Theme, "bg" | "bold" | "fg" | "italic">;
 
-type PresentedEntry = Readonly<{
-  body: string;
-  label: string;
-  timestamp: number | undefined;
+export type HistoryRenderLocation = Readonly<{
+  pageIndex: number;
+  segmentIndex: number;
 }>;
 
-type CachedBlock = Readonly<{
-  lines: readonly string[];
+export type HistoryEntryDisplayState = Readonly<{
+  detailed: boolean;
+  showDiffs: boolean;
+  showThinking: boolean;
+  showToolOutput: boolean;
 }>;
+
+export const DEFAULT_HISTORY_ENTRY_DISPLAY: HistoryEntryDisplayState = {
+  detailed: false,
+  showDiffs: false,
+  showThinking: false,
+  showToolOutput: false,
+};
+
+type CachedBlock = Readonly<{ lines: readonly string[] }>;
 
 type PreparedEntry = Readonly<{
   hasMore: boolean;
-  presented: PresentedEntry;
+  presentation: HistoryEntryPresentation;
   segments: readonly string[];
   truncated: boolean;
 }>;
@@ -51,59 +62,51 @@ export function terminalSafeHistoryText(value: string): string {
   return safe;
 }
 
-function contentSection(item: unknown): string | undefined {
-  const type = stringField(item, "type");
-  if (type === "text") return stringField(item, "text");
-  if (type === "thinking") {
-    const thinking = stringField(item, "thinking");
-    return thinking ? `*Thinking*\n\n${thinking}` : undefined;
+function thinkingSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
+  return state.showThinking
+    ? `*Thinking*\n\n${section.text}`
+    : "*Thinking hidden · press T to show*";
+}
+
+function toolSectionText(
+  section: HistorySection,
+  state: HistoryEntryDisplayState,
+  presentation: HistoryEntryPresentation,
+): string {
+  if (state.showToolOutput) return section.text;
+  const summary = presentation.summary?.trim().split("\n", 1)[0];
+  return summary
+    ? `**${summary.slice(0, 240)}**\n\n*Tool details hidden · press O to show*`
+    : "*Tool details hidden · press O to show*";
+}
+
+function diffSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
+  return state.showDiffs
+    ? `\`\`\`diff\n${section.text}\n\`\`\``
+    : "*Diff hidden · press D to show*";
+}
+
+function sectionText(
+  section: HistorySection,
+  state: HistoryEntryDisplayState,
+  presentation: HistoryEntryPresentation,
+): string {
+  if (section.kind === "thinking") return thinkingSectionText(section, state);
+  if (section.kind === "toolOutput") return toolSectionText(section, state, presentation);
+  if (section.kind === "diff") return diffSectionText(section, state);
+  return section.text;
+}
+
+function displayBody(
+  presentation: HistoryEntryPresentation,
+  state: HistoryEntryDisplayState,
+): string {
+  const sections: string[] = [];
+  for (const section of presentation.sections) {
+    const text = sectionText(section, state, presentation);
+    if (!sections.includes(text) || !text.includes(" hidden · press ")) sections.push(text);
   }
-  if (type === "toolCall") return `**Tool:** ${stringField(item, "name") ?? "unknown"}`;
-  return undefined;
-}
-
-function contentText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map(contentSection)
-    .filter((section) => section !== undefined)
-    .join("\n\n");
-}
-
-function messageTimestamp(entry: unknown, message: unknown): number | undefined {
-  return numberField(message, "timestamp") ?? entryTimestamp(entry);
-}
-
-function messageEntry(entry: unknown, message: unknown): PresentedEntry {
-  const role = stringField(message, "role") ?? "message";
-  const toolName = stringField(message, "toolName");
-  return {
-    body: isRecord(message) ? contentText(message["content"]) : "",
-    label: role === "toolResult" && toolName ? `tool result · ${toolName}` : role,
-    timestamp: messageTimestamp(entry, message),
-  };
-}
-
-function nonMessageEntry(entry: unknown, type: string): PresentedEntry {
-  if (type === "compaction") {
-    return {
-      body: stringField(entry, "summary") ?? "",
-      label: "compaction",
-      timestamp: entryTimestamp(entry),
-    };
-  }
-  return {
-    body: type === "custom_message" ? (stringField(entry, "content") ?? "") : "",
-    label: stringField(entry, "customType") ?? type,
-    timestamp: entryTimestamp(entry),
-  };
-}
-
-function presentEntry(entry: unknown): PresentedEntry {
-  const message = messageFromEntry(entry);
-  if (isRecord(message)) return messageEntry(entry, message);
-  return nonMessageEntry(entry, stringField(entry, "type") ?? "entry");
+  return sections.join("\n\n");
 }
 
 function boundedBody(
@@ -155,11 +158,38 @@ function bodySegments(body: string, width: number, lineBudget: number): readonly
   return segments;
 }
 
-function blockHeader(entry: PresentedEntry, width: number, theme: HistoryRenderTheme): string {
-  const timestamp = entry.timestamp === undefined ? "" : formatLocalTimestamp(entry.timestamp);
+function entrySymbol(kind: HistoryEntryKind): string {
+  if (kind === "user") return "◆";
+  if (kind === "assistant") return "●";
+  if (kind === "tool") return "✓";
+  if (kind === "error") return "✗";
+  if (kind === "compaction") return "◇";
+  return "•";
+}
+
+function entryColor(kind: HistoryEntryKind): Parameters<HistoryRenderTheme["fg"]>[0] {
+  if (kind === "user") return "userMessageText";
+  if (kind === "tool") return "toolTitle";
+  if (kind === "error") return "error";
+  if (kind === "compaction" || kind === "custom") return "customMessageLabel";
+  return "accent";
+}
+
+function blockHeader(
+  presentation: HistoryEntryPresentation,
+  width: number,
+  theme: HistoryRenderTheme,
+  selected: boolean,
+): string {
+  const timestamp =
+    presentation.timestamp === undefined ? "" : formatLocalTimestamp(presentation.timestamp);
   const suffix = timestamp ? `  ${theme.fg("dim", timestamp)}` : "";
-  const label = terminalSafeHistoryText(entry.label);
-  return truncateToWidth(`  ${theme.bold(theme.fg("accent", label))}${suffix}`, width);
+  const label = terminalSafeHistoryText(presentation.label);
+  const text = `${entrySymbol(presentation.kind)} ${label}`;
+  const colored = theme.bold(
+    theme.fg(selected ? "borderAccent" : entryColor(presentation.kind), text),
+  );
+  return truncateToWidth(`  ${colored}${suffix}`, width);
 }
 
 function truncationLines(
@@ -174,30 +204,96 @@ function truncationLines(
   return [truncateToWidth(theme.fg("warning", message), width)];
 }
 
+function literalHighlight(text: string, query: string, theme: HistoryRenderTheme): string {
+  if (!query) return text;
+  const lowerText = text.toLocaleLowerCase();
+  const lowerQuery = query.toLocaleLowerCase();
+  if (!lowerQuery) return text;
+  const parts: string[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const match = lowerText.indexOf(lowerQuery, cursor);
+    if (match < 0) break;
+    parts.push(text.slice(cursor, match));
+    parts.push(theme.bg("selectedBg", text.slice(match, match + query.length)));
+    cursor = match + query.length;
+  }
+  parts.push(text.slice(cursor));
+  return parts.join("");
+}
+
+function padVisible(value: string, width: number): string {
+  const truncated = truncateToWidth(value, width, "…", true);
+  return `${truncated}${" ".repeat(Math.max(0, width - visibleWidth(truncated)))}`;
+}
+
+function styleBodyLine(
+  line: string,
+  kind: HistoryEntryKind,
+  width: number,
+  theme: HistoryRenderTheme,
+): string {
+  if (kind === "user") {
+    return theme.bg("userMessageBg", theme.fg("userMessageText", padVisible(line, width)));
+  }
+  if (kind === "compaction" || kind === "custom") {
+    return theme.bg("customMessageBg", padVisible(line, width));
+  }
+  if (kind === "error") return theme.fg("error", line);
+  if (kind === "tool") return theme.fg("toolOutput", line);
+  return line;
+}
+
 function renderedSegment(
   prepared: PreparedEntry,
   segmentIndex: number,
   pageIndex: number,
   width: number,
   theme: HistoryRenderTheme,
+  query: string,
+  selected: boolean,
 ): readonly string[] {
   const segment = prepared.segments[segmentIndex] ?? "";
+  const highlighted = literalHighlight(segment, query, theme);
   const markdown = new Markdown(
-    segment || theme.fg("dim", "[no text content]"),
+    highlighted || theme.fg("dim", "[no text content]"),
     2,
     0,
     getMarkdownTheme(),
   );
+  const body = markdown
+    .render(width)
+    .map((line) => styleBodyLine(line, prepared.presentation.kind, width, theme));
   return [
     ...(pageIndex === 0 && segmentIndex === 0
-      ? [blockHeader(prepared.presented, width, theme)]
+      ? [blockHeader(prepared.presentation, width, theme, selected)]
       : []),
-    ...markdown.render(width),
+    ...body,
     ...(segmentIndex === prepared.segments.length - 1
       ? truncationLines(prepared, width, theme)
       : []),
     ...(segmentIndex === prepared.segments.length - 1 ? [""] : []),
   ];
+}
+
+function touchCache<T>(cache: Map<string, T>, key: string, value: T): T {
+  cache.delete(key);
+  cache.set(key, value);
+  return value;
+}
+
+function trimCache<T>(cache: Map<string, T>, limit: number): void {
+  while (cache.size > limit) {
+    const oldest = cache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    cache.delete(oldest);
+  }
+}
+
+function stateKey(state: HistoryEntryDisplayState): string {
+  return [state.detailed, state.showThinking, state.showToolOutput, state.showDiffs]
+    .map((value) => (value ? "1" : "0"))
+    .join("");
 }
 
 export class HistoryEntryRenderer {
@@ -220,62 +316,92 @@ export class HistoryEntryRenderer {
     this.prepared.clear();
   }
 
-  pageCount(entry: unknown, detailed: boolean): number {
-    if (!detailed) return 1;
-    return Math.max(1, Math.ceil(presentEntry(entry).body.length / DETAIL_CHARACTER_LIMIT));
+  describe(entry: unknown): HistoryEntryPresentation {
+    return historyEntryPresentation(entry);
+  }
+
+  locate(
+    entry: unknown,
+    width: number,
+    state: HistoryEntryDisplayState,
+    lineBudget: number,
+    query: string,
+  ): HistoryRenderLocation {
+    const presentation = historyEntryPresentation(entry);
+    const body = displayBody(presentation, state);
+    const match = body.toLocaleLowerCase().indexOf(query.toLocaleLowerCase());
+    if (match < 0) return { pageIndex: 0, segmentIndex: 0 };
+    const pageIndex = state.detailed ? Math.floor(match / DETAIL_CHARACTER_LIMIT) : 0;
+    const pageOffset = state.detailed ? match % DETAIL_CHARACTER_LIMIT : match;
+    const page = boundedBody(body, state.detailed, pageIndex).text;
+    const segments = bodySegments(page, width, lineBudget);
+    let consumed = 0;
+    for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex += 1) {
+      consumed += segments[segmentIndex]?.length ?? 0;
+      if (pageOffset < consumed) return { pageIndex, segmentIndex };
+    }
+    return { pageIndex, segmentIndex: Math.max(0, segments.length - 1) };
+  }
+
+  pageCount(entry: unknown, state: HistoryEntryDisplayState): number {
+    if (!state.detailed) return 1;
+    const body = displayBody(historyEntryPresentation(entry), state);
+    return Math.max(1, Math.ceil(body.length / DETAIL_CHARACTER_LIMIT));
   }
 
   segmentCount(
     entry: unknown,
     entryIndex: number,
     width: number,
-    detailed: boolean,
+    state: HistoryEntryDisplayState,
     lineBudget: number,
     pageIndex = 0,
   ): number {
-    return this.prepare(entry, entryIndex, width, detailed, lineBudget, pageIndex).segments.length;
+    return this.prepare(entry, entryIndex, width, state, lineBudget, pageIndex).segments.length;
   }
 
   hasNextPage(
     entry: unknown,
     entryIndex: number,
     width: number,
-    detailed: boolean,
+    state: HistoryEntryDisplayState,
     lineBudget: number,
     pageIndex: number,
   ): boolean {
-    return this.prepare(entry, entryIndex, width, detailed, lineBudget, pageIndex).hasMore;
+    return this.prepare(entry, entryIndex, width, state, lineBudget, pageIndex).hasMore;
   }
 
   render(
     entry: unknown,
     entryIndex: number,
     width: number,
-    detailed: boolean,
+    state: HistoryEntryDisplayState,
     segmentIndex = 0,
     lineBudget = 20,
     pageIndex = 0,
+    query = "",
+    selected = false,
   ): readonly string[] {
     const safeWidth = Math.max(1, width);
     const safeBudget = Math.max(4, lineBudget);
-    const prepared = this.prepare(entry, entryIndex, safeWidth, detailed, safeBudget, pageIndex);
+    const prepared = this.prepare(entry, entryIndex, safeWidth, state, safeBudget, pageIndex);
     const safeSegmentIndex = Math.min(Math.max(0, segmentIndex), prepared.segments.length - 1);
-    const key = `${String(entryIndex)}:${String(safeWidth)}:${detailed ? "detail" : "preview"}:${String(safeBudget)}:${String(pageIndex)}:${String(safeSegmentIndex)}`;
+    const key = `${String(entryIndex)}:${String(safeWidth)}:${stateKey(state)}:${String(safeBudget)}:${String(pageIndex)}:${String(safeSegmentIndex)}:${query}:${selected ? "selected" : "normal"}`;
     const cached = this.cache.get(key);
-    if (cached) {
-      this.cache.delete(key);
-      this.cache.set(key, cached);
-      return cached.lines;
-    }
+    if (cached) return touchCache(this.cache, key, cached).lines;
 
-    const lines = renderedSegment(prepared, safeSegmentIndex, pageIndex, safeWidth, this.theme);
+    const lines = renderedSegment(
+      prepared,
+      safeSegmentIndex,
+      pageIndex,
+      safeWidth,
+      this.theme,
+      query,
+      selected,
+    );
     const block = { lines };
     this.cache.set(key, block);
-    while (this.cache.size > this.cacheLimit) {
-      const oldest = this.cache.keys().next().value;
-      if (typeof oldest !== "string") break;
-      this.cache.delete(oldest);
-    }
+    trimCache(this.cache, this.cacheLimit);
     return lines;
   }
 
@@ -283,32 +409,23 @@ export class HistoryEntryRenderer {
     entry: unknown,
     entryIndex: number,
     width: number,
-    detailed: boolean,
+    state: HistoryEntryDisplayState,
     lineBudget: number,
     pageIndex: number,
   ): PreparedEntry {
-    const key = `${String(entryIndex)}:${String(width)}:${detailed ? "detail" : "preview"}:${String(lineBudget)}:${String(pageIndex)}`;
+    const key = `${String(entryIndex)}:${String(width)}:${stateKey(state)}:${String(lineBudget)}:${String(pageIndex)}`;
     const cached = this.prepared.get(key);
-    if (cached) {
-      this.prepared.delete(key);
-      this.prepared.set(key, cached);
-      return cached;
-    }
-    const presented = presentEntry(entry);
-    const body = boundedBody(presented.body, detailed, pageIndex);
+    if (cached) return touchCache(this.prepared, key, cached);
+    const presentation = historyEntryPresentation(entry);
+    const body = boundedBody(displayBody(presentation, state), state.detailed, pageIndex);
     const prepared = {
       hasMore: body.hasMore,
-      presented,
+      presentation,
       segments: bodySegments(body.text, width, lineBudget),
       truncated: body.truncated,
     };
     this.prepared.set(key, prepared);
-    const preparedLimit = Math.min(this.cacheLimit, 8);
-    while (this.prepared.size > preparedLimit) {
-      const oldest = this.prepared.keys().next().value;
-      if (typeof oldest !== "string") break;
-      this.prepared.delete(oldest);
-    }
+    trimCache(this.prepared, Math.min(this.cacheLimit, PREPARED_CACHE_LIMIT));
     return prepared;
   }
 }

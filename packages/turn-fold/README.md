@@ -6,7 +6,7 @@ Compact transcript rendering and on-demand history for the Pi coding agent.
 
 Automatic compactions during a turn appear as `compacted` in the summary. Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a per-turn diffstat such as `3 files +42 −11`, followed by each edited absolute path and its cumulative counters. Interrupted runs retain their last partial response or an interruption message.
 
-The main transcript always stays compact. Full message history is available through a virtualized history explorer rendered inside Pi. The explorer starts with the newest three compaction windows, renders only viewport-near entries, and can load three older windows at a time without restarting Pi.
+The main transcript always stays compact. Full message history is available through a virtualized history explorer rendered inside Pi. The explorer starts with the newest three compaction windows, renders only viewport-near entries, and can load three older windows at a time without restarting Pi. Pi-themed role styles separate users and assistant replies from tools, errors, compactions and custom rows. Search, filters, direct jumps, and back or forward navigation make long histories easier to inspect.
 
 Turn Fold preserves every normal session message and Pi's model context. It stores one small custom boundary entry for each new agent run so extension-started runs replay correctly after a restart. Compaction still controls what reaches the model. [SPEC.md](SPEC.md) defines the required behavior.
 
@@ -53,14 +53,25 @@ The explorer uses these keys:
 ```text
 Up / Ctrl+P       one line backward
 Down / Ctrl+N     one line forward
-b                 one screen backward
-Space             one screen forward
+b / Space         one screen backward / forward
 g / G             oldest admitted row / newest row
-Enter             show more or less of the current entry
-q / Esc           close
+/                 edit search
+n / N             next / previous search match
+f                 choose a role filter
+j                 jump to a window, turn, match or timestamp
+[ / ]             previous / next jump position
+Enter             show more or less long text
+T / O / D         thinking / tool output / diff details
+?                 key reference
+q / Esc           close or return from a subview
+Ctrl+Shift+O      close from any explorer screen
 ```
 
-The initial range contains the newest three compaction windows. Moving backward at the oldest admitted row loads three older windows and preserves the visible position. The header reports the admitted and total window counts. Expanded entries continue through bounded detail pages, so scrolling can reach their full suffix without caching the full rendered body. Loaded extent, scroll position, and detailed entries are discarded when the explorer closes.
+Search is a case-insensitive literal scan of the complete active branch. It runs in bounded slices, highlights matching text, shows nearby entries, and admits older compaction windows when needed. Search and jump fields support standard terminal editing keys such as `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Ctrl+K`, `Ctrl+U`, `Ctrl+Y`, word movement, Home, End, Delete and Backspace.
+
+The filter menu covers all rows, users, assistants, tools, errors, compactions and custom rows. The jump field accepts `wN` for a compaction window, `tN` for a user turn, `mN` for a search match, `@HH:MM` or another timestamp, plus `oldest` and `newest`.
+
+The initial range contains the newest three compaction windows. Moving backward at the oldest admitted row loads three older windows and preserves the visible position. The sticky header reports the current role, timestamp, entry, compaction window, filter, search progress, and navigation history. Expanded entries continue through bounded detail pages, so scrolling can reach their full suffix without caching the full rendered body. Loaded extent, search, filters, scroll position, navigation history, and detailed entries are discarded when the explorer closes.
 
 `Ctrl+O` remains Pi's separate tool-output detail toggle.
 

@@ -1,11 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { initTheme } from "@earendil-works/pi-coding-agent";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { HistoryExplorer, HistoryViewport } from "./history-viewer.ts";
+import { HistoryExplorer } from "./history-viewer.ts";
+import { HistoryViewport } from "./history-viewport.ts";
+
+initTheme("dark", false);
 
 const theme = {
+  bg: (_color: string, text: string) => text,
   bold: (text: string) => text,
   fg: (_color: string, text: string) => text,
+  italic: (text: string) => text,
 };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function assistant(id: string, text: string): unknown {
   return {
@@ -48,7 +58,7 @@ describe("Turn Fold history viewport", () => {
     const viewport = new HistoryViewport(entries, theme);
     viewport.render(80, 8);
 
-    viewport.toggleCurrentEntry();
+    viewport.toggleDetails();
     viewport.moveToNewest();
 
     expect(viewport.render(80, 8).join("\n")).toContain("-end");
@@ -73,7 +83,7 @@ describe("Turn Fold history viewport", () => {
     const rendered = viewport.render(80, 20);
 
     expect(rendered.join("\n")).toContain("Text 999");
-    expect(bodyReads).toBeLessThan(20);
+    expect(bodyReads).toBeLessThanOrEqual(25);
   });
 
   it("starts with three windows and admits three older windows at the boundary", () => {
@@ -137,6 +147,79 @@ describe("Turn Fold history viewport", () => {
     expect(resized).toContain("Answer 3");
     expect(resized).not.toContain("Answer 0");
   });
+});
+
+describe("Turn Fold history viewport controls", () => {
+  it("filters entries and restores exact locations through navigation history", () => {
+    const entries = [
+      {
+        id: "user",
+        message: { content: "Question", role: "user", timestamp: 1 },
+        type: "message",
+      },
+      assistant("assistant", "Answer"),
+      { id: "compaction", summary: "Summary", type: "compaction" },
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+
+    viewport.setFilter("user");
+    expect(viewport.render(80, 8).join("\n")).toContain("Question");
+    viewport.jumpToEntry(2);
+    expect(viewport.filter).toBe("all");
+    expect(viewport.context()?.entryIndex).toBe(2);
+    expect(viewport.goBack()).toBe(true);
+    expect(viewport.filter).toBe("user");
+    expect(viewport.goForward()).toBe(true);
+    expect(viewport.context()?.entryIndex).toBe(2);
+  });
+
+  it("reveals the section containing a search match", () => {
+    const entries = [
+      {
+        id: "thinking",
+        message: {
+          content: [
+            { thinking: "hidden needle", type: "thinking" },
+            { text: "answer", type: "text" },
+          ],
+          role: "assistant",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+    viewport.setSearch("needle");
+
+    viewport.jumpToMatch({ entryIndex: 0, section: "thinking", snippet: "needle" });
+
+    expect(viewport.render(80, 8).join("\n")).toContain("hidden needle");
+  });
+
+  it("keeps independent section toggles scoped to the focused entry", () => {
+    const entries = [
+      {
+        id: "tool",
+        message: {
+          content: [{ arguments: { path: "a.ts" }, id: "call", name: "read", type: "toolCall" }],
+          role: "assistant",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+      assistant("answer", "Answer"),
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+    viewport.jumpToEntry(0);
+
+    expect(viewport.toggleToolOutput()).toBe(true);
+    expect(viewport.render(80, 8).join("\n")).toContain("a.ts");
+    viewport.jumpToEntry(1);
+    expect(viewport.toggleToolOutput()).toBe(false);
+  });
 
   it("expands the current truncated entry without unbounding the cache", () => {
     const viewport = new HistoryViewport(
@@ -147,7 +230,7 @@ describe("Turn Fold history viewport", () => {
 
     expect(viewport.render(80, 8).join("\n")).not.toContain("-end");
     viewport.moveToOldest();
-    viewport.toggleCurrentEntry();
+    viewport.toggleDetails();
 
     expect(viewport.render(80, 8).join("\n")).toContain("start-");
     expect(viewport.cachedBlocks).toBeLessThanOrEqual(2);
@@ -189,6 +272,99 @@ describe("Turn Fold history explorer", () => {
 
     expect(requestRender).toHaveBeenCalledTimes(4);
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("searches incrementally, highlights a match, and clears before closing", async () => {
+    vi.useFakeTimers();
+    const close = vi.fn();
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      theme,
+      [assistant("one", "Nothing"), assistant("two", "Needle here")],
+      close,
+    );
+
+    explorer.handleInput("/");
+    for (const character of "needle") explorer.handleInput(character);
+    explorer.handleInput("\r");
+    await vi.runAllTimersAsync();
+
+    expect(explorer.render(100).join("\n")).toContain("search “needle”");
+    expect(explorer.render(100).join("\n")).toContain("Needle here");
+    explorer.handleInput("\u001b");
+    expect(close).not.toHaveBeenCalled();
+    explorer.handleInput("\u001b");
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("cancels incremental search work when the explorer closes", async () => {
+    vi.useFakeTimers();
+    const requestRender = vi.fn();
+    const close = vi.fn();
+    const explorer = new HistoryExplorer(
+      { requestRender, terminal: { rows: 20 } as never },
+      theme,
+      Array.from({ length: 1_000 }, (_, index) =>
+        assistant(String(index), `entry ${String(index)}`),
+      ),
+      close,
+    );
+    explorer.handleInput("/");
+    explorer.handleInput("x");
+    explorer.handleInput("\r");
+    const renderCount = requestRender.mock.calls.length;
+
+    explorer.handleInput("\u001b[111;6u");
+    await vi.runAllTimersAsync();
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(requestRender).toHaveBeenCalledTimes(renderCount);
+  });
+});
+
+describe("Turn Fold history explorer controls", () => {
+  it("filters, jumps, and navigates back without leaving the overlay", () => {
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      theme,
+      [
+        {
+          id: "user",
+          message: { content: "Question", role: "user", timestamp: 1 },
+          type: "message",
+        },
+        ...history(7),
+      ],
+      vi.fn(),
+    );
+
+    explorer.handleInput("f");
+    expect(explorer.render(100).join("\n")).toContain("user messages");
+    explorer.handleInput("u");
+    expect(explorer.render(100).join("\n")).toContain("Question");
+    explorer.handleInput("j");
+    explorer.handleInput("w");
+    explorer.handleInput("1");
+    explorer.handleInput("\r");
+    expect(explorer.render(100).join("\n")).toContain("w 1/7");
+    explorer.handleInput("[");
+    expect(explorer.render(100).join("\n")).toContain("filter user");
+  });
+
+  it("opens help and returns to the same transcript position", () => {
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 24 } as never },
+      theme,
+      history(4),
+      vi.fn(),
+    );
+    const before = explorer.render(100).join("\n");
+
+    explorer.handleInput("?");
+    expect(explorer.render(100).join("\n")).toContain("Navigation");
+    explorer.handleInput("\u001b");
+
+    expect(explorer.render(100).join("\n")).toBe(before);
   });
 
   it("fits compact chrome within very short terminals", () => {

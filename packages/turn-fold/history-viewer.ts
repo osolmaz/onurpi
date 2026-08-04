@@ -1,4 +1,4 @@
-import type { ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
   matchesKey,
   truncateToWidth,
@@ -7,16 +7,18 @@ import {
   type TUI,
 } from "@earendil-works/pi-tui";
 
-import { createHistoryIndex, HistoryRange } from "./history-index.ts";
-import { HistoryEntryRenderer } from "./history-renderer.ts";
+import { historyFilterKey, type HistoryFilter } from "./history-entry.ts";
+import { HistoryInput } from "./history-input.ts";
+import { HistoryJumpIndex, parseHistoryJump } from "./history-navigation.ts";
+import { formatLocalTimestamp } from "./local-time.ts";
+import { HistorySearch } from "./history-search.ts";
+import type { HistoryRenderTheme } from "./history-renderer.ts";
+import { HistoryViewport } from "./history-viewport.ts";
 
-type HistoryPosition = Readonly<{
-  entryIndex: number;
-  lineOffset: number;
-  pageIndex: number;
-  segmentIndex: number;
-}>;
+const SEARCH_STEP_ENTRIES = 250;
+const SEARCH_STEP_CHARACTERS = 256_000;
 
+type ExplorerMode = "browse" | "filter" | "help" | "jump" | "search";
 type ExplorerTui = Pick<TUI, "requestRender" | "terminal">;
 
 export type HistoryExplorerLifecycle = Readonly<{
@@ -29,283 +31,66 @@ function padLine(value: string, width: number): string {
   return truncated + " ".repeat(Math.max(0, width - visibleWidth(truncated)));
 }
 
-export class HistoryViewport {
-  private readonly detailedEntries = new Set<number>();
-  private readonly range: HistoryRange;
-  private readonly renderer: HistoryEntryRenderer;
-  private readonly theme: Pick<Theme, "bold" | "fg">;
-  private top: HistoryPosition | undefined;
-  private viewportHeight = 1;
-  private width = 1;
+function helpLines(): readonly string[] {
+  return [
+    "Navigation",
+    "  ↑/↓ or Ctrl+P/Ctrl+N   one line",
+    "  b / Space              one screen back / forward",
+    "  g / G                  oldest admitted / newest",
+    "  [ / ]                  previous / next jump position",
+    "",
+    "Find and narrow",
+    "  /                      edit search",
+    "  n / N                  next / previous match",
+    "  f                      filter menu",
+    "  j                      jump menu",
+    "",
+    "Current entry",
+    "  Enter                  long text details",
+    "  T                      thinking",
+    "  O                      tool output or arguments",
+    "  D                      diff output",
+    "",
+    "Overlay",
+    "  ?                      close help",
+    "  q / Esc                close or return",
+    "  Ctrl+Shift+O           close from any screen",
+  ];
+}
 
-  constructor(entries: readonly unknown[], theme: Pick<Theme, "bold" | "fg">, cacheLimit?: number) {
-    this.range = new HistoryRange(createHistoryIndex(entries));
-    this.renderer = new HistoryEntryRenderer(theme, cacheLimit);
-    this.theme = theme;
-  }
-
-  get admittedWindows(): number {
-    return this.range.index.entries.length === 0 ? 0 : this.range.admittedWindows;
-  }
-
-  get cachedBlocks(): number {
-    return this.renderer.cachedBlocks;
-  }
-
-  get totalWindows(): number {
-    return this.range.index.entries.length === 0 ? 0 : this.range.index.totalWindows;
-  }
-
-  invalidate(): void {
-    this.renderer.clear();
-  }
-
-  render(width: number, height: number): readonly string[] {
-    this.resize(width, height);
-    if (this.range.index.entries.length === 0) {
-      return [
-        this.theme.fg("dim", "[no transcript history]"),
-        ...Array.from({ length: this.viewportHeight - 1 }, () => ""),
-      ];
-    }
-    const lines: string[] = [];
-    let position: HistoryPosition | undefined = this.top;
-    while (position && lines.length < this.viewportHeight) {
-      const block = this.block(position.entryIndex, position.segmentIndex, position.pageIndex);
-      lines.push(block[position.lineOffset] ?? "");
-      position = this.next(position);
-    }
-    while (lines.length < this.viewportHeight) lines.push("");
-    return lines;
-  }
-
-  private resize(width: number, height: number): void {
-    const wasAtNewest = this.top ? this.viewportEndsAtNewest(this.top) : true;
-    const nextWidth = Math.max(1, width);
-    const nextHeight = Math.max(1, height);
-    const layoutChanged = this.width !== nextWidth || this.viewportHeight !== nextHeight;
-    this.width = nextWidth;
-    this.viewportHeight = nextHeight;
-    if (!this.top || wasAtNewest) {
-      this.top = this.newestTop();
-    } else if (layoutChanged) {
-      const segmentIndex = Math.min(
-        this.top.segmentIndex,
-        this.segmentCount(this.top.entryIndex, this.top.pageIndex) - 1,
-      );
-      const block = this.block(this.top.entryIndex, segmentIndex, this.top.pageIndex);
-      this.top = {
-        entryIndex: this.top.entryIndex,
-        lineOffset: Math.min(this.top.lineOffset, block.length - 1),
-        pageIndex: this.top.pageIndex,
-        segmentIndex,
-      };
-    }
-  }
-
-  moveBackward(lines: number): void {
-    this.ensurePosition();
-    let loadedOlder = false;
-    let movementLimit = Math.max(1, lines);
-    for (let index = 0; index < movementLimit; index += 1) {
-      const previous = this.previous(this.ensurePosition());
-      if (previous) {
-        this.top = previous;
-        continue;
-      }
-      if (loadedOlder || !this.range.loadOlder()) break;
-      loadedOlder = true;
-      if (movementLimit > 1) movementLimit -= 1;
-      const older = this.previous(this.ensurePosition());
-      if (!older) break;
-      this.top = older;
-    }
-  }
-
-  moveForward(lines: number): void {
-    this.ensurePosition();
-    for (let index = 0; index < Math.max(1, lines); index += 1) {
-      const current = this.ensurePosition();
-      if (this.viewportEndsAtNewest(current)) break;
-      const next = this.next(current);
-      if (!next) break;
-      this.top = next;
-    }
-  }
-
-  moveToOldest(): void {
-    this.ensurePosition();
-    this.top = { entryIndex: this.range.startIndex, lineOffset: 0, pageIndex: 0, segmentIndex: 0 };
-  }
-
-  moveToNewest(): void {
-    this.ensurePosition();
-    this.top = this.newestTop();
-  }
-
-  toggleCurrentEntry(): void {
-    const current = this.ensurePosition();
-    const entryIndex = current.entryIndex;
-    if (this.detailedEntries.has(entryIndex)) {
-      this.detailedEntries.delete(entryIndex);
-    } else {
-      this.detailedEntries.add(entryIndex);
-    }
-    this.renderer.clear();
-    const segmentIndex = Math.min(current.segmentIndex, this.segmentCount(entryIndex, 0) - 1);
-    const block = this.block(entryIndex, segmentIndex, 0);
-    this.top = {
-      entryIndex,
-      lineOffset: Math.min(current.lineOffset, block.length - 1),
-      pageIndex: 0,
-      segmentIndex,
-    };
-  }
-
-  private block(entryIndex: number, segmentIndex: number, pageIndex: number): readonly string[] {
-    const entry = this.range.index.entries[entryIndex];
-    if (entry === undefined) return [""];
-    return this.renderer.render(
-      entry,
-      entryIndex,
-      this.width,
-      this.detailedEntries.has(entryIndex),
-      segmentIndex,
-      this.viewportHeight + 4,
-      pageIndex,
-    );
-  }
-
-  private pageCount(entryIndex: number): number {
-    const entry = this.range.index.entries[entryIndex];
-    if (entry === undefined) return 1;
-    return this.renderer.pageCount(entry, this.detailedEntries.has(entryIndex));
-  }
-
-  private segmentCount(entryIndex: number, pageIndex: number): number {
-    const entry = this.range.index.entries[entryIndex];
-    if (entry === undefined) return 1;
-    return this.renderer.segmentCount(
-      entry,
-      entryIndex,
-      this.width,
-      this.detailedEntries.has(entryIndex),
-      this.viewportHeight + 4,
-      pageIndex,
-    );
-  }
-
-  private hasNextPage(entryIndex: number, pageIndex: number): boolean {
-    const entry = this.range.index.entries[entryIndex];
-    if (entry === undefined) return false;
-    return this.renderer.hasNextPage(
-      entry,
-      entryIndex,
-      this.width,
-      this.detailedEntries.has(entryIndex),
-      this.viewportHeight + 4,
-      pageIndex,
-    );
-  }
-
-  private ensurePosition(): HistoryPosition {
-    this.top ??= this.newestTop();
-    return this.top;
-  }
-
-  private newestTop(): HistoryPosition {
-    const lastEntryIndex = Math.max(this.range.startIndex, this.range.index.entries.length - 1);
-    const pageIndex = this.pageCount(lastEntryIndex) - 1;
-    const segmentIndex = this.segmentCount(lastEntryIndex, pageIndex) - 1;
-    const lastBlock = this.block(lastEntryIndex, segmentIndex, pageIndex);
-    let position: HistoryPosition = {
-      entryIndex: lastEntryIndex,
-      lineOffset: Math.max(0, lastBlock.length - 1),
-      pageIndex,
-      segmentIndex,
-    };
-    for (let index = 1; index < this.viewportHeight; index += 1) {
-      const previous = this.previous(position);
-      if (!previous) break;
-      position = previous;
-    }
-    return position;
-  }
-
-  private next(position: HistoryPosition): HistoryPosition | undefined {
-    const block = this.block(position.entryIndex, position.segmentIndex, position.pageIndex);
-    if (position.lineOffset + 1 < block.length) {
-      return { ...position, lineOffset: position.lineOffset + 1 };
-    }
-    if (position.segmentIndex + 1 < this.segmentCount(position.entryIndex, position.pageIndex)) {
-      return { ...position, lineOffset: 0, segmentIndex: position.segmentIndex + 1 };
-    }
-    if (this.hasNextPage(position.entryIndex, position.pageIndex)) {
-      return { ...position, lineOffset: 0, pageIndex: position.pageIndex + 1, segmentIndex: 0 };
-    }
-    if (position.entryIndex + 1 >= this.range.index.entries.length) return undefined;
-    return { entryIndex: position.entryIndex + 1, lineOffset: 0, pageIndex: 0, segmentIndex: 0 };
-  }
-
-  private previous(position: HistoryPosition): HistoryPosition | undefined {
-    if (position.lineOffset > 0) return { ...position, lineOffset: position.lineOffset - 1 };
-    if (position.segmentIndex > 0) {
-      const segmentIndex = position.segmentIndex - 1;
-      return {
-        ...position,
-        lineOffset: Math.max(
-          0,
-          this.block(position.entryIndex, segmentIndex, position.pageIndex).length - 1,
-        ),
-        segmentIndex,
-      };
-    }
-    if (position.pageIndex > 0) {
-      const pageIndex = position.pageIndex - 1;
-      const segmentIndex = this.segmentCount(position.entryIndex, pageIndex) - 1;
-      return {
-        ...position,
-        lineOffset: Math.max(
-          0,
-          this.block(position.entryIndex, segmentIndex, pageIndex).length - 1,
-        ),
-        pageIndex,
-        segmentIndex,
-      };
-    }
-    if (position.entryIndex <= this.range.startIndex) return undefined;
-    const previousEntryIndex = position.entryIndex - 1;
-    const pageIndex = this.pageCount(previousEntryIndex) - 1;
-    const segmentIndex = this.segmentCount(previousEntryIndex, pageIndex) - 1;
-    return {
-      entryIndex: previousEntryIndex,
-      lineOffset: Math.max(0, this.block(previousEntryIndex, segmentIndex, pageIndex).length - 1),
-      pageIndex,
-      segmentIndex,
-    };
-  }
-
-  private viewportEndsAtNewest(top: HistoryPosition): boolean {
-    let position: HistoryPosition | undefined = top;
-    for (let index = 1; index < this.viewportHeight; index += 1) {
-      const next = this.next(position);
-      if (!next) return true;
-      position = next;
-    }
-    return this.next(position) === undefined;
-  }
+function filterLines(active: HistoryFilter): readonly string[] {
+  return [
+    `Filter · current ${active}`,
+    "",
+    "  a  all entries",
+    "  u  user messages",
+    "  s  assistant messages",
+    "  t  tools and tool errors",
+    "  e  errors only",
+    "  c  compactions",
+    "  x  custom rows",
+    "",
+    "Esc or q returns without changing the filter.",
+  ];
 }
 
 export class HistoryExplorer implements Component {
   private closed = false;
   private readonly closeCallback: () => void;
-  private readonly theme: Pick<Theme, "bold" | "fg">;
+  private input: HistoryInput | undefined;
+  private jumpIndex: HistoryJumpIndex | undefined;
+  private mode: ExplorerMode = "browse";
+  private readonly search: HistorySearch;
+  private searchSelected = false;
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  private statusMessage = "";
+  private readonly theme: HistoryRenderTheme;
   private readonly tui: ExplorerTui;
   private readonly viewport: HistoryViewport;
 
   constructor(
     tui: ExplorerTui,
-    theme: Pick<Theme, "bold" | "fg">,
+    theme: HistoryRenderTheme,
     entries: readonly unknown[],
     close: () => void,
   ) {
@@ -313,21 +98,27 @@ export class HistoryExplorer implements Component {
     this.theme = theme;
     this.closeCallback = close;
     this.viewport = new HistoryViewport(entries, theme);
+    this.search = new HistorySearch(this.viewport.entries);
   }
 
   handleInput(data: string): void {
-    if (this.isCloseInput(data)) {
+    if (matchesKey(data, "ctrl+shift+o")) {
       this.close();
       return;
     }
-    if (
-      this.handleLineInput(data) ||
-      this.handleScreenInput(data) ||
-      this.handleBoundaryInput(data) ||
-      this.handleDetailInput(data)
-    ) {
-      this.tui.requestRender();
+    if (this.mode === "help") {
+      this.handleHelpInput(data);
+      return;
     }
+    if (this.mode === "filter") {
+      this.handleFilterInput(data);
+      return;
+    }
+    if (this.mode === "search" || this.mode === "jump") {
+      this.handleTextInput(data);
+      return;
+    }
+    this.handleBrowseInput(data);
   }
 
   invalidate(): void {
@@ -336,90 +127,345 @@ export class HistoryExplorer implements Component {
 
   render(width: number): string[] {
     if (width < 4) return ["".padEnd(Math.max(0, width))];
-    const safeWidth = width;
-    const innerWidth = safeWidth - 2;
+    const innerWidth = width - 2;
     const overlayHeight = this.overlayHeight();
     const contentHeight = this.contentHeight(overlayHeight);
-    const body = this.viewport
-      .render(innerWidth, Math.max(1, contentHeight))
-      .slice(0, contentHeight);
+    const body = this.renderBody(innerWidth, contentHeight);
     const border = this.theme.fg("border", `+${"-".repeat(innerWidth)}+`);
     const row = (content: string) =>
       `${this.theme.fg("border", "|")}${padLine(content, innerWidth)}${this.theme.fg("border", "|")}`;
-    const title = this.theme.bold(
-      this.theme.fg(
-        "accent",
-        ` Turn Fold history · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows`,
-      ),
-    );
-    const hint = this.theme.fg(
-      "dim",
-      " ↑/↓ or C-p/C-n line · b/space screen · g/G ends · enter details · q/esc/C-S-o close",
-    );
     const lines =
       overlayHeight >= 6
         ? [
             border,
-            row(title),
-            row(hint),
+            row(this.title()),
+            row(this.status()),
             row(this.theme.fg("border", "-".repeat(innerWidth))),
             ...body.map(row),
             border,
           ]
-        : [border, row(title), ...body.map(row), border];
+        : [border, row(this.title()), ...body.map(row), border];
     return lines.slice(0, overlayHeight);
   }
 
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = undefined;
     this.closeCallback();
   }
 
-  private isCloseInput(data: string): boolean {
-    return matchesKey(data, "escape") || matchesKey(data, "ctrl+shift+o") || data === "q";
+  private handleBrowseInput(data: string): void {
+    this.statusMessage = "";
+    if (this.handleCloseOrSearchClear(data)) return;
+    if (this.handleModeOpen(data)) return;
+    if (this.handleSearchNavigation(data)) return;
+    if (this.handleHistoryNavigation(data)) return;
+    if (this.handleMovement(data)) return;
+    if (this.handleEntryControl(data)) return;
   }
 
-  private handleLineInput(data: string): boolean {
+  private handleModeOpen(data: string): boolean {
+    if (data === "?") {
+      this.mode = "help";
+    } else if (data === "/") {
+      this.mode = "search";
+      this.input = new HistoryInput(this.search.query);
+    } else if (data === "f") {
+      this.mode = "filter";
+    } else if (data === "j") {
+      this.mode = "jump";
+      this.input = new HistoryInput();
+      this.jumpIndex ??= new HistoryJumpIndex(this.viewport.index);
+    } else {
+      return false;
+    }
+    this.requestRender();
+    return true;
+  }
+
+  private handleCloseOrSearchClear(data: string): boolean {
+    if (matchesKey(data, "escape") && this.search.query) {
+      this.cancelSearch();
+      return true;
+    }
+    if (matchesKey(data, "escape") || data === "q") {
+      this.close();
+      return true;
+    }
+    return false;
+  }
+
+  private handleHelpInput(data: string): void {
+    if (data === "?" || data === "q" || matchesKey(data, "escape")) {
+      this.mode = "browse";
+      this.requestRender();
+    }
+  }
+
+  private handleFilterInput(data: string): void {
+    if (data === "q" || matchesKey(data, "escape")) {
+      this.mode = "browse";
+      this.requestRender();
+      return;
+    }
+    const filter = historyFilterKey(data);
+    if (!filter) return;
+    this.viewport.setFilter(filter);
+    this.mode = "browse";
+    this.statusMessage = `Filter: ${filter}`;
+    if (this.search.query) this.startSearch(this.search.query);
+    this.requestRender();
+  }
+
+  private handleTextInput(data: string): void {
+    const input = this.input;
+    if (!input) return;
+    const action = input.handle(data);
+    if (action === "cancel") {
+      this.input = undefined;
+      this.mode = "browse";
+      this.requestRender();
+      return;
+    }
+    if (action === "submit") {
+      const value = input.text;
+      const mode = this.mode;
+      this.input = undefined;
+      this.mode = "browse";
+      if (mode === "search") this.startSearch(value);
+      else this.submitJump(value);
+      this.requestRender();
+      return;
+    }
+    if (action === "changed") this.requestRender();
+  }
+
+  private handleSearchNavigation(data: string): boolean {
+    if (!this.search.query || (data !== "n" && data !== "N")) return false;
+    const direction: 1 | -1 = data === "n" ? 1 : -1;
+    const match = this.search.next(this.viewport.currentEntryIndex, direction);
+    if (!match) {
+      this.statusMessage = this.search.complete ? "No matches." : "Search is still scanning.";
+    } else {
+      this.viewport.jumpToMatch(match);
+      this.searchSelected = true;
+    }
+    this.requestRender();
+    return true;
+  }
+
+  private handleHistoryNavigation(data: string): boolean {
+    if (data === "[") {
+      this.statusMessage = this.viewport.goBack() ? "Moved back." : "No earlier jump position.";
+      this.requestRender();
+      return true;
+    }
+    if (data === "]") {
+      this.statusMessage = this.viewport.goForward() ? "Moved forward." : "No later jump position.";
+      this.requestRender();
+      return true;
+    }
+    return false;
+  }
+
+  private handleMovement(data: string): boolean {
+    return (
+      this.handleLineMovement(data) ||
+      this.handleScreenMovement(data) ||
+      this.handleBoundaryMovement(data)
+    );
+  }
+
+  private handleLineMovement(data: string): boolean {
     if (matchesKey(data, "up") || matchesKey(data, "ctrl+p")) {
       this.viewport.moveBackward(1);
-      return true;
-    }
-    if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
+    } else if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
       this.viewport.moveForward(1);
-      return true;
+    } else {
+      return false;
     }
-    return false;
-  }
-
-  private handleScreenInput(data: string): boolean {
-    if (data === "b" || matchesKey(data, "pageUp")) {
-      this.viewport.moveBackward(Math.max(1, this.contentHeight(this.overlayHeight())));
-      return true;
-    }
-    if (matchesKey(data, "space") || matchesKey(data, "pageDown")) {
-      this.viewport.moveForward(Math.max(1, this.contentHeight(this.overlayHeight())));
-      return true;
-    }
-    return false;
-  }
-
-  private handleBoundaryInput(data: string): boolean {
-    if (data === "G" || matchesKey(data, "shift+g")) {
-      this.viewport.moveToNewest();
-      return true;
-    }
-    if (data === "g") {
-      this.viewport.moveToOldest();
-      return true;
-    }
-    return false;
-  }
-
-  private handleDetailInput(data: string): boolean {
-    if (!matchesKey(data, "enter")) return false;
-    this.viewport.toggleCurrentEntry();
+    this.requestRender();
     return true;
+  }
+
+  private handleScreenMovement(data: string): boolean {
+    const height = Math.max(1, this.contentHeight(this.overlayHeight()));
+    if (data === "b" || matchesKey(data, "pageUp")) {
+      this.viewport.moveBackward(height);
+    } else if (matchesKey(data, "space") || matchesKey(data, "pageDown")) {
+      this.viewport.moveForward(height);
+    } else {
+      return false;
+    }
+    this.requestRender();
+    return true;
+  }
+
+  private handleBoundaryMovement(data: string): boolean {
+    if (data === "G" || matchesKey(data, "shift+g")) {
+      this.viewport.moveToNewest(true);
+    } else if (data === "g") {
+      this.viewport.moveToOldest(true);
+    } else {
+      return false;
+    }
+    this.requestRender();
+    return true;
+  }
+
+  private handleEntryControl(data: string): boolean {
+    let changed = false;
+    if (matchesKey(data, "enter")) changed = this.viewport.toggleDetails();
+    else if (data === "T") changed = this.viewport.toggleThinking();
+    else if (data === "O") changed = this.viewport.toggleToolOutput();
+    else if (data === "D") changed = this.viewport.toggleDiffs();
+    else return false;
+    this.statusMessage = changed ? "Entry display updated." : "That section is unavailable.";
+    this.requestRender();
+    return true;
+  }
+
+  private startSearch(query: string): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = undefined;
+    this.searchSelected = false;
+    this.viewport.setSearch(query.trim());
+    this.search.start(query, this.viewport.filter);
+    if (!this.search.query) {
+      this.statusMessage = "Search cleared.";
+      return;
+    }
+    this.statusMessage = `Searching for “${this.search.query}”…`;
+    this.scheduleSearch();
+  }
+
+  private scheduleSearch(): void {
+    if (this.closed || this.search.complete || this.searchTimer) return;
+    this.searchTimer = setTimeout(() => {
+      this.searchTimer = undefined;
+      this.search.step(SEARCH_STEP_ENTRIES, SEARCH_STEP_CHARACTERS);
+      if (!this.searchSelected && this.search.results[0]) {
+        this.viewport.jumpToMatch(this.search.results[0]);
+        this.searchSelected = true;
+      }
+      if (this.search.complete) {
+        this.statusMessage = this.search.results.length === 0 ? "No matches." : "Search complete.";
+      }
+      this.requestRender();
+      this.scheduleSearch();
+    }, 0);
+  }
+
+  private cancelSearch(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = undefined;
+    this.search.clear();
+    this.viewport.clearSearch();
+    this.searchSelected = false;
+    this.statusMessage = "Search cleared.";
+    this.requestRender();
+  }
+
+  private submitJump(value: string): void {
+    const target = parseHistoryJump(value);
+    if (!target) {
+      this.statusMessage = "Jump format is invalid. Press j for examples.";
+      return;
+    }
+    const jumps = (this.jumpIndex ??= new HistoryJumpIndex(this.viewport.index));
+    const result = jumps.resolve(target, this.search.results);
+    if (!result.ok) {
+      this.statusMessage = result.error;
+      return;
+    }
+    if (target.kind === "match") {
+      const match = this.search.results[target.number - 1];
+      if (match) this.viewport.jumpToMatch(match);
+    } else {
+      this.viewport.jumpToEntry(result.entryIndex);
+    }
+    this.statusMessage = `Jumped to ${result.label}.`;
+  }
+
+  private renderBody(width: number, height: number): readonly string[] {
+    if (this.mode === "help") return helpLines().slice(0, height);
+    if (this.mode === "filter") return filterLines(this.viewport.filter).slice(0, height);
+    if (this.mode === "jump") return this.jumpLines().slice(0, height);
+    return this.viewport.render(width, Math.max(1, height)).slice(0, height);
+  }
+
+  private jumpLines(): readonly string[] {
+    const jumps = (this.jumpIndex ??= new HistoryJumpIndex(this.viewport.index));
+    return [
+      "Jump target",
+      "",
+      `  wN  window 1–${String(this.viewport.totalWindows)}`,
+      `  tN  user turn 1–${String(jumps.totalTurns)}`,
+      `  mN  search match 1–${String(this.search.results.length)}`,
+      "  @HH:MM or @timestamp",
+      "  oldest / newest",
+      "",
+      "Enter jumps. Esc cancels.",
+    ];
+  }
+
+  private title(): string {
+    const context = this.viewport.context();
+    if (!context) {
+      return this.theme.bold(
+        this.theme.fg(
+          "accent",
+          ` Turn Fold history · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows`,
+        ),
+      );
+    }
+    const timestamp = context.presentation.timestamp;
+    const time = timestamp === undefined ? "" : ` · ${formatLocalTimestamp(timestamp)}`;
+    return this.theme.bold(
+      this.theme.fg(
+        "accent",
+        ` Turn Fold · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows · w ${String(context.windowNumber)}/${String(context.totalWindows)} · e ${String(context.entryIndex + 1)}/${String(context.totalEntries)} · ${context.presentation.label}${time}`,
+      ),
+    );
+  }
+
+  private status(): string {
+    const editing = this.editingStatus();
+    if (editing) return this.theme.fg("accent", editing);
+    if (this.mode === "help") return this.theme.fg("dim", " Help · ?/q/Esc returns");
+    if (this.mode === "filter") return this.theme.fg("dim", " Choose a filter key · q/Esc returns");
+    const browse = this.browseStatus();
+    const message = this.statusMessage ? ` ${this.statusMessage} ·${browse}` : browse;
+    return this.theme.fg("dim", `${this.searchStatus()}${message}`);
+  }
+
+  private editingStatus(): string | undefined {
+    if (!this.input) return undefined;
+    if (this.mode === "search") return ` Search: ${this.input.cursorText()}`;
+    return this.mode === "jump" ? ` Jump: ${this.input.cursorText()}` : undefined;
+  }
+
+  private browseStatus(): string {
+    const navigation = this.viewport.navigationCounts;
+    return ` filter ${this.viewport.filter} · back ${String(navigation.back)} · forward ${String(navigation.forward)} · / search · f filter · j jump · ? help`;
+  }
+
+  private searchStatus(): string {
+    if (!this.search.query) return "";
+    const progress = this.search.progress;
+    const entryIndex = this.viewport.currentEntryIndex;
+    const selected = entryIndex === undefined ? undefined : this.search.ordinal(entryIndex);
+    const ordinal = selected === undefined ? "" : `${String(selected)}/`;
+    const scanning = progress.complete
+      ? ""
+      : ` · ${String(progress.scannedEntries)}/${String(progress.totalEntries)}`;
+    return ` · search “${this.search.query}” ${ordinal}${String(progress.matchedEntries)}${scanning}`;
+  }
+
+  private requestRender(): void {
+    this.tui.requestRender();
   }
 
   private overlayHeight(): number {
