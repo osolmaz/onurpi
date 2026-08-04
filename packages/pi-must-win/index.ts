@@ -78,9 +78,11 @@ export function loadConfig(path: string): PiMustWinConfig {
 /** Normalize a Git remote URL or URL-like config entry to a `host/path` key. */
 export function normalizeRepoUrl(value: string): string {
   let text = value.trim().toLowerCase();
+  const hadScheme = /^(https?|ssh|git):\/\//.test(text);
   text = text.replace(/^(https?|ssh|git):\/\//, "");
   text = text.replace(/^[^@/]+@/, "");
-  text = text.replace(":", "/");
+  // Scheme URLs keep an explicit port (`host:2222/path`); scp-like syntax uses `host:path`.
+  text = hadScheme ? text.replace(/^([^:/]+):\d+(?=\/|$)/, "$1") : text.replace(":", "/");
   text = text.replace(/\/+$/, "");
   text = text.replace(/\.git$/, "");
   return text;
