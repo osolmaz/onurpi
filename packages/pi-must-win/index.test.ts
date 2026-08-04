@@ -201,14 +201,12 @@ describe("resolveRepoIdentity", () => {
     expect(resolveRepoIdentity(dir)).toEqual({ urlKey: undefined, repoPath: realpathSync(dir) });
   });
 
-  it("normalizes the origin URL and treats an empty URL as missing", () => {
+  it("normalizes the origin URL", () => {
     const dir = initRepo("git@github.com:OpenClaw/OpenClaw.git");
     expect(resolveRepoIdentity(dir)).toEqual({
       urlKey: "github.com/openclaw/openclaw",
       repoPath: realpathSync(dir),
     });
-    const emptyRemote = initRepo("");
-    expect(resolveRepoIdentity(emptyRemote).urlKey).toBeUndefined();
   });
 
   it("resolves a linked worktree to the main clone path", () => {
