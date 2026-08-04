@@ -117,7 +117,7 @@ Stale partial assistant text MUST NOT replace a terminal tool error selected as 
 
 Expanded mode shows Pi's original transcript rows in their original order within the selected window range, including attached and standalone compaction rows. Turn Fold summary lines, edit diffstats, and edited-file path rows are hidden.
 
-Switching between compact and expanded mode MUST update the existing transcript immediately. A single mode change MUST invalidate each affected component no more than once. The OnurPi runtime MUST enable Pi's documented `terminal.clearOnShrink` setting so an expanded-to-compact transition clears obsolete screen and scrollback rows. Turn Fold MUST NOT emit terminal clearing sequences or mutate Pi settings at runtime.
+Switching between compact and expanded mode MUST update the existing transcript immediately. A single mode change MUST invalidate each affected component no more than once. While its editor wrapper is active, Turn Fold MUST enable Pi TUI's public shrink-clearing behavior so an expanded-to-compact transition clears obsolete screen and scrollback rows, then restore the previous value when it unloads. Turn Fold MUST NOT emit terminal clearing sequences or persist a global Pi setting.
 
 ## History and reload
 

@@ -1,7 +1,11 @@
 import type { EditorComponent } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 
-import { ToggleShortcutController, TurnFoldShortcutEditor } from "./shortcut-editor.ts";
+import {
+  enableTranscriptShrinkClearing,
+  ToggleShortcutController,
+  TurnFoldShortcutEditor,
+} from "./shortcut-editor.ts";
 
 const TOGGLE_KEY = "\x1b[111;6u";
 
@@ -52,6 +56,41 @@ function shortcutEditor(base = new FakeEditor()) {
     request,
   };
 }
+
+describe("enableTranscriptShrinkClearing", () => {
+  it("enables shrink clearing for the extension lifetime and restores the previous value", () => {
+    let enabled = false;
+    const tui = {
+      getClearOnShrink: () => enabled,
+      setClearOnShrink: (value: boolean) => {
+        enabled = value;
+      },
+    };
+
+    const restore = enableTranscriptShrinkClearing(tui);
+    expect(enabled).toBe(true);
+
+    restore();
+    restore();
+    expect(enabled).toBe(false);
+  });
+
+  it("does not disable shrink clearing that was already enabled", () => {
+    let enabled = true;
+    const setClearOnShrink = vi.fn((value: boolean) => {
+      enabled = value;
+    });
+
+    const restore = enableTranscriptShrinkClearing({
+      getClearOnShrink: () => enabled,
+      setClearOnShrink,
+    });
+    restore();
+
+    expect(enabled).toBe(true);
+    expect(setClearOnShrink).not.toHaveBeenCalled();
+  });
+});
 
 describe("TurnFoldShortcutEditor", () => {
   it("submits the toggle command without replacing the editor draft", () => {

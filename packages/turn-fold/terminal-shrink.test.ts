@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { TUI, type Component, type Terminal } from "@earendil-works/pi-tui";
 
+import { enableTranscriptShrinkClearing } from "./shortcut-editor.ts";
+
 const CLEAR_SCREEN_AND_SCROLLBACK = "\u001b[2J\u001b[H\u001b[3J";
 
 class RecordingTerminal implements Terminal {
@@ -88,7 +90,7 @@ describe("Turn Fold terminal shrinking", () => {
     const terminal = new RecordingTerminal();
     const transcript = new MutableTranscript(128);
     const tui = new TUI(terminal);
-    tui.setClearOnShrink(true);
+    const restoreShrinkClearing = enableTranscriptShrinkClearing(tui);
     tui.addChild(transcript);
 
     try {
@@ -101,7 +103,10 @@ describe("Turn Fold terminal shrinking", () => {
       await waitForRender();
 
       expect(terminal.writes.join("")).toContain(CLEAR_SCREEN_AND_SCROLLBACK);
+      restoreShrinkClearing();
+      expect(tui.getClearOnShrink()).toBe(false);
     } finally {
+      restoreShrinkClearing();
       tui.stop();
     }
   });
