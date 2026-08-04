@@ -503,7 +503,7 @@ export async function showHistoryExplorer(
         overlay: true,
         overlayOptions: {
           anchor: "center",
-          margin: 1,
+          margin: { bottom: 1, left: 0, right: 0, top: 1 },
           maxHeight: "95%",
           width: "100%",
         },
