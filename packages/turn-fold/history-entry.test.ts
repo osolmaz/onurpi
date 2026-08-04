@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  historyEntryKind,
   historyEntryMatchesFilter,
   historyEntryPresentation,
   historyFilterKey,
@@ -76,6 +77,50 @@ describe("Turn Fold history entries", () => {
     expect(historyEntryPresentation({ customType: "notice", id: "n", type: "custom" }).kind).toBe(
       "custom",
     );
+  });
+
+  it("derives kinds without reading message bodies", () => {
+    let bodyReads = 0;
+    const entries = [
+      {
+        id: "lazy",
+        get message(): unknown {
+          bodyReads += 1;
+          return {
+            content: [{ arguments: {}, id: "call", name: "read", type: "toolCall" }],
+            role: "assistant",
+          };
+        },
+        type: "message",
+      },
+      message("user", "Question"),
+      message("toolResult", "done", { toolName: "exec" }),
+      message("toolResult", "boom", { isError: true, toolName: "exec" }),
+      { id: "c", type: "compaction" },
+      { id: "x", type: "custom" },
+    ];
+
+    const kinds = entries.map(historyEntryKind);
+
+    expect(kinds).toEqual(["tool", "user", "tool", "error", "compaction", "custom"]);
+    expect(bodyReads).toBe(1);
+  });
+
+  it("agrees with full presentations on entry kinds", () => {
+    const entries = [
+      message("user", "Question"),
+      message("assistant", [{ text: "Answer", type: "text" }]),
+      message("assistant", [{ thinking: "Reason", type: "thinking" }]),
+      message("assistant", [{ arguments: {}, id: "call", name: "read", type: "toolCall" }]),
+      message("toolResult", "done", { toolName: "exec" }),
+      message("toolResult", "boom", { isError: true, toolName: "exec" }),
+      { id: "c", type: "compaction" },
+      { id: "x", type: "custom" },
+    ];
+
+    for (const entry of entries) {
+      expect(historyEntryKind(entry)).toBe(historyEntryPresentation(entry).kind);
+    }
   });
 
   it("matches filters without conflating successful tools and errors", () => {

@@ -13,6 +13,7 @@ import { HistoryJumpIndex, parseHistoryJump } from "./history-navigation.ts";
 import { formatLocalTimestamp } from "./local-time.ts";
 import { HistorySearch } from "./history-search.ts";
 import type { HistoryRenderTheme } from "./history-renderer.ts";
+import { terminalSafeHistoryText } from "./history-renderer.ts";
 import { HistoryViewport } from "./history-viewport.ts";
 
 const SEARCH_STEP_ENTRIES = 250;
@@ -426,7 +427,7 @@ export class HistoryExplorer implements Component {
     return this.theme.bold(
       this.theme.fg(
         "accent",
-        ` Turn Fold · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows · w ${String(context.windowNumber)}/${String(context.totalWindows)} · e ${String(context.entryIndex + 1)}/${String(context.totalEntries)} · ${context.presentation.label}${time}`,
+        ` Turn Fold · ${String(this.viewport.admittedWindows)} of ${String(this.viewport.totalWindows)} windows · w ${String(context.windowNumber)}/${String(context.totalWindows)} · e ${String(context.entryIndex + 1)}/${String(context.totalEntries)} · ${terminalSafeHistoryText(context.presentation.label)}${time}`,
       ),
     );
   }
