@@ -39,8 +39,10 @@ describe("Turn Fold history rendering", () => {
     const renderer = new HistoryEntryRenderer(theme);
     const entry = assistant("large", `start-${"x".repeat(5_000)}-end`);
 
-    const preview = renderer.render(entry, 0, 80, false).join("\n");
-    const detail = renderer.render(entry, 0, 80, true).join("\n");
+    const previewSegment = renderer.segmentCount(entry, 0, 80, false, 20) - 1;
+    const detailSegment = renderer.segmentCount(entry, 0, 80, true, 20) - 1;
+    const preview = renderer.render(entry, 0, 80, false, previewSegment, 20).join("\n");
+    const detail = renderer.render(entry, 0, 80, true, detailSegment, 20).join("\n");
 
     expect(preview).toContain("press Enter to show more");
     expect(preview).not.toContain("-end");
@@ -48,6 +50,21 @@ describe("Turn Fold history rendering", () => {
     expect(renderer.render(entry, 0, 20, false).every((line) => visibleWidth(line) <= 20)).toBe(
       true,
     );
+  });
+
+  it("renders only a bounded segment of multiline content", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+    const entry = assistant(
+      "lines",
+      Array.from({ length: 4_000 }, (_, index) => `line ${String(index)}`).join("\n"),
+    );
+    const segmentCount = renderer.segmentCount(entry, 0, 80, false, 20);
+
+    const rendered = renderer.render(entry, 0, 80, false, 0, 20);
+
+    expect(segmentCount).toBeGreaterThan(1);
+    expect(rendered.length).toBeLessThanOrEqual(20);
+    expect(renderer.cachedBlocks).toBe(1);
   });
 
   it("keeps its rendered-block cache bounded", () => {
