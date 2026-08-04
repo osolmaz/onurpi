@@ -157,7 +157,11 @@ export function applyCommitAttribution(
 
 export default function onurPiMustWin(pi: ExtensionAPI, options: OnurPiMustWinOptions = {}): void {
   const config = loadConfig(options.configPath ?? DEFAULT_CONFIG_PATH);
-  const identity = options.identity ?? resolveRepoIdentity(options.cwd ?? process.cwd());
+  // Skip Git subprocesses when nothing can be disabled.
+  const identity =
+    config.disabledRepos.length === 0
+      ? { urlKey: undefined, repoPath: undefined }
+      : (options.identity ?? resolveRepoIdentity(options.cwd ?? process.cwd()));
   if (isRepoDisabled(identity, config)) return;
   const session = new CommitAttributionSession();
   piMustWin(pi, { commitAttributionSession: session });
