@@ -36,6 +36,15 @@ pi-reviewer login openai-codex
 
 Reviewer config records `auth: "pi"`. Model settings, prompts, tools, and session policy remain isolated. Login and OAuth refreshes update regular Pi's canonical auth file without copying credentials.
 
+Hugging Face Inference Providers models work through regular Pi's Hugging Face OAuth from `pi-huggingface-oauth`, including route-suffixed model identifiers discovered by regular Pi. The reviewer registers the same OAuth provider in its isolated runtime and reads regular Pi's model catalog cache in place.
+
+```bash
+pi-reviewer config set model huggingface/moonshotai/Kimi-K3:fireworks-ai
+pi-reviewer config set thinking high
+```
+
+If the canonical auth file has no Hugging Face credential yet, run `pi-reviewer login huggingface` or regular Pi's Hugging Face login once. Both write the same canonical credential through regular Pi's auth file. Token refreshes stay shared through that file, so the reviewer never holds its own copy.
+
 ## Review
 
 ```bash
