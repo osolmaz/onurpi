@@ -131,7 +131,9 @@ describe("Turn Fold history explorer", () => {
       close,
     );
 
-    expect(explorer.render(80).join("\n")).toContain("3 of 7 windows");
+    const rendered = explorer.render(80);
+    expect(rendered).toHaveLength(18);
+    expect(rendered.join("\n")).toContain("3 of 7 windows");
     explorer.handleInput("b");
     explorer.handleInput(" ");
     explorer.handleInput("\u0010");
@@ -139,6 +141,17 @@ describe("Turn Fold history explorer", () => {
 
     expect(requestRender).toHaveBeenCalledTimes(4);
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("fits compact chrome within very short terminals", () => {
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 6 } as never },
+      theme,
+      history(2),
+      vi.fn(),
+    );
+
+    expect(explorer.render(80)).toHaveLength(4);
   });
 
   it("closes with q, escape, or the same shortcut exactly once", () => {
