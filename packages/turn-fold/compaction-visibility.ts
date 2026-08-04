@@ -1,32 +1,42 @@
 import { entryTimestamp, stringField } from "./turn-message.ts";
 
 export class CompactionVisibility {
-  private timestampByComponent = new WeakMap<object, number>();
-  private hiddenTimestamps = new Set<number>();
-  private historicalTimestamps = new Set<number>();
+  private entryIdByComponent = new WeakMap<object, string>();
+  private entryIdsByTimestamp = new Map<number, string[]>();
+  private nextIndexByTimestamp = new Map<number, number>();
+  private visibleEntryIds = new Set<string>();
 
-  recordHistoricalTimestamp(timestamp: number): void {
-    this.historicalTimestamps.add(timestamp);
+  recordHistoricalEntry(entry: unknown): void {
+    const entryId = stringField(entry, "id");
+    const timestamp = entryTimestamp(entry);
+    if (!entryId || timestamp === undefined) return;
+    const entryIds = this.entryIdsByTimestamp.get(timestamp) ?? [];
+    entryIds.push(entryId);
+    this.entryIdsByTimestamp.set(timestamp, entryIds);
+    this.visibleEntryIds.add(entryId);
   }
 
   apply(displayEntries: readonly unknown[]): void {
-    const visibleTimestamps = new Set<number>();
-    for (const entry of displayEntries) {
-      if (stringField(entry, "type") !== "compaction") continue;
-      const timestamp = entryTimestamp(entry);
-      if (timestamp !== undefined) visibleTimestamps.add(timestamp);
-    }
-    this.hiddenTimestamps = new Set(
-      [...this.historicalTimestamps].filter((timestamp) => !visibleTimestamps.has(timestamp)),
+    this.visibleEntryIds = new Set(
+      displayEntries
+        .filter((entry) => stringField(entry, "type") === "compaction")
+        .map((entry) => stringField(entry, "id"))
+        .filter((entryId): entryId is string => entryId !== undefined),
     );
   }
 
   associate(component: object, timestamp: number | undefined): void {
-    if (timestamp !== undefined) this.timestampByComponent.set(component, timestamp);
+    if (timestamp === undefined || this.entryIdByComponent.has(component)) return;
+    const entryIds = this.entryIdsByTimestamp.get(timestamp);
+    const index = this.nextIndexByTimestamp.get(timestamp) ?? 0;
+    const entryId = entryIds?.[index];
+    if (!entryId) return;
+    this.entryIdByComponent.set(component, entryId);
+    this.nextIndexByTimestamp.set(timestamp, index + 1);
   }
 
   visible(component: object): boolean {
-    const timestamp = this.timestampByComponent.get(component);
-    return timestamp === undefined || !this.hiddenTimestamps.has(timestamp);
+    const entryId = this.entryIdByComponent.get(component);
+    return entryId === undefined || this.visibleEntryIds.has(entryId);
   }
 }

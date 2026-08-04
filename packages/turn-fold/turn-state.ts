@@ -682,7 +682,7 @@ export class TurnFoldState {
     const timestamp = entryTimestamp(entry);
     if (timestamp !== undefined) {
       this.compactionGroupByTimestamp.set(timestamp, null);
-      this.compactionVisibility.recordHistoricalTimestamp(timestamp);
+      this.compactionVisibility.recordHistoricalEntry(entry);
     }
     return true;
   }

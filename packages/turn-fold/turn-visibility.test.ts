@@ -61,6 +61,29 @@ it("does not make a group visible from pass-through metadata alone", () => {
   expect(state.viewFor(assistant)?.display).toBe("hidden");
 });
 
+it("keeps post-compaction output visible when a boundary splits a run", () => {
+  const state = new TurnFoldState();
+  const postCompactionComponent = {};
+  const before = assistantMessage(110, "Before compaction");
+  const after = assistantMessage(170, "After compaction");
+  const entries = [
+    { id: "prompt", message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
+    { id: "before", message: before, type: "message" },
+    {
+      id: "boundary",
+      summary: "Summary",
+      timestamp: new Date(160).toISOString(),
+      type: "compaction",
+    },
+    { id: "after", message: after, type: "message" },
+  ];
+
+  state.applyHistoryProjection(entries, entries.slice(2));
+  state.associateAssistant(postCompactionComponent, after);
+
+  expect(state.viewFor(postCompactionComponent)?.display).not.toBe("hidden");
+});
+
 it("keeps a retained automatic compaction visible when its preceding run is hidden", () => {
   const state = new TurnFoldState();
   const compaction = {};
@@ -95,18 +118,18 @@ it("keeps a retained automatic compaction visible when its preceding run is hidd
   expect(state.viewFor(compaction)?.display).toBe("original");
 });
 
-it("hides and restores standalone compaction components with their entries", () => {
+it("hides standalone compactions by entry identity when timestamps collide", () => {
   const state = new TurnFoldState();
   const olderComponent = {};
   const newerComponent = {};
   const entries = [
     { id: "older", summary: "Older", timestamp: new Date(100).toISOString(), type: "compaction" },
-    { id: "newer", summary: "Newer", timestamp: new Date(200).toISOString(), type: "compaction" },
+    { id: "newer", summary: "Newer", timestamp: new Date(100).toISOString(), type: "compaction" },
   ];
 
   state.applyHistoryProjection(entries, entries.slice(1));
   state.associateCompaction(olderComponent, { timestamp: 100 });
-  state.associateCompaction(newerComponent, { timestamp: 200 });
+  state.associateCompaction(newerComponent, { timestamp: 100 });
 
   expect(state.compactionVisibleFor(olderComponent)).toBe(false);
   expect(state.compactionVisibleFor(newerComponent)).toBe(true);

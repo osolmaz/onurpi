@@ -65,7 +65,9 @@ remain in the active component tree. When a request needs entries omitted by spa
 Turn Fold saves the configuration and reports `restart required`. Exit Pi and resume the session to
 load those entries; `/reload` is not enough because Pi rebuilds the transcript before extension
 projection is bound. `/turn-fold status` includes the pending restart state. A TUI started with
-`--no-session` rejects widening that cannot survive a restart.
+`--no-session` rejects widening that cannot survive a restart. Entering or leaving a range that
+contains another extension's custom entry also requires a restart because Turn Fold cannot safely
+patch that extension's renderer through Pi's public API.
 
 `Ctrl+O` remains Pi's separate tool-output detail toggle. While its editor wrapper is active, Turn
 Fold enables Pi TUI's public shrink-clearing behavior so narrowing removes obsolete terminal rows.

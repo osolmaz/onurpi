@@ -71,7 +71,7 @@ Pi performs a transcript rebuild after every successful compaction. The rebuilt 
 
 Every prompt entry that begins a projected run remains in source order. Its native content and Turn Fold timestamp behavior stay unchanged.
 
-Custom entries outside Turn Fold's managed assistant, tool, and compaction rows pass through unchanged. This preserves other extensions' registered entry renderers. Turn Fold's own run-boundary and configuration entries continue to have no renderer and create no visible component.
+Custom entries outside Turn Fold's managed assistant, tool, and compaction rows pass through unchanged. This preserves other extensions' registered entry renderers. Entering or leaving a scope that contains one of these entries requires a full restart because Turn Fold cannot patch an unknown renderer in place. Turn Fold's own run-boundary and configuration entries continue to have no renderer and create no visible component.
 
 The projection MUST preserve the original entry objects and ordering. It MUST NOT clone entries with changed messages, append display entries, or alter parent links.
 

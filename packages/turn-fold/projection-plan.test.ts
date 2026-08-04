@@ -84,6 +84,32 @@ describe("transcript projection plans", () => {
     expect(canApplyProjectionInPlace(result, new Set(["visible"]))).toBe(true);
   });
 
+  it("requires a restart when third-party custom entries enter or leave the projection", () => {
+    const customEntry: Entry = {
+      customType: "third-party-renderer",
+      data: {},
+      id: "custom",
+      parentId: null,
+      timestamp: "2026-08-04T00:00:00.000Z",
+      type: "custom",
+    };
+    const customBranch = [customEntry, entry("latest", "compaction"), entry("after")];
+    const show = plan(customBranch, {
+      density: "expanded",
+      preCompaction: "show",
+      windows: "all",
+    });
+    const hide = plan(customBranch, {
+      density: "expanded",
+      preCompaction: "hide",
+      windows: "all",
+    });
+
+    expect(canApplyProjectionInPlace(show, new Set(["latest", "after"]))).toBe(false);
+    expect(canApplyProjectionInPlace(hide, new Set(["custom", "latest", "after"]))).toBe(false);
+    expect(canApplyProjectionInPlace(hide, new Set(["latest", "after"]))).toBe(true);
+  });
+
   it("allows only projections whose displayed entries are already loaded", () => {
     const show = plan(branch, {
       density: "expanded",
