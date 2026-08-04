@@ -35,8 +35,8 @@ Two constraints follow from that request:
   repositories.
 - No per-command re-checks. The decision is made once when the extension loads; a session that
   starts in an allowed repo and later commits inside a disabled one still gets trailers.
-- No separate handling of the GitHub star prompt. A disabled repo skips the whole extension for
-  that session; the prompt fires on its own cadence in other sessions.
+- No separate handling of the GitHub star prompt. A disabled repo skips the whole extension for that
+  session; the prompt fires on its own cadence in other sessions.
 
 ## Design
 
