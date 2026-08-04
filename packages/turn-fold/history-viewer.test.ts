@@ -252,6 +252,20 @@ describe("Turn Fold history explorer", () => {
     expect(rendered).toContain("no transcript history");
   });
 
+  it("escapes transcript-controlled labels in the sticky title", () => {
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      theme,
+      [{ customType: "other\u001b-extension", id: "custom", type: "custom" }],
+      vi.fn(),
+    );
+
+    const rendered = explorer.render(80).join("\n");
+
+    expect(rendered).toContain("other\\x1b-extension");
+    expect(rendered).not.toContain("\u001b-extension");
+  });
+
   it("renders a Pi overlay and supports Mac-accessible movement", () => {
     const requestRender = vi.fn();
     const close = vi.fn();

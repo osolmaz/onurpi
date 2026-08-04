@@ -218,6 +218,34 @@ function nonMessagePresentation(entry: unknown): HistoryEntryPresentation {
   };
 }
 
+function contentItemVisibility(item: unknown): "text" | "toolCall" | undefined {
+  const type = stringField(item, "type");
+  if (type === "toolCall") return "toolCall";
+  if (type === "text" && /\S/u.test(stringField(item, "text") ?? "")) return "text";
+  if (type === "thinking" && /\S/u.test(stringField(item, "thinking") ?? "")) return "text";
+  return undefined;
+}
+
+function messageKindFromContent(role: string, content: unknown): HistoryEntryKind {
+  if (role === "user") return "user";
+  if (!Array.isArray(content)) return "assistant";
+  const visibility = content.map(contentItemVisibility);
+  const hasToolCall = visibility.includes("toolCall");
+  return hasToolCall && !visibility.includes("text") ? "tool" : "assistant";
+}
+
+export function historyEntryKind(entry: unknown): HistoryEntryKind {
+  const message = messageFromEntry(entry);
+  if (isRecord(message)) {
+    const role = stringField(message, "role") ?? "assistant";
+    if (role === "toolResult") {
+      return booleanField(message, "isError") === true ? "error" : "tool";
+    }
+    return messageKindFromContent(role, message["content"]);
+  }
+  return stringField(entry, "type") === "compaction" ? "compaction" : "custom";
+}
+
 export function historyEntryPresentation(entry: unknown): HistoryEntryPresentation {
   const message = messageFromEntry(entry);
   return isRecord(message) ? messagePresentation(entry, message) : nonMessagePresentation(entry);
@@ -232,7 +260,7 @@ export function historyKindMatchesFilter(kind: HistoryEntryKind, filter: History
 }
 
 export function historyEntryMatchesFilter(entry: unknown, filter: HistoryFilter): boolean {
-  return historyKindMatchesFilter(historyEntryPresentation(entry).kind, filter);
+  return historyKindMatchesFilter(historyEntryKind(entry), filter);
 }
 
 export function nextHistoryFilter(filter: HistoryFilter, direction = 1): HistoryFilter {
