@@ -88,6 +88,23 @@ describe("review Hugging Face provider", () => {
     expect(available.some((entry) => entry.id === "moonshotai/Kimi-K3:fireworks-ai")).toBe(true);
   });
 
+  it("registers the provider in the login runtime factory", async () => {
+    const agentDir = await canonicalFixture();
+    const modelsDir = path.join(agentDir, "reviewer-models");
+    await mkdir(modelsDir, { recursive: true });
+    await writeFile(path.join(modelsDir, "models.json"), JSON.stringify({ providers: {} }));
+    const authPath = path.join(agentDir, "auth.json");
+    const { defaultRuntimeFactory } = await import("../src/auth.js");
+    const runtime = await defaultRuntimeFactory({
+      authPath,
+      modelsPath: path.join(modelsDir, "models.json"),
+    });
+
+    const huggingface = runtime.getProviders().find((provider) => provider.id === "huggingface");
+
+    expect(huggingface?.auth.oauth).toBeDefined();
+  });
+
   it("passes a valid provider configuration", async () => {
     const agentDir = await canonicalFixture();
     const authPath = path.join(agentDir, "auth.json");
