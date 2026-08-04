@@ -33,6 +33,7 @@ export class HistoryViewport {
   private readonly detailedEntries = new Set<number>();
   private readonly range: HistoryRange;
   private readonly renderer: HistoryEntryRenderer;
+  private readonly theme: Pick<Theme, "bold" | "fg">;
   private top: HistoryPosition | undefined;
   private viewportHeight = 1;
   private width = 1;
@@ -40,10 +41,11 @@ export class HistoryViewport {
   constructor(entries: readonly unknown[], theme: Pick<Theme, "bold" | "fg">, cacheLimit?: number) {
     this.range = new HistoryRange(createHistoryIndex(entries));
     this.renderer = new HistoryEntryRenderer(theme, cacheLimit);
+    this.theme = theme;
   }
 
   get admittedWindows(): number {
-    return this.range.admittedWindows;
+    return this.range.index.entries.length === 0 ? 0 : this.range.admittedWindows;
   }
 
   get cachedBlocks(): number {
@@ -51,7 +53,7 @@ export class HistoryViewport {
   }
 
   get totalWindows(): number {
-    return this.range.index.totalWindows;
+    return this.range.index.entries.length === 0 ? 0 : this.range.index.totalWindows;
   }
 
   invalidate(): void {
@@ -60,6 +62,12 @@ export class HistoryViewport {
 
   render(width: number, height: number): readonly string[] {
     this.resize(width, height);
+    if (this.range.index.entries.length === 0) {
+      return [
+        this.theme.fg("dim", "[no transcript history]"),
+        ...Array.from({ length: this.viewportHeight - 1 }, () => ""),
+      ];
+    }
     const lines: string[] = [];
     let position: HistoryPosition | undefined = this.top;
     while (position && lines.length < this.viewportHeight) {

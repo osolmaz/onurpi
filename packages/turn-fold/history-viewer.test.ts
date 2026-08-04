@@ -155,6 +155,20 @@ describe("Turn Fold history viewport", () => {
 });
 
 describe("Turn Fold history explorer", () => {
+  it("renders an explicit empty state without claiming a compaction window", () => {
+    const explorer = new HistoryExplorer(
+      { requestRender: vi.fn(), terminal: { rows: 20 } as never },
+      theme,
+      [],
+      vi.fn(),
+    );
+
+    const rendered = explorer.render(80).join("\n");
+
+    expect(rendered).toContain("0 of 0 windows");
+    expect(rendered).toContain("no transcript history");
+  });
+
   it("renders a Pi overlay and supports Mac-accessible movement", () => {
     const requestRender = vi.fn();
     const close = vi.fn();
