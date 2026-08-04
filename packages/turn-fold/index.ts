@@ -217,6 +217,7 @@ async function applyWindowArgument(
   configuration: TurnFoldConfiguration,
   requestConfiguration: RequestConfiguration,
 ): Promise<void> {
+  await ctx.waitForIdle();
   const branch = ctx.sessionManager.getBranch();
   const resolved = resolveWindowArgument(
     argument,

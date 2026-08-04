@@ -621,6 +621,32 @@ describe("Turn Fold widening commands", () => {
     );
   });
 
+  it("resolves relative windows after the active response settles", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "user", message: { content: "Prompt", role: "user" }, type: "message" },
+      { id: "first-compaction", type: "compaction" },
+      { id: "after", message: { content: "After", role: "user" }, type: "message" },
+    ];
+    const ctx = context(branch, branch);
+    let firstWait = true;
+    ctx.waitForIdle.mockImplementation(() => {
+      if (firstWait) branch.push({ id: "settled-compaction", type: "compaction" });
+      firstWait = false;
+      return Promise.resolve();
+    });
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "windows -1", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      density: "compact",
+      preCompaction: "show",
+      windows: 2,
+    });
+  });
+
   it("rejects widening an in-memory TUI session", async () => {
     const extension = extensionHarness();
     const branch = [

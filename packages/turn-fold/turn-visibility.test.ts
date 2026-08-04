@@ -61,6 +61,40 @@ it("does not make a group visible from pass-through metadata alone", () => {
   expect(state.viewFor(assistant)?.display).toBe("hidden");
 });
 
+it("keeps a retained automatic compaction visible when its preceding run is hidden", () => {
+  const state = new TurnFoldState();
+  const compaction = {};
+  const firstAssistant = assistantMessage(110, "Before compaction");
+  const entries = [
+    { id: "before", message: { content: "Before", role: "user", timestamp: 100 }, type: "message" },
+    { id: "answer", message: firstAssistant, type: "message" },
+    {
+      id: "boundary",
+      summary: "Summary",
+      timestamp: new Date(160).toISOString(),
+      type: "compaction",
+    },
+    { id: "after", message: { content: "After", role: "user", timestamp: 200 }, type: "message" },
+  ];
+  const associations = new Map([
+    [
+      "boundary",
+      {
+        compactionEntryId: "boundary",
+        timestamp: 160,
+        turnEntryIds: ["before", "answer"],
+        turnStartedAt: 100,
+      },
+    ],
+  ]);
+
+  state.applyHistoryProjection(entries, entries.slice(2), associations);
+  state.associateCompaction(compaction, { timestamp: 160 });
+
+  expect(state.compactionVisibleFor(compaction)).toBe(true);
+  expect(state.viewFor(compaction)?.display).toBe("original");
+});
+
 it("hides and restores standalone compaction components with their entries", () => {
   const state = new TurnFoldState();
   const olderComponent = {};
