@@ -202,11 +202,12 @@ export class HistoryExplorer implements Component {
         limit,
         Math.max(0, this.helpScroll + direction * WHEEL_SCROLL_LINES),
       );
-    } else if (direction < 0) {
-      this.viewport.moveBackward(WHEEL_SCROLL_LINES);
-    } else {
-      this.viewport.moveForward(WHEEL_SCROLL_LINES);
+      this.requestRender();
+      return true;
     }
+    if (this.mode !== "browse") return true;
+    if (direction < 0) this.viewport.moveBackward(WHEEL_SCROLL_LINES);
+    else this.viewport.moveForward(WHEEL_SCROLL_LINES);
     this.requestRender();
     return true;
   }
