@@ -241,7 +241,7 @@ it("renders per-file diffstats beside paths only in compact summaries", () => {
   expect(visibleWidth(fileLine ?? "")).toBeLessThanOrEqual(120);
   expect(compact.indexOf("1 file +2 −1")).toBeLessThan(compact.indexOf(expectedPath));
   expect(compact.indexOf(expectedPath)).toBeLessThan(compact.indexOf("Final response"));
-  state.setMode("expanded");
+  state.setDensity("expanded");
   const expanded = frame(transcript);
   expect(expanded).not.toContain("1 file +2 −1");
   expect(expanded).not.toContain(expectedPath);
@@ -269,13 +269,13 @@ it("timestamps every visible user and assistant message in both modes", () => {
   transcript.addChild(new AssistantMessageComponent(first, false, undefined, undefined, 0));
   transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
 
-  state.setMode("expanded");
+  state.setDensity("expanded");
   const expanded = frame(transcript);
   expect(expanded.match(/08:01/gu)).toHaveLength(1);
   expect(expanded.match(/08:02/gu)).toHaveLength(1);
   expect(expanded.match(/08:03/gu)).toHaveLength(1);
 
-  state.setMode("compact");
+  state.setDensity("compact");
   const compact = frame(transcript);
   expect(compact.match(/08:01/gu)).toHaveLength(1);
   expect(compact).not.toContain("08:02");
@@ -328,7 +328,7 @@ it("folds an automatic compaction into the turn summary", () => {
   expect(compact).not.toContain("Compacted from 12,345 tokens");
   expect(compactionSpacer.render(120)).toEqual([]);
 
-  state.setMode("expanded");
+  state.setDensity("expanded");
   const expanded = frame(transcript);
   expect(expanded).toContain("[compaction]");
   expect(expanded).toContain("Compacted from 12,345 tokens");
@@ -359,7 +359,7 @@ it("folds both compaction rows emitted after a live automatic compaction", () =>
   expect(rebuiltSpacer.render(120)).toEqual([]);
   expect(liveSpacer.render(120)).toEqual([]);
 
-  state.setMode("expanded");
+  state.setDensity("expanded");
   expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(2);
   expect(rebuiltSpacer.render(120)).toEqual([""]);
   expect(liveSpacer.render(120)).toEqual([""]);
@@ -485,7 +485,7 @@ it("compacts ten sequential tool calls while leaving the working line visible", 
   expect(settledFrame).toContain("Worked for");
   expect(settledFrame.indexOf("Worked for")).toBeLessThan(settledFrame.indexOf("Final response"));
 
-  state.setMode("expanded");
+  state.setDensity("expanded");
   expect(toolNames(frame(transcript))).toHaveLength(10);
 });
 

@@ -1,10 +1,10 @@
 # Turn Fold transcript windows
 
-Turn Fold owns transcript selection and folding as one installed extension. It loads a bounded part of the active branch into Pi's main transcript and keeps the model's compacted context unchanged.
+Turn Fold owns transcript selection and folding as one installed extension. It selects a configured part of the active branch for Pi's main transcript and keeps the model's compacted context unchanged.
 
 ## Window model
 
-A compaction window is the active-branch range between two compaction entries. The current window begins after the latest compaction and ends at the active leaf. The default value is three, which selects the current window and the two before it.
+A compaction window is the active-branch range between two compaction entries. The current window begins after the latest compaction and ends at the active leaf. The default is `all`, which selects the complete active branch before pre-compaction visibility and density are applied.
 
 One command handles exact limits, relative changes, full history, and reset:
 
@@ -13,18 +13,18 @@ One command handles exact limits, relative changes, full history, and reset:
 /turn-fold windows +2     load 2 more
 /turn-fold windows -1     unload 1
 /turn-fold windows all    load the full active branch
-/turn-fold windows reset  return to the default of 3
+/turn-fold windows reset  return to the default of all
 ```
 
-After Pi becomes idle, every successful change persists the complete Turn Fold configuration before rebuilding the main transcript. In TUI mode, Turn Fold resumes the current session through Pi's public command context so the new adapter is installed before replay. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
+After Pi becomes idle, every successful change persists the complete Turn Fold configuration. Relative subtraction stops at one window. Adding to `all` keeps `all`; subtracting from `all` uses the active branch's effective window count.
 
-`all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports both the display mode and window value. A TUI started with `--no-session` rejects replay-setting changes because Pi has no public action that rebuilds an in-memory transcript after extension startup.
+Changing from a numeric value to `all` reports the active-branch entry count and asks for confirmation. Cancelling leaves the current value and transcript unchanged. `/turn-fold status` reports density, pre-compaction visibility, windows, and pending restart state. A change applies in place when its required entries are already loaded. A wider range is saved and takes effect after a full Pi restart; `/reload` is not enough.
 
-Compact and expanded modes operate on the same selected range. Expanded mode restores Pi's original rows within that range and does not load older entries.
+Compact and expanded densities operate on the same selected history scope. `pre-compaction show` preserves the selected range, while `hide` starts it at the newest compaction boundary.
 
 ## Entry selection
 
-`transcript-windows.ts` receives `ctx.sessionManager.getBranch()` in root-to-leaf order. For a numeric value, it collects compaction positions and finds the requested oldest boundary. A value of three selects the third-newest compaction. If the branch contains fewer compactions, selection starts at the branch root. `all` returns the complete active branch.
+`transcript-windows.ts` receives `ctx.sessionManager.getBranch()` in root-to-leaf order. For a numeric value, it collects compaction positions and finds the requested oldest boundary. A value of three selects the third-newest compaction. If the branch contains fewer compactions, selection starts at the branch root. `all` returns the complete active branch. `history-scope.ts` then applies pre-compaction visibility before compact or expanded projection.
 
 When a numeric boundary exists, selection walks backward to the nearest `onurpi-turn-fold-run` entry. The marker's `promptEntryId` moves the start to the persisted user or custom prompt that began the run. A user-message entry remains the fallback for sessions without markers. The returned slice ends at the active leaf.
 
@@ -54,9 +54,9 @@ Turn Fold keeps the selected entries as a source snapshot for one-pass summary r
 
 ## Configuration
 
-The `onurpi-turn-fold-run` custom entry stores the strict run marker used for replay. The existing `onurpi-turn-fold-config` custom entry stores a complete object containing `mode` and `windows`. The window value is a positive safe integer or `all`. Entries that do not match the complete shape are ignored, and Turn Fold uses compact mode with three windows.
+The `onurpi-turn-fold-run` custom entry stores the strict run marker used for replay. The `onurpi-turn-fold-config` custom entry stores exactly `density`, `preCompaction`, and `windows`. Extra, missing, and invalid fields make an entry invalid. Defaults are compact density, pre-compaction messages shown, and all windows.
 
-A command appends one configuration entry before rebuilding the transcript. Session replacement restores the latest valid entry on the active branch before replay. Tree navigation applies the same value to the newly selected branch. Turn Fold writes no custom messages, labels, tool metadata, or sidecar files.
+A command appends one configuration entry. A change that requires omitted entries reports that a full restart is required. Tree navigation reads the latest valid configuration on the selected branch. Turn Fold writes no custom messages, labels, tool metadata, or sidecar files.
 
 ## Package replacement
 
@@ -66,6 +66,6 @@ The unlicensed vendored package has been removed. None of its source was copied 
 
 ## Verification
 
-Unit tests cover exact and relative values, reset, `all`, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, and adapter reuse. Integration tests verify that commands persist complete configuration and resume the selected range through Pi's public session action.
+Unit tests cover exact and relative values, reset, `all`, pre-compaction scope, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, and adapter reuse. Integration tests verify strict configuration persistence, in-place subset changes, and restart-required widening.
 
 Turn-state tests verify that unchanged renders do not sort activity or rescan assistant content. Workspace checks and the Pi extension-load smoke test cover the package alongside the rest of OnurPi.

@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { foldDisplay } from "./fold-policy.ts";
 
 describe("fold display policy", () => {
-  it("shows the overflow summary and latest activity while compact mode is running", () => {
+  it("shows the overflow summary and latest activity while compact density is running", () => {
     expect(
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: false,
         isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: true,
-        mode: "compact",
+        density: "compact",
         settled: false,
       }),
     ).toBe("streaming-summary");
@@ -20,7 +20,7 @@ describe("fold display policy", () => {
         isRecentActivity: true,
         isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
-        mode: "compact",
+        density: "compact",
         settled: false,
       }),
     ).toBe("original");
@@ -30,7 +30,7 @@ describe("fold display policy", () => {
         isRecentActivity: false,
         isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
-        mode: "compact",
+        density: "compact",
         settled: false,
       }),
     ).toBe("hidden");
@@ -43,7 +43,7 @@ describe("fold display policy", () => {
         isRecentActivity: false,
         isSettledSummaryAnchor: true,
         isStreamingSummaryAnchor: false,
-        mode: "compact",
+        density: "compact",
         settled: true,
       }),
     ).toBe("settled-summary");
@@ -53,7 +53,7 @@ describe("fold display policy", () => {
         isRecentActivity: false,
         isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: false,
-        mode: "compact",
+        density: "compact",
         settled: true,
       }),
     ).toBe("settled-final");
@@ -63,7 +63,7 @@ describe("fold display policy", () => {
         isRecentActivity: false,
         isSettledSummaryAnchor: true,
         isStreamingSummaryAnchor: false,
-        mode: "compact",
+        density: "compact",
         settled: true,
       }),
     ).toBe("settled-summary-final");
@@ -73,20 +73,20 @@ describe("fold display policy", () => {
         isRecentActivity: true,
         isSettledSummaryAnchor: false,
         isStreamingSummaryAnchor: true,
-        mode: "compact",
+        density: "compact",
         settled: true,
       }),
     ).toBe("hidden");
   });
 
-  it("shows every row in expanded mode", () => {
+  it("shows every row in expanded density", () => {
     expect(
       foldDisplay({
         isFinalAnchor: false,
         isRecentActivity: false,
         isSettledSummaryAnchor: true,
         isStreamingSummaryAnchor: false,
-        mode: "expanded",
+        density: "expanded",
         settled: true,
       }),
     ).toBe("original");
