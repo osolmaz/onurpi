@@ -69,6 +69,19 @@ describe("Turn Fold history viewport", () => {
     expect(viewport.render(80, 8).join("\n")).toContain("Answer 4");
   });
 
+  it("keeps the previous top line visible after page-back admits older windows", () => {
+    const viewport = new HistoryViewport(history(10), theme);
+    viewport.render(80, 8);
+    viewport.moveToOldest();
+    const before = viewport.render(80, 8);
+
+    viewport.moveBackward(8);
+    const after = viewport.render(80, 8);
+
+    expect(viewport.admittedWindows).toBe(6);
+    expect(after.at(-1)).toBe(before[0]);
+  });
+
   it("reaches the branch root through repeated bounded loads", () => {
     const viewport = new HistoryViewport(history(8), theme);
     viewport.render(80, 5);
