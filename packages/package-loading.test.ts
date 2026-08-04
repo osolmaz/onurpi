@@ -96,6 +96,11 @@ describe("OnurPi package loading", () => {
     ).toEqual(expected);
   });
 
+  it("clears stale terminal rows when Turn Fold shrinks the transcript", () => {
+    const settings = readJson("settings.json");
+    expect(settings["terminal"]).toMatchObject({ clearOnShrink: true });
+  });
+
   it("pins external extensions in private wrapper packages", () => {
     const rootManifest = readJson("package.json");
     expect(rootManifest["dependencies"]).toBeUndefined();
