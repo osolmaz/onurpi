@@ -227,13 +227,21 @@ describe("Pi Must Win adapter", () => {
 
   it("resolves identity from an explicit cwd and stays enabled outside Git", () => {
     const { pi, handlers } = createMockPi();
-    onurPiMustWin(pi, { configPath: missingConfigPath(), cwd: tempDir() });
+    const configPath = tempConfig('{"disabledRepos": ["github.com/otherorg"]}');
+    onurPiMustWin(pi, { configPath, cwd: tempDir() });
+    expect(handlers.has("tool_call")).toBe(true);
+  });
+
+  it("skips repository checks when no repos are disabled", () => {
+    const { pi, handlers } = createMockPi();
+    onurPiMustWin(pi, { configPath: tempConfig('{"disabledRepos": []}'), cwd: tempDir() });
     expect(handlers.has("tool_call")).toBe(true);
   });
 
   it("resolves identity from the process cwd and the default config path", () => {
     const withCwdDefault = createMockPi();
-    onurPiMustWin(withCwdDefault.pi, { configPath: missingConfigPath() });
+    const configPath = tempConfig('{"disabledRepos": ["github.com/otherorg"]}');
+    onurPiMustWin(withCwdDefault.pi, { configPath });
     expect(withCwdDefault.handlers.has("tool_call")).toBe(true);
 
     const withConfigDefault = createMockPi();
