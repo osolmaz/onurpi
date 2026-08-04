@@ -1,5 +1,6 @@
 export default {
   mutate: [
+    "compaction-visibility.ts",
     "configuration.ts",
     "edit-diff-stat.ts",
     "fold-policy.ts",

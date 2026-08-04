@@ -2,6 +2,7 @@ export default {
   checkers: ["typescript"],
   coverageAnalysis: "perTest",
   mutate: [
+    "packages/turn-fold/compaction-visibility.ts",
     "packages/turn-fold/configuration.ts",
     "packages/turn-fold/edit-diff-stat.ts",
     "packages/turn-fold/fold-policy.ts",

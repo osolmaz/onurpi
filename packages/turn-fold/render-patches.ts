@@ -344,6 +344,7 @@ function installUserSpacingPatches(state: TurnFoldState): RestoreRenderPatches {
   const patchedSpacerRender = function (this: Spacer, width: number): string[] {
     if (suppressedSpacers.has(this)) return [];
     const compaction = compactionBySpacer.get(this);
+    if (compaction && !state.compactionVisibleFor(compaction)) return [];
     const compactionDisplay = compaction ? state.viewFor(compaction)?.display : undefined;
     return compactionDisplay && compactionDisplay !== "original"
       ? []
@@ -441,6 +442,7 @@ function installCompactionRenderPatch(
   ): string[] {
     const message: unknown = Reflect.get(this, "message");
     state.associateCompaction(this, message);
+    if (!state.compactionVisibleFor(this)) return [];
     const view = state.viewFor(this);
     if (!view) return originalRender.call(this, width);
     return renderFoldView(

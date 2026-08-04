@@ -352,11 +352,20 @@ type TurnFoldRuntime = {
   configuration: TurnFoldConfiguration;
   currentTheme: Theme | undefined;
   ensureShrinkClearing: () => void;
+  knownEntryIds: Set<string>;
   loadedEntryIds: Set<string>;
   restartRequired: boolean;
   restoreEditor: () => void;
   runBoundaries: RunBoundaryRecorder;
 };
+
+function recordLoadedLiveEntries(runtime: TurnFoldRuntime, branch: BranchEntries): void {
+  const currentEntryIds = entryIds(branch);
+  for (const id of currentEntryIds) {
+    if (!runtime.knownEntryIds.has(id)) runtime.loadedEntryIds.add(id);
+  }
+  runtime.knownEntryIds = currentEntryIds;
+}
 
 function sameConfiguration(left: TurnFoldConfiguration, right: TurnFoldConfiguration): boolean {
   return (
@@ -445,6 +454,7 @@ function startSession(
   applyProjectionPlanToState(plan, state, associations, ctx);
   state.setDensity(runtime.configuration.density);
   const sourceEntryIds = entryIds(plan.sourceEntries);
+  runtime.knownEntryIds = entryIds(branch);
   runtime.loadedEntryIds = new Set(
     [...entryIds(nativeEntries)].filter((id) => sourceEntryIds.has(id)),
   );
@@ -573,6 +583,7 @@ function registerAgentEvents(
   pi.on("agent_settled", (_event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
     runtime.runBoundaries.persist(ctx.sessionManager.getBranch());
+    recordLoadedLiveEntries(runtime, ctx.sessionManager.getBranch());
     state.settleActive();
   });
 }
@@ -587,6 +598,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
     currentTheme: undefined,
     ensureShrinkClearing: () => undefined,
+    knownEntryIds: new Set(),
     loadedEntryIds: new Set(),
     restartRequired: false,
     restoreEditor: () => undefined,
@@ -598,6 +610,7 @@ export default function turnFold(pi: ExtensionAPI): void {
   const requestConfiguration: RequestConfiguration = async (next, ctx, persist) => {
     await ctx.waitForIdle();
     const branch = ctx.sessionManager.getBranch();
+    recordLoadedLiveEntries(runtime, branch);
     const associations = compactionAssociationsForBranch(branch, ctx, registry);
     const plan = planTranscriptProjection(branch, next, projectionOptions(state, associations));
     const canApplyInPlace = canApplyProjectionInPlace(plan, runtime.loadedEntryIds);

@@ -16,6 +16,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - packages/turn-fold/compaction-visibility.ts
       - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
       - packages/turn-fold/density.ts

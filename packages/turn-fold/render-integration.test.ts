@@ -390,6 +390,30 @@ it("keeps a manual idle compaction as a standalone row", () => {
   expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
+it("hides standalone compaction rows outside the projected source", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  restore = installRenderPatches(state, () => undefined);
+  const olderEntry = compactionEntry("compact-older", 100);
+  const newerEntry = compactionEntry("compact-newer", 200);
+
+  state.applyHistoryProjection([olderEntry, newerEntry], [newerEntry]);
+  const olderSpacer = new Spacer(1);
+  const newerSpacer = new Spacer(1);
+  transcript.addChild(olderSpacer);
+  transcript.addChild(compactionComponent(100));
+  transcript.addChild(newerSpacer);
+  transcript.addChild(compactionComponent(200));
+
+  expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(1);
+  expect(olderSpacer.render(120)).toEqual([]);
+  expect(newerSpacer.render(120)).toEqual([""]);
+
+  state.applyDisplayProjection("expanded", [olderEntry, newerEntry]);
+  expect(frame(transcript).match(/\[compaction\]/gu)).toHaveLength(2);
+  expect(olderSpacer.render(120)).toEqual([""]);
+});
+
 it("timestamps skill-only user rows without duplicating timestamps", () => {
   const state = new TurnFoldState();
   const transcript = new Container();

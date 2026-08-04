@@ -14,6 +14,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - compaction-visibility.ts
       - configuration.ts
       - fold-policy.ts
       - density.ts
