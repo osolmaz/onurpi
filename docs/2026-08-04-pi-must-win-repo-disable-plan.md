@@ -76,3 +76,21 @@ wrapping and no child-environment attribution happen for the session.
 - `npm run check`, `npm run slophammer`, and `git diff --check` in `packages/pi-must-win`.
 - `npx -y @simpledoc/simpledoc check` for this document.
 - Pi Reviewer against `main`, then CI on the pull request.
+
+## Implementation status
+
+Merged in PR #55. The shipped design matches this plan, with hardening added during review:
+
+- Review ran with `huggingface/moonshotai/Kimi-K3:fireworks-ai` because the Codex usage limit
+  blocked the configured GPT model. Four runs reported no P0/P1 findings.
+- `normalizeRepoUrl` strips explicit ports from scheme URLs so `ssh://git@host:2222/owner/repo`
+  remotes still match org entries.
+- The gate skips Git subprocesses entirely when `disabledRepos` is empty.
+- Path entries and the clone path are compared after `realpathSync`, so symlinked clone locations
+  (for example `/var` on macOS) still match.
+- Known limitation: path entries cannot match clones whose directory name itself ends in `.git`
+  (bare-repo-style layouts); URL entries are unaffected and remain the primary mechanism.
+
+One environment note: running the root test suite from inside a Pi session with Pi Must Win active
+fails the Unified Exec integration test, because the session exports the attribution hook
+environment to every command. CI and env-stripped local runs pass.
