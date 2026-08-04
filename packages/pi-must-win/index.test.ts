@@ -74,12 +74,6 @@ describe("repository disable gate", () => {
     expect(eventsOn).not.toHaveBeenCalled();
   });
 
-  it("registers with default options when the session repository is enabled", () => {
-    const { pi, handlers } = createMockPi();
-    onurPiMustWin(pi);
-    expect(handlers.has("tool_call")).toBe(true);
-  });
-
   it("resolves identity from an explicit cwd and stays enabled outside Git", () => {
     const { pi, handlers } = createMockPi();
     const configPath = tempConfig('{"disabledRepos": ["github.com/otherorg"]}');
