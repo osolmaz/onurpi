@@ -151,24 +151,19 @@ export class HistoryExplorer implements Component {
 
   render(width: number): string[] {
     if (width < 4) return ["".padEnd(Math.max(0, width))];
-    const innerWidth = width - 2;
     const overlayHeight = this.overlayHeight();
     const contentHeight = this.contentHeight(overlayHeight);
-    const body = this.renderBody(innerWidth, contentHeight);
-    const border = this.theme.fg("border", `+${"-".repeat(innerWidth)}+`);
-    const row = (content: string) =>
-      `${this.theme.fg("border", "|")}${padLine(content, innerWidth)}${this.theme.fg("border", "|")}`;
+    const body = this.renderBody(width, contentHeight);
+    const row = (content: string) => padLine(content, width);
     const lines =
-      overlayHeight >= 6
+      overlayHeight >= 4
         ? [
-            border,
             row(this.title()),
             row(this.status()),
-            row(this.theme.fg("border", "-".repeat(innerWidth))),
+            row(this.theme.fg("border", "-".repeat(width))),
             ...body.map(row),
-            border,
           ]
-        : [border, row(this.title()), ...body.map(row), border];
+        : [row(this.title()), ...body.map(row)];
     return lines.slice(0, overlayHeight);
   }
 
@@ -543,13 +538,11 @@ export class HistoryExplorer implements Component {
   }
 
   private overlayHeight(): number {
-    const terminalRows = Math.max(1, this.tui.terminal.rows);
-    const availableRows = Math.max(1, terminalRows - 2);
-    return Math.min(availableRows, Math.max(1, Math.floor(terminalRows * 0.95)));
+    return Math.max(1, this.tui.terminal.rows);
   }
 
   private contentHeight(overlayHeight: number): number {
-    return Math.max(0, overlayHeight - (overlayHeight >= 6 ? 5 : 3));
+    return Math.max(0, overlayHeight - (overlayHeight >= 4 ? 3 : 1));
   }
 }
 
@@ -577,8 +570,8 @@ export async function showHistoryExplorer(
         overlay: true,
         overlayOptions: {
           anchor: "center",
-          margin: { bottom: 1, left: 0, right: 0, top: 1 },
-          maxHeight: "95%",
+          margin: 0,
+          maxHeight: "100%",
           width: "100%",
         },
       },
