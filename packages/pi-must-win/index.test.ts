@@ -133,6 +133,12 @@ describe("normalizeRepoUrl", () => {
       "github.com/openclaw/openclaw",
     );
   });
+
+  it("strips explicit ports from scheme URLs", () => {
+    expect(normalizeRepoUrl("ssh://git@github.com:2222/OpenClaw/OpenClaw.git")).toBe(
+      "github.com/openclaw/openclaw",
+    );
+  });
 });
 
 describe("isRepoDisabled", () => {
