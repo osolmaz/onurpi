@@ -157,7 +157,7 @@ describe("compact streaming", () => {
     );
     expect(firstInvalidations).toBe(beforeTokenUpdate);
     const beforeModeChange = firstInvalidations;
-    state.setMode("expanded");
+    state.setDensity("expanded");
     expect(firstInvalidations).toBeGreaterThan(beforeModeChange);
   });
 
@@ -340,7 +340,7 @@ describe("edit diffstats", () => {
       ],
       files: 2,
     });
-    state.setMode("expanded");
+    state.setDensity("expanded");
     expect(state.viewFor(final, 200)?.display).toBe("original");
   });
 });
@@ -530,7 +530,7 @@ describe("expanded transcript", () => {
     const first = {};
     const second = {};
 
-    state.setMode("expanded");
+    state.setDensity("expanded");
     state.ensureActive(100);
     registerAssistant(state, first, assistantMessage(110, [{ text: "First", type: "text" }]));
     registerAssistant(state, second, assistantMessage(120, [{ text: "Second", type: "text" }]));
@@ -545,7 +545,7 @@ describe("expanded transcript", () => {
     const state = new TurnFoldState();
     const compaction = {};
 
-    state.setMode("expanded");
+    state.setDensity("expanded");
     state.ensureActive(100);
     state.registerCompaction(compactionEntry("compact-expanded", 120), "threshold");
     state.associateCompaction(compaction, compactionMessage(120));
@@ -553,10 +553,10 @@ describe("expanded transcript", () => {
     expect(state.viewFor(compaction)?.display).toBe("original");
   });
 
-  it("toggles back to compact mode", () => {
+  it("toggles back to compact density", () => {
     const state = new TurnFoldState();
-    expect(state.toggleExpanded()).toBe("expanded");
-    expect(state.toggleExpanded()).toBe("compact");
+    expect(state.toggleDensity()).toBe("expanded");
+    expect(state.toggleDensity()).toBe("compact");
   });
 });
 

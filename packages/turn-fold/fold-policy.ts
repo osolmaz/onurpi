@@ -1,4 +1,4 @@
-import type { TurnFoldMode } from "./mode.ts";
+import type { TranscriptDensity } from "./density.ts";
 
 export type FoldDisplay =
   | "hidden"
@@ -13,7 +13,7 @@ export type FoldDisplayInput = {
   isRecentActivity: boolean;
   isSettledSummaryAnchor: boolean;
   isStreamingSummaryAnchor: boolean;
-  mode: TurnFoldMode;
+  density: TranscriptDensity;
   settled: boolean;
 };
 
@@ -24,7 +24,7 @@ function settledDisplay(input: FoldDisplayInput): FoldDisplay {
 }
 
 export function foldDisplay(input: FoldDisplayInput): FoldDisplay {
-  if (input.mode === "expanded") return "original";
+  if (input.density === "expanded") return "original";
   if (input.settled) return settledDisplay(input);
   if (input.isRecentActivity) return "original";
   return input.isStreamingSummaryAnchor ? "streaming-summary" : "hidden";

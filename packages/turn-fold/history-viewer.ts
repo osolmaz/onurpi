@@ -156,7 +156,7 @@ export async function showHistoryViewer(
   entries: readonly unknown[],
 ): Promise<void> {
   if (ctx.mode !== "tui") {
-    ctx.ui.notify("Turn Fold history is available only in TUI mode.", "warning");
+    ctx.ui.notify("Turn Fold history is available only in TUI density.", "warning");
     return;
   }
   await ctx.ui.custom<undefined>((tui, theme, _keybindings, done) => {

@@ -1,6 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import type { TurnFoldMode } from "./mode.ts";
+import type { TranscriptDensity } from "./density.ts";
 import { historicalRunStarts } from "./run-boundary.ts";
 import { assistantSnapshot, messageFromEntry, stringField } from "./turn-message.ts";
 
@@ -32,7 +32,7 @@ export type TranscriptProjectionOptions = {
   activeRun: boolean;
   attachedCompactionEntryIds: ReadonlySet<string>;
   componentLimit?: number;
-  mode: TurnFoldMode;
+  density: TranscriptDensity;
 };
 
 export type TranscriptProjection = {
@@ -395,7 +395,7 @@ export function projectTranscriptEntries(
   options: TranscriptProjectionOptions,
 ): TranscriptProjection {
   const sourceEntries = [...entries];
-  if (options.mode === "expanded") {
+  if (options.density === "expanded") {
     return {
       displayEntries: sourceEntries,
       omittedRunCount: 0,

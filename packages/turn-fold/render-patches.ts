@@ -373,6 +373,7 @@ function installUserTimestampPatches(
 
   const patchedUserRender = function (this: UserMessageComponent, width: number): string[] {
     state.associateUser(this);
+    if (!state.userVisibleFor(this)) return [];
     return timestampOnBottomLine(
       originalUserRender.call(this, width),
       state.userTimestampFor(this),
@@ -385,9 +386,11 @@ function installUserTimestampPatches(
     this: SkillInvocationMessageComponent,
     width: number,
   ): string[] {
+    const hasUserMessage = skillHasUserMessage(this);
+    state.associateUser(this, !hasUserMessage);
+    if (!state.userVisibleFor(this)) return [];
     const original = originalSkillRender.call(this, width);
-    if (skillHasUserMessage(this)) return original;
-    state.associateUser(this);
+    if (hasUserMessage) return original;
     return timestampOnBottomLine(
       original,
       state.userTimestampFor(this),

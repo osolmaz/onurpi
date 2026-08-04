@@ -18,10 +18,13 @@ typescript:
     targets:
       - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
-      - packages/turn-fold/mode.ts
+      - packages/turn-fold/density.ts
+      - packages/turn-fold/history-scope.ts
+      - packages/turn-fold/projection-plan.ts
       - packages/turn-fold/transcript-window-adapter.ts
       - packages/turn-fold/transcript-windows.ts
       - packages/turn-fold/tool-padding.ts
+      - packages/turn-fold/turn-visibility.ts
       - packages/live-stats/live-stats.ts
       - packages/nyan-mode/src/png.ts
       - packages/nyan-mode/src/progress.ts

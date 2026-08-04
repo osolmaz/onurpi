@@ -2,8 +2,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { nearestRunStartIndex } from "./run-boundary.ts";
 
-export const DEFAULT_TRANSCRIPT_WINDOWS = 3;
 export const ALL_TRANSCRIPT_WINDOWS = "all" as const;
+export const DEFAULT_TRANSCRIPT_WINDOWS = ALL_TRANSCRIPT_WINDOWS;
 
 export type TranscriptWindowValue = number | typeof ALL_TRANSCRIPT_WINDOWS;
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;

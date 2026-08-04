@@ -16,11 +16,14 @@ typescript:
     targets:
       - configuration.ts
       - fold-policy.ts
-      - mode.ts
+      - density.ts
+      - history-scope.ts
+      - projection-plan.ts
       - run-boundary.ts
       - transcript-window-adapter.ts
       - transcript-windows.ts
       - tool-padding.ts
+      - turn-visibility.ts
   dependency_boundaries:
     - from: .
       allow: []

@@ -89,7 +89,7 @@ describe("Goal-heavy transcript windows", () => {
     const projection = projectTranscriptEntries(branch, {
       activeRun: false,
       attachedCompactionEntryIds: new Set(),
-      mode: "compact",
+      density: "compact",
     });
 
     expect(projection.projectedComponentCount).toBeLessThanOrEqual(

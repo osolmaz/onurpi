@@ -2,7 +2,7 @@
 
 ## Status
 
-This document specifies the compact-mode transcript projection implemented by Turn Fold. Earlier releases loaded every entry in the selected compaction windows into Pi's component tree and hid most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
+This document specifies the compact-density transcript projection implemented by Turn Fold. Earlier releases loaded every entry in the selected compaction windows into Pi's component tree and hid most rows during rendering. The implementation plan is in [../../docs/turn-fold-sparse-transcript-implementation-plan.md](../../docs/turn-fold-sparse-transcript-implementation-plan.md).
 
 ## Purpose
 
@@ -97,17 +97,17 @@ Compact projection remains active while the main editor is in use. Raw hidden ac
 
 The viewer MUST have an explicit close action and MUST release its page components on close. Changing pages MUST replace the previous page instead of accumulating components. Opening the viewer has no effect on model context or stored session data.
 
-Until the paged viewer ships, expanded mode may continue to use full selected-window replay as an explicitly requested diagnostic mode. Compact mode MUST never fall back to full replay merely to support expansion.
+Until the paged viewer ships, expanded density may continue to use full selected-window replay as an explicitly requested diagnostic density. Compact density MUST never fall back to full replay merely to support expansion.
 
 ## Compatibility checks
 
 The adapter uses one undocumented Pi method and therefore requires a tested Pi version range. Startup MUST verify that the method exists, is callable, and returns a branch-entry array for a smoke fixture. An unsupported shape disables sparse projection and leaves Pi's original method installed.
 
-The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, mode change, shutdown restoration, and non-TUI isolation pass.
+The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, density change, shutdown restoration, and non-TUI isolation pass.
 
 ## Performance requirements
 
-The primary performance measure is key-to-echo latency in compact mode after session replay. The release fixture includes the 44 MB session that exposed the problem, or a sanitized structural equivalent with the same large-run and edit-result shape.
+The primary performance measure is key-to-echo latency in compact density after session replay. The release fixture includes the 44 MB session that exposed the problem, or a sanitized structural equivalent with the same large-run and edit-result shape.
 
 After warmup, at least ten measured runs MUST meet both limits:
 

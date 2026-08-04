@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
-import { nextTurnFoldMode, type TurnFoldMode } from "./mode.ts";
+import { nextTranscriptDensity, type TranscriptDensity } from "./density.ts";
 import { historicalRunStarts, type RunBoundary } from "./run-boundary.ts";
 import {
   compactionGroupIndex,
@@ -11,6 +11,7 @@ import {
   reassignGroupIds,
   reloadedActiveGroups,
 } from "./turn-history-reload.ts";
+import { projectedGroupIds } from "./turn-visibility.ts";
 import {
   assistantSnapshot,
   type AssistantSnapshot,
@@ -117,20 +118,6 @@ function rememberVisibleAssistant(group: TurnGroup, snapshot: AssistantSnapshot)
   if (snapshot.hasVisibleContent) group.visibleAssistantKeys.add(snapshot.key);
 }
 
-function projectedGroupIds(
-  displayEntries: readonly unknown[],
-  historicalGroupByEntryId: ReadonlyMap<string, string>,
-): ReadonlySet<string> {
-  const groupIds = new Set<string>();
-  for (const entry of displayEntries) {
-    if (stringField(messageFromEntry(entry), "role") !== "user") continue;
-    const entryId = stringField(entry, "id");
-    const groupId = entryId ? historicalGroupByEntryId.get(entryId) : undefined;
-    if (groupId) groupIds.add(groupId);
-  }
-  return groupIds;
-}
-
 function assistantLayoutChanged(
   previous: AssistantSnapshot | undefined,
   current: AssistantSnapshot,
@@ -161,13 +148,14 @@ export class TurnFoldState {
   private groups = new Map<string, TurnGroup>();
   private historicalGroupByEntryId = new Map<string, string>();
   private latestAssistantKeyByTimestamp = new Map<number, string>();
-  private mode: TurnFoldMode = "compact";
+  private density: TranscriptDensity = "compact";
   private pendingLiveCompactionGroups: (string | null)[] = [];
   private sequence = 0;
   private toolGroupById = new Map<string, string>();
   private userComponentGroup = new WeakMap<object, string>();
   private userGroupCursor = 0;
   private userGroupIds: string[] = [];
+  private visibleGroupIds = new Set<string>();
   private workingDirectory: string;
 
   constructor(workingDirectory = process.cwd()) {
@@ -181,18 +169,18 @@ export class TurnFoldState {
     for (const group of this.groups.values()) this.markGroupChanged(group);
   }
 
-  getMode(): TurnFoldMode {
-    return this.mode;
+  getDensity(): TranscriptDensity {
+    return this.density;
   }
 
-  setMode(mode: TurnFoldMode): void {
-    this.mode = mode;
+  setDensity(density: TranscriptDensity): void {
+    this.density = density;
     this.invalidateAllComponents();
   }
 
-  toggleExpanded(): TurnFoldMode {
-    this.setMode(nextTurnFoldMode(this.mode));
-    return this.mode;
+  toggleDensity(): TranscriptDensity {
+    this.setDensity(nextTranscriptDensity(this.density));
+    return this.density;
   }
 
   loadHistory(
@@ -231,11 +219,26 @@ export class TurnFoldState {
     } else {
       this.loadHistory(entries, compactionAssociations);
     }
-    const visibleGroupIds = projectedGroupIds(displayEntries, this.historicalGroupByEntryId);
-    this.userGroupIds = this.userGroupIds.filter((groupId) => visibleGroupIds.has(groupId));
+    this.visibleGroupIds = new Set(
+      projectedGroupIds(displayEntries, this.historicalGroupByEntryId),
+    );
+    if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
+    this.userGroupIds = this.userGroupIds.filter((groupId) => this.visibleGroupIds.has(groupId));
     this.applyOmittedRuns(omittedRuns, oldestRetainedEntryId);
   }
 
+  applyDisplayProjection(
+    density: TranscriptDensity,
+    entries: readonly unknown[],
+    omittedRuns = 0,
+    oldestRetainedEntryId?: string,
+  ): void {
+    this.density = density;
+    this.visibleGroupIds = new Set(projectedGroupIds(entries, this.historicalGroupByEntryId));
+    if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
+    this.applyOmittedRuns(omittedRuns, oldestRetainedEntryId);
+    this.invalidateAllComponents();
+  }
   private applyOmittedRuns(omittedRuns: number, oldestRetainedEntryId?: string): void {
     for (const group of this.groups.values()) group.omittedRuns = 0;
     const oldestGroupId = oldestRetainedEntryId
@@ -244,7 +247,6 @@ export class TurnFoldState {
     const oldestGroup = oldestGroupId ? this.groups.get(oldestGroupId) : undefined;
     if (!oldestGroup || omittedRuns <= 0) return;
     oldestGroup.omittedRuns = omittedRuns;
-    this.markGroupChanged(oldestGroup);
   }
 
   replaceCompactionAssociations(
@@ -338,17 +340,22 @@ export class TurnFoldState {
     }
   }
 
-  associateUser(component: object): void {
+  associateUser(component: object, advance = true): void {
     if (this.userComponentGroup.has(component)) return;
     const groupId = this.userGroupIds[this.userGroupCursor];
     if (!groupId || !this.groups.has(groupId)) return;
     this.userComponentGroup.set(component, groupId);
-    this.userGroupCursor += 1;
+    if (advance) this.userGroupCursor += 1;
   }
 
   userTimestampFor(component: object): number | undefined {
     const groupId = this.userComponentGroup.get(component);
     return groupId ? this.groups.get(groupId)?.startedAt : undefined;
+  }
+
+  userVisibleFor(component: object): boolean {
+    const groupId = this.userComponentGroup.get(component);
+    return groupId === undefined || this.visibleGroupIds.has(groupId);
   }
 
   associateAssistant(component: object, message: unknown): void {
@@ -440,22 +447,23 @@ export class TurnFoldState {
     if (!group) return undefined;
 
     const layout = this.layoutFor(group);
+    if (!this.visibleGroupIds.has(group.id)) {
+      return { display: "hidden", summary: this.summary(group, layout, now) };
+    }
     const display = foldDisplay({
       isFinalAnchor: component === layout.finalAnchor,
       isRecentActivity: layout.recentActivities.has(component),
       isSettledSummaryAnchor: component === layout.settledSummaryAnchor,
       isStreamingSummaryAnchor: component === layout.streamingSummaryAnchor,
-      mode: this.mode,
+      density: this.density,
       settled: group.settled,
     });
     return { display, summary: this.summary(group, layout, now) };
   }
-
   private queueLiveCompactionComponents(groupId: string | null): void {
     // Pi rebuilds the stored compaction row, then appends a second live row.
     this.pendingLiveCompactionGroups.push(groupId, groupId);
   }
-
   private compactionGroupForTimestamp(timestamp: number | undefined): string | null {
     if (timestamp !== undefined && this.compactionGroupByTimestamp.has(timestamp)) {
       const groupId = this.compactionGroupByTimestamp.get(timestamp) ?? null;
@@ -466,11 +474,9 @@ export class TurnFoldState {
     }
     return this.pendingLiveCompactionGroups.shift() ?? null;
   }
-
   private messageAssistantKey(message: unknown): string | undefined {
     return isRecord(message) ? this.assistantKeyByMessage.get(message) : undefined;
   }
-
   private newAssistantKey(timestamp: number): string {
     const ordinal = (this.assistantOrdinalByTimestamp.get(timestamp) ?? 0) + 1;
     const key = `${String(timestamp)}:${String(ordinal)}`;
@@ -660,6 +666,7 @@ export class TurnFoldState {
       visibleAssistantKeys: new Set(),
     };
     this.groups.set(group.id, group);
+    this.visibleGroupIds.add(group.id);
     if (startedByUser) this.userGroupIds.push(group.id);
     return group;
   }
@@ -836,6 +843,7 @@ export class TurnFoldState {
     this.userComponentGroup = new WeakMap();
     this.userGroupCursor = 0;
     this.userGroupIds = [];
+    this.visibleGroupIds = new Set();
   }
 
   private reloadHistory(entries: readonly unknown[]): void {
