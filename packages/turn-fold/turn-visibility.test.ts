@@ -49,6 +49,26 @@ it("does not make a group visible from non-rendering custom metadata alone", () 
   expect(state.viewFor(assistant)?.display).toBe("hidden");
 });
 
+it("hides and restores standalone compaction components with their entries", () => {
+  const state = new TurnFoldState();
+  const olderComponent = {};
+  const newerComponent = {};
+  const entries = [
+    { id: "older", summary: "Older", timestamp: new Date(100).toISOString(), type: "compaction" },
+    { id: "newer", summary: "Newer", timestamp: new Date(200).toISOString(), type: "compaction" },
+  ];
+
+  state.applyHistoryProjection(entries, entries.slice(1));
+  state.associateCompaction(olderComponent, { timestamp: 100 });
+  state.associateCompaction(newerComponent, { timestamp: 200 });
+
+  expect(state.compactionVisibleFor(olderComponent)).toBe(false);
+  expect(state.compactionVisibleFor(newerComponent)).toBe(true);
+
+  state.applyDisplayProjection("expanded", entries);
+  expect(state.compactionVisibleFor(olderComponent)).toBe(true);
+});
+
 it("hides and restores loaded groups without rebuilding component associations", () => {
   const state = new TurnFoldState();
   const firstUser = {};

@@ -472,6 +472,48 @@ describe("Turn Fold configuration commands", () => {
     expect(ctx.reload).not.toHaveBeenCalled();
   });
 
+  it("treats entries rendered by live turns as loaded for later narrowing", async () => {
+    const extension = extensionHarness();
+    const branch = [
+      { id: "user-1", message: { content: "First", role: "user", timestamp: 1 }, type: "message" },
+      {
+        id: "assistant-1",
+        message: { content: [], role: "assistant", stopReason: "stop", timestamp: 2 },
+        type: "message",
+      },
+      {
+        customType: "onurpi-turn-fold-config",
+        data: { density: "expanded", preCompaction: "show", windows: "all" },
+        id: "configuration",
+        type: "custom",
+      },
+    ];
+    const ctx = context(branch, branch);
+    turnFold(extension.pi);
+    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+    branch.push(
+      { id: "user-2", message: { content: "Second", role: "user", timestamp: 3 }, type: "message" },
+      {
+        id: "assistant-2",
+        message: { content: [], role: "assistant", stopReason: "stop", timestamp: 4 },
+        type: "message",
+      },
+    );
+    await emit(extension.handlers, "agent_settled", { type: "agent_settled" }, ctx);
+
+    await runTurnFoldCommand(extension.commands, "compact", ctx);
+
+    expect(extension.appendEntry).toHaveBeenCalledWith("onurpi-turn-fold-config", {
+      density: "compact",
+      preCompaction: "show",
+      windows: "all",
+    });
+    expect(ctx.ui.notify).toHaveBeenLastCalledWith(
+      "Turn fold: compact, pre-compaction show, windows all",
+      "info",
+    );
+  });
+
   it("compacts a fully loaded transcript in place", async () => {
     const extension = extensionHarness();
     const config = {

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import { CompactionVisibility } from "./compaction-visibility.ts";
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
 import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
@@ -144,6 +145,7 @@ export class TurnFoldState {
   private componentInfo = new WeakMap<object, { groupId: string; sequence: number }>();
   private compactionComponentGroup = new WeakMap<object, string | null>();
   private compactionGroupByTimestamp = new Map<number, string | null>();
+  private compactionVisibility = new CompactionVisibility();
   private groupCounter = 0;
   private groups = new Map<string, TurnGroup>();
   private historicalGroupByEntryId = new Map<string, string>();
@@ -169,9 +171,7 @@ export class TurnFoldState {
     for (const group of this.groups.values()) this.markGroupChanged(group);
   }
 
-  getDensity(): TranscriptDensity {
-    return this.density;
-  }
+  getDensity = (): TranscriptDensity => this.density;
 
   setDensity(density: TranscriptDensity): void {
     this.density = density;
@@ -222,6 +222,7 @@ export class TurnFoldState {
     this.visibleGroupIds = new Set(
       projectedGroupIds(displayEntries, this.historicalGroupByEntryId),
     );
+    this.compactionVisibility.apply(displayEntries);
     if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
     this.userGroupIds = this.userGroupIds.filter((groupId) => this.visibleGroupIds.has(groupId));
     this.applyOmittedRuns(omittedRuns, oldestRetainedEntryId);
@@ -235,6 +236,7 @@ export class TurnFoldState {
   ): void {
     this.density = density;
     this.visibleGroupIds = new Set(projectedGroupIds(entries, this.historicalGroupByEntryId));
+    this.compactionVisibility.apply(entries);
     if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
     this.applyOmittedRuns(omittedRuns, oldestRetainedEntryId);
     this.invalidateAllComponents();
@@ -256,9 +258,7 @@ export class TurnFoldState {
     this.pendingLiveCompactionGroups = [];
   }
 
-  hasActive(): boolean {
-    return this.activeGroupId !== undefined;
-  }
+  hasActive = (): boolean => this.activeGroupId !== undefined;
 
   activeId(): string | undefined {
     return this.activeGroupId;
@@ -415,7 +415,9 @@ export class TurnFoldState {
 
   associateCompaction(component: object, message: unknown): void {
     if (this.compactionComponentGroup.has(component)) return;
-    const groupId = this.compactionGroupForTimestamp(numberField(message, "timestamp"));
+    const timestamp = numberField(message, "timestamp");
+    this.compactionVisibility.associate(component, timestamp);
+    const groupId = this.compactionGroupForTimestamp(timestamp);
     this.compactionComponentGroup.set(component, groupId);
     const group = groupId ? this.groups.get(groupId) : undefined;
     if (!group) return;
@@ -423,6 +425,9 @@ export class TurnFoldState {
       this.markGroupChanged(group);
     }
   }
+
+  compactionVisibleFor = (component: object): boolean =>
+    this.compactionVisibility.visible(component);
 
   settleActive(endedAt = Date.now()): void {
     if (!this.activeGroupId) return;
@@ -674,7 +679,10 @@ export class TurnFoldState {
   private indexHistoricalCompactionEntry(entry: unknown): boolean {
     if (stringField(entry, "type") !== "compaction") return false;
     const timestamp = entryTimestamp(entry);
-    if (timestamp !== undefined) this.compactionGroupByTimestamp.set(timestamp, null);
+    if (timestamp !== undefined) {
+      this.compactionGroupByTimestamp.set(timestamp, null);
+      this.compactionVisibility.recordHistoricalTimestamp(timestamp);
+    }
     return true;
   }
 
@@ -833,6 +841,7 @@ export class TurnFoldState {
     this.componentInfo = new WeakMap();
     this.compactionComponentGroup = new WeakMap();
     this.compactionGroupByTimestamp = new Map();
+    this.compactionVisibility = new CompactionVisibility();
     this.groups = new Map();
     this.groupCounter = 0;
     this.historicalGroupByEntryId = new Map();
