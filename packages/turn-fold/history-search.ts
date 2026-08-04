@@ -1,4 +1,5 @@
 import {
+  historyEntryKind,
   historyEntryPresentation,
   historyKindMatchesFilter,
   type HistoryEntryPresentation,
@@ -9,6 +10,7 @@ import {
 const DEFAULT_ENTRY_BUDGET = 50;
 const DEFAULT_CHARACTER_BUDGET = 64_000;
 const SNIPPET_RADIUS = 80;
+const ENTRY_BUDGET_PER_STEP = DEFAULT_ENTRY_BUDGET;
 
 export type HistorySearchMatch = Readonly<{
   entryIndex: number;
@@ -114,7 +116,7 @@ export class HistorySearch {
     while (!this.completeValue && entriesLeft > 0 && charactersLeft > 0) {
       const progress = this.scanStep(charactersLeft);
       charactersLeft -= progress.consumed;
-      if (progress.finishedEntry) entriesLeft -= 1;
+      entriesLeft -= progress.entries;
     }
     return this.progress;
   }
@@ -143,13 +145,16 @@ export class HistorySearch {
     return index < 0 ? undefined : index + 1;
   }
 
-  private scanStep(characterBudget: number): { consumed: number; finishedEntry: boolean } {
-    this.active ??= this.openNextEntry();
-    if (!this.active) {
-      this.completeValue = true;
-      return { consumed: 1, finishedEntry: false };
+  private scanStep(characterBudget: number): { consumed: number; entries: number } {
+    if (this.active === undefined) {
+      const opened = this.openNextEntry(ENTRY_BUDGET_PER_STEP);
+      if (!opened.hasActive) {
+        if (opened.listExhausted) this.completeValue = true;
+        return { consumed: 1, entries: Math.max(1, opened.skipped) };
+      }
     }
-    return this.scanActive(characterBudget);
+    const scanned = this.scanActive(characterBudget);
+    return { consumed: scanned.consumed, entries: scanned.finishedEntry ? 1 : 0 };
   }
 
   private previousResult(entryIndex: number): HistorySearchMatch | undefined {
@@ -160,26 +165,33 @@ export class HistorySearch {
     return undefined;
   }
 
-  private openNextEntry(): ActiveEntry | undefined {
-    while (this.nextEntryIndex < this.entries.length) {
+  private openNextEntry(entryBudget: number): {
+    hasActive: boolean;
+    listExhausted: boolean;
+    skipped: number;
+  } {
+    let skipped = 0;
+    while (this.nextEntryIndex < this.entries.length && skipped < entryBudget) {
       const entryIndex = this.nextEntryIndex;
       this.nextEntryIndex += 1;
       const entry = this.entries[entryIndex];
-      const presented = historyEntryPresentation(entry);
-      if (!historyKindMatchesFilter(presented.kind, this.filterValue)) {
+      if (!historyKindMatchesFilter(historyEntryKind(entry), this.filterValue)) {
         this.scannedEntriesValue += 1;
+        skipped += 1;
         continue;
       }
+      const presented = historyEntryPresentation(entry);
       const original = `${presented.label}\n${presented.searchableText}`;
-      return {
+      this.active = {
         entryIndex,
         normalized: normalized(original),
         offset: 0,
         original,
         section: searchSection(presented, this.queryNormalized),
       };
+      return { hasActive: true, listExhausted: false, skipped };
     }
-    return undefined;
+    return { hasActive: false, listExhausted: this.nextEntryIndex >= this.entries.length, skipped };
   }
 
   private scanActive(characterBudget: number): { consumed: number; finishedEntry: boolean } {
