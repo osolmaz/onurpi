@@ -7,9 +7,10 @@ export function projectedGroupIds(
   const groupIds = new Set<string>();
   for (const entry of displayEntries) {
     const type = stringField(entry, "type");
-    const isPrompt =
-      type === "custom_message" || stringField(messageFromEntry(entry), "role") === "user";
-    if (!isPrompt) continue;
+    const role = stringField(messageFromEntry(entry), "role");
+    const isRunContent =
+      type === "custom_message" || role === "user" || role === "assistant" || role === "toolResult";
+    if (!isRunContent) continue;
     const entryId = stringField(entry, "id");
     const groupId = entryId ? historicalGroupByEntryId.get(entryId) : undefined;
     if (groupId) groupIds.add(groupId);
