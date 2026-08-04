@@ -30,6 +30,7 @@ describe("Turn Fold history index", () => {
 
     expect(index.totalWindows).toBe(4);
     expect(index.windowStarts).toEqual([0, 1, 3, 5]);
+    expect(index.entryWindows).toEqual([1, 2, 2, 3, 3, 4, 4]);
     expect(historyStartIndex(index, 3)).toBe(1);
     expect(bodyReads.count).toBe(0);
   });
@@ -60,6 +61,19 @@ describe("Turn Fold history index", () => {
     expect(range.admittedWindows).toBe(5);
     expect(range.startIndex).toBe(0);
     expect(range.loadOlder()).toBe(false);
+  });
+
+  it("admits the window containing a direct jump target", () => {
+    const entries = Array.from({ length: 14 }, (_, index) =>
+      entry(`entry-${String(index)}`, index % 2 === 1 ? "compaction" : "message"),
+    );
+    const range = new HistoryRange(createHistoryIndex(entries));
+
+    expect(range.startIndex).toBeGreaterThan(0);
+    expect(range.admitEntry(0)).toBe(true);
+    expect(range.startIndex).toBe(0);
+    expect(range.windowStart(3)).toBe(3);
+    expect(range.windowStart(0)).toBeUndefined();
   });
 
   it("handles branches with fewer than three windows", () => {

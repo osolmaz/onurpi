@@ -17,9 +17,14 @@ typescript:
       - compaction-visibility.ts
       - configuration.ts
       - fold-policy.ts
+      - history-entry.ts
       - history-index.ts
+      - history-input.ts
+      - history-navigation.ts
       - history-renderer.ts
       - history-scope.ts
+      - history-search.ts
+      - history-viewport.ts
       - projection-plan.ts
       - restart-marker.ts
       - run-boundary.ts

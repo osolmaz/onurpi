@@ -6,6 +6,7 @@ export const DEFAULT_HISTORY_WINDOW_BATCH = 3;
 
 export type HistoryIndex = Readonly<{
   entries: readonly unknown[];
+  entryWindows: readonly number[];
   totalWindows: number;
   windowStarts: readonly number[];
 }>;
@@ -22,12 +23,19 @@ export function historyDisplayEntries(entries: readonly unknown[]): readonly unk
 
 export function createHistoryIndex(entries: readonly unknown[]): HistoryIndex {
   const displayEntries = historyDisplayEntries(entries);
+  const entryWindows: number[] = [];
   const windowStarts = [0];
+  let windowNumber = 1;
   displayEntries.forEach((entry, entryIndex) => {
-    if (stringField(entry, "type") === "compaction") windowStarts.push(entryIndex);
+    if (stringField(entry, "type") === "compaction") {
+      windowStarts.push(entryIndex);
+      windowNumber += 1;
+    }
+    entryWindows.push(windowNumber);
   });
   return {
     entries: displayEntries,
+    entryWindows,
     totalWindows: windowStarts.length,
     windowStarts,
   };
@@ -55,6 +63,17 @@ export class HistoryRange {
 
   get startIndex(): number {
     return historyStartIndex(this.index, this.admittedWindowCount);
+  }
+
+  admitEntry(entryIndex: number): boolean {
+    let changed = false;
+    while (entryIndex < this.startIndex && this.loadOlder()) changed = true;
+    return changed;
+  }
+
+  windowStart(windowNumber: number): number | undefined {
+    if (!Number.isSafeInteger(windowNumber) || windowNumber < 1) return undefined;
+    return this.index.windowStarts[windowNumber - 1];
   }
 
   loadOlder(): boolean {

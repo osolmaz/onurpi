@@ -19,9 +19,14 @@ typescript:
       - packages/turn-fold/compaction-visibility.ts
       - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
+      - packages/turn-fold/history-entry.ts
       - packages/turn-fold/history-index.ts
+      - packages/turn-fold/history-input.ts
+      - packages/turn-fold/history-navigation.ts
       - packages/turn-fold/history-renderer.ts
       - packages/turn-fold/history-scope.ts
+      - packages/turn-fold/history-search.ts
+      - packages/turn-fold/history-viewport.ts
       - packages/turn-fold/projection-plan.ts
       - packages/turn-fold/restart-marker.ts
       - packages/turn-fold/transcript-window-adapter.ts
