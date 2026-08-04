@@ -4,6 +4,10 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
 import { regularPiAuthPath } from "./auth-path.js";
+import {
+  canonicalModelsStorePath,
+  registerHuggingFaceOAuthProvider,
+} from "./huggingface-provider.js";
 import { terminalText } from "./terminal-text.js";
 
 type AuthType = Parameters<ModelRuntime["login"]>[1];
@@ -228,10 +232,13 @@ function consumeSecretCharacter(
   return { value: next, done: false, cancelled: false };
 }
 
-async function defaultRuntimeFactory(paths: RuntimePaths): Promise<LoginRuntime> {
-  return await ModelRuntime.create({
+export async function defaultRuntimeFactory(paths: RuntimePaths): Promise<LoginRuntime> {
+  const runtime = await ModelRuntime.create({
     authPath: paths.authPath,
     modelsPath: paths.modelsPath,
+    modelsStorePath: canonicalModelsStorePath(paths.authPath),
     allowModelNetwork: false,
   });
+  await registerHuggingFaceOAuthProvider(runtime);
+  return runtime;
 }
