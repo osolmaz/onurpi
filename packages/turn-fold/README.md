@@ -66,8 +66,9 @@ Turn Fold saves the configuration and reports `restart required`. Exit Pi and re
 load those entries; `/reload` is not enough because Pi rebuilds the transcript before extension
 projection is bound. `/turn-fold status` includes the pending restart state. A TUI started with
 `--no-session` rejects widening that cannot survive a restart. Entering or leaving a range that
-contains another extension's custom entry also requires a restart because Turn Fold cannot safely
-patch that extension's renderer through Pi's public API.
+contains an unpatched row, including another extension's custom entry or custom prompt and Pi's
+branch summaries, also requires a restart because Turn Fold cannot safely hide that renderer in
+place through Pi's public API.
 
 `Ctrl+O` remains Pi's separate tool-output detail toggle. While its editor wrapper is active, Turn
 Fold enables Pi TUI's public shrink-clearing behavior so narrowing removes obsolete terminal rows.

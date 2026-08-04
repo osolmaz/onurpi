@@ -124,6 +124,7 @@ describe("transcript projection plans", () => {
     const loaded = new Set(["latest", "after"]);
 
     expect(canApplyProjectionInPlace(hide, loaded)).toBe(true);
+    expect(canApplyProjectionInPlace(hide, new Set(["before", "latest", "after"]))).toBe(false);
     expect(canApplyProjectionInPlace(show, loaded)).toBe(false);
     expect(canApplyProjectionInPlace(show, new Set(["before", "latest", "after"]))).toBe(true);
   });

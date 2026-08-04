@@ -5,6 +5,7 @@ import { selectPreCompactionEntries } from "./history-scope.ts";
 import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { projectTranscriptEntries } from "./transcript-projection.ts";
 import { selectTranscriptEntries } from "./transcript-windows.ts";
+import { messageFromEntry, stringField } from "./turn-message.ts";
 
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 type BranchEntry = BranchEntries[number];
@@ -29,16 +30,18 @@ function entryId(entry: BranchEntry): string | undefined {
   return typeof entry.id === "string" && entry.id.length > 0 ? entry.id : undefined;
 }
 
-function isUnpatchableCustomEntry(entry: BranchEntry): boolean {
-  return (
-    entry.type === "custom" &&
-    entry.customType !== TURN_FOLD_CONFIG_ENTRY &&
-    entry.customType !== TURN_FOLD_RUN_ENTRY
-  );
+function isUnpatchableDisplayEntry(entry: BranchEntry): boolean {
+  if (entry.type === "custom") {
+    return entry.customType !== TURN_FOLD_CONFIG_ENTRY && entry.customType !== TURN_FOLD_RUN_ENTRY;
+  }
+  if (entry.type === "custom_message" || entry.type === "branch_summary") return true;
+  if (entry.type !== "message") return false;
+  const role = stringField(messageFromEntry(entry), "role");
+  return role !== "user" && role !== "assistant" && role !== "toolResult";
 }
 
 function requiresLoadedComponent(entry: BranchEntry): boolean {
-  return entry.type !== "custom" || isUnpatchableCustomEntry(entry);
+  return entry.type !== "custom" || isUnpatchableDisplayEntry(entry);
 }
 
 function omittedUnpatchableEntryIds(
@@ -48,7 +51,7 @@ function omittedUnpatchableEntryIds(
   const omitted = new Set<string>();
   for (const entry of entries) {
     const id = entryId(entry);
-    if (isUnpatchableCustomEntry(entry) && id && !displayEntryIds.has(id)) omitted.add(id);
+    if (isUnpatchableDisplayEntry(entry) && id && !displayEntryIds.has(id)) omitted.add(id);
   }
   return omitted;
 }
