@@ -325,6 +325,19 @@ describe("Turn Fold history explorer mouse support", () => {
     expect(explorer.render(100).join("\n")).toBe(first);
   });
 
+  it("keeps the viewport fixed while a subview handles wheel input", () => {
+    const tui = fakeTui(20);
+    const explorer = new HistoryExplorer(tui, theme, history(8), vi.fn());
+    const before = explorer.render(80).join("\n");
+
+    explorer.handleInput("f");
+    explorer.handleInput("\u001b[<64;10;5M");
+    explorer.handleInput("\u001b[<64;10;5M");
+    explorer.handleInput("\u001b");
+
+    expect(explorer.render(80).join("\n")).toBe(before);
+  });
+
   it("ignores clicks, releases, motion, and horizontal wheel codes", () => {
     const tui = fakeTui(20);
     const explorer = new HistoryExplorer(tui, theme, history(5), vi.fn());
