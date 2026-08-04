@@ -81,6 +81,7 @@ export class HistoryExplorer implements Component {
   private input: HistoryInput | undefined;
   private jumpIndex: HistoryJumpIndex | undefined;
   private mode: ExplorerMode = "browse";
+  private helpScroll = 0;
   private readonly search: HistorySearch;
   private searchSelected = false;
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -201,6 +202,17 @@ export class HistoryExplorer implements Component {
   private handleHelpInput(data: string): void {
     if (data === "?" || data === "q" || matchesKey(data, "escape")) {
       this.mode = "browse";
+      this.helpScroll = 0;
+      this.requestRender();
+      return;
+    }
+    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p")) {
+      this.helpScroll = Math.max(0, this.helpScroll - 1);
+      this.requestRender();
+      return;
+    }
+    if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
+      this.helpScroll = Math.min(Math.max(0, helpLines().length - 1), this.helpScroll + 1);
       this.requestRender();
     }
   }
@@ -250,8 +262,9 @@ export class HistoryExplorer implements Component {
     if (!match) {
       this.statusMessage = this.search.complete ? "No matches." : "Search is still scanning.";
     } else {
-      this.viewport.jumpToMatch(match);
+      const jump = this.viewport.jumpToMatch(match);
       this.searchSelected = true;
+      if (jump.filterReset) this.startSearch(this.search.query);
     }
     this.requestRender();
     return true;
@@ -381,17 +394,23 @@ export class HistoryExplorer implements Component {
       this.statusMessage = result.error;
       return;
     }
+    let filterReset = false;
     if (target.kind === "match") {
       const match = this.search.results[target.number - 1];
-      if (match) this.viewport.jumpToMatch(match);
+      if (match) filterReset = this.viewport.jumpToMatch(match).filterReset;
     } else {
-      this.viewport.jumpToEntry(result.entryIndex);
+      filterReset = this.viewport.jumpToEntry(result.entryIndex).filterReset;
     }
     this.statusMessage = `Jumped to ${result.label}.`;
+    if (filterReset && this.search.query) this.startSearch(this.search.query);
   }
 
   private renderBody(width: number, height: number): readonly string[] {
-    if (this.mode === "help") return helpLines().slice(0, height);
+    if (this.mode === "help") {
+      const all = helpLines();
+      const start = Math.min(this.helpScroll, Math.max(0, all.length - Math.max(1, height)));
+      return all.slice(start, start + Math.max(1, height));
+    }
     if (this.mode === "filter") return filterLines(this.viewport.filter).slice(0, height);
     if (this.mode === "jump") return this.jumpLines().slice(0, height);
     return this.viewport.render(width, Math.max(1, height)).slice(0, height);

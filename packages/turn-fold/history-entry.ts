@@ -234,10 +234,17 @@ function messageKindFromContent(role: string, content: unknown): HistoryEntryKin
   return hasToolCall && !visibility.includes("text") ? "tool" : "assistant";
 }
 
+export function historyEntryTimestamp(entry: unknown): number | undefined {
+  const message = messageFromEntry(entry);
+  if (isRecord(message)) return numberField(message, "timestamp") ?? entryTimestamp(entry);
+  return entryTimestamp(entry);
+}
+
 export function historyEntryKind(entry: unknown): HistoryEntryKind {
   const message = messageFromEntry(entry);
   if (isRecord(message)) {
     const role = stringField(message, "role") ?? "assistant";
+    if (role === "user") return "user";
     if (role === "toolResult") {
       return booleanField(message, "isError") === true ? "error" : "tool";
     }

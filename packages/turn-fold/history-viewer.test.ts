@@ -174,6 +174,42 @@ describe("Turn Fold history viewport controls", () => {
     expect(viewport.context()?.entryIndex).toBe(2);
   });
 
+  it("keeps the jump target visible when context entries are tall", () => {
+    const tall = `tall ${"x".repeat(3_500)}`;
+    const entries = [
+      assistant("tall-1", tall),
+      assistant("tall-2", tall),
+      assistant("target", "Target header"),
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+
+    viewport.jumpToEntry(2);
+
+    expect(viewport.render(80, 8).join("\n")).toContain("Target header");
+  });
+
+  it("reports when a jump resets the active filter", () => {
+    const viewport = new HistoryViewport(
+      [
+        {
+          id: "user",
+          message: { content: "Question", role: "user", timestamp: 1 },
+          type: "message",
+        },
+        assistant("assistant", "Answer"),
+      ],
+      theme,
+    );
+    viewport.render(80, 8);
+    viewport.setFilter("user");
+
+    const jump = viewport.jumpToEntry(1);
+
+    expect(jump.filterReset).toBe(true);
+    expect(viewport.filter).toBe("all");
+  });
+
   it("reveals the section containing a search match", () => {
     const entries = [
       {

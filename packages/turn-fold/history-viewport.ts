@@ -205,28 +205,34 @@ export class HistoryViewport {
     this.setSearch("");
   }
 
-  jumpToEntry(entryIndex: number, contextBefore = 2): boolean {
+  jumpToEntry(entryIndex: number, contextLines = 8): { filterReset: boolean; moved: boolean } {
     const entry = this.index.entries[entryIndex];
-    if (entry === undefined) return false;
+    if (entry === undefined) return { filterReset: false, moved: false };
     this.recordLocation();
-    if (!this.entryVisible(entryIndex)) this.filterValue = "all";
+    let filterReset = false;
+    if (!this.entryVisible(entryIndex)) {
+      this.filterValue = "all";
+      filterReset = true;
+    }
     this.range.admitEntry(entryIndex);
     this.focusEntryIndex = entryIndex;
-    let contextIndex = entryIndex;
-    for (let count = 0; count < contextBefore; count += 1) {
-      const previous = this.previousVisibleEntry(contextIndex);
-      if (previous === undefined || previous < this.range.startIndex) break;
-      contextIndex = previous;
+    const budget = Math.min(Math.max(1, contextLines), Math.max(1, this.viewportHeight - 2));
+    let position = this.entryStart(entryIndex);
+    for (let count = 0; count < budget; count += 1) {
+      const previous = this.previous(position);
+      if (!previous) break;
+      position = previous;
     }
-    this.top = this.entryStart(contextIndex);
-    return true;
+    this.top = position;
+    return { filterReset, moved: true };
   }
 
-  jumpToMatch(match: HistorySearchMatch): boolean {
-    if (!this.jumpToEntry(match.entryIndex)) return false;
+  jumpToMatch(match: HistorySearchMatch): { filterReset: boolean; moved: boolean } {
+    const jump = this.jumpToEntry(match.entryIndex);
+    if (!jump.moved) return jump;
     this.revealSection(match.entryIndex, match.section);
     const entry = this.index.entries[match.entryIndex];
-    if (entry === undefined) return false;
+    if (entry === undefined) return { filterReset: jump.filterReset, moved: false };
     const state = entryState(this.entryStates, match.entryIndex);
     const location = this.renderer.locate(
       entry,
@@ -243,7 +249,7 @@ export class HistoryViewport {
         segmentIndex: location.segmentIndex,
       };
     }
-    return true;
+    return jump;
   }
 
   goBack(): boolean {
@@ -462,10 +468,6 @@ export class HistoryViewport {
       if (this.entryVisible(entryIndex)) return entryIndex;
     }
     return undefined;
-  }
-
-  private previousVisibleEntry(entryIndex: number): number | undefined {
-    return this.firstVisibleEntry(entryIndex - 1, -1);
   }
 
   private nearestVisibleEntry(entryIndex: number): number | undefined {
