@@ -244,7 +244,11 @@ export class HistoryExplorer implements Component {
     if (width < 4) return ["".padEnd(Math.max(0, width))];
     const safeWidth = width;
     const innerWidth = safeWidth - 2;
-    const body = this.viewport.render(innerWidth, this.contentHeight());
+    const overlayHeight = this.overlayHeight();
+    const contentHeight = this.contentHeight(overlayHeight);
+    const body = this.viewport
+      .render(innerWidth, Math.max(1, contentHeight))
+      .slice(0, contentHeight);
     const border = this.theme.fg("border", `+${"-".repeat(innerWidth)}+`);
     const row = (content: string) =>
       `${this.theme.fg("border", "|")}${padLine(content, innerWidth)}${this.theme.fg("border", "|")}`;
@@ -258,14 +262,18 @@ export class HistoryExplorer implements Component {
       "dim",
       " ↑/↓ or C-p/C-n line · b/space screen · g/G ends · enter details · q/esc/C-S-o close",
     );
-    return [
-      border,
-      row(title),
-      row(hint),
-      row(this.theme.fg("border", "-".repeat(innerWidth))),
-      ...body.map(row),
-      border,
-    ];
+    const lines =
+      overlayHeight >= 6
+        ? [
+            border,
+            row(title),
+            row(hint),
+            row(this.theme.fg("border", "-".repeat(innerWidth))),
+            ...body.map(row),
+            border,
+          ]
+        : [border, row(title), ...body.map(row), border];
+    return lines.slice(0, overlayHeight);
   }
 
   close(): void {
@@ -292,11 +300,11 @@ export class HistoryExplorer implements Component {
 
   private handleScreenInput(data: string): boolean {
     if (data === "b" || matchesKey(data, "pageUp")) {
-      this.viewport.moveBackward(this.contentHeight());
+      this.viewport.moveBackward(Math.max(1, this.contentHeight(this.overlayHeight())));
       return true;
     }
     if (matchesKey(data, "space") || matchesKey(data, "pageDown")) {
-      this.viewport.moveForward(this.contentHeight());
+      this.viewport.moveForward(Math.max(1, this.contentHeight(this.overlayHeight())));
       return true;
     }
     return false;
@@ -320,9 +328,14 @@ export class HistoryExplorer implements Component {
     return true;
   }
 
-  private contentHeight(): number {
-    const overlayHeight = Math.max(8, Math.floor(this.tui.terminal.rows * 0.95));
-    return Math.max(3, overlayHeight - 5);
+  private overlayHeight(): number {
+    const terminalRows = Math.max(1, this.tui.terminal.rows);
+    const availableRows = Math.max(1, terminalRows - 2);
+    return Math.min(availableRows, Math.max(1, Math.floor(terminalRows * 0.95)));
+  }
+
+  private contentHeight(overlayHeight: number): number {
+    return Math.max(0, overlayHeight - (overlayHeight >= 6 ? 5 : 3));
   }
 }
 
