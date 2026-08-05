@@ -7,7 +7,7 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "yarp-cli": "https://codeload.github.com/osolmaz/yarp/tar.gz/e729a6521d5bcf850641f069a458decb3e143d7a"
+    "yarp-cli": "https://codeload.github.com/osolmaz/yarp/tar.gz/d56d07093b8adecda94c409412ec0bfc369d636f"
   },
   "pi": {
     "extensions": [

@@ -19,7 +19,12 @@ cap marker to proven recovery output.
 The extension requires the matching `yarp` binary on `PATH`:
 
 ```sh
-cargo install yarp-cli --version 0.2.0 --locked --force
+cargo install \
+  --git https://github.com/osolmaz/yarp.git \
+  --rev d56d07093b8adecda94c409412ec0bfc369d636f \
+  --locked \
+  --force \
+  yarp-cli
 ```
 
 ## Configuration
@@ -34,9 +39,9 @@ yarp config set output.cap_bytes 8192
 yarp config check
 ```
 
-The file controls pruning, the ordinary output cap, recovery byte and line limits, archive capture
-and location, and user-wide compiled rule packs. Configuration errors disable the Pi extension for
-that session instead of applying partial settings.
+The file controls typed pruning, the non-recovery output cap, recovery byte and line limits, archive
+capture and location, and user-wide compiled rule packs. Configuration errors disable the Pi
+extension for that session instead of applying partial settings.
 
 The archive defaults to `~/.local/share/yarp/tool-calls.sqlite3`. Use `yarp archive stats` or
 `yarp archive verify` for inspection. The separate `yarp archive prune --before <UTC timestamp>`
