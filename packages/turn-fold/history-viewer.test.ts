@@ -241,7 +241,7 @@ describe("Turn Fold history viewport controls", () => {
     expect(viewport.render(80, 8).join("\n")).toContain("hidden needle");
   });
 
-  it("keeps independent section toggles scoped to the focused entry", () => {
+  it("shows thinking and tool output by default and toggles one entry", () => {
     const entries = [
       {
         id: "tool",
@@ -258,10 +258,42 @@ describe("Turn Fold history viewport controls", () => {
     viewport.render(80, 8);
     viewport.jumpToEntry(0);
 
+    expect(viewport.render(80, 8).join("\n")).toContain('"path"');
     expect(viewport.toggleToolOutput()).toBe(true);
-    expect(viewport.render(80, 8).join("\n")).toContain("a.ts");
+    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
     viewport.jumpToEntry(1);
     expect(viewport.toggleToolOutput()).toBe(false);
+  });
+
+  it("toggles a section for all entries and clears single-entry overrides", () => {
+    const entries = [
+      {
+        id: "tool",
+        message: {
+          content: [{ arguments: { path: "a.ts" }, id: "call", name: "read", type: "toolCall" }],
+          role: "assistant",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+      assistant("answer", "Answer"),
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+
+    viewport.toggleAllToolOutput();
+    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
+    expect(viewport.render(80, 8).join("\n")).not.toContain('"path"');
+
+    viewport.jumpToEntry(0);
+    viewport.toggleToolOutput();
+    expect(viewport.render(80, 8).join("\n")).toContain('"path"');
+
+    viewport.toggleAllToolOutput();
+    expect(viewport.render(80, 8).join("\n")).toContain('"path"');
+    viewport.jumpToEntry(0);
+    viewport.toggleToolOutput();
+    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
   });
 
   it("expands the current truncated entry without unbounding the cache", () => {

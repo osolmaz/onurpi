@@ -67,9 +67,8 @@ function helpLines(): readonly string[] {
     "",
     "Current entry",
     "  Enter                  long text details",
-    "  T                      thinking",
-    "  O                      tool output or arguments",
-    "  D                      diff output",
+    "  t / o / d              thinking / tool output / diffs, this entry",
+    "  T / O / D              same sections, all entries",
     "",
     "Overlay",
     "  ?                      close help",
@@ -379,15 +378,51 @@ export class HistoryExplorer implements Component {
   }
 
   private handleEntryControl(data: string): boolean {
-    let changed = false;
-    if (matchesKey(data, "enter")) changed = this.viewport.toggleDetails();
-    else if (data === "T") changed = this.viewport.toggleThinking();
-    else if (data === "O") changed = this.viewport.toggleToolOutput();
-    else if (data === "D") changed = this.viewport.toggleDiffs();
-    else return false;
-    this.statusMessage = changed ? "Entry display updated." : "That section is unavailable.";
+    const message = this.handleSingleEntryControl(data) ?? this.handleAllEntryControl(data);
+    if (message === undefined && !this.isEntryControlKey(data)) return false;
+    this.statusMessage = message ?? "That section is unavailable on this entry.";
     this.requestRender();
     return true;
+  }
+
+  private isEntryControlKey(data: string): boolean {
+    return matchesKey(data, "enter") || "tToOdD".includes(data);
+  }
+
+  private handleSingleEntryControl(data: string): string | undefined {
+    if (matchesKey(data, "enter")) {
+      return this.viewport.toggleDetails() ? "Entry detail toggled." : undefined;
+    }
+    return this.singleSectionControl(data);
+  }
+
+  private singleSectionControl(data: string): string | undefined {
+    if (data === "t") {
+      return this.viewport.toggleThinking() ? "Entry thinking toggled." : undefined;
+    }
+    if (data === "o") {
+      return this.viewport.toggleToolOutput() ? "Entry tool output toggled." : undefined;
+    }
+    if (data === "d") {
+      return this.viewport.toggleDiffs() ? "Entry diffs toggled." : undefined;
+    }
+    return undefined;
+  }
+
+  private handleAllEntryControl(data: string): string | undefined {
+    if (data === "T") {
+      this.viewport.toggleAllThinking();
+      return "Thinking toggled for all entries.";
+    }
+    if (data === "O") {
+      this.viewport.toggleAllToolOutput();
+      return "Tool output toggled for all entries.";
+    }
+    if (data === "D") {
+      this.viewport.toggleAllDiffs();
+      return "Diffs toggled for all entries.";
+    }
+    return undefined;
   }
 
   private startSearch(query: string): void {

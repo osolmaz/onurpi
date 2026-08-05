@@ -97,18 +97,18 @@ describe("Turn Fold history rendering", () => {
       type: "message",
     };
 
-    const collapsed = renderer.render(thinkingEntry, 0, 80, state()).join("\n");
-    const thinking = renderer
-      .render(thinkingEntry, 0, 80, state({ showThinking: true }))
+    const collapsed = renderer
+      .render(thinkingEntry, 0, 80, state({ showThinking: false, showToolOutput: false }))
       .join("\n");
-    const tool = renderer.render(thinkingEntry, 0, 80, state({ showToolOutput: true })).join("\n");
+    const expanded = renderer.render(thinkingEntry, 0, 80, state()).join("\n");
     const diff = renderer.render(thinkingEntry, 0, 80, state({ showDiffs: true })).join("\n");
 
     expect(collapsed).toContain("Thinking hidden");
     expect(collapsed).toContain("Tool details hidden");
     expect(collapsed).toContain("Diff hidden");
-    expect(thinking).toContain("reasoning");
-    expect(tool).toContain("a.ts");
+    expect(expanded).toContain("reasoning");
+    expect(expanded).toContain("a.ts");
+    expect(expanded).toContain("Diff hidden");
     expect(diff).toContain("old");
   });
 
@@ -126,7 +126,9 @@ describe("Turn Fold history rendering", () => {
     expect(rendered.length).toBeLessThanOrEqual(20);
     expect(renderer.cachedBlocks).toBe(1);
   });
+});
 
+describe("Turn Fold history role styling", () => {
   it("uses role-specific public Pi theme styles", () => {
     const calls: string[] = [];
     const styledTheme = {
@@ -151,6 +153,33 @@ describe("Turn Fold history rendering", () => {
     expect(renderer.render(user, 0, 80, state()).join("\n")).toContain("◆ You");
     expect(calls).toContain("bg:userMessageBg");
     expect(calls).toContain("fg:userMessageText");
+  });
+
+  it("wraps the entire user block in the user message background", () => {
+    const backgrounds: string[] = [];
+    const styledTheme = {
+      bg: (color: string, text: string) => {
+        if (color === "userMessageBg") backgrounds.push(text);
+        return text;
+      },
+      bold: (text: string) => text,
+      fg: (_color: string, text: string) => text,
+      italic: (text: string) => text,
+    };
+    const renderer = new HistoryEntryRenderer(styledTheme);
+    const user = {
+      id: "user",
+      message: { content: "Question body", role: "user", timestamp: 1 },
+      type: "message",
+    };
+
+    const lines = renderer.render(user, 0, 80, state());
+
+    expect(backgrounds.length).toBe(lines.length);
+    expect(backgrounds.length).toBeGreaterThanOrEqual(3);
+    expect(backgrounds[0]).toContain("◆ You");
+    expect(backgrounds[1]).toContain("Question body");
+    expect(backgrounds.at(-1)?.trim()).toBe("");
   });
 
   it("highlights literal search text and selected headers", () => {
