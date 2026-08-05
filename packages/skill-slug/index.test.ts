@@ -141,11 +141,12 @@ describe("skillSlug extension", () => {
     });
     primeStructured(handlers, { skills: [{ name: "hidden-skill" }] });
 
-    expect(input(handlers, { text: "hidden-skill", source: "interactive" }, PROMPT_WITH_AMK))
-      .toEqual({
-        action: "transform",
-        text: "/skill:hidden-skill",
-      });
+    expect(
+      input(handlers, { text: "hidden-skill", source: "interactive" }, PROMPT_WITH_AMK),
+    ).toEqual({
+      action: "transform",
+      text: "/skill:hidden-skill",
+    });
     expect(input(handlers, { text: "amk", source: "interactive" })).toEqual({
       action: "continue",
     });
