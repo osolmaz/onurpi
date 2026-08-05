@@ -65,7 +65,7 @@ export function terminalSafeHistoryText(value: string): string {
 function thinkingSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
   return state.showThinking
     ? `*Thinking*\n\n${section.text}`
-    : "*Thinking hidden · press T to show*";
+    : "*Thinking hidden · press t to show*";
 }
 
 function toolSectionText(
@@ -76,14 +76,14 @@ function toolSectionText(
   if (state.showToolOutput) return section.text;
   const summary = presentation.summary?.trim().split("\n", 1)[0];
   return summary
-    ? `**${summary.slice(0, 240)}**\n\n*Tool details hidden · press O to show*`
-    : "*Tool details hidden · press O to show*";
+    ? `**${summary.slice(0, 240)}**\n\n*Tool details hidden · press o to show*`
+    : "*Tool details hidden · press o to show*";
 }
 
 function diffSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
   return state.showDiffs
     ? `\`\`\`diff\n${section.text}\n\`\`\``
-    : "*Diff hidden · press D to show*";
+    : "*Diff hidden · press d to show*";
 }
 
 function sectionText(

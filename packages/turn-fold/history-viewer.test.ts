@@ -295,6 +295,40 @@ describe("Turn Fold history viewport controls", () => {
     viewport.toggleToolOutput();
     expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
   });
+});
+
+describe("Turn Fold history viewport display defaults", () => {
+  it("clamps the scroll position when an all-entry toggle shrinks a deep entry", () => {
+    const entries = [
+      {
+        id: "tool",
+        message: {
+          content: [
+            {
+              arguments: { payload: "x".repeat(120_000) },
+              id: "call",
+              name: "exec",
+              type: "toolCall",
+            },
+          ],
+          role: "assistant",
+          timestamp: 1,
+        },
+        type: "message",
+      },
+    ];
+    const viewport = new HistoryViewport(entries, theme);
+    viewport.render(80, 8);
+    viewport.jumpToEntry(0);
+    viewport.toggleDetails();
+    viewport.moveToNewest();
+
+    viewport.toggleAllToolOutput();
+    const rendered = viewport.render(80, 8).join("\n");
+
+    expect(rendered.trim().length).toBeGreaterThan(0);
+    expect(rendered).toContain("Tool details hidden");
+  });
 
   it("expands the current truncated entry without unbounding the cache", () => {
     const viewport = new HistoryViewport(
