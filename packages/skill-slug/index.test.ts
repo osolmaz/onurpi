@@ -132,6 +132,25 @@ describe("skillSlug extension", () => {
     });
   });
 
+  it("keeps structured skills captured by an extension-triggered first run", () => {
+    const { pi, handlers } = createMockPi();
+    skillSlug(pi);
+
+    expect(input(handlers, { text: "amk", source: "extension" }, PROMPT_WITH_AMK)).toEqual({
+      action: "continue",
+    });
+    primeStructured(handlers, { skills: [{ name: "hidden-skill" }] });
+
+    expect(input(handlers, { text: "hidden-skill", source: "interactive" }, PROMPT_WITH_AMK))
+      .toEqual({
+        action: "transform",
+        text: "/skill:hidden-skill",
+      });
+    expect(input(handlers, { text: "amk", source: "interactive" })).toEqual({
+      action: "continue",
+    });
+  });
+
   it("passes through extension-sourced input that Pi would not expand", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
