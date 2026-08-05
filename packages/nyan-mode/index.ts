@@ -367,7 +367,7 @@ function leftFooter(
   branch: string | null,
 ): string {
   return joinParts([
-    theme.fg("accent", "π"),
+    theme.fg("accent", "∮"),
     theme.fg("accent", model),
     reasoning ? theme.fg("muted", `(${thinkingLevel})`) : undefined,
     theme.fg("text", branch ? `${project}  ${branch}` : project),
