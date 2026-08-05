@@ -18,6 +18,9 @@ export default function skillSlug(pi: ExtensionAPI): void {
   });
 
   pi.on("input", (event) => {
+    // Pi skips skill expansion for extension-injected messages; rewriting them would
+    // deliver a literal /skill: slug to the model instead of invoking the skill.
+    if (event.source === "extension") return { action: "continue" };
     const command = skillSlugCommand(event.text, (slug) => slugs.has(slug));
     if (command === undefined) return { action: "continue" };
     return {
