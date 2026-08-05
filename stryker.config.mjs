@@ -33,7 +33,6 @@ export default {
     "packages/prompt-queue/window-state.ts",
     "packages/reliable-compaction/reliable-compaction.ts",
     "packages/context-window-policy/context-window-policy.ts",
-    "packages/startup-model/startup-model.ts",
     "packages/codex-usage/src/codex-usage.ts",
     "packages/codex-usage/src/format.ts",
     "packages/codex-usage/src/normalize.ts",
