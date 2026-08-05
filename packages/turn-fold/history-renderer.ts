@@ -66,10 +66,21 @@ function thinkingSectionText(section: HistorySection, state: HistoryEntryDisplay
 
 const TOOL_PREVIEW_LINES = 5;
 
-function stripDanglingFences(lines: readonly string[]): readonly string[] {
-  const fenceCount = lines.filter((line) => line.trimStart().startsWith("```")).length;
-  if (fenceCount % 2 === 0) return lines;
-  return lines.filter((line) => !line.trimStart().startsWith("```"));
+function stripDanglingFence(lines: readonly string[]): readonly string[] {
+  let open = false;
+  let dangling: number | undefined;
+  lines.forEach((line, index) => {
+    if (!line.trimStart().startsWith("```")) return;
+    if (open) {
+      open = false;
+      dangling = undefined;
+    } else {
+      open = true;
+      dangling = index;
+    }
+  });
+  if (dangling === undefined) return lines;
+  return lines.filter((_, index) => index !== dangling);
 }
 
 function toolSectionText(
@@ -79,10 +90,11 @@ function toolSectionText(
 ): string {
   if (state.showToolOutput) return section.text;
   const lines = section.text.split("\n");
-  const preview = stripDanglingFences(lines.slice(0, TOOL_PREVIEW_LINES)).join("\n");
+  const previewLines = stripDanglingFence(lines.slice(0, TOOL_PREVIEW_LINES));
+  const preview = previewLines.join("\n");
   const summary = presentation.summary?.trim().split("\n", 1)[0];
   const head = preview.trim() ? preview : (summary?.slice(0, 240) ?? "");
-  const remaining = lines.length - TOOL_PREVIEW_LINES;
+  const remaining = lines.length - previewLines.length;
   if (remaining > 0) {
     return `${head}\n... (${String(remaining)} more lines, press o to expand)`;
   }
@@ -423,7 +435,6 @@ export class HistoryEntryRenderer {
     lineBudget = 20,
     pageIndex = 0,
     query = "",
-    selected = false,
     callSummary?: string,
   ): readonly string[] {
     const safeWidth = Math.max(1, width);
@@ -436,7 +447,6 @@ export class HistoryEntryRenderer {
       pageIndex,
       segmentIndex,
       query,
-      selected,
       callSummary,
     );
     const cached = this.cache.get(key);
@@ -467,11 +477,9 @@ export class HistoryEntryRenderer {
     pageIndex: number,
     segmentIndex: number,
     query: string,
-    selected: boolean,
     callSummary: string | undefined,
   ): string {
-    const selection = selected ? "selected" : "normal";
-    return `${String(entryIndex)}:${String(width)}:${stateKey(state)}:${String(lineBudget)}:${String(pageIndex)}:${String(segmentIndex)}:${query}:${selection}:${callSummary ?? ""}`;
+    return `${String(entryIndex)}:${String(width)}:${stateKey(state)}:${String(lineBudget)}:${String(pageIndex)}:${String(segmentIndex)}:${query}:${callSummary ?? ""}`;
   }
 
   private prepare(

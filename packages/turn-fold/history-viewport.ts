@@ -401,7 +401,6 @@ export class HistoryViewport {
       this.viewportHeight + 4,
       position.pageIndex,
       this.queryValue,
-      position.entryIndex === this.focusEntryIndex,
       this.callSummary(position.entryIndex),
     );
   }
