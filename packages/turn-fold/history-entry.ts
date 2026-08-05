@@ -28,12 +28,15 @@ export type HistoryEntryPresentation = Readonly<{
   hasDiff: boolean;
   hasThinking: boolean;
   hasToolOutput: boolean;
+  isError: boolean;
   kind: HistoryEntryKind;
   label: string;
   searchableText: string;
   sections: readonly HistorySection[];
   summary: string | undefined;
   timestamp: number | undefined;
+  toolCallId: string | undefined;
+  toolName: string | undefined;
 }>;
 
 const FILTER_ORDER: readonly HistoryFilter[] = [
@@ -147,12 +150,15 @@ function toolResultPresentation(entry: unknown, message: unknown): HistoryEntryP
     hasDiff: sectionKind === "diff",
     hasThinking: false,
     hasToolOutput: true,
+    isError,
     kind: isError ? "error" : "tool",
     label: isError ? `Tool error · ${toolName}` : `Tool result · ${toolName}`,
     searchableText: `${toolName}\n${text}`,
     sections,
     summary: text.trim().split("\n", 1)[0]?.slice(0, 240),
     timestamp: messageTimestamp(entry, message),
+    toolCallId: stringField(message, "toolCallId"),
+    toolName,
   };
 }
 
@@ -168,6 +174,14 @@ function messageKind(
 function messageLabel(kind: HistoryEntryKind): string {
   if (kind === "user") return "You";
   return kind === "tool" ? "Tool call" : "Assistant";
+}
+
+function firstToolCallName(content: unknown): string | undefined {
+  if (!Array.isArray(content)) return undefined;
+  for (const item of content as readonly unknown[]) {
+    if (stringField(item, "type") === "toolCall") return stringField(item, "name");
+  }
+  return undefined;
 }
 
 function messagePresentation(entry: unknown, message: unknown): HistoryEntryPresentation {
@@ -186,12 +200,15 @@ function messagePresentation(entry: unknown, message: unknown): HistoryEntryPres
     hasDiff: sections.some((section) => section.kind === "diff"),
     hasThinking: sections.some((section) => section.kind === "thinking"),
     hasToolOutput,
+    isError: false,
     kind,
     label: messageLabel(kind),
     searchableText: sections.map((section) => section.text).join("\n\n"),
     sections,
     summary: sections.find((section) => section.kind === "toolOutput")?.text,
     timestamp: messageTimestamp(entry, message),
+    toolCallId: undefined,
+    toolName: firstToolCallName(content),
   };
 }
 
@@ -209,12 +226,15 @@ function nonMessagePresentation(entry: unknown): HistoryEntryPresentation {
     hasDiff: false,
     hasThinking: false,
     hasToolOutput: false,
+    isError: false,
     kind: isCompaction ? "compaction" : "custom",
     label: isCompaction ? "Compaction" : (stringField(entry, "customType") ?? type),
     searchableText: text,
     sections: [{ kind: "text", text }],
     summary,
     timestamp: entryTimestamp(entry),
+    toolCallId: undefined,
+    toolName: undefined,
   };
 }
 
@@ -231,6 +251,23 @@ function messageKindFromContent(role: string, content: unknown): HistoryEntryKin
   const visibility = content.map(contentItemVisibility);
   const hasToolCall = visibility.includes("toolCall");
   return hasToolCall && !visibility.includes("text") ? "tool" : "assistant";
+}
+
+export type HistoryToolCallInfo = Readonly<{ id: string; name: string; summary: string }>;
+
+export function historyToolCallInfos(entry: unknown): readonly HistoryToolCallInfo[] {
+  const message = messageFromEntry(entry);
+  if (!isRecord(message)) return [];
+  const content = message["content"];
+  if (!Array.isArray(content)) return [];
+  const infos: HistoryToolCallInfo[] = [];
+  for (const item of content) {
+    if (stringField(item, "type") !== "toolCall") continue;
+    const id = stringField(item, "id");
+    const name = stringField(item, "name");
+    if (id && name) infos.push({ id, name, summary: toolSummary(item) });
+  }
+  return infos;
 }
 
 export function historyEntryTimestamp(entry: unknown): number | undefined {

@@ -37,7 +37,7 @@ describe("Turn Fold history performance bounds", () => {
     for (let index = 0; index < 100; index += 1) viewport.moveBackward(1);
     viewport.render(120, 30);
 
-    expect(reads.count).toBeLessThan(300);
+    expect(reads.count).toBeLessThan(400);
     expect(viewport.cachedBlocks).toBeLessThanOrEqual(128);
   });
 

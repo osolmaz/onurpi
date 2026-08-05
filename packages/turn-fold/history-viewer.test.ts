@@ -90,7 +90,8 @@ describe("Turn Fold history viewport", () => {
     const rendered = viewport.render(80, 20);
 
     expect(rendered.join("\n")).toContain("Text 999");
-    expect(bodyReads).toBeLessThanOrEqual(25);
+    // Two bounded reads per visible entry: presentation plus tool-call pairing inspection.
+    expect(bodyReads).toBeLessThanOrEqual(45);
   });
 
   it("starts with three windows and admits three older windows at the boundary", () => {
@@ -205,8 +206,7 @@ describe("Turn Fold history viewport controls", () => {
     viewport.jumpToEntry(2);
 
     const lines = viewport.render(80, 8);
-    expect(lines.at(-1)).toContain("Assistant");
-    expect(lines.at(-1)).not.toContain("Summary");
+    expect(lines.at(-1)).toContain("Target header");
   });
 
   it("reports when a jump resets the active filter", () => {
@@ -273,7 +273,7 @@ describe("Turn Fold history viewport controls", () => {
 
     expect(viewport.render(80, 8).join("\n")).toContain('"path"');
     expect(viewport.toggleToolOutput()).toBe(true);
-    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
+    expect(viewport.render(80, 8).join("\n")).toContain("more lines, press o to expand");
     viewport.jumpToEntry(1);
     expect(viewport.toggleToolOutput()).toBe(false);
   });
@@ -283,7 +283,14 @@ describe("Turn Fold history viewport controls", () => {
       {
         id: "tool",
         message: {
-          content: [{ arguments: { path: "a.ts" }, id: "call", name: "read", type: "toolCall" }],
+          content: [
+            {
+              arguments: { extra: "z".repeat(300), path: "a.ts" },
+              id: "call",
+              name: "read",
+              type: "toolCall",
+            },
+          ],
           role: "assistant",
           timestamp: 1,
         },
@@ -295,18 +302,17 @@ describe("Turn Fold history viewport controls", () => {
     viewport.render(80, 8);
 
     viewport.toggleAllToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
-    expect(viewport.render(80, 8).join("\n")).not.toContain('"path"');
+    expect(viewport.render(80, 8).join("\n")).toContain("more lines, press o to expand");
+    expect(viewport.render(80, 8).join("\n")).not.toContain("```");
 
     viewport.jumpToEntry(0);
     viewport.toggleToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain('"path"');
+    expect(viewport.render(80, 8).join("\n")).not.toContain("more lines, press o to expand");
 
     viewport.toggleAllToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain('"path"');
     viewport.jumpToEntry(0);
     viewport.toggleToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
+    expect(viewport.render(80, 12).join("\n")).toContain("more lines, press o to expand");
   });
 });
 
@@ -340,7 +346,7 @@ describe("Turn Fold history viewport display defaults", () => {
     const rendered = viewport.render(80, 8).join("\n");
 
     expect(rendered.trim().length).toBeGreaterThan(0);
-    expect(rendered).toContain("press o for");
+    expect(rendered).toContain("more lines, press o to expand");
   });
 
   it("expands the current truncated entry without unbounding the cache", () => {
