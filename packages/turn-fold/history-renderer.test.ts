@@ -194,6 +194,26 @@ describe("Turn Fold history layout and tool presentation", () => {
     expect(backgrounds.some((entry) => entry.startsWith("toolErrorBg:"))).toBe(true);
   });
 
+  it("keeps matched fences and drops only the dangling opener in previews", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+    const entry = {
+      id: "tool",
+      message: {
+        content: 'before\n```\ncode\n```\n```json\n{ "tail": true }',
+        role: "toolResult",
+        timestamp: 1,
+        toolName: "exec",
+      },
+      type: "message",
+    };
+
+    const rendered = renderer.render(entry, 0, 80, state({ showToolOutput: false })).join("\n");
+
+    expect(rendered).toContain("code");
+    expect(rendered).not.toContain("tail");
+    expect(rendered).toContain("(2 more lines, press o to expand)");
+  });
+
   it("pairs the call summary into the tool block header", () => {
     const titles: string[] = [];
     const styledTheme = {
@@ -218,7 +238,7 @@ describe("Turn Fold history layout and tool presentation", () => {
       type: "message",
     };
 
-    renderer.render(result, 0, 80, state(), 0, 20, 0, "", false, "read · /tmp/plan.md");
+    renderer.render(result, 0, 80, state(), 0, 20, 0, "", "read · /tmp/plan.md");
 
     expect(titles).toContain("read · /tmp/plan.md");
   });
@@ -296,7 +316,7 @@ describe("Turn Fold history role styling", () => {
     };
     const renderer = new HistoryEntryRenderer(styledTheme);
 
-    renderer.render(assistant("match", "Needle"), 0, 80, state(), 0, 20, 0, "needle", true);
+    renderer.render(assistant("match", "Needle"), 0, 80, state(), 0, 20, 0, "needle");
 
     expect(calls).toContain("bg:selectedBg");
   });
