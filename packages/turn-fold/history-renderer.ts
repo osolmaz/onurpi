@@ -68,16 +68,21 @@ function thinkingSectionText(section: HistorySection, state: HistoryEntryDisplay
     : "*Thinking hidden · press t to show*";
 }
 
+const TOOL_PREVIEW_LINES = 4;
+
 function toolSectionText(
   section: HistorySection,
   state: HistoryEntryDisplayState,
   presentation: HistoryEntryPresentation,
 ): string {
   if (state.showToolOutput) return section.text;
+  const lines = section.text.split("\n");
+  const preview = lines.slice(0, TOOL_PREVIEW_LINES).join("\n");
   const summary = presentation.summary?.trim().split("\n", 1)[0];
-  return summary
-    ? `**${summary.slice(0, 240)}**\n\n*Tool details hidden · press o to show*`
-    : "*Tool details hidden · press o to show*";
+  const head = preview.trim() ? preview : (summary?.slice(0, 240) ?? "");
+  const more = lines.length > TOOL_PREVIEW_LINES;
+  const hint = `*… press o for ${more ? "full output" : "details"}*`;
+  return head ? `${head}\n\n${hint}` : hint;
 }
 
 function diffSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
@@ -189,6 +194,10 @@ function blockHeader(
   const colored = theme.bold(
     theme.fg(selected ? "borderAccent" : entryColor(presentation.kind), text),
   );
+  if (presentation.kind === "tool" || presentation.kind === "error") {
+    const background = presentation.kind === "error" ? "toolErrorBg" : "toolSuccessBg";
+    return theme.bg(background, padVisible(`  ${colored}${suffix}`, width));
+  }
   return truncateToWidth(`  ${colored}${suffix}`, width);
 }
 
@@ -272,15 +281,12 @@ function renderedSegment(
   const body = markdown
     .render(width)
     .map((line) => styleBodyLine(line, prepared.presentation.kind, width, theme));
+  const firstSegment = pageIndex === 0 && segmentIndex === 0;
+  const lastSegment = segmentIndex === prepared.segments.length - 1;
   const lines = [
-    ...(pageIndex === 0 && segmentIndex === 0
-      ? [blockHeader(prepared.presentation, width, theme, selected)]
-      : []),
+    ...(firstSegment ? ["", blockHeader(prepared.presentation, width, theme, selected)] : []),
     ...body,
-    ...(segmentIndex === prepared.segments.length - 1
-      ? truncationLines(prepared, width, theme)
-      : []),
-    ...(segmentIndex === prepared.segments.length - 1 ? [""] : []),
+    ...(lastSegment ? truncationLines(prepared, width, theme) : []),
   ];
   return prepared.presentation.kind === "user" ? styleUserBlock(lines, width, theme) : lines;
 }

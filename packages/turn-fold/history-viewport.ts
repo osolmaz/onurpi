@@ -1,4 +1,5 @@
 import {
+  historyEntryKind,
   historyEntryMatchesFilter,
   historyEntryPresentation,
   type HistoryEntryPresentation,
@@ -211,6 +212,30 @@ export class HistoryViewport {
     const nearest = current === undefined ? undefined : this.nearestVisibleEntry(current);
     this.top = nearest === undefined ? this.newestTop() : this.entryStart(nearest);
     return true;
+  }
+
+  hopEntry(direction: -1 | 1): { filterReset: boolean; moved: boolean } {
+    const current = this.currentEntryIndex ?? this.range.startIndex;
+    const target =
+      direction < 0
+        ? this.firstVisibleEntry(current - 1, -1)
+        : this.firstVisibleEntry(current + 1, 1);
+    if (target === undefined) return { filterReset: false, moved: false };
+    return this.jumpToEntry(target);
+  }
+
+  hopUserMessage(direction: -1 | 1): { filterReset: boolean; moved: boolean } {
+    const current = this.currentEntryIndex ?? this.range.startIndex;
+    for (
+      let entryIndex = current + direction;
+      entryIndex >= 0 && entryIndex < this.index.entries.length;
+      entryIndex += direction
+    ) {
+      if (historyEntryKind(this.index.entries[entryIndex]) === "user") {
+        return this.jumpToEntry(entryIndex);
+      }
+    }
+    return { filterReset: false, moved: false };
   }
 
   setSearch(query: string): void {

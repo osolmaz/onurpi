@@ -51,18 +51,25 @@ function padLine(value: string, width: number): string {
   return truncated + " ".repeat(Math.max(0, width - visibleWidth(truncated)));
 }
 
+function padRows(rows: readonly string[], height: number): readonly string[] {
+  if (rows.length >= height) return rows;
+  return [...rows, ...Array.from({ length: height - rows.length }, () => "")];
+}
+
 function helpLines(): readonly string[] {
   return [
     "Navigation",
-    "  ↑/↓ or Ctrl+P/Ctrl+N   one line",
-    "  b / Space              one screen back / forward",
+    "  ↑/↓ or b/f or C-p/C-n  one line back / forward",
+    "  ←/→ or p/n or Space    one page back / forward",
+    "  [ / ]                  previous / next entry",
+    "  { / }                  previous / next user message",
+    "  Tab / Shift+Tab        forward / back in jump history",
     "  g / G                  oldest admitted / newest",
-    "  [ / ]                  previous / next jump position",
     "",
     "Find and narrow",
     "  /                      edit search",
-    "  n / N                  next / previous match",
-    "  f                      filter menu",
+    "  n / N                  next / previous match, while searching",
+    "  F                      filter menu",
     "  j                      jump menu",
     "",
     "Current entry",
@@ -74,6 +81,7 @@ function helpLines(): readonly string[] {
     "  ?                      close help",
     "  q / Esc                close or return",
     "  Ctrl+Shift+O           close from any screen",
+    "  Mouse wheel            scroll lines",
   ];
 }
 
@@ -212,6 +220,7 @@ export class HistoryExplorer implements Component {
     if (this.handleModeOpen(data)) return;
     if (this.handleSearchNavigation(data)) return;
     if (this.handleHistoryNavigation(data)) return;
+    if (this.handleHopNavigation(data)) return;
     if (this.handleMovement(data)) return;
     if (this.handleEntryControl(data)) return;
   }
@@ -222,7 +231,7 @@ export class HistoryExplorer implements Component {
     } else if (data === "/") {
       this.mode = "search";
       this.input = new HistoryInput(this.search.query);
-    } else if (data === "f") {
+    } else if (data === "F") {
       this.mode = "filter";
     } else if (data === "j") {
       this.mode = "jump";
@@ -254,15 +263,30 @@ export class HistoryExplorer implements Component {
       this.requestRender();
       return;
     }
-    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p")) {
-      this.helpScroll = Math.max(0, this.helpScroll - 1);
-      this.requestRender();
-      return;
-    }
-    if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
-      this.helpScroll = Math.min(Math.max(0, helpLines().length - 1), this.helpScroll + 1);
-      this.requestRender();
-    }
+    const delta = this.helpScrollDelta(data);
+    if (delta === 0) return;
+    const limit = Math.max(0, helpLines().length - 1);
+    this.helpScroll = Math.min(limit, Math.max(0, this.helpScroll + delta));
+    this.requestRender();
+  }
+
+  private helpScrollDelta(data: string): number {
+    const line = this.helpLineDelta(data);
+    if (line !== 0) return line;
+    return this.helpPageDelta(data);
+  }
+
+  private helpLineDelta(data: string): number {
+    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p") || data === "b") return -1;
+    if (matchesKey(data, "down") || matchesKey(data, "ctrl+n") || data === "f") return 1;
+    return 0;
+  }
+
+  private helpPageDelta(data: string): number {
+    const page = Math.max(1, this.contentHeight(this.overlayHeight()));
+    if (data === "p" || matchesKey(data, "left") || matchesKey(data, "pageUp")) return -page;
+    if (data === "n" || matchesKey(data, "right") || matchesKey(data, "pageDown")) return page;
+    return 0;
   }
 
   private handleFilterInput(data: string): void {
@@ -304,7 +328,8 @@ export class HistoryExplorer implements Component {
   }
 
   private handleSearchNavigation(data: string): boolean {
-    if (!this.search.query || (data !== "n" && data !== "N")) return false;
+    if (!this.search.query) return false;
+    if (data !== "n" && data !== "N") return false;
     const direction: 1 | -1 = data === "n" ? 1 : -1;
     const match = this.search.next(this.viewport.currentEntryIndex, direction);
     if (!match) {
@@ -319,17 +344,39 @@ export class HistoryExplorer implements Component {
   }
 
   private handleHistoryNavigation(data: string): boolean {
-    if (data === "[") {
-      this.statusMessage = this.viewport.goBack() ? "Moved back." : "No earlier jump position.";
-      this.requestRender();
-      return true;
-    }
-    if (data === "]") {
+    if (matchesKey(data, "tab")) {
       this.statusMessage = this.viewport.goForward() ? "Moved forward." : "No later jump position.";
       this.requestRender();
       return true;
     }
+    if (matchesKey(data, "shift+tab")) {
+      this.statusMessage = this.viewport.goBack() ? "Moved back." : "No earlier jump position.";
+      this.requestRender();
+      return true;
+    }
     return false;
+  }
+
+  private handleHopNavigation(data: string): boolean {
+    if (data === "[" || data === "]") return this.hop(data === "[" ? -1 : 1, false);
+    if (data === "{" || data === "}") return this.hop(data === "{" ? -1 : 1, true);
+    return false;
+  }
+
+  private hop(direction: -1 | 1, userOnly: boolean): boolean {
+    const jump = userOnly
+      ? this.viewport.hopUserMessage(direction)
+      : this.viewport.hopEntry(direction);
+    if (!jump.moved) {
+      this.statusMessage = "No further message in that direction.";
+    } else {
+      this.statusMessage = userOnly
+        ? "Hopped to the neighboring user message."
+        : "Hopped to the neighboring entry.";
+    }
+    if (jump.filterReset && this.search.query) this.startSearch(this.search.query);
+    this.requestRender();
+    return true;
   }
 
   private handleMovement(data: string): boolean {
@@ -341,9 +388,9 @@ export class HistoryExplorer implements Component {
   }
 
   private handleLineMovement(data: string): boolean {
-    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p")) {
+    if (matchesKey(data, "up") || matchesKey(data, "ctrl+p") || data === "b") {
       this.viewport.moveBackward(1);
-    } else if (matchesKey(data, "down") || matchesKey(data, "ctrl+n")) {
+    } else if (matchesKey(data, "down") || matchesKey(data, "ctrl+n") || data === "f") {
       this.viewport.moveForward(1);
     } else {
       return false;
@@ -354,15 +401,22 @@ export class HistoryExplorer implements Component {
 
   private handleScreenMovement(data: string): boolean {
     const height = Math.max(1, this.contentHeight(this.overlayHeight()));
-    if (data === "b" || matchesKey(data, "pageUp")) {
+    if (data === "p" || matchesKey(data, "left") || matchesKey(data, "pageUp")) {
       this.viewport.moveBackward(height);
-    } else if (matchesKey(data, "space") || matchesKey(data, "pageDown")) {
+    } else if (this.pageForwardKey(data)) {
       this.viewport.moveForward(height);
     } else {
       return false;
     }
     this.requestRender();
     return true;
+  }
+
+  private pageForwardKey(data: string): boolean {
+    if (matchesKey(data, "space") || matchesKey(data, "right") || matchesKey(data, "pageDown")) {
+      return true;
+    }
+    return data === "n" && !this.search.query;
   }
 
   private handleBoundaryMovement(data: string): boolean {
@@ -490,14 +544,17 @@ export class HistoryExplorer implements Component {
   }
 
   private renderBody(width: number, height: number): readonly string[] {
+    const safeHeight = Math.max(1, height);
     if (this.mode === "help") {
       const all = helpLines();
-      const start = Math.min(this.helpScroll, Math.max(0, all.length - Math.max(1, height)));
-      return all.slice(start, start + Math.max(1, height));
+      const start = Math.min(this.helpScroll, Math.max(0, all.length - safeHeight));
+      return padRows(all.slice(start, start + safeHeight), safeHeight);
     }
-    if (this.mode === "filter") return filterLines(this.viewport.filter).slice(0, height);
-    if (this.mode === "jump") return this.jumpLines().slice(0, height);
-    return this.viewport.render(width, Math.max(1, height)).slice(0, height);
+    if (this.mode === "filter") {
+      return padRows(filterLines(this.viewport.filter).slice(0, safeHeight), safeHeight);
+    }
+    if (this.mode === "jump") return padRows(this.jumpLines().slice(0, safeHeight), safeHeight);
+    return this.viewport.render(width, safeHeight).slice(0, safeHeight);
   }
 
   private jumpLines(): readonly string[] {
@@ -553,7 +610,7 @@ export class HistoryExplorer implements Component {
 
   private browseStatus(): string {
     const navigation = this.viewport.navigationCounts;
-    return ` filter ${this.viewport.filter} · back ${String(navigation.back)} · forward ${String(navigation.forward)} · / search · f filter · j jump · ? help`;
+    return ` filter ${this.viewport.filter} · back ${String(navigation.back)} · forward ${String(navigation.forward)} · / search · F filter · j jump · ? help`;
   }
 
   private searchStatus(): string {
