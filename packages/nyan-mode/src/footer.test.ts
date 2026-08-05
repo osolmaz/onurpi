@@ -53,6 +53,35 @@ describe("Nyan footer context display", () => {
     expect(plain(line)).not.toContain("128k");
     expect(visibleWidth(line)).toBe(120);
   });
+});
+
+describe("Nyan footer identity display", () => {
+  it("leads with the model and thinking level before the project", () => {
+    const line = plain(
+      renderFooterLine({
+        bitmapPainter: bitmapPainter(),
+        branch: "feature",
+        cumulativeCost: 0,
+        displayMode: "text",
+        enabled: true,
+        modelId: "gpt-5.6-sol",
+        presentation: { contextStress: "none", mood: "neutral" },
+        project: "onurpi",
+        reasoning: true,
+        textPainter: createTextNyanPainter(vi.fn(), 0),
+        theme: testTheme,
+        thinkingLevel: "high",
+        usedPercent: 90,
+        usingSubscription: true,
+        weeklyUsage: undefined,
+        width: 120,
+      }),
+    );
+
+    expect(line.startsWith("gpt5.6-sol (high) π onurpi")).toBe(true);
+    expect(line.indexOf("gpt5.6-sol")).toBe(line.lastIndexOf("gpt5.6-sol"));
+    expect(line).not.toContain("think high");
+  });
 
   it("keeps unknown usage compact and width-bounded", () => {
     const line = renderFooterLine({
@@ -76,5 +105,31 @@ describe("Nyan footer context display", () => {
 
     expect(plain(line)).toMatch(/\(=\^･ω･\^=\)\s+\?/u);
     expect(visibleWidth(line)).toBeLessThanOrEqual(40);
+  });
+
+  it("omits the thinking level when the model does not reason", () => {
+    const line = plain(
+      renderFooterLine({
+        bitmapPainter: bitmapPainter(),
+        branch: null,
+        cumulativeCost: 0,
+        displayMode: "text",
+        enabled: true,
+        modelId: undefined,
+        presentation: { contextStress: "none", mood: "neutral" },
+        project: "onurpi",
+        reasoning: undefined,
+        textPainter: createTextNyanPainter(vi.fn(), 0),
+        theme: testTheme,
+        thinkingLevel: "off",
+        usedPercent: undefined,
+        usingSubscription: false,
+        weeklyUsage: undefined,
+        width: 120,
+      }),
+    );
+
+    expect(line.startsWith("no-model π onurpi")).toBe(true);
+    expect(line).not.toContain("(off)");
   });
 });

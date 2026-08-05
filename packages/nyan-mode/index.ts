@@ -322,14 +322,18 @@ function modelSnapshot(ctx: ExtensionContext): Pick<FooterSnapshot, "modelId" | 
 
 export function renderFooterLine(options: FooterLineOptions): string {
   const model = options.modelId ? shortModel(options.modelId) : "no-model";
-  const left = leftFooter(options.theme, options.project, options.branch);
+  const left = leftFooter(
+    options.theme,
+    model,
+    options.reasoning,
+    options.thinkingLevel,
+    options.project,
+    options.branch,
+  );
   const right = rightFooter(
     options.theme,
     options.cumulativeCost,
     options.usingSubscription,
-    model,
-    options.reasoning,
-    options.thinkingLevel,
     options.weeklyUsage,
   );
   const context = colorRemainingContext(
@@ -354,8 +358,17 @@ export function renderFooterLine(options: FooterLineOptions): string {
   return nyanLine ?? composeLine(left, "", joinParts([context, right]), options.width);
 }
 
-function leftFooter(theme: FooterTheme, project: string, branch: string | null): string {
+function leftFooter(
+  theme: FooterTheme,
+  model: string,
+  reasoning: boolean | undefined,
+  thinkingLevel: string,
+  project: string,
+  branch: string | null,
+): string {
   return joinParts([
+    theme.fg("accent", model),
+    reasoning ? theme.fg("muted", `(${thinkingLevel})`) : undefined,
     theme.fg("accent", "π"),
     theme.fg("text", branch ? `${project}  ${branch}` : project),
   ]);
@@ -365,16 +378,11 @@ function rightFooter(
   theme: FooterTheme,
   cumulativeCost: number,
   usingSubscription: boolean,
-  model: string,
-  reasoning: boolean | undefined,
-  thinkingLevel: string,
   weeklyUsage: string | undefined,
 ): string {
   return joinParts([
     mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
     mutedLabel(theme, weeklyUsage),
-    reasoning ? theme.fg("muted", `think ${thinkingLevel}`) : undefined,
-    theme.fg("accent", model),
   ]);
 }
 
