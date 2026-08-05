@@ -35,30 +35,25 @@ function unescapeXml(value: string): string {
 
 export default function skillSlug(pi: ExtensionAPI): void {
   let slugs = new Set<string>();
-  let primed = false;
-
-  const prime = (systemPrompt: string): void => {
-    primed = true;
-    slugs = new Set(skillNamesFromSystemPrompt(systemPrompt));
-  };
-
-  pi.on("session_start", (_event, ctx) => {
-    prime(ctx.getSystemPrompt());
-  });
+  // The first input primes from the assembled prompt; session_start fires before
+  // extension-contributed skills merge, so only the input-time snapshot is complete.
+  let inputPrimed = false;
 
   pi.on("before_agent_start", (event) => {
     const skills = event.systemPromptOptions.skills ?? [];
     if (skills.length > 0) {
       slugs = new Set(skills.map((skill) => skill.name));
     }
-    primed = true;
   });
 
   pi.on("input", (event, ctx) => {
     // Pi skips skill expansion for extension-injected messages; rewriting them would
     // deliver a literal /skill: slug to the model instead of invoking the skill.
     if (event.source === "extension") return { action: "continue" };
-    if (!primed) prime(ctx.getSystemPrompt());
+    if (!inputPrimed) {
+      inputPrimed = true;
+      slugs = new Set(skillNamesFromSystemPrompt(ctx.getSystemPrompt()));
+    }
     const command = skillSlugCommand(event.text, (slug) => slugs.has(slug));
     if (command === undefined) return { action: "continue" };
     return {

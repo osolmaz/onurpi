@@ -79,31 +79,11 @@ describe("skillSlug extension", () => {
     }
   }
 
-  function sessionStart(handlers: Map<string, Handler[]>, systemPrompt: string): void {
-    for (const handler of handlers.get("session_start") ?? []) {
-      handler({} as never, fakeCtx(systemPrompt));
-    }
-  }
-
   function input(handlers: Map<string, Handler[]>, event: unknown, systemPrompt = ""): unknown {
     return handlers.get("input")?.[0]?.(event as never, fakeCtx(systemPrompt));
   }
 
-  it("transforms the first message of a session from the system prompt", () => {
-    const { pi, handlers } = createMockPi();
-    skillSlug(pi);
-    sessionStart(handlers, PROMPT_WITH_AMK);
-
-    expect(input(handlers, { text: "amk", source: "interactive" })).toEqual({
-      action: "transform",
-      text: "/skill:amk",
-    });
-    expect(input(handlers, { text: "hello", source: "interactive" })).toEqual({
-      action: "continue",
-    });
-  });
-
-  it("primes lazily on input when no session start ran", () => {
+  it("transforms the first message of a session by priming from the system prompt", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
 
@@ -119,7 +99,9 @@ describe("skillSlug extension", () => {
   it("prefers the structured skills list and keeps it when a later list is empty", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
-    sessionStart(handlers, "no skills here");
+    expect(input(handlers, { text: "amk", source: "interactive" }, "no skills here")).toEqual({
+      action: "continue",
+    });
     primeStructured(handlers, { skills: [{ name: "amk" }] });
 
     expect(input(handlers, { text: "amk", source: "interactive" })).toMatchObject({
@@ -140,9 +122,10 @@ describe("skillSlug extension", () => {
   it("keeps attached images on the transformed input", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
-    sessionStart(handlers, PROMPT_WITH_AMK);
     const images = [{ type: "image", data: "...", mimeType: "image/png" }];
-    expect(input(handlers, { text: "amk", source: "interactive", images })).toEqual({
+    expect(
+      input(handlers, { text: "amk", source: "interactive", images }, PROMPT_WITH_AMK),
+    ).toEqual({
       action: "transform",
       text: "/skill:amk",
       images,
@@ -152,12 +135,11 @@ describe("skillSlug extension", () => {
   it("passes through extension-sourced input that Pi would not expand", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
-    sessionStart(handlers, PROMPT_WITH_AMK);
 
-    expect(input(handlers, { text: "amk", source: "extension" })).toEqual({
+    expect(input(handlers, { text: "amk", source: "extension" }, PROMPT_WITH_AMK)).toEqual({
       action: "continue",
     });
-    expect(input(handlers, { text: "amk", source: "rpc" })).toMatchObject({
+    expect(input(handlers, { text: "amk", source: "rpc" }, PROMPT_WITH_AMK)).toMatchObject({
       action: "transform",
     });
   });
