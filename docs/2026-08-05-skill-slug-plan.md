@@ -28,10 +28,12 @@ Deliberate choices:
 
 - **Exact match only.** First-word matching (`amk bu nedir`) would hijack natural-language messages,
   and slugs like `amk` are real words. Arguments stay available as `/skill:slug args`.
-- **Fail open on a cold cache.** The skills list is exposed at `before_agent_start`, so the very
-  first message of a fresh session passes through untransformed. The model still sees the skill in
-  its system prompt. The missing public capability for a warmer start is a skills accessor on
-  `ExtensionContext`, which is a Pi feature request, not a workaround.
+- **Prime from the system prompt.** The slug set is built at `session_start` (and lazily on the
+  first input) by extracting `<name>` entries from the `<available_skills>` block of
+  `ctx.getSystemPrompt()`, then refreshed from the structured `systemPromptOptions.skills` list at
+  each `before_agent_start`. The very first message of a fresh session matches like any other; there
+  is no cold start. Skills with `disable-model-invocation` are absent from the prompt block, so they
+  match only after the first agent run refreshes from the structured list.
 
 Rejected alternatives: one `registerCommand` per skill (commands need a slash, so the input hook is
 still required), and self-expanding skill content via the public `loadSkills` export (re-implements
@@ -62,3 +64,9 @@ discovery and expansion, drifts from Pi).
 - `npm run check` and `npm run slophammer` in `packages/skill-slug`.
 - Root `npm run check`, `npm run slophammer`, `git diff --check`, and `pi list`.
 - Pi Reviewer against `main`, then CI on the pull request.
+
+## Implementation status
+
+Merged in PR #65 and follow-up. Live verification: a fresh Pi session in a scratch directory loaded
+the extension, and its first message `amk` was expanded by Pi into the full skill content
+(`<skill name="amk" location="...">` in the session file), identical to `/skill:amk`.
