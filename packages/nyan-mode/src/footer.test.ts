@@ -78,7 +78,7 @@ describe("Nyan footer identity display", () => {
       }),
     );
 
-    expect(line.startsWith("gpt5.6-sol (high) π onurpi")).toBe(true);
+    expect(line.startsWith("π gpt5.6-sol (high) onurpi")).toBe(true);
     expect(line.indexOf("gpt5.6-sol")).toBe(line.lastIndexOf("gpt5.6-sol"));
     expect(line).not.toContain("think high");
   });
@@ -129,7 +129,7 @@ describe("Nyan footer identity display", () => {
       }),
     );
 
-    expect(line.startsWith("no-model π onurpi")).toBe(true);
+    expect(line.startsWith("π no-model onurpi")).toBe(true);
     expect(line).not.toContain("(off)");
   });
 });
