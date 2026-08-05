@@ -216,10 +216,13 @@ export class HistoryViewport {
 
   hopEntry(direction: -1 | 1): { filterReset: boolean; moved: boolean } {
     const current = this.currentEntryIndex ?? this.range.startIndex;
-    const target =
+    let target =
       direction < 0
         ? this.firstVisibleEntry(current - 1, -1)
         : this.firstVisibleEntry(current + 1, 1);
+    while (target === undefined && direction < 0 && this.range.loadOlder()) {
+      target = this.firstVisibleEntry(current - 1, -1);
+    }
     if (target === undefined) return { filterReset: false, moved: false };
     return this.jumpToEntry(target);
   }

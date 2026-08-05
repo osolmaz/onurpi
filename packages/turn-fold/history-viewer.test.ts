@@ -157,6 +157,17 @@ describe("Turn Fold history viewport", () => {
 });
 
 describe("Turn Fold history viewport controls", () => {
+  it("admits older windows when hopping back past the admitted boundary", () => {
+    const viewport = new HistoryViewport(history(10), theme);
+    viewport.render(80, 8);
+    viewport.moveToOldest();
+
+    const jump = viewport.hopEntry(-1);
+
+    expect(jump.moved).toBe(true);
+    expect(viewport.admittedWindows).toBeGreaterThan(3);
+  });
+
   it("filters entries and restores exact locations through navigation history", () => {
     const entries = [
       {
