@@ -44,7 +44,6 @@ typescript:
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
       - packages/context-window-policy/context-window-policy.ts
-      - packages/startup-model/startup-model.ts
       - packages/codex-usage/src/codex-usage.ts
       - packages/codex-usage/src/format.ts
       - packages/codex-usage/src/normalize.ts
@@ -81,9 +80,6 @@ typescript:
     - from: packages/context-window-policy
       allow:
         - packages/context-window-policy
-    - from: packages/startup-model
-      allow:
-        - packages/startup-model
     - from: packages/codex-usage
       allow:
         - packages/codex-usage

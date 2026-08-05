@@ -19,7 +19,6 @@
       "./packages/nyan-mode/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
-      "./packages/startup-model/index.ts",
       "./packages/infinite-retry/index.ts",
       "./packages/codex-usage/index.ts",
       "./packages/plan-checklist/index.ts",

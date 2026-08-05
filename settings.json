@@ -10,7 +10,6 @@
     "../../repos/onurpi/packages/nyan-mode",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
-    "../../repos/onurpi/packages/startup-model",
     "../../repos/onurpi/packages/infinite-retry",
     "../../repos/onurpi/packages/codex-usage",
     "../../repos/onurpi/packages/plan-checklist",
@@ -24,9 +23,9 @@
     "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.83.0",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
-  "defaultThinkingLevel": "high",
+  "defaultProvider": "huggingface",
+  "defaultModel": "moonshotai/Kimi-K3:fireworks-ai",
+  "defaultThinkingLevel": "max",
   "outputPad": 0,
   "theme": "onur-dark"
 }
