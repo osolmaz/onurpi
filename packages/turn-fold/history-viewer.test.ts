@@ -193,7 +193,9 @@ describe("Turn Fold history viewport controls", () => {
 
     viewport.jumpToEntry(2);
 
-    expect(viewport.render(80, 8).join("\n")).toContain("Target header");
+    const lines = viewport.render(80, 8);
+    expect(lines.at(-1)).toContain("Assistant");
+    expect(lines.at(-1)).not.toContain("Summary");
   });
 
   it("reports when a jump resets the active filter", () => {
@@ -260,7 +262,7 @@ describe("Turn Fold history viewport controls", () => {
 
     expect(viewport.render(80, 8).join("\n")).toContain('"path"');
     expect(viewport.toggleToolOutput()).toBe(true);
-    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
+    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
     viewport.jumpToEntry(1);
     expect(viewport.toggleToolOutput()).toBe(false);
   });
@@ -282,7 +284,7 @@ describe("Turn Fold history viewport controls", () => {
     viewport.render(80, 8);
 
     viewport.toggleAllToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
+    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
     expect(viewport.render(80, 8).join("\n")).not.toContain('"path"');
 
     viewport.jumpToEntry(0);
@@ -293,7 +295,7 @@ describe("Turn Fold history viewport controls", () => {
     expect(viewport.render(80, 8).join("\n")).toContain('"path"');
     viewport.jumpToEntry(0);
     viewport.toggleToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain("Tool details hidden");
+    expect(viewport.render(80, 8).join("\n")).toContain("press o for");
   });
 });
 
@@ -327,7 +329,7 @@ describe("Turn Fold history viewport display defaults", () => {
     const rendered = viewport.render(80, 8).join("\n");
 
     expect(rendered.trim().length).toBeGreaterThan(0);
-    expect(rendered).toContain("Tool details hidden");
+    expect(rendered).toContain("press o for");
   });
 
   it("expands the current truncated entry without unbounding the cache", () => {
@@ -397,7 +399,7 @@ describe("Turn Fold history explorer mouse support", () => {
     const explorer = new HistoryExplorer(tui, theme, history(8), vi.fn());
     const before = explorer.render(80).join("\n");
 
-    explorer.handleInput("f");
+    explorer.handleInput("F");
     explorer.handleInput("\u001b[<64;10;5M");
     explorer.handleInput("\u001b[<64;10;5M");
     explorer.handleInput("\u001b");
@@ -418,6 +420,73 @@ describe("Turn Fold history explorer mouse support", () => {
 
     expect(explorer.render(80).join("\n")).toBe(before);
     expect(tui.requestRender).not.toHaveBeenCalled();
+  });
+});
+
+describe("Turn Fold history explorer hops", () => {
+  it("hops between entries and user messages with navigation history", () => {
+    const requestRender = vi.fn();
+    const explorer = new HistoryExplorer(
+      { ...fakeTui(20), requestRender },
+      theme,
+      [
+        {
+          id: "u1",
+          message: { content: "First question", role: "user", timestamp: 1 },
+          type: "message",
+        },
+        assistant("a1", "Answer one"),
+        {
+          id: "u2",
+          message: { content: "Second question", role: "user", timestamp: 2 },
+          type: "message",
+        },
+        assistant("a2", "Answer two"),
+      ],
+      vi.fn(),
+    );
+
+    explorer.handleInput("[");
+    expect(explorer.render(100).join("\n")).toContain("First question");
+    explorer.handleInput("{");
+    expect(explorer.render(100).join("\n")).toContain("First question");
+    explorer.handleInput("}");
+    expect(explorer.render(100).join("\n")).toContain("Second question");
+    explorer.handleInput("\u001b[Z");
+    expect(explorer.render(100).join("\n")).toContain("Moved back");
+    explorer.handleInput("\t");
+    expect(explorer.render(100).join("\n")).toContain("Moved forward");
+  });
+
+  it("fills every subview row so the conversation never bleeds through", () => {
+    const explorer = new HistoryExplorer(fakeTui(30), theme, history(2), vi.fn());
+
+    explorer.handleInput("?");
+    const help = explorer.render(100);
+    explorer.handleInput("\u001b");
+    explorer.handleInput("F");
+    const filter = explorer.render(100);
+
+    expect(help).toHaveLength(30);
+    expect(filter).toHaveLength(30);
+  });
+
+  it("uses n for matches while searching and for pages otherwise", async () => {
+    vi.useFakeTimers();
+    const explorer = new HistoryExplorer(
+      fakeTui(20),
+      theme,
+      [assistant("one", "Nothing"), assistant("two", "Needle")],
+      vi.fn(),
+    );
+    explorer.handleInput("/");
+    for (const character of "needle") explorer.handleInput(character);
+    explorer.handleInput("\r");
+    await vi.runAllTimersAsync();
+
+    expect(explorer.render(100).join("\n")).toContain("search “needle”");
+    explorer.handleInput("\u001b");
+    expect(explorer.render(100).join("\n")).not.toContain("search “needle”");
   });
 });
 
@@ -532,7 +601,7 @@ describe("Turn Fold history explorer controls", () => {
       vi.fn(),
     );
 
-    explorer.handleInput("f");
+    explorer.handleInput("F");
     expect(explorer.render(100).join("\n")).toContain("user messages");
     explorer.handleInput("u");
     expect(explorer.render(100).join("\n")).toContain("Question");

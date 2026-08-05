@@ -51,23 +51,27 @@ The package is private and is not published yet.
 The explorer uses these keys and pointer input:
 
 ```text
-Mouse wheel       scroll three lines (help text while help is open)
-Up / Ctrl+P       one line backward
-Down / Ctrl+N     one line forward
-b / Space         one screen backward / forward
-g / G             oldest admitted row / newest row
-/                 edit search
-n / N             next / previous search match
-f                 choose a role filter
-j                 jump to a window, turn, match or timestamp
-[ / ]             previous / next jump position
-Enter             show more or less long text
-t / o / d         thinking / tool output / diffs, this entry
-T / O / D         thinking / tool output / diffs, all entries
-?                 key reference
-q / Esc           close or return from a subview
-Ctrl+Shift+O      close from any explorer screen
+Mouse wheel          scroll three lines
+Up / Down / b / f    one line back / forward
+Left / Right / p / n one page back / forward
+Space / PageUp/Dn    page, alternate keys
+[ / ]                previous / next entry
+{ / }                previous / next user message
+Tab / Shift+Tab      forward / back in jump history
+g / G                oldest admitted row / newest row
+/                    edit search
+n / N                next / previous match, while searching
+F                    choose a role filter
+j                    jump to a window, turn, match or timestamp
+Enter                show more or less long text
+t / o / d            thinking / tool output / diffs, this entry
+T / O / D            thinking / tool output / diffs, all entries
+?                    key reference
+q / Esc              close or return from a subview
+Ctrl+Shift+O         close from any explorer screen
 ```
+
+User-message hops keep a couple of entries of context and record the position in jump history, so `Shift+Tab` walks back through them. Tool results show their call in a colored header (green-tinted on success, red-tinted on error) with a short output preview by default, and blocks are separated by exactly one blank line before each header so padding is symmetric at the top, bottom, and between entries. Help, filter and jump subviews always fill the screen, so the conversation never shows through.
 
 While the explorer is open, Turn Fold enables terminal mouse reporting (`?1002` with SGR `?1006`) through Pi's public terminal write API so the wheel can reach the overlay. It restores the terminal exactly once when the explorer closes, no matter which close path runs. Nothing is persisted; mouse clicks and motion are ignored.
 

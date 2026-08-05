@@ -104,7 +104,7 @@ describe("Turn Fold history rendering", () => {
     const diff = renderer.render(thinkingEntry, 0, 80, state({ showDiffs: true })).join("\n");
 
     expect(collapsed).toContain("Thinking hidden");
-    expect(collapsed).toContain("Tool details hidden");
+    expect(collapsed).toContain("press o for");
     expect(collapsed).toContain("Diff hidden");
     expect(expanded).toContain("reasoning");
     expect(expanded).toContain("a.ts");
@@ -125,6 +125,72 @@ describe("Turn Fold history rendering", () => {
     expect(segmentCount).toBeGreaterThan(1);
     expect(rendered.length).toBeLessThanOrEqual(20);
     expect(renderer.cachedBlocks).toBe(1);
+  });
+});
+
+describe("Turn Fold history layout and tool presentation", () => {
+  it("puts one blank line before every header and no trailing blank", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+
+    const first = renderer.render(assistant("one", "One"), 0, 80, state());
+    const second = renderer.render(assistant("two", "Two"), 1, 80, state());
+
+    expect(first[0]?.trim()).toBe("");
+    expect(first[1]).toContain("Assistant");
+    expect(first.at(-1)?.trim()).not.toBe("");
+    expect(second[0]?.trim()).toBe("");
+  });
+
+  it("shows a Pi-style truncated tool preview by default", () => {
+    const renderer = new HistoryEntryRenderer(theme);
+    const entry = {
+      id: "tool",
+      message: {
+        content: Array.from({ length: 8 }, (_, index) => `line ${String(index)}`).join("\n"),
+        role: "toolResult",
+        timestamp: 1,
+        toolName: "exec",
+      },
+      type: "message",
+    };
+
+    const rendered = renderer.render(entry, 0, 80, state({ showToolOutput: false })).join("\n");
+
+    expect(rendered).toContain("line 0");
+    expect(rendered).toContain("line 3");
+    expect(rendered).not.toContain("line 4");
+    expect(rendered).toContain("press o for full output");
+  });
+
+  it("colors tool headers by success or failure", () => {
+    const backgrounds: string[] = [];
+    const styledTheme = {
+      bg: (color: string, text: string) => {
+        backgrounds.push(`${color}:${text}`);
+        return text;
+      },
+      bold: (text: string) => text,
+      fg: (_color: string, text: string) => text,
+      italic: (text: string) => text,
+    };
+    const renderer = new HistoryEntryRenderer(styledTheme);
+    const result = (isError: boolean, id: string) => ({
+      id,
+      message: {
+        content: "out",
+        isError,
+        role: "toolResult",
+        timestamp: 1,
+        toolName: "exec",
+      },
+      type: "message",
+    });
+
+    renderer.render(result(false, "ok"), 0, 80, state());
+    renderer.render(result(true, "bad"), 1, 80, state());
+
+    expect(backgrounds.some((entry) => entry.startsWith("toolSuccessBg:"))).toBe(true);
+    expect(backgrounds.some((entry) => entry.startsWith("toolErrorBg:"))).toBe(true);
   });
 });
 
@@ -177,9 +243,9 @@ describe("Turn Fold history role styling", () => {
 
     expect(backgrounds.length).toBe(lines.length);
     expect(backgrounds.length).toBeGreaterThanOrEqual(3);
-    expect(backgrounds[0]).toContain("◆ You");
-    expect(backgrounds[1]).toContain("Question body");
-    expect(backgrounds.at(-1)?.trim()).toBe("");
+    expect(backgrounds[0]?.trim()).toBe("");
+    expect(backgrounds[1]).toContain("◆ You");
+    expect(backgrounds[2]).toContain("Question body");
   });
 
   it("highlights literal search text and selected headers", () => {
