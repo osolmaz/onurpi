@@ -62,7 +62,8 @@ f                 choose a role filter
 j                 jump to a window, turn, match or timestamp
 [ / ]             previous / next jump position
 Enter             show more or less long text
-T / O / D         thinking / tool output / diff details
+t / o / d         thinking / tool output / diffs, this entry
+T / O / D         thinking / tool output / diffs, all entries
 ?                 key reference
 q / Esc           close or return from a subview
 Ctrl+Shift+O      close from any explorer screen
@@ -72,7 +73,7 @@ While the explorer is open, Turn Fold enables terminal mouse reporting (`?1002` 
 
 Search is a case-insensitive literal scan of the complete active branch. It runs in bounded slices, highlights matching text, shows nearby entries, and admits older compaction windows when needed. Search and jump fields support standard terminal editing keys such as `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Ctrl+K`, `Ctrl+U`, `Ctrl+Y`, word movement, Home, End, Delete and Backspace.
 
-The filter menu covers all rows, users, assistants, tools, errors, compactions and custom rows. The jump field accepts `wN` for a compaction window, `tN` for a user turn, `mN` for a search match, `@HH:MM` or another timestamp, plus `oldest` and `newest`.
+The filter menu covers all rows, users, assistants, tools, errors, compactions and custom rows. The jump field accepts `wN` for a compaction window, `tN` for a user turn, `mN` for a search match, `@HH:MM` or another timestamp, plus `oldest` and `newest`. User messages render as one continuous themed background block like Pi's main session. Thinking and tool output start expanded; lowercase keys toggle the focused entry and uppercase keys flip a section for every entry while clearing single-entry overrides.
 
 The initial range contains the newest three compaction windows. Moving backward at the oldest admitted row loads three older windows and preserves the visible position. The sticky header reports the current role, timestamp, entry, compaction window, filter, search progress, and navigation history. Expanded entries continue through bounded detail pages, so scrolling can reach their full suffix without caching the full rendered body. Loaded extent, search, filters, scroll position, navigation history, and detailed entries are discarded when the explorer closes.
 

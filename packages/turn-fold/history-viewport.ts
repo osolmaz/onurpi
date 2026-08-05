@@ -37,15 +37,27 @@ export type HistoryViewportContext = Readonly<{
   windowNumber: number;
 }>;
 
-function entryState(
-  states: ReadonlyMap<number, HistoryEntryDisplayState>,
-  entryIndex: number,
-): HistoryEntryDisplayState {
-  return states.get(entryIndex) ?? DEFAULT_HISTORY_ENTRY_DISPLAY;
+type EntryDisplayOverride = {
+  -readonly [Key in keyof HistoryEntryDisplayState]?: HistoryEntryDisplayState[Key];
+};
+type SectionKey = "showDiffs" | "showThinking" | "showToolOutput";
+
+function clearSection(override: EntryDisplayOverride, key: SectionKey): EntryDisplayOverride {
+  const next: EntryDisplayOverride = {};
+  if (override.detailed !== undefined) next.detailed = override.detailed;
+  if (key !== "showDiffs" && override.showDiffs !== undefined) next.showDiffs = override.showDiffs;
+  if (key !== "showThinking" && override.showThinking !== undefined) {
+    next.showThinking = override.showThinking;
+  }
+  if (key !== "showToolOutput" && override.showToolOutput !== undefined) {
+    next.showToolOutput = override.showToolOutput;
+  }
+  return next;
 }
 
 export class HistoryViewport {
-  private readonly entryStates = new Map<number, HistoryEntryDisplayState>();
+  private readonly entryOverrides = new Map<number, EntryDisplayOverride>();
+  private sessionDisplay: HistoryEntryDisplayState = DEFAULT_HISTORY_ENTRY_DISPLAY;
   private readonly presentations = new Map<number, HistoryEntryPresentation>();
   private filterValue: HistoryFilter = "all";
   private focusEntryIndex: number | undefined;
@@ -239,7 +251,7 @@ export class HistoryViewport {
     this.revealSection(match.entryIndex, match.section);
     const entry = this.index.entries[match.entryIndex];
     if (entry === undefined) return { filterReset: jump.filterReset, moved: false };
-    const state = entryState(this.entryStates, match.entryIndex);
+    const state = this.entryState(match.entryIndex);
     const location = this.renderer.locate(
       entry,
       this.width,
@@ -277,34 +289,59 @@ export class HistoryViewport {
   }
 
   toggleDetails(): boolean {
-    return this.updateCurrentState((current) => ({ ...current, detailed: !current.detailed }));
+    const entryIndex = this.currentEntryIndex;
+    if (entryIndex === undefined) return false;
+    return this.updateCurrentState({ detailed: !this.entryState(entryIndex).detailed });
   }
 
   toggleThinking(): boolean {
-    const entryIndex = this.currentEntryIndex;
-    const entry = entryIndex === undefined ? undefined : this.index.entries[entryIndex];
-    if (entry === undefined || !historyEntryPresentation(entry).hasThinking) return false;
-    return this.updateCurrentState((current) => ({
-      ...current,
-      showThinking: !current.showThinking,
-    }));
+    return this.toggleSection("showThinking", "hasThinking");
   }
 
   toggleToolOutput(): boolean {
-    const entryIndex = this.currentEntryIndex;
-    const entry = entryIndex === undefined ? undefined : this.index.entries[entryIndex];
-    if (entry === undefined || !historyEntryPresentation(entry).hasToolOutput) return false;
-    return this.updateCurrentState((current) => ({
-      ...current,
-      showToolOutput: !current.showToolOutput,
-    }));
+    return this.toggleSection("showToolOutput", "hasToolOutput");
   }
 
   toggleDiffs(): boolean {
+    return this.toggleSection("showDiffs", "hasDiff");
+  }
+
+  toggleAllThinking(): boolean {
+    return this.toggleAllSection("showThinking");
+  }
+
+  toggleAllToolOutput(): boolean {
+    return this.toggleAllSection("showToolOutput");
+  }
+
+  toggleAllDiffs(): boolean {
+    return this.toggleAllSection("showDiffs");
+  }
+
+  private toggleSection(
+    key: "showDiffs" | "showThinking" | "showToolOutput",
+    capability: "hasDiff" | "hasThinking" | "hasToolOutput",
+  ): boolean {
     const entryIndex = this.currentEntryIndex;
-    const entry = entryIndex === undefined ? undefined : this.index.entries[entryIndex];
-    if (entry === undefined || !historyEntryPresentation(entry).hasDiff) return false;
-    return this.updateCurrentState((current) => ({ ...current, showDiffs: !current.showDiffs }));
+    if (entryIndex === undefined) return false;
+    const entry = this.index.entries[entryIndex];
+    if (entry === undefined || !historyEntryPresentation(entry)[capability]) return false;
+    return this.updateCurrentState({ [key]: !this.entryState(entryIndex)[key] });
+  }
+
+  private toggleAllSection(key: "showDiffs" | "showThinking" | "showToolOutput"): boolean {
+    this.sessionDisplay = { ...this.sessionDisplay, [key]: !this.sessionDisplay[key] };
+    for (const [entryIndex, override] of this.entryOverrides) {
+      const next = clearSection(override, key);
+      if (Object.keys(next).length === 0) this.entryOverrides.delete(entryIndex);
+      else this.entryOverrides.set(entryIndex, next);
+    }
+    this.renderer.clear();
+    return true;
+  }
+
+  private entryState(entryIndex: number): HistoryEntryDisplayState {
+    return { ...this.sessionDisplay, ...this.entryOverrides.get(entryIndex) };
   }
 
   private block(position: HistoryPosition): readonly string[] {
@@ -314,7 +351,7 @@ export class HistoryViewport {
       entry,
       position.entryIndex,
       this.width,
-      entryState(this.entryStates, position.entryIndex),
+      this.entryState(position.entryIndex),
       position.segmentIndex,
       this.viewportHeight + 4,
       position.pageIndex,
@@ -325,9 +362,7 @@ export class HistoryViewport {
 
   private pageCount(entryIndex: number): number {
     const entry = this.index.entries[entryIndex];
-    return entry === undefined
-      ? 1
-      : this.renderer.pageCount(entry, entryState(this.entryStates, entryIndex));
+    return entry === undefined ? 1 : this.renderer.pageCount(entry, this.entryState(entryIndex));
   }
 
   private segmentCount(entryIndex: number, pageIndex: number): number {
@@ -337,7 +372,7 @@ export class HistoryViewport {
       entry,
       entryIndex,
       this.width,
-      entryState(this.entryStates, entryIndex),
+      this.entryState(entryIndex),
       this.viewportHeight + 4,
       pageIndex,
     );
@@ -350,7 +385,7 @@ export class HistoryViewport {
       entry,
       entryIndex,
       this.width,
-      entryState(this.entryStates, entryIndex),
+      this.entryState(entryIndex),
       this.viewportHeight + 4,
       pageIndex,
     );
@@ -486,13 +521,11 @@ export class HistoryViewport {
     return undefined;
   }
 
-  private updateCurrentState(
-    update: (current: HistoryEntryDisplayState) => HistoryEntryDisplayState,
-  ): boolean {
+  private updateCurrentState(update: EntryDisplayOverride): boolean {
     const entryIndex = this.currentEntryIndex;
     if (entryIndex === undefined) return false;
-    const next = update(entryState(this.entryStates, entryIndex));
-    this.entryStates.set(entryIndex, next);
+    const currentOverride = this.entryOverrides.get(entryIndex) ?? {};
+    this.entryOverrides.set(entryIndex, { ...currentOverride, ...update });
     this.renderer.clear();
     const current = this.top;
     if (current?.entryIndex === entryIndex) {
@@ -507,13 +540,13 @@ export class HistoryViewport {
   }
 
   private revealSection(entryIndex: number, section: HistorySectionKind | undefined): void {
-    const current = entryState(this.entryStates, entryIndex);
-    this.entryStates.set(entryIndex, {
+    const current = this.entryOverrides.get(entryIndex) ?? {};
+    this.entryOverrides.set(entryIndex, {
       ...current,
       detailed: true,
-      showDiffs: current.showDiffs || section === "diff",
-      showThinking: current.showThinking || section === "thinking",
-      showToolOutput: current.showToolOutput || section === "toolOutput",
+      ...(section === "diff" ? { showDiffs: true } : {}),
+      ...(section === "thinking" ? { showThinking: true } : {}),
+      ...(section === "toolOutput" ? { showToolOutput: true } : {}),
     });
     this.renderer.clear();
   }

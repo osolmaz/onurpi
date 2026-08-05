@@ -31,8 +31,8 @@ export type HistoryEntryDisplayState = Readonly<{
 export const DEFAULT_HISTORY_ENTRY_DISPLAY: HistoryEntryDisplayState = {
   detailed: false,
   showDiffs: false,
-  showThinking: false,
-  showToolOutput: false,
+  showThinking: true,
+  showToolOutput: true,
 };
 
 type CachedBlock = Readonly<{ lines: readonly string[] }>;
@@ -233,15 +233,23 @@ function styleBodyLine(
   width: number,
   theme: HistoryRenderTheme,
 ): string {
-  if (kind === "user") {
-    return theme.bg("userMessageBg", theme.fg("userMessageText", padVisible(line, width)));
-  }
+  if (kind === "user") return theme.fg("userMessageText", line);
   if (kind === "compaction" || kind === "custom") {
     return theme.bg("customMessageBg", padVisible(line, width));
   }
   if (kind === "error") return theme.fg("error", line);
   if (kind === "tool") return theme.fg("toolOutput", line);
   return line;
+}
+
+function styleUserBlock(
+  lines: readonly string[],
+  width: number,
+  theme: HistoryRenderTheme,
+): readonly string[] {
+  return lines.map((line) =>
+    theme.bg("userMessageBg", theme.fg("userMessageText", padVisible(line, width))),
+  );
 }
 
 function renderedSegment(
@@ -264,7 +272,7 @@ function renderedSegment(
   const body = markdown
     .render(width)
     .map((line) => styleBodyLine(line, prepared.presentation.kind, width, theme));
-  return [
+  const lines = [
     ...(pageIndex === 0 && segmentIndex === 0
       ? [blockHeader(prepared.presentation, width, theme, selected)]
       : []),
@@ -274,6 +282,7 @@ function renderedSegment(
       : []),
     ...(segmentIndex === prepared.segments.length - 1 ? [""] : []),
   ];
+  return prepared.presentation.kind === "user" ? styleUserBlock(lines, width, theme) : lines;
 }
 
 function touchCache<T>(cache: Map<string, T>, key: string, value: T): T {
