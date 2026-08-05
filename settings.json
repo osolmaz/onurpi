@@ -1,6 +1,6 @@
 {
   "packages": [
-    "npm:pi-web-access@0.18.0",
+    "npm:pi-web-access@0.13.0",
     "npm:@narumitw/pi-btw@0.25.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/turn-fold",
@@ -26,7 +26,7 @@
   "lastChangelogVersion": "0.83.0",
   "defaultProvider": "huggingface",
   "defaultModel": "moonshotai/Kimi-K3:fireworks-ai",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "max",
   "outputPad": 0,
   "theme": "onur-dark"
 }

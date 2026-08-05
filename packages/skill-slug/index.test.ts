@@ -83,6 +83,19 @@ describe("skillSlug extension", () => {
     });
   });
 
+  it("passes through extension-sourced input that Pi would not expand", () => {
+    const { pi, handlers } = createMockPi();
+    skillSlug(pi);
+    primeSkills(handlers, { skills: [{ name: "amk" }] });
+
+    expect(input(handlers, { text: "amk", source: "extension" })).toEqual({
+      action: "continue",
+    });
+    expect(input(handlers, { text: "amk", source: "rpc" })).toMatchObject({
+      action: "transform",
+    });
+  });
+
   it("cannot match before the first agent run and refreshes on later runs", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
