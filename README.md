@@ -11,6 +11,7 @@ configuration.
 | [`@onurpi/goal`](packages/goal/)                                   | Bounded autonomous goals with no-progress circuit breakers       |
 | [`@onurpi/loop-guard`](packages/loop-guard/)                       | Opt-in bounded detection and interruption of repeated work       |
 | [`@onurpi/live-stats`](packages/live-stats/)                       | Shimmering Turkish working messages with live response metrics   |
+| [`@onurpi/skill-slug`](packages/skill-slug/)                       | Invoke skills by typing their bare slug                          |
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                          |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |

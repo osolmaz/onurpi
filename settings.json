@@ -1,6 +1,6 @@
 {
   "packages": [
-    "npm:pi-web-access@0.13.0",
+    "npm:pi-web-access@0.18.0",
     "npm:@narumitw/pi-btw@0.25.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/turn-fold",
@@ -20,12 +20,13 @@
     "../../repos/onurpi/packages/regrafter-driver",
     "../../repos/onurpi/packages/workflows",
     "../../repos/onurpi/packages/demo-mode",
+    "../../repos/onurpi/packages/skill-slug",
     "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.83.0",
   "defaultProvider": "huggingface",
   "defaultModel": "moonshotai/Kimi-K3:fireworks-ai",
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "outputPad": 0,
   "theme": "onur-dark"
 }

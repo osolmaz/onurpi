@@ -21,6 +21,7 @@ export default {
     "packages/turn-fold/tool-padding.ts",
     "packages/turn-fold/turn-visibility.ts",
     "packages/live-stats/live-stats.ts",
+    "packages/skill-slug/index.ts",
     "packages/nyan-mode/src/cost.ts",
     "packages/nyan-mode/src/png.ts",
     "packages/nyan-mode/src/progress.ts",

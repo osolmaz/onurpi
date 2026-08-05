@@ -45,6 +45,12 @@ jobs:
       - name: Check @onurpi/live-stats package with Slophammer
         working-directory: packages/live-stats
         run: npm run slophammer
+      - name: Check @onurpi/skill-slug package
+        working-directory: packages/skill-slug
+        run: npm run check
+      - name: Check @onurpi/skill-slug package with Slophammer
+        working-directory: packages/skill-slug
+        run: npm run slophammer
       - name: Check @onurpi/nyan-mode package
         working-directory: packages/nyan-mode
         run: npm run check
@@ -178,6 +184,9 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/live-stats package
         working-directory: packages/live-stats
+        run: npm run mutate
+      - name: Mutate @onurpi/skill-slug package
+        working-directory: packages/skill-slug
         run: npm run mutate
       - name: Mutate @onurpi/nyan-mode package
         working-directory: packages/nyan-mode
