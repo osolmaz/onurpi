@@ -27,6 +27,7 @@ export default defineConfig({
         "packages/loop-guard/thinking-stream-detector.ts",
         "packages/live-stats/live-stats.ts",
         "packages/live-stats/working-phrases.ts",
+        "packages/skill-slug/index.ts",
         "packages/nyan-mode/src/cat-state.ts",
         "packages/nyan-mode/src/cost.ts",
         "packages/nyan-mode/src/image.ts",
