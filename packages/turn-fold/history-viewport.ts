@@ -329,7 +329,7 @@ export class HistoryViewport {
     return this.updateCurrentState({ [key]: !this.entryState(entryIndex)[key] });
   }
 
-  private toggleAllSection(key: "showDiffs" | "showThinking" | "showToolOutput"): boolean {
+  private toggleAllSection(key: SectionKey): boolean {
     this.sessionDisplay = { ...this.sessionDisplay, [key]: !this.sessionDisplay[key] };
     for (const [entryIndex, override] of this.entryOverrides) {
       const next = clearSection(override, key);
@@ -337,7 +337,23 @@ export class HistoryViewport {
       else this.entryOverrides.set(entryIndex, next);
     }
     this.renderer.clear();
+    this.clampTop();
     return true;
+  }
+
+  private clampTop(): void {
+    const current = this.top;
+    if (current === undefined) return;
+    const pageIndex = Math.min(current.pageIndex, this.pageCount(current.entryIndex) - 1);
+    const segmentIndex = Math.min(
+      current.segmentIndex,
+      this.segmentCount(current.entryIndex, pageIndex) - 1,
+    );
+    const position = { ...current, pageIndex, segmentIndex };
+    this.top = {
+      ...position,
+      lineOffset: Math.min(current.lineOffset, this.block(position).length - 1),
+    };
   }
 
   private entryState(entryIndex: number): HistoryEntryDisplayState {
