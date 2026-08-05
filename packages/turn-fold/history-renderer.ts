@@ -3,11 +3,9 @@ import { Markdown, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui"
 
 import {
   historyEntryPresentation,
-  type HistoryEntryKind,
   type HistoryEntryPresentation,
   type HistorySection,
 } from "./history-entry.ts";
-import { formatLocalTimestamp } from "./local-time.ts";
 
 const PREVIEW_CHARACTER_LIMIT = 4_000;
 const DETAIL_CHARACTER_LIMIT = 100_000;
@@ -63,12 +61,16 @@ export function terminalSafeHistoryText(value: string): string {
 }
 
 function thinkingSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
-  return state.showThinking
-    ? `*Thinking*\n\n${section.text}`
-    : "*Thinking hidden · press t to show*";
+  return state.showThinking ? section.text : "*Thinking hidden · press t to show*";
 }
 
-const TOOL_PREVIEW_LINES = 4;
+const TOOL_PREVIEW_LINES = 5;
+
+function stripDanglingFences(lines: readonly string[]): readonly string[] {
+  const fenceCount = lines.filter((line) => line.trimStart().startsWith("```")).length;
+  if (fenceCount % 2 === 0) return lines;
+  return lines.filter((line) => !line.trimStart().startsWith("```"));
+}
 
 function toolSectionText(
   section: HistorySection,
@@ -77,12 +79,14 @@ function toolSectionText(
 ): string {
   if (state.showToolOutput) return section.text;
   const lines = section.text.split("\n");
-  const preview = lines.slice(0, TOOL_PREVIEW_LINES).join("\n");
+  const preview = stripDanglingFences(lines.slice(0, TOOL_PREVIEW_LINES)).join("\n");
   const summary = presentation.summary?.trim().split("\n", 1)[0];
   const head = preview.trim() ? preview : (summary?.slice(0, 240) ?? "");
-  const more = lines.length > TOOL_PREVIEW_LINES;
-  const hint = `*… press o for ${more ? "full output" : "details"}*`;
-  return head ? `${head}\n\n${hint}` : hint;
+  const remaining = lines.length - TOOL_PREVIEW_LINES;
+  if (remaining > 0) {
+    return `${head}\n... (${String(remaining)} more lines, press o to expand)`;
+  }
+  return head;
 }
 
 function diffSectionText(section: HistorySection, state: HistoryEntryDisplayState): string {
@@ -163,42 +167,46 @@ function bodySegments(body: string, width: number, lineBudget: number): readonly
   return segments;
 }
 
-function entrySymbol(kind: HistoryEntryKind): string {
-  if (kind === "user") return "◆";
-  if (kind === "assistant") return "●";
-  if (kind === "tool") return "✓";
-  if (kind === "error") return "✗";
-  if (kind === "compaction") return "◇";
-  return "•";
-}
+type BlockBackground = Parameters<HistoryRenderTheme["bg"]>[0];
 
-function entryColor(kind: HistoryEntryKind): Parameters<HistoryRenderTheme["fg"]>[0] {
-  if (kind === "user") return "userMessageText";
-  if (kind === "tool") return "toolTitle";
-  if (kind === "error") return "error";
-  if (kind === "compaction" || kind === "custom") return "customMessageLabel";
-  return "accent";
-}
-
-function blockHeader(
-  presentation: HistoryEntryPresentation,
-  width: number,
-  theme: HistoryRenderTheme,
-  selected: boolean,
-): string {
-  const timestamp =
-    presentation.timestamp === undefined ? "" : formatLocalTimestamp(presentation.timestamp);
-  const suffix = timestamp ? `  ${theme.fg("dim", timestamp)}` : "";
-  const label = terminalSafeHistoryText(presentation.label);
-  const text = `${entrySymbol(presentation.kind)} ${label}`;
-  const colored = theme.bold(
-    theme.fg(selected ? "borderAccent" : entryColor(presentation.kind), text),
-  );
-  if (presentation.kind === "tool" || presentation.kind === "error") {
-    const background = presentation.kind === "error" ? "toolErrorBg" : "toolSuccessBg";
-    return theme.bg(background, padVisible(`  ${colored}${suffix}`, width));
+function blockBackground(presentation: HistoryEntryPresentation): BlockBackground | undefined {
+  if (presentation.kind === "user") return "userMessageBg";
+  if (presentation.kind === "tool") return "toolSuccessBg";
+  if (presentation.kind === "error") return "toolErrorBg";
+  if (presentation.kind === "compaction" || presentation.kind === "custom") {
+    return "customMessageBg";
   }
-  return truncateToWidth(`  ${colored}${suffix}`, width);
+  return undefined;
+}
+
+type BlockForeground = Parameters<HistoryRenderTheme["fg"]>[0];
+
+function blockForeground(presentation: HistoryEntryPresentation): BlockForeground | undefined {
+  if (presentation.kind === "user") return "userMessageText";
+  if (presentation.kind === "tool" || presentation.kind === "error") return "toolOutput";
+  if (presentation.kind === "compaction" || presentation.kind === "custom") {
+    return "customMessageText";
+  }
+  return undefined;
+}
+
+function blockLabel(
+  presentation: HistoryEntryPresentation,
+  theme: HistoryRenderTheme,
+  callSummary: string | undefined,
+): string | undefined {
+  if (presentation.kind === "compaction") {
+    return theme.bold(theme.fg("customMessageLabel", "[compaction]"));
+  }
+  if (presentation.kind === "custom") {
+    const label = terminalSafeHistoryText(presentation.label);
+    return theme.bold(theme.fg("customMessageLabel", `[${label}]`));
+  }
+  if (presentation.kind === "tool" || presentation.kind === "error") {
+    const name = callSummary ?? presentation.toolName ?? "tool";
+    return theme.bold(theme.fg("toolTitle", terminalSafeHistoryText(name)));
+  }
+  return undefined;
 }
 
 function truncationLines(
@@ -238,27 +246,23 @@ function padVisible(value: string, width: number): string {
 
 function styleBodyLine(
   line: string,
-  kind: HistoryEntryKind,
-  width: number,
+  foreground: BlockForeground | undefined,
   theme: HistoryRenderTheme,
 ): string {
-  if (kind === "user") return theme.fg("userMessageText", line);
-  if (kind === "compaction" || kind === "custom") {
-    return theme.bg("customMessageBg", padVisible(line, width));
-  }
-  if (kind === "error") return theme.fg("error", line);
-  if (kind === "tool") return theme.fg("toolOutput", line);
-  return line;
+  return foreground === undefined ? line : theme.fg(foreground, line);
 }
 
-function styleUserBlock(
+function styleBackgroundBlock(
   lines: readonly string[],
   width: number,
+  background: BlockBackground,
+  foreground: BlockForeground | undefined,
   theme: HistoryRenderTheme,
 ): readonly string[] {
-  return lines.map((line) =>
-    theme.bg("userMessageBg", theme.fg("userMessageText", padVisible(line, width))),
-  );
+  return lines.map((line) => {
+    const styled = foreground === undefined ? line : theme.fg(foreground, line);
+    return theme.bg(background, padVisible(styled, width));
+  });
 }
 
 function renderedSegment(
@@ -268,7 +272,7 @@ function renderedSegment(
   width: number,
   theme: HistoryRenderTheme,
   query: string,
-  selected: boolean,
+  callSummary: string | undefined,
 ): readonly string[] {
   const segment = prepared.segments[segmentIndex] ?? "";
   const highlighted = literalHighlight(segment, query, theme);
@@ -278,17 +282,35 @@ function renderedSegment(
     0,
     getMarkdownTheme(),
   );
-  const body = markdown
-    .render(width)
-    .map((line) => styleBodyLine(line, prepared.presentation.kind, width, theme));
+  const foreground = blockForeground(prepared.presentation);
+  const body = markdown.render(width).map((line) => styleBodyLine(line, foreground, theme));
+  const lines = segmentLines(prepared, segmentIndex, pageIndex, body, width, theme, callSummary);
+  const background = blockBackground(prepared.presentation);
+  return background === undefined
+    ? lines
+    : styleBackgroundBlock(lines, width, background, foreground, theme);
+}
+
+function segmentLines(
+  prepared: PreparedEntry,
+  segmentIndex: number,
+  pageIndex: number,
+  body: readonly string[],
+  width: number,
+  theme: HistoryRenderTheme,
+  callSummary: string | undefined,
+): readonly string[] {
   const firstSegment = pageIndex === 0 && segmentIndex === 0;
   const lastSegment = segmentIndex === prepared.segments.length - 1;
-  const lines = [
-    ...(firstSegment ? ["", blockHeader(prepared.presentation, width, theme, selected)] : []),
+  const label = firstSegment ? blockLabel(prepared.presentation, theme, callSummary) : undefined;
+  const background = blockBackground(prepared.presentation);
+  return [
+    ...(firstSegment ? [""] : []),
+    ...(label === undefined ? [] : [label]),
     ...body,
     ...(lastSegment ? truncationLines(prepared, width, theme) : []),
+    ...(lastSegment && background !== undefined ? [""] : []),
   ];
-  return prepared.presentation.kind === "user" ? styleUserBlock(lines, width, theme) : lines;
 }
 
 function touchCache<T>(cache: Map<string, T>, key: string, value: T): T {
@@ -402,15 +424,26 @@ export class HistoryEntryRenderer {
     pageIndex = 0,
     query = "",
     selected = false,
+    callSummary?: string,
   ): readonly string[] {
     const safeWidth = Math.max(1, width);
     const safeBudget = Math.max(4, lineBudget);
-    const prepared = this.prepare(entry, entryIndex, safeWidth, state, safeBudget, pageIndex);
-    const safeSegmentIndex = Math.min(Math.max(0, segmentIndex), prepared.segments.length - 1);
-    const key = `${String(entryIndex)}:${String(safeWidth)}:${stateKey(state)}:${String(safeBudget)}:${String(pageIndex)}:${String(safeSegmentIndex)}:${query}:${selected ? "selected" : "normal"}`;
+    const key = this.renderKey(
+      entryIndex,
+      safeWidth,
+      state,
+      safeBudget,
+      pageIndex,
+      segmentIndex,
+      query,
+      selected,
+      callSummary,
+    );
     const cached = this.cache.get(key);
     if (cached) return touchCache(this.cache, key, cached).lines;
 
+    const prepared = this.prepare(entry, entryIndex, safeWidth, state, safeBudget, pageIndex);
+    const safeSegmentIndex = Math.min(Math.max(0, segmentIndex), prepared.segments.length - 1);
     const lines = renderedSegment(
       prepared,
       safeSegmentIndex,
@@ -418,12 +451,27 @@ export class HistoryEntryRenderer {
       safeWidth,
       this.theme,
       query,
-      selected,
+      callSummary,
     );
     const block = { lines };
     this.cache.set(key, block);
     trimCache(this.cache, this.cacheLimit);
     return lines;
+  }
+
+  private renderKey(
+    entryIndex: number,
+    width: number,
+    state: HistoryEntryDisplayState,
+    lineBudget: number,
+    pageIndex: number,
+    segmentIndex: number,
+    query: string,
+    selected: boolean,
+    callSummary: string | undefined,
+  ): string {
+    const selection = selected ? "selected" : "normal";
+    return `${String(entryIndex)}:${String(width)}:${stateKey(state)}:${String(lineBudget)}:${String(pageIndex)}:${String(segmentIndex)}:${query}:${selection}:${callSummary ?? ""}`;
   }
 
   private prepare(

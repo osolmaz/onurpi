@@ -2,6 +2,7 @@ import {
   historyEntryKind,
   historyEntryMatchesFilter,
   historyEntryPresentation,
+  historyToolCallInfos,
   type HistoryEntryPresentation,
   type HistoryFilter,
   type HistorySectionKind,
@@ -57,6 +58,8 @@ function clearSection(override: EntryDisplayOverride, key: SectionKey): EntryDis
 }
 
 export class HistoryViewport {
+  private readonly callSummaries = new Map<string, string>();
+  private readonly inspectedCallEntries = new Set<number>();
   private readonly entryOverrides = new Map<number, EntryDisplayOverride>();
   private sessionDisplay: HistoryEntryDisplayState = DEFAULT_HISTORY_ENTRY_DISPLAY;
   private readonly presentations = new Map<number, HistoryEntryPresentation>();
@@ -117,11 +120,8 @@ export class HistoryViewport {
     if (entryIndex === undefined) return undefined;
     const entry = this.index.entries[entryIndex];
     if (entry === undefined) return undefined;
-    let presentation = this.presentations.get(entryIndex);
-    if (presentation === undefined) {
-      presentation = historyEntryPresentation(entry);
-      this.presentations.set(entryIndex, presentation);
-    }
+    const presentation = this.present(entryIndex);
+    if (presentation === undefined) return undefined;
     return {
       entryIndex,
       filter: this.filterValue,
@@ -391,6 +391,7 @@ export class HistoryViewport {
   private block(position: HistoryPosition): readonly string[] {
     const entry = this.index.entries[position.entryIndex];
     if (entry === undefined) return [""];
+    this.registerToolCalls(position.entryIndex, entry);
     return this.renderer.render(
       entry,
       position.entryIndex,
@@ -401,7 +402,35 @@ export class HistoryViewport {
       position.pageIndex,
       this.queryValue,
       position.entryIndex === this.focusEntryIndex,
+      this.callSummary(position.entryIndex),
     );
+  }
+
+  private registerToolCalls(entryIndex: number, entry: unknown): void {
+    if (this.inspectedCallEntries.has(entryIndex)) return;
+    this.inspectedCallEntries.add(entryIndex);
+    const presentation = this.present(entryIndex);
+    if (presentation?.hasToolOutput !== true || presentation.toolCallId !== undefined) return;
+    for (const info of historyToolCallInfos(entry)) {
+      this.callSummaries.set(info.id, info.summary);
+    }
+  }
+
+  private callSummary(entryIndex: number): string | undefined {
+    const toolCallId = this.present(entryIndex)?.toolCallId;
+    if (toolCallId === undefined) return undefined;
+    return this.callSummaries.get(toolCallId);
+  }
+
+  private present(entryIndex: number): HistoryEntryPresentation | undefined {
+    let presentation = this.presentations.get(entryIndex);
+    if (presentation === undefined) {
+      const entry = this.index.entries[entryIndex];
+      if (entry === undefined) return undefined;
+      presentation = historyEntryPresentation(entry);
+      this.presentations.set(entryIndex, presentation);
+    }
+    return presentation;
   }
 
   private pageCount(entryIndex: number): number {

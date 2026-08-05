@@ -104,7 +104,7 @@ describe("Turn Fold history rendering", () => {
     const diff = renderer.render(thinkingEntry, 0, 80, state({ showDiffs: true })).join("\n");
 
     expect(collapsed).toContain("Thinking hidden");
-    expect(collapsed).toContain("press o for");
+    expect(collapsed).toContain("more lines, press o to expand");
     expect(collapsed).toContain("Diff hidden");
     expect(expanded).toContain("reasoning");
     expect(expanded).toContain("a.ts");
@@ -129,14 +129,15 @@ describe("Turn Fold history rendering", () => {
 });
 
 describe("Turn Fold history layout and tool presentation", () => {
-  it("puts one blank line before every header and no trailing blank", () => {
+  it("puts one blank line before assistant blocks with no header or trailing blank", () => {
     const renderer = new HistoryEntryRenderer(theme);
 
     const first = renderer.render(assistant("one", "One"), 0, 80, state());
     const second = renderer.render(assistant("two", "Two"), 1, 80, state());
 
     expect(first[0]?.trim()).toBe("");
-    expect(first[1]).toContain("Assistant");
+    expect(first[1]).toContain("One");
+    expect(first.join("\n")).not.toContain("Assistant");
     expect(first.at(-1)?.trim()).not.toBe("");
     expect(second[0]?.trim()).toBe("");
   });
@@ -157,9 +158,9 @@ describe("Turn Fold history layout and tool presentation", () => {
     const rendered = renderer.render(entry, 0, 80, state({ showToolOutput: false })).join("\n");
 
     expect(rendered).toContain("line 0");
-    expect(rendered).toContain("line 3");
-    expect(rendered).not.toContain("line 4");
-    expect(rendered).toContain("press o for full output");
+    expect(rendered).toContain("line 4");
+    expect(rendered).not.toContain("line 5");
+    expect(rendered).toContain("(3 more lines, press o to expand)");
   });
 
   it("colors tool headers by success or failure", () => {
@@ -192,6 +193,35 @@ describe("Turn Fold history layout and tool presentation", () => {
     expect(backgrounds.some((entry) => entry.startsWith("toolSuccessBg:"))).toBe(true);
     expect(backgrounds.some((entry) => entry.startsWith("toolErrorBg:"))).toBe(true);
   });
+
+  it("pairs the call summary into the tool block header", () => {
+    const titles: string[] = [];
+    const styledTheme = {
+      bg: (_color: string, text: string) => text,
+      bold: (text: string) => {
+        titles.push(text);
+        return text;
+      },
+      fg: (_color: string, text: string) => text,
+      italic: (text: string) => text,
+    };
+    const renderer = new HistoryEntryRenderer(styledTheme);
+    const result = {
+      id: "result",
+      message: {
+        content: "out",
+        role: "toolResult",
+        timestamp: 1,
+        toolCallId: "call-1",
+        toolName: "read",
+      },
+      type: "message",
+    };
+
+    renderer.render(result, 0, 80, state(), 0, 20, 0, "", false, "read · /tmp/plan.md");
+
+    expect(titles).toContain("read · /tmp/plan.md");
+  });
 });
 
 describe("Turn Fold history role styling", () => {
@@ -216,7 +246,9 @@ describe("Turn Fold history role styling", () => {
       type: "message",
     };
 
-    expect(renderer.render(user, 0, 80, state()).join("\n")).toContain("◆ You");
+    const rendered = renderer.render(user, 0, 80, state()).join("\n");
+    expect(rendered).toContain("Question");
+    expect(rendered).not.toContain("You");
     expect(calls).toContain("bg:userMessageBg");
     expect(calls).toContain("fg:userMessageText");
   });
@@ -244,8 +276,8 @@ describe("Turn Fold history role styling", () => {
     expect(backgrounds.length).toBe(lines.length);
     expect(backgrounds.length).toBeGreaterThanOrEqual(3);
     expect(backgrounds[0]?.trim()).toBe("");
-    expect(backgrounds[1]).toContain("◆ You");
-    expect(backgrounds[2]).toContain("Question body");
+    expect(backgrounds[1]).toContain("Question body");
+    expect(backgrounds.at(-1)?.trim()).toBe("");
   });
 
   it("highlights literal search text and selected headers", () => {
@@ -267,7 +299,6 @@ describe("Turn Fold history role styling", () => {
     renderer.render(assistant("match", "Needle"), 0, 80, state(), 0, 20, 0, "needle", true);
 
     expect(calls).toContain("bg:selectedBg");
-    expect(calls).toContain("fg:borderAccent");
   });
 
   it("locates matches after terminal control characters in the right segment", () => {
