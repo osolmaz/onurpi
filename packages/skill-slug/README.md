@@ -13,9 +13,10 @@ manually typed slash form for global, project, and package skills alike.
   does not. Arguments remain available as `/skill:amk <args>`, which keeps natural-language
   messages that merely start with a slug from being hijacked.
 - Attached images are preserved on the rewritten input.
-- Skill names are primed from Pi's assembled system prompt at session start (and lazily on the
-  first input), then refreshed from Pi's structured loaded-skills list on each agent run. The
-  first message of a fresh session matches like any other.
+- Skill names are primed from Pi's assembled system prompt on the first typed input, then
+  refreshed from Pi's structured loaded-skills list on each agent run. When an earlier
+  extension-triggered run already captured the structured list, it wins because it also covers
+  skills hidden from the prompt. The first message of a fresh session matches like any other.
 
 The extension adds no session entries, settings, or persistent state.
 
