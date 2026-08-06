@@ -1,42 +1,35 @@
-# 📊 pi-usage — Provider Usage for Pi
+# @onurpi/pi-usage
 
-[![npm](https://img.shields.io/npm/v/@narumitw/pi-usage)](https://www.npmjs.com/package/@narumitw/pi-usage) [![Pi extension](https://img.shields.io/badge/Pi-extension-blue)](https://pi.dev) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+Vendored from [`@narumitw/pi-usage`](https://www.npmjs.com/package/@narumitw/pi-usage); see
+[UPSTREAM.md](UPSTREAM.md) for provenance and local changes. [MIT](LICENSE) licensed.
 
-`@narumitw/pi-usage` is a native [Pi coding agent](https://pi.dev) extension that adds one interactive `/usage` command for reading usage from the account Pi is actually using. It supports OpenAI Codex ChatGPT subscription windows, GitHub Copilot allowances, and OpenRouter API-key spend limits without pretending those limits have the same semantics.
+`@onurpi/pi-usage` is a native [Pi coding agent](https://pi.dev) extension that adds one interactive
+`/usage` command for reading usage from the account Pi is actually using. It supports OpenAI Codex
+ChatGPT subscription windows, GitHub Copilot allowances, and OpenRouter API-key spend limits without
+pretending those limits have the same semantics.
 
 ## ✨ Features
 
 - Opens one interactive `/usage` menu with current state and next actions.
 - Automatically queries the selected model provider and active runtime account.
 - Supports OpenAI Codex subscription windows, resets, credits, and model-specific buckets.
-- Supports GitHub Copilot AI Credits, legacy premium requests, Free chat quota, additional usage, percentage, and reset time.
+- Supports GitHub Copilot AI Credits, legacy premium requests, Free chat quota, additional usage,
+  percentage, and reset time.
 - Supports OpenRouter per-key credit limits plus daily, weekly, monthly, and all-time spend.
 - Provides explicit refresh, another-provider, and all-configured-provider actions.
-- Runs manually requested all-provider queries with concurrency limited to two and preserves partial results.
+- Runs manually requested all-provider queries with concurrency limited to two and preserves partial
+  results.
 - Labels only the selected model provider as `Current`; other results are `Configured`.
 - Keeps the compact statusline scoped to the current provider and runtime account.
 - Isolates its five-minute in-memory cache by provider and a process-salted credential fingerprint.
-- Resolves runtime credentials through Pi; for Copilot only, reads Pi's stored OAuth credential through Pi's public credential API and verifies that it matches the active runtime account.
+- Resolves runtime credentials through Pi; for Copilot only, reads Pi's stored OAuth credential
+  through Pi's public credential API and verifies that it matches the active runtime account.
 
-## 📦 Install
+## 📦 Requirements
 
-Requires Pi 0.81.0 or newer so the extension can validate the effective base URL attached to resolved provider auth before sending credentials to an official usage endpoint.
-
-```bash
-pi install npm:@narumitw/pi-usage
-```
-
-Try without installing permanently:
-
-```bash
-pi -e npm:@narumitw/pi-usage
-```
-
-Try this package locally from the repository root:
-
-```bash
-pi -e ./extensions/pi-usage
-```
+Requires Pi 0.81.0 or newer so the extension can validate the effective base URL attached to
+resolved provider auth before sending credentials to an official usage endpoint. The interactive
+menu runs on the vendored [`@onurpi/pi-tui-kit`](../pi-tui-kit/) workspace library.
 
 ## 🚀 Usage
 
@@ -46,8 +39,8 @@ Run:
 /usage
 ```
 
-In TUI or RPC mode, the standard menu first queries the current model provider and presents its state
-with these actions:
+In TUI or RPC mode, the standard menu first queries the current model provider and presents its
+state with these actions:
 
 ```text
 Refresh current usage
@@ -56,11 +49,12 @@ View all configured providers…
 Close
 ```
 
-There are intentionally no `/usage --refresh`, `/usage <provider>`, or `/usage --all` argument paths.
-Cross-provider traffic requires an explicit interactive choice. Escape returns from provider selection
-and closes the root menu. Print and JSON modes reject `/usage` observably because they cannot host the
-interactive flow. The cancellable live-query progress view remains extension-owned because it streams
-provider work and supports in-flight abort rather than presenting a standard menu screen.
+There are intentionally no `/usage --refresh`, `/usage <provider>`, or `/usage --all` argument
+paths. Cross-provider traffic requires an explicit interactive choice. Escape returns from provider
+selection and closes the root menu. Print and JSON modes reject `/usage` observably because they
+cannot host the interactive flow. The cancellable live-query progress view remains extension-owned
+because it streams provider work and supports in-flight abort rather than presenting a standard menu
+screen.
 
 ## 📋 Provider semantics
 
@@ -69,75 +63,97 @@ provider work and supports in-flight abort rather than presenting a standard men
 - Provider ID: `openai-codex`
 - Semantics: ChatGPT consumer subscription limits
 - Source: the Codex usage endpoint using Pi's resolved runtime authorization
-- Displayed data: returned duration-based windows, resets, credits, earned usage-limit resets, and additional model buckets
+- Displayed data: returned duration-based windows, resets, credits, earned usage-limit resets, and
+  additional model buckets
 - Statusline examples: `codex 59% 5h 61% wk` or `codex spark 100% 5h`
 
-The statusline selects a returned bucket that matches the current Codex model when one is available. Unlike `pi-codex-usage`, this successor intentionally has no Codex CLI fallback because the CLI may be logged into a different account than Pi's active runtime account.
+The statusline selects a returned bucket that matches the current Codex model when one is available.
+Unlike `pi-codex-usage`, this successor intentionally has no Codex CLI fallback because the CLI may
+be logged into a different account than Pi's active runtime account.
 
 ### GitHub Copilot
 
 - Provider ID: `github-copilot`
-- Semantics: the allowance reported for the active Copilot plan—AI credits for current usage-based billing, premium requests for legacy annual billing, or chat requests for Copilot Free's limited response shape
+- Semantics: the allowance reported for the active Copilot plan—AI credits for current usage-based
+  billing, premium requests for legacy annual billing, or chat requests for Copilot Free's limited
+  response shape
 - Source: GitHub's undocumented `GET /copilot_internal/user` endpoint
-- Displayed data: entitlement, remaining allowance, percentage, reset time, plan, and any additional usage beyond the included allowance
-- Statusline examples: `copilot credits 1200/1500 80%`, `copilot 245/300 82%`, or `copilot chat 40/50 80%`
+- Displayed data: entitlement, remaining allowance, percentage, reset time, plan, and any additional
+  usage beyond the included allowance
+- Statusline examples: `copilot credits 1200/1500 80%`, `copilot 245/300 82%`, or
+  `copilot chat 40/50 80%`
 
-GitHub's quota endpoint requires the original GitHub OAuth token rather than the short-lived Copilot inference token exposed by runtime auth. `pi-usage` therefore supports Copilot accounts created through Pi's `/login` flow, reads that stored credential through Pi's public API, and uses it only when its short-lived access token matches the active runtime credential. API-key credentials, account mismatches, GitHub Enterprise accounts, and proxy/custom provider origins fail closed. The detailed report follows the endpoint's `token_based_billing` marker so AI credits are not mislabeled as legacy premium requests, and it reports overage without treating a negative included balance as a malformed response.
+GitHub's quota endpoint requires the original GitHub OAuth token rather than the short-lived Copilot
+inference token exposed by runtime auth. `pi-usage` therefore supports Copilot accounts created
+through Pi's `/login` flow, reads that stored credential through Pi's public API, and uses it only
+when its short-lived access token matches the active runtime credential. API-key credentials,
+account mismatches, GitHub Enterprise accounts, and proxy/custom provider origins fail closed. The
+detailed report follows the endpoint's `token_based_billing` marker so AI credits are not mislabeled
+as legacy premium requests, and it reports overage without treating a negative included balance as a
+malformed response.
 
 ### OpenRouter
 
 - Provider ID: `openrouter`
 - Semantics: API-key spend and per-key credit limits—not consumer subscription quota
-- Source: OpenRouter's documented [`GET /api/v1/key`](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key) endpoint using Pi's resolved inference API key
-- Displayed data: key label when safely returned, optional per-key limit and remaining amount, reset period, and daily/weekly/monthly/all-time spend
+- Source: OpenRouter's documented
+  [`GET /api/v1/key`](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key)
+  endpoint using Pi's resolved inference API key
+- Displayed data: key label when safely returned, optional per-key limit and remaining amount, reset
+  period, and daily/weekly/monthly/all-time spend
 - Statusline examples: `openrouter $74.50 left` or `openrouter $25.50 used`
 
-The extension does not call OpenRouter's account-level `/credits` endpoint because that operation requires a separate management key. OpenRouter documents the distinction between credit and rate limits in its [API limits guide](https://openrouter.ai/docs/api_reference/limits).
+The extension does not call OpenRouter's account-level `/credits` endpoint because that operation
+requires a separate management key. OpenRouter documents the distinction between credit and rate
+limits in its [API limits guide](https://openrouter.ai/docs/api_reference/limits).
 
 ## 🧭 Current and configured accounts
 
-`Current` means the provider and credential used by Pi's selected model. `Configured` means Pi reports runtime auth for another supported provider; it does not mean that provider is active.
+`Current` means the provider and credential used by Pi's selected model. `Configured` means Pi
+reports runtime auth for another supported provider; it does not mean that provider is active.
 
-The extension does not enumerate multiple accounts inside one provider and does not switch accounts. Account selection remains owned by Pi or an account-management extension. After the active runtime credential changes, the next command, turn, or scheduled refresh resolves auth again and cannot reuse another account's cached report.
+The extension does not enumerate multiple accounts inside one provider and does not switch accounts.
+Account selection remains owned by Pi or an account-management extension. After the active runtime
+credential changes, the next command, turn, or scheduled refresh resolves auth again and cannot
+reuse another account's cached report.
 
 ## 📊 Statusline behavior
 
-The `usage` status item is active only for the selected model provider. It refreshes every five minutes while the session remains on a supported provider and is cleared when the model changes to an unsupported provider.
+The `usage` status item is active only for the selected model provider and is cleared when the model
+changes to an unsupported provider. In this vendored package it has no polling timer: the status
+refreshes on Pi lifecycle events (session start, session tree changes, model selection, and turn
+starts) and on `/usage` menu actions, bounded by the shared five-minute in-memory cache.
 
-Manual another-provider and all-provider queries never publish to the statusline. `@narumitw/pi-statusline` supplies the default `📊` icon; `pi-usage` publishes text-only values.
+Manual another-provider and all-provider queries never publish to the statusline. `pi-usage`
+publishes text-only status values.
 
-## 🔄 Migrating from pi-codex-usage
+## 🔄 Migration notes
 
-`pi-codex-usage` is deprecated and its source is archived under `deprecated/`. To migrate one installation:
-
-```bash
-pi remove npm:@narumitw/pi-codex-usage
-pi install npm:@narumitw/pi-usage
-```
-
-Remove the deprecated package rather than loading both usage extensions together.
-
-Behavior changes:
+This package replaces the retired `@onurpi/codex-usage` package. Behavior changes relative to it:
 
 - Use `/usage` as the only entry point; `/codex-status` is no longer registered.
 - Refresh and cross-provider operations are menu actions rather than flags.
-- Codex CLI fallback is removed to preserve active-runtime-account correctness.
+- There is no Codex CLI fallback, preserving active-runtime-account correctness.
 - The status key changes from `codex-usage` to `usage`.
 
 ## 🚧 Limitations
 
 - Only providers with a meaningful usage source and verifiable Pi runtime auth are supported.
 - GitHub Copilot quota uses an undocumented GitHub endpoint that may change without notice.
-- Credentials resolved for custom provider base URLs are never forwarded to the providers' official usage endpoints; effective auth origin validation requires Pi 0.81.0 or newer.
+- Credentials resolved for custom provider base URLs are never forwarded to the providers' official
+  usage endpoints; effective auth origin validation requires Pi 0.81.0 or newer.
 - Provider reports are snapshots and may themselves be delayed by the provider.
-- OpenRouter successful inference responses do not expose proactive request-rate counters; `/usage` reports the documented per-key credit/spend fields instead.
-- A provider may not return a safe human-readable account identity. In that case the provider and runtime credential state remain visible without exposing secrets.
-- Immediate account-change events are not available from Pi; auth is re-resolved before commands, turns, and scheduled refreshes.
+- OpenRouter successful inference responses do not expose proactive request-rate counters; `/usage`
+  reports the documented per-key credit/spend fields instead.
+- A provider may not return a safe human-readable account identity. In that case the provider and
+  runtime credential state remain visible without exposing secrets.
+- Immediate account-change events are not available from Pi; auth is re-resolved before commands,
+  turns, and scheduled refreshes.
 
 ## 🗂️ Package layout
 
 ```txt
-extensions/pi-usage/
+packages/pi-usage/
 ├── src/
 │   ├── index.ts       # Pi package entrypoint and helper export barrel
 │   ├── usage.ts       # Menu, cache, and lifecycle orchestration
@@ -153,11 +169,14 @@ extensions/pi-usage/
 └── package.json
 ```
 
-`index.ts` is the Pi entrypoint and forwards the default factory from `usage.ts` while retaining the package's named helper exports; other source modules are internal.
+`index.ts` is the Pi entrypoint and forwards the default factory from `usage.ts` while retaining the
+package's named helper exports; other source modules are internal.
 
 ## 🔎 Keywords
 
-Pi extension, Pi coding agent, usage, quota, OpenAI Codex usage, ChatGPT subscription limits, GitHub Copilot AI credits, GitHub Copilot premium requests, OpenRouter credits, API-key spend limits, TypeScript Pi package, npm Pi extension.
+Pi extension, Pi coding agent, usage, quota, OpenAI Codex usage, ChatGPT subscription limits, GitHub
+Copilot AI credits, GitHub Copilot premium requests, OpenRouter credits, API-key spend limits,
+TypeScript Pi package, npm Pi extension.
 
 ## 📄 License
 

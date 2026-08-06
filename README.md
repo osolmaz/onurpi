@@ -18,6 +18,7 @@ configuration.
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                 |
 | [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
+| [`@onurpi/pi-usage`](packages/pi-usage/)                           | Multi-provider usage reports and model-gated usage status        |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |
 | [`@onurpi/yarp`](packages/yarp/)                                   | Prunes long output from supported developer commands             |
@@ -28,6 +29,9 @@ configuration.
 | [`@onurpi/regrafter-driver`](packages/regrafter-driver/)           | Regraft command and optional Regrafter delegation                |
 | [`@osolmaz/pi-reviewer`](packages/pi-reviewer/)                    | Standalone Pi Factory reviewer with P0–P3 findings               |
 | [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                    |
+
+[`@onurpi/pi-tui-kit`](packages/pi-tui-kit/) is a vendored library package (declarative Pi TUI
+menus), not a Pi extension; it backs `@onurpi/pi-usage` and is not loaded as a Pi resource.
 
 ## Included external extensions
 

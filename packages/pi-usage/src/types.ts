@@ -8,95 +8,95 @@ export type UsageUnit = "percent" | "usd" | "count";
 export type UsageDisplayState = "current" | "configured";
 
 export interface UsageSemantics {
-	kind: UsageSemanticsKind;
-	label: string;
+  kind: UsageSemanticsKind;
+  label: string;
 }
 
 export interface UsageBucket {
-	id: string;
-	label: string;
-	groupId?: string;
-	groupLabel?: string;
-	modelKeys?: string[];
-	used?: number;
-	remaining?: number;
-	limit?: number;
-	unit: UsageUnit;
-	period?: string;
-	windowMinutes?: number;
-	resetsAt?: number;
+  id: string;
+  label: string;
+  groupId?: string;
+  groupLabel?: string;
+  modelKeys?: string[];
+  used?: number;
+  remaining?: number;
+  limit?: number;
+  unit: UsageUnit;
+  period?: string;
+  windowMinutes?: number;
+  resetsAt?: number;
 }
 
 export interface UsageMetric {
-	id: string;
-	label: string;
-	value: number | string;
-	unit?: UsageUnit;
+  id: string;
+  label: string;
+  value: number | string;
+  unit?: UsageUnit;
 }
 
 export interface UsageReport {
-	providerId: string;
-	providerName: string;
-	capturedAt: number;
-	source: string;
-	semantics: UsageSemantics;
-	accountLabel?: string;
-	buckets: UsageBucket[];
-	metrics: UsageMetric[];
-	notes?: string[];
+  providerId: string;
+  providerName: string;
+  capturedAt: number;
+  source: string;
+  semantics: UsageSemantics;
+  accountLabel?: string | undefined;
+  buckets: UsageBucket[];
+  metrics: UsageMetric[];
+  notes?: string[];
 }
 
 export interface ResolvedUsageAuth {
-	apiKey?: string;
-	headers: Record<string, string>;
-	fingerprint: string;
-	secrets: string[];
-	model: PiModel;
+  apiKey?: string | undefined;
+  headers: Record<string, string>;
+  fingerprint: string;
+  secrets: string[];
+  model: PiModel;
 }
 
 export interface UsageProviderAdapter {
-	id: string;
-	displayName: string;
-	semantics: UsageSemantics;
-	query(auth: ResolvedUsageAuth, signal: AbortSignal, timeoutMs: number): Promise<UsageReport>;
+  id: string;
+  displayName: string;
+  semantics: UsageSemantics;
+  query(auth: ResolvedUsageAuth, signal: AbortSignal, timeoutMs: number): Promise<UsageReport>;
 }
 
 export type ProviderUsageState =
-	| {
-			providerId: string;
-			providerName: string;
-			displayState: UsageDisplayState;
-			status: "ready";
-			report: UsageReport;
-	  }
-	| {
-			providerId: string;
-			providerName: string;
-			displayState: UsageDisplayState;
-			status: "unsupported" | "auth-unavailable" | "query-failed";
-			message: string;
-	  };
+  | {
+      providerId: string;
+      providerName: string;
+      displayState: UsageDisplayState;
+      status: "ready";
+      report: UsageReport;
+    }
+  | {
+      providerId: string;
+      providerName: string;
+      displayState: UsageDisplayState;
+      status: "unsupported" | "auth-unavailable" | "query-failed";
+      message: string;
+    };
 
 export type GitHubCopilotUsagePayload = {
-	login?: unknown;
-	copilot_plan?: unknown;
-	access_type_sku?: unknown;
-	limited_user_quotas?: unknown;
-	limited_user_reset_date?: unknown;
-	monthly_quotas?: unknown;
-	quota_reset_date?: unknown;
-	quota_reset_date_utc?: unknown;
-	quota_snapshots?: unknown;
+  login?: unknown;
+  copilot_plan?: unknown;
+  access_type_sku?: unknown;
+  limited_user_quotas?: unknown;
+  limited_user_reset_date?: unknown;
+  monthly_quotas?: unknown;
+  quota_reset_date?: unknown;
+  quota_reset_date_utc?: unknown;
+  quota_snapshots?: unknown;
 };
 
 export type OpenRouterKeyPayload = {
-	data?: unknown;
+  data?: unknown;
 };
 
 export type CodexBackendPayload = {
-	plan_type?: unknown;
-	rate_limit?: unknown;
-	additional_rate_limits?: unknown;
-	credits?: unknown;
-	rate_limit_reset_credits?: unknown;
+  plan_type?: unknown;
+  rate_limit?: unknown;
+  additional_rate_limits?: unknown;
+  credits?: unknown;
+  rate_limit_reset_credits?: unknown;
 };

@@ -1,30 +1,30 @@
 import type {
-	ExtensionAPI,
-	ExtensionCommandContext,
-	ExtensionContext,
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import {
-	awaitWithDeadline,
-	errorMessage,
-	runWithConcurrency,
-	sanitizeDisplayText,
-	UsageCache,
+  awaitWithDeadline,
+  errorMessage,
+  runWithConcurrency,
+  sanitizeDisplayText,
+  UsageCache,
 } from "./core.js";
 import { formatProviderStates, formatUsageStatusline } from "./format.js";
 import {
-	adapterForProvider,
-	isStaleExtensionContextError,
-	providerIsConfigured,
-	queryProviderUsage,
-	resolveUsageAuth,
-	SUPPORTED_ADAPTERS,
+  adapterForProvider,
+  isStaleExtensionContextError,
+  providerIsConfigured,
+  queryProviderUsage,
+  resolveUsageAuth,
+  SUPPORTED_ADAPTERS,
 } from "./query.js";
 import type {
-	PiModel,
-	ProviderUsageState,
-	ResolvedUsageAuth,
-	UsageDisplayState,
-	UsageProviderAdapter,
+  PiModel,
+  ProviderUsageState,
+  ResolvedUsageAuth,
+  UsageDisplayState,
+  UsageProviderAdapter,
 } from "./types.js";
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -40,658 +40,634 @@ const VIEW_ALL = "View all configured providers…";
 const CLOSE = "Close";
 
 type QueryOutcome = {
-	state: ProviderUsageState;
-	fingerprint?: string;
-	authState?: "unavailable";
+  state: ProviderUsageState;
+  fingerprint?: string;
+  authState?: "unavailable";
 };
 
 type StableCurrent = {
-	outcome: QueryOutcome;
-	model: PiModel | undefined;
+  outcome: QueryOutcome;
+  model: PiModel | undefined;
 };
 
+// eslint-disable-next-line max-lines-per-function -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
 export default function usageExtension(pi: ExtensionAPI) {
-	const cache = new UsageCache(CACHE_TTL_MS);
-	const failureBackoff = new Map<string, { until: number; message: string }>();
-	const latestQueries = new Map<string, number>();
-	const activeControllers = new Set<AbortController>();
-	let querySequence = 0;
-	let activeCurrentIdentity: string | undefined;
-	let sessionActive = false;
-	let statusGeneration = 0;
-	let statusRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-	let statusController: AbortController | undefined;
+  const cache = new UsageCache(CACHE_TTL_MS);
+  const failureBackoff = new Map<string, { until: number; message: string }>();
+  const latestQueries = new Map<string, number>();
+  const activeControllers = new Set<AbortController>();
+  let querySequence = 0;
+  let activeCurrentIdentity: string | undefined;
+  let sessionActive = false;
+  let statusGeneration = 0;
+  let statusController: AbortController | undefined;
 
-	const clearStatusTimer = () => {
-		if (statusRefreshTimer) clearTimeout(statusRefreshTimer);
-		statusRefreshTimer = undefined;
-	};
+  const safeSetStatus = (ctx: ExtensionContext, value: string | undefined): boolean => {
+    try {
+      ctx.ui.setStatus(STATUS_KEY, value);
+      return true;
+    } catch (error) {
+      if (isStaleExtensionContextError(error)) return false;
+      throw error;
+    }
+  };
 
-	const safeSetStatus = (ctx: ExtensionContext, value: string | undefined): boolean => {
-		try {
-			ctx.ui.setStatus(STATUS_KEY, value);
-			return true;
-		} catch (error) {
-			if (isStaleExtensionContextError(error)) return false;
-			throw error;
-		}
-	};
+  const clearStatus = (ctx: ExtensionContext) => {
+    statusGeneration += 1;
+    statusController?.abort();
+    statusController = undefined;
+    safeSetStatus(ctx, undefined);
+  };
 
-	const clearStatus = (ctx: ExtensionContext) => {
-		statusGeneration += 1;
-		statusController?.abort();
-		statusController = undefined;
-		clearStatusTimer();
-		safeSetStatus(ctx, undefined);
-	};
+  const publishStatus = (ctx: ExtensionContext, outcome: QueryOutcome, model: PiModel) => {
+    if (outcome.state.status === "unsupported") {
+      safeSetStatus(ctx, undefined);
+      return;
+    }
+    if (outcome.state.status !== "ready") {
+      safeSetStatus(
+        ctx,
+        outcome.state.status === "auth-unavailable" ? "auth unavailable" : "usage error",
+      );
+      return;
+    }
+    const value = formatUsageStatusline(outcome.state.report, model);
+    safeSetStatus(ctx, value);
+  };
 
-	const scheduleStatusRefresh = (ctx: ExtensionContext, model: PiModel) => {
-		clearStatusTimer();
-		const generation = statusGeneration;
-		statusRefreshTimer = setTimeout(() => {
-			statusRefreshTimer = undefined;
-			if (!sessionActive || generation !== statusGeneration) return;
-			startStatusRefresh(ctx, model, true);
-		}, CACHE_TTL_MS);
-		statusRefreshTimer.unref?.();
-	};
+  // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  const transitionCurrentIdentity = (nextIdentity: string, providerId: string) => {
+    if (!activeCurrentIdentity || activeCurrentIdentity === nextIdentity) {
+      activeCurrentIdentity = nextIdentity;
+      return;
+    }
+    const previousProviderId = activeCurrentIdentity.split(":", 1)[0] ?? "";
+    for (const id of new Set([previousProviderId, providerId])) {
+      if (!id) continue;
+      cache.clearProvider(id);
+      for (const key of failureBackoff.keys()) {
+        if (key.startsWith(`${id}:`)) failureBackoff.delete(key);
+      }
+      for (const key of latestQueries.keys()) {
+        if (key.startsWith(`${id}:`)) latestQueries.delete(key);
+      }
+    }
+    activeCurrentIdentity = nextIdentity;
+  };
 
-	const publishStatus = (
-		ctx: ExtensionContext,
-		outcome: QueryOutcome,
-		model: PiModel,
-		shouldSchedule: boolean,
-	) => {
-		if (outcome.state.status === "unsupported") {
-			clearStatusTimer();
-			safeSetStatus(ctx, undefined);
-			return;
-		}
-		if (outcome.state.status !== "ready") {
-			if (
-				safeSetStatus(
-					ctx,
-					outcome.state.status === "auth-unavailable" ? "auth unavailable" : "usage error",
-				)
-			) {
-				if (shouldSchedule && sessionActive) scheduleStatusRefresh(ctx, model);
-			}
-			return;
-		}
-		const value = formatUsageStatusline(outcome.state.report, model);
-		if (!safeSetStatus(ctx, value)) return;
-		if (shouldSchedule && sessionActive) scheduleStatusRefresh(ctx, model);
-	};
+  // eslint-disable-next-line max-lines-per-function -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  const queryAdapterState = async (
+    ctx: ExtensionContext,
+    adapter: UsageProviderAdapter,
+    displayState: UsageDisplayState,
+    force: boolean,
+    signal: AbortSignal,
+    // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  ): Promise<QueryOutcome> => {
+    const startedAt = Date.now();
+    let auth: ResolvedUsageAuth | undefined;
+    try {
+      auth = await awaitWithDeadline(
+        resolveUsageAuth(ctx, adapter),
+        signal,
+        DEFAULT_TIMEOUT_MS,
+        `resolving ${adapter.displayName} runtime auth`,
+      );
+    } catch (error) {
+      if (isStaleExtensionContextError(error) || isAbortError(error)) throw error;
+      if (displayState === "current") {
+        transitionCurrentIdentity(`${adapter.id}:auth-error`, adapter.id);
+      }
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: isTimeoutError(error) ? "query-failed" : "auth-unavailable",
+          message: errorMessage(error),
+        },
+      };
+    }
+    if (!auth) {
+      if (displayState === "current") {
+        transitionCurrentIdentity(`${adapter.id}:unavailable`, adapter.id);
+      }
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: "auth-unavailable",
+          message: `No runtime credential is configured for ${adapter.displayName}.`,
+        },
+        authState: "unavailable",
+      };
+    }
+    if (displayState === "current") {
+      transitionCurrentIdentity(`${adapter.id}:${auth.fingerprint}`, adapter.id);
+    }
 
-	const transitionCurrentIdentity = (nextIdentity: string, providerId: string) => {
-		if (!activeCurrentIdentity || activeCurrentIdentity === nextIdentity) {
-			activeCurrentIdentity = nextIdentity;
-			return;
-		}
-		const previousProviderId = activeCurrentIdentity.split(":", 1)[0] ?? "";
-		for (const id of new Set([previousProviderId, providerId])) {
-			if (!id) continue;
-			cache.clearProvider(id);
-			for (const key of failureBackoff.keys()) {
-				if (key.startsWith(`${id}:`)) failureBackoff.delete(key);
-			}
-			for (const key of latestQueries.keys()) {
-				if (key.startsWith(`${id}:`)) latestQueries.delete(key);
-			}
-		}
-		activeCurrentIdentity = nextIdentity;
-	};
+    const cached = !force ? cache.get(adapter.id, auth.fingerprint) : undefined;
+    if (cached) {
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: "ready",
+          report: cached,
+        },
+        fingerprint: auth.fingerprint,
+      };
+    }
 
-	const queryAdapterState = async (
-		ctx: ExtensionContext,
-		adapter: UsageProviderAdapter,
-		displayState: UsageDisplayState,
-		force: boolean,
-		signal: AbortSignal,
-	): Promise<QueryOutcome> => {
-		const startedAt = Date.now();
-		let auth: ResolvedUsageAuth | undefined;
-		try {
-			auth = await awaitWithDeadline(
-				resolveUsageAuth(ctx, adapter),
-				signal,
-				DEFAULT_TIMEOUT_MS,
-				`resolving ${adapter.displayName} runtime auth`,
-			);
-		} catch (error) {
-			if (isStaleExtensionContextError(error) || isAbortError(error)) throw error;
-			if (displayState === "current") {
-				transitionCurrentIdentity(`${adapter.id}:auth-error`, adapter.id);
-			}
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: isTimeoutError(error) ? "query-failed" : "auth-unavailable",
-					message: errorMessage(error),
-				},
-			};
-		}
-		if (!auth) {
-			if (displayState === "current") {
-				transitionCurrentIdentity(`${adapter.id}:unavailable`, adapter.id);
-			}
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: "auth-unavailable",
-					message: `No runtime credential is configured for ${adapter.displayName}.`,
-				},
-				authState: "unavailable",
-			};
-		}
-		if (displayState === "current") {
-			transitionCurrentIdentity(`${adapter.id}:${auth.fingerprint}`, adapter.id);
-		}
+    const failureKey = `${adapter.id}:${auth.fingerprint}`;
+    const previousFailure = failureBackoff.get(failureKey);
+    if (!force && previousFailure && previousFailure.until > Date.now()) {
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: "query-failed",
+          message: previousFailure.message,
+        },
+        fingerprint: auth.fingerprint,
+      };
+    }
+    failureBackoff.delete(failureKey);
+    querySequence += 1;
+    const queryId = querySequence;
+    setBoundedMap(latestQueries, failureKey, queryId, MAX_ACCOUNT_STATES);
 
-		const cached = !force ? cache.get(adapter.id, auth.fingerprint) : undefined;
-		if (cached) {
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: "ready",
-					report: cached,
-				},
-				fingerprint: auth.fingerprint,
-			};
-		}
+    try {
+      const remainingMs = Math.max(1, DEFAULT_TIMEOUT_MS - (Date.now() - startedAt));
+      const report = await queryProviderUsage(adapter, auth, signal, remainingMs);
+      if (latestQueries.get(failureKey) === queryId) {
+        cache.set(adapter.id, auth.fingerprint, report);
+        failureBackoff.delete(failureKey);
+      }
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: "ready",
+          report,
+        },
+        fingerprint: auth.fingerprint,
+      };
+    } catch (error) {
+      if (isStaleExtensionContextError(error) || isAbortError(error)) throw error;
+      const message = errorMessage(error);
+      const now = Date.now();
+      for (const [key, failure] of failureBackoff) {
+        if (failure.until <= now) failureBackoff.delete(key);
+      }
+      if (latestQueries.get(failureKey) === queryId) {
+        setBoundedMap(
+          failureBackoff,
+          failureKey,
+          { until: now + FAILURE_BACKOFF_MS, message },
+          MAX_ACCOUNT_STATES,
+        );
+      }
+      return {
+        state: {
+          providerId: adapter.id,
+          providerName: adapter.displayName,
+          displayState,
+          status: "query-failed",
+          message,
+        },
+        fingerprint: auth.fingerprint,
+      };
+    }
+  };
 
-		const failureKey = `${adapter.id}:${auth.fingerprint}`;
-		const previousFailure = failureBackoff.get(failureKey);
-		if (!force && previousFailure && previousFailure.until > Date.now()) {
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: "query-failed",
-					message: previousFailure.message,
-				},
-				fingerprint: auth.fingerprint,
-			};
-		}
-		failureBackoff.delete(failureKey);
-		querySequence += 1;
-		const queryId = querySequence;
-		setBoundedMap(latestQueries, failureKey, queryId, MAX_ACCOUNT_STATES);
+  const queryCurrentState = async (
+    ctx: ExtensionContext,
+    model: PiModel | undefined,
+    force: boolean,
+    signal: AbortSignal,
+  ): Promise<QueryOutcome> => {
+    const adapter = adapterForProvider(model?.provider);
+    if (!adapter) {
+      const providerId = model?.provider ?? "none";
+      transitionCurrentIdentity(`unsupported:${providerId}`, providerId);
+      return {
+        state: {
+          providerId,
+          providerName: providerDisplayName(ctx, providerId),
+          displayState: "current",
+          status: "unsupported",
+          message: model
+            ? `Usage reporting is not supported for ${providerDisplayName(ctx, providerId)}.`
+            : "No model is selected.",
+        },
+      };
+    }
+    return queryAdapterState(ctx, adapter, "current", force, signal);
+  };
 
-		try {
-			const remainingMs = Math.max(1, DEFAULT_TIMEOUT_MS - (Date.now() - startedAt));
-			const report = await queryProviderUsage(adapter, auth, signal, remainingMs);
-			if (latestQueries.get(failureKey) === queryId) {
-				cache.set(adapter.id, auth.fingerprint, report);
-				failureBackoff.delete(failureKey);
-			}
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: "ready",
-					report,
-				},
-				fingerprint: auth.fingerprint,
-			};
-		} catch (error) {
-			if (isStaleExtensionContextError(error) || isAbortError(error)) throw error;
-			const message = errorMessage(error);
-			const now = Date.now();
-			for (const [key, failure] of failureBackoff) {
-				if (failure.until <= now) failureBackoff.delete(key);
-			}
-			if (latestQueries.get(failureKey) === queryId) {
-				setBoundedMap(
-					failureBackoff,
-					failureKey,
-					{ until: now + FAILURE_BACKOFF_MS, message },
-					MAX_ACCOUNT_STATES,
-				);
-			}
-			return {
-				state: {
-					providerId: adapter.id,
-					providerName: adapter.displayName,
-					displayState,
-					status: "query-failed",
-					message,
-				},
-				fingerprint: auth.fingerprint,
-			};
-		}
-	};
+  const refreshCurrentStatus = async (
+    ctx: ExtensionContext,
+    model: PiModel | undefined,
+    force: boolean,
+    // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  ) => {
+    const adapter = adapterForProvider(model?.provider);
+    if (!adapter || !model) {
+      const providerId = model?.provider ?? "none";
+      transitionCurrentIdentity(`unsupported:${providerId}`, providerId);
+      clearStatus(ctx);
+      return;
+    }
+    statusGeneration += 1;
+    const generation = statusGeneration;
+    statusController?.abort();
+    const controller = new AbortController();
+    statusController = controller;
+    activeControllers.add(controller);
+    try {
+      if (!safeSetStatus(ctx, "checking")) return;
+      const outcome = await queryCurrentState(ctx, model, force, controller.signal);
+      if (!sessionActive || generation !== statusGeneration || controller.signal.aborted) return;
+      if (!(await outcomeStillCurrent(ctx, model, generation, outcome, controller.signal))) {
+        if (sessionActive && generation === statusGeneration) {
+          queueMicrotask(() => startStatusRefresh(ctx, ctx.model, false));
+        }
+        return;
+      }
+      publishStatus(ctx, outcome, model);
+    } finally {
+      activeControllers.delete(controller);
+      if (statusController === controller) statusController = undefined;
+    }
+  };
 
-	const queryCurrentState = async (
-		ctx: ExtensionContext,
-		model: PiModel | undefined,
-		force: boolean,
-		signal: AbortSignal,
-	): Promise<QueryOutcome> => {
-		const adapter = adapterForProvider(model?.provider);
-		if (!adapter) {
-			const providerId = model?.provider ?? "none";
-			transitionCurrentIdentity(`unsupported:${providerId}`, providerId);
-			return {
-				state: {
-					providerId,
-					providerName: providerDisplayName(ctx, providerId),
-					displayState: "current",
-					status: "unsupported",
-					message: model
-						? `Usage reporting is not supported for ${providerDisplayName(ctx, providerId)}.`
-						: "No model is selected.",
-				},
-			};
-		}
-		return queryAdapterState(ctx, adapter, "current", force, signal);
-	};
+  const startStatusRefresh = (
+    ctx: ExtensionContext,
+    model: PiModel | undefined,
+    force: boolean,
+  ) => {
+    void refreshCurrentStatus(ctx, model, force).catch((error) => {
+      if (isStaleExtensionContextError(error) || isAbortError(error)) return;
+      safeSetStatus(ctx, "usage error");
+    });
+  };
 
-	const refreshCurrentStatus = async (
-		ctx: ExtensionContext,
-		model: PiModel | undefined,
-		force: boolean,
-	) => {
-		const adapter = adapterForProvider(model?.provider);
-		if (!adapter || !model) {
-			const providerId = model?.provider ?? "none";
-			transitionCurrentIdentity(`unsupported:${providerId}`, providerId);
-			clearStatus(ctx);
-			return;
-		}
-		statusGeneration += 1;
-		const generation = statusGeneration;
-		statusController?.abort();
-		const controller = new AbortController();
-		statusController = controller;
-		activeControllers.add(controller);
-		try {
-			if (!safeSetStatus(ctx, "checking")) return;
-			const outcome = await queryCurrentState(ctx, model, force, controller.signal);
-			if (!sessionActive || generation !== statusGeneration || controller.signal.aborted) return;
-			if (!(await outcomeStillCurrent(ctx, model, generation, outcome, controller.signal))) {
-				if (sessionActive && generation === statusGeneration) {
-					queueMicrotask(() => startStatusRefresh(ctx, ctx.model, false));
-				}
-				return;
-			}
-			publishStatus(ctx, outcome, model, true);
-		} finally {
-			activeControllers.delete(controller);
-			if (statusController === controller) statusController = undefined;
-		}
-	};
+  const runMenuOperation = async <T>(
+    ctx: ExtensionCommandContext,
+    label: string,
+    parentSignal: AbortSignal,
+    operation: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T | undefined> => {
+    const { runTask } = await import("@onurpi/pi-tui-kit");
+    if (parentSignal.aborted) return undefined;
+    const result = await runTask(ctx, {
+      label,
+      signal: parentSignal,
+      onError: () => undefined,
+      task: ({ signal }) => operation(signal),
+    });
+    switch (result.kind) {
+      case "completed":
+        return result.value;
+      case "cancelled":
+      case "stale":
+        return undefined;
+      case "error":
+        throw result.error;
+    }
+  };
 
-	const startStatusRefresh = (
-		ctx: ExtensionContext,
-		model: PiModel | undefined,
-		force: boolean,
-	) => {
-		void refreshCurrentStatus(ctx, model, force).catch((error) => {
-			if (isStaleExtensionContextError(error) || isAbortError(error)) return;
-			safeSetStatus(ctx, "usage error");
-		});
-	};
+  const outcomeStillCurrent = async (
+    ctx: ExtensionContext,
+    model: PiModel | undefined,
+    generation: number,
+    outcome: QueryOutcome,
+    signal: AbortSignal,
+    // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  ): Promise<boolean> => {
+    if (generation !== statusGeneration || modelIdentity(ctx.model) !== modelIdentity(model)) {
+      return false;
+    }
+    const adapter = adapterForProvider(model?.provider);
+    if (outcome.authState === "unavailable") {
+      if (!adapter) return false;
+      try {
+        const auth = await awaitWithDeadline(
+          resolveUsageAuth(ctx, adapter),
+          signal,
+          DEFAULT_TIMEOUT_MS,
+          `revalidating ${adapter.displayName} runtime auth`,
+        );
+        return (
+          generation === statusGeneration &&
+          modelIdentity(ctx.model) === modelIdentity(model) &&
+          auth === undefined
+        );
+      } catch (error) {
+        if (isAbortError(error) || isStaleExtensionContextError(error)) throw error;
+        return false;
+      }
+    }
+    if (!outcome.fingerprint) return true;
+    if (!adapter) return false;
+    try {
+      const auth = await awaitWithDeadline(
+        resolveUsageAuth(ctx, adapter),
+        signal,
+        DEFAULT_TIMEOUT_MS,
+        `revalidating ${adapter.displayName} runtime auth`,
+      );
+      return (
+        generation === statusGeneration &&
+        modelIdentity(ctx.model) === modelIdentity(model) &&
+        auth?.fingerprint === outcome.fingerprint
+      );
+    } catch (error) {
+      if (isAbortError(error) || isStaleExtensionContextError(error)) throw error;
+      return false;
+    }
+  };
 
-	const runMenuOperation = async <T>(
-		ctx: ExtensionCommandContext,
-		label: string,
-		parentSignal: AbortSignal,
-		operation: (signal: AbortSignal) => Promise<T>,
-	): Promise<T | undefined> => {
-		const { runTask } = await import("@narumitw/pi-tui-kit");
-		if (parentSignal.aborted) return undefined;
-		const result = await runTask(ctx, {
-			label,
-			signal: parentSignal,
-			onError: () => undefined,
-			task: ({ signal }) => operation(signal),
-		});
-		switch (result.kind) {
-			case "completed":
-				return result.value;
-			case "cancelled":
-			case "stale":
-				return undefined;
-			case "error":
-				throw result.error;
-		}
-	};
+  const queryStableCurrent = async (
+    ctx: ExtensionCommandContext,
+    force: boolean,
+    controller: AbortController,
+    label: string,
+  ): Promise<StableCurrent | undefined> => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const model = ctx.model;
+      const generation = statusGeneration;
+      const result = await runMenuOperation(ctx, label, controller.signal, async (signal) => {
+        const outcome = await queryCurrentState(ctx, model, force, signal);
+        return {
+          outcome,
+          stable: await outcomeStillCurrent(ctx, model, generation, outcome, signal),
+        };
+      });
+      if (!result) return undefined;
+      if (result.stable) return { outcome: result.outcome, model };
+      force = false;
+    }
+    ctx.ui.notify("The active model or account kept changing; reopen /usage to retry.", "warning");
+    return undefined;
+  };
 
-	const outcomeStillCurrent = async (
-		ctx: ExtensionContext,
-		model: PiModel | undefined,
-		generation: number,
-		outcome: QueryOutcome,
-		signal: AbortSignal,
-	): Promise<boolean> => {
-		if (generation !== statusGeneration || modelIdentity(ctx.model) !== modelIdentity(model)) {
-			return false;
-		}
-		const adapter = adapterForProvider(model?.provider);
-		if (outcome.authState === "unavailable") {
-			if (!adapter) return false;
-			try {
-				const auth = await awaitWithDeadline(
-					resolveUsageAuth(ctx, adapter),
-					signal,
-					DEFAULT_TIMEOUT_MS,
-					`revalidating ${adapter.displayName} runtime auth`,
-				);
-				return (
-					generation === statusGeneration &&
-					modelIdentity(ctx.model) === modelIdentity(model) &&
-					auth === undefined
-				);
-			} catch (error) {
-				if (isAbortError(error) || isStaleExtensionContextError(error)) throw error;
-				return false;
-			}
-		}
-		if (!outcome.fingerprint) return true;
-		if (!adapter) return false;
-		try {
-			const auth = await awaitWithDeadline(
-				resolveUsageAuth(ctx, adapter),
-				signal,
-				DEFAULT_TIMEOUT_MS,
-				`revalidating ${adapter.displayName} runtime auth`,
-			);
-			return (
-				generation === statusGeneration &&
-				modelIdentity(ctx.model) === modelIdentity(model) &&
-				auth?.fingerprint === outcome.fingerprint
-			);
-		} catch (error) {
-			if (isAbortError(error) || isStaleExtensionContextError(error)) throw error;
-			return false;
-		}
-	};
+  const publishStableCurrent = (ctx: ExtensionCommandContext, current: StableCurrent) => {
+    if (current.model) publishStatus(ctx, current.outcome, current.model);
+    else safeSetStatus(ctx, undefined);
+  };
 
-	const queryStableCurrent = async (
-		ctx: ExtensionCommandContext,
-		force: boolean,
-		controller: AbortController,
-		label: string,
-	): Promise<StableCurrent | undefined> => {
-		for (let attempt = 0; attempt < 3; attempt += 1) {
-			const model = ctx.model;
-			const generation = statusGeneration;
-			const result = await runMenuOperation(ctx, label, controller.signal, async (signal) => {
-				const outcome = await queryCurrentState(ctx, model, force, signal);
-				return {
-					outcome,
-					stable: await outcomeStillCurrent(ctx, model, generation, outcome, signal),
-				};
-			});
-			if (!result) return undefined;
-			if (result.stable) return { outcome: result.outcome, model };
-			force = false;
-		}
-		ctx.ui.notify("The active model or account kept changing; reopen /usage to retry.", "warning");
-		return undefined;
-	};
+  // eslint-disable-next-line max-lines-per-function -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+  const showMenu = async (ctx: ExtensionCommandContext): Promise<void> => {
+    if (!ctx.hasUI) throw new Error("/usage requires TUI or RPC mode.");
+    statusGeneration += 1;
+    const menuGeneration = statusGeneration;
+    statusController?.abort();
+    statusController = undefined;
+    const controller = new AbortController();
+    activeControllers.add(controller);
+    try {
+      let stableCurrent = await queryStableCurrent(
+        ctx,
+        false,
+        controller,
+        "Checking current usage…",
+      );
+      if (!stableCurrent) return;
+      publishStableCurrent(ctx, stableCurrent);
+      let current = stableCurrent.outcome;
+      let visibleStates: ProviderUsageState[] = [current.state];
+      const { defineMenu, runMenu } = await import("@onurpi/pi-tui-kit");
+      if (controller.signal.aborted || statusGeneration !== menuGeneration) return;
+      type Screen = "main" | "providers";
+      type Action = "refresh" | "another" | "all" | "provider";
+      const menu = defineMenu<undefined, Screen, Action>({
+        start: "main",
+        screens: {
+          main: () => ({
+            kind: "actions",
+            title: "Provider usage",
+            lines: formatProviderStates(visibleStates).split("\n"),
+            items: [
+              { id: "refresh", label: REFRESH_CURRENT, action: "refresh" },
+              { id: "another", label: VIEW_ANOTHER, action: "another" },
+              { id: "all", label: VIEW_ALL, action: "all" },
+              { id: "close", label: CLOSE, close: true },
+            ],
+            hint: "close",
+          }),
+          providers: () => ({
+            kind: "actions",
+            title: "Select a configured provider",
+            items: configuredAdapters(ctx)
+              .filter((adapter) => adapter.id !== ctx.model?.provider)
+              .map((adapter) => ({
+                id: adapter.id,
+                label: adapter.displayName,
+                action: "provider" as const,
+              })),
+            hint: "back",
+          }),
+        },
+        actions: {
+          refresh: async () => {
+            const refreshed = await queryStableCurrent(
+              ctx,
+              true,
+              controller,
+              "Refreshing current usage…",
+            );
+            if (!refreshed) return { kind: "stay" };
+            stableCurrent = refreshed;
+            publishStableCurrent(ctx, refreshed);
+            current = refreshed.outcome;
+            visibleStates = [current.state];
+            return { kind: "stay" };
+          },
+          another: async () => {
+            const others = configuredAdapters(ctx).filter(
+              (adapter) => adapter.id !== ctx.model?.provider,
+            );
+            if (others.length === 0) {
+              ctx.ui.notify("No other supported provider has configured runtime auth.", "info");
+              return { kind: "stay" };
+            }
+            return { kind: "to", screen: "providers" };
+          },
+          provider: async ({ itemId }) => {
+            const adapter = configuredAdapters(ctx).find(
+              (candidate) => candidate.id === itemId && candidate.id !== ctx.model?.provider,
+            );
+            if (!adapter) return { kind: "back" };
+            const outcome = await runMenuOperation(
+              ctx,
+              `Checking ${adapter.displayName} usage…`,
+              controller.signal,
+              (signal) => queryAdapterState(ctx, adapter, "configured", false, signal),
+            );
+            if (!outcome) return { kind: "back" };
+            const revalidated = await queryStableCurrent(
+              ctx,
+              false,
+              controller,
+              "Revalidating current usage…",
+            );
+            if (!revalidated) return { kind: "back" };
+            stableCurrent = revalidated;
+            current = revalidated.outcome;
+            visibleStates = [
+              outcome.state.providerId === current.state.providerId
+                ? current.state
+                : { ...outcome.state, displayState: "configured" },
+            ];
+            return { kind: "back" };
+          },
+          all: async () => {
+            const adapters = configuredAdapters(ctx);
+            const currentProviderId = ctx.model?.provider;
+            const settled = await runMenuOperation(
+              ctx,
+              "Checking configured provider usage…",
+              controller.signal,
+              (signal) =>
+                runWithConcurrency(
+                  adapters,
+                  ALL_PROVIDER_CONCURRENCY,
+                  (adapter, _index, workerSignal) =>
+                    queryAdapterState(
+                      ctx,
+                      adapter,
+                      adapter.id === currentProviderId ? "current" : "configured",
+                      true,
+                      workerSignal,
+                    ),
+                  signal,
+                ),
+            );
+            if (!settled) return { kind: "stay" };
+            const queriedStates: ProviderUsageState[] = settled.map((result, index) => {
+              if (result.status === "fulfilled") {
+                return { ...result.value.state, displayState: "configured" };
+              }
+              const adapter = adapters[index]!;
+              return {
+                providerId: adapter.id,
+                providerName: adapter.displayName,
+                displayState: "configured",
+                status: "query-failed",
+                message: errorMessage(result.reason),
+              };
+            });
+            const revalidated = await queryStableCurrent(
+              ctx,
+              false,
+              controller,
+              "Revalidating current usage…",
+            );
+            if (!revalidated) return { kind: "stay" };
+            stableCurrent = revalidated;
+            current = revalidated.outcome;
+            visibleStates = [
+              current.state,
+              ...queriedStates.filter((state) => state.providerId !== current.state.providerId),
+            ];
+            return { kind: "stay" };
+          },
+        },
+      });
+      await runMenu(ctx, menu, {
+        getState: () => undefined,
+        signal: controller.signal,
+        isCurrent: () => statusGeneration === menuGeneration && !controller.signal.aborted,
+      });
+    } finally {
+      controller.abort(new DOMException("Usage menu closed", "AbortError"));
+      activeControllers.delete(controller);
+    }
+  };
 
-	const publishStableCurrent = (ctx: ExtensionCommandContext, current: StableCurrent) => {
-		if (current.model) publishStatus(ctx, current.outcome, current.model, sessionActive);
-		else safeSetStatus(ctx, undefined);
-	};
+  const commandHandler = async (args: string, ctx: ExtensionCommandContext) => {
+    if (args.trim()) {
+      ctx.ui.notify("/usage does not accept arguments; choose an action from its menu.", "warning");
+      return;
+    }
+    try {
+      await showMenu(ctx);
+    } catch (error) {
+      if (isStaleExtensionContextError(error) || isAbortError(error)) return;
+      throw error;
+    }
+  };
 
-	const showMenu = async (ctx: ExtensionCommandContext): Promise<void> => {
-		if (!ctx.hasUI) throw new Error("/usage requires TUI or RPC mode.");
-		statusGeneration += 1;
-		const menuGeneration = statusGeneration;
-		statusController?.abort();
-		statusController = undefined;
-		clearStatusTimer();
-		const controller = new AbortController();
-		activeControllers.add(controller);
-		try {
-			let stableCurrent = await queryStableCurrent(
-				ctx,
-				false,
-				controller,
-				"Checking current usage…",
-			);
-			if (!stableCurrent) return;
-			publishStableCurrent(ctx, stableCurrent);
-			let current = stableCurrent.outcome;
-			let visibleStates: ProviderUsageState[] = [current.state];
-			const { defineMenu, runMenu } = await import("@narumitw/pi-tui-kit");
-			if (controller.signal.aborted || statusGeneration !== menuGeneration) return;
-			type Screen = "main" | "providers";
-			type Action = "refresh" | "another" | "all" | "provider";
-			const menu = defineMenu<undefined, Screen, Action, ExtensionCommandContext>({
-				start: "main",
-				screens: {
-					main: () => ({
-						kind: "actions",
-						title: "Provider usage",
-						lines: formatProviderStates(visibleStates).split("\n"),
-						items: [
-							{ id: "refresh", label: REFRESH_CURRENT, action: "refresh" },
-							{ id: "another", label: VIEW_ANOTHER, action: "another" },
-							{ id: "all", label: VIEW_ALL, action: "all" },
-							{ id: "close", label: CLOSE, close: true },
-						],
-						hint: "close",
-					}),
-					providers: () => ({
-						kind: "actions",
-						title: "Select a configured provider",
-						items: configuredAdapters(ctx)
-							.filter((adapter) => adapter.id !== ctx.model?.provider)
-							.map((adapter) => ({
-								id: adapter.id,
-								label: adapter.displayName,
-								action: "provider" as const,
-							})),
-						hint: "back",
-					}),
-				},
-				actions: {
-					refresh: async () => {
-						const refreshed = await queryStableCurrent(
-							ctx,
-							true,
-							controller,
-							"Refreshing current usage…",
-						);
-						if (!refreshed) return { kind: "stay" };
-						stableCurrent = refreshed;
-						publishStableCurrent(ctx, refreshed);
-						current = refreshed.outcome;
-						visibleStates = [current.state];
-						return { kind: "stay" };
-					},
-					another: async () => {
-						const others = configuredAdapters(ctx).filter(
-							(adapter) => adapter.id !== ctx.model?.provider,
-						);
-						if (others.length === 0) {
-							ctx.ui.notify("No other supported provider has configured runtime auth.", "info");
-							return { kind: "stay" };
-						}
-						return { kind: "to", screen: "providers" };
-					},
-					provider: async ({ itemId }) => {
-						const adapter = configuredAdapters(ctx).find(
-							(candidate) => candidate.id === itemId && candidate.id !== ctx.model?.provider,
-						);
-						if (!adapter) return { kind: "back" };
-						const outcome = await runMenuOperation(
-							ctx,
-							`Checking ${adapter.displayName} usage…`,
-							controller.signal,
-							(signal) => queryAdapterState(ctx, adapter, "configured", false, signal),
-						);
-						if (!outcome) return { kind: "back" };
-						const revalidated = await queryStableCurrent(
-							ctx,
-							false,
-							controller,
-							"Revalidating current usage…",
-						);
-						if (!revalidated) return { kind: "back" };
-						stableCurrent = revalidated;
-						current = revalidated.outcome;
-						visibleStates = [
-							outcome.state.providerId === current.state.providerId
-								? current.state
-								: { ...outcome.state, displayState: "configured" },
-						];
-						return { kind: "back" };
-					},
-					all: async () => {
-						const adapters = configuredAdapters(ctx);
-						const currentProviderId = ctx.model?.provider;
-						const settled = await runMenuOperation(
-							ctx,
-							"Checking configured provider usage…",
-							controller.signal,
-							(signal) =>
-								runWithConcurrency(
-									adapters,
-									ALL_PROVIDER_CONCURRENCY,
-									(adapter, _index, workerSignal) =>
-										queryAdapterState(
-											ctx,
-											adapter,
-											adapter.id === currentProviderId ? "current" : "configured",
-											true,
-											workerSignal,
-										),
-									signal,
-								),
-						);
-						if (!settled) return { kind: "stay" };
-						const queriedStates: ProviderUsageState[] = settled.map((result, index) => {
-							if (result.status === "fulfilled") {
-								return { ...result.value.state, displayState: "configured" };
-							}
-							const adapter = adapters[index] as UsageProviderAdapter;
-							return {
-								providerId: adapter.id,
-								providerName: adapter.displayName,
-								displayState: "configured",
-								status: "query-failed",
-								message: errorMessage(result.reason),
-							};
-						});
-						const revalidated = await queryStableCurrent(
-							ctx,
-							false,
-							controller,
-							"Revalidating current usage…",
-						);
-						if (!revalidated) return { kind: "stay" };
-						stableCurrent = revalidated;
-						current = revalidated.outcome;
-						visibleStates = [
-							current.state,
-							...queriedStates.filter((state) => state.providerId !== current.state.providerId),
-						];
-						return { kind: "stay" };
-					},
-				},
-			});
-			await runMenu(ctx, menu, {
-				getState: () => undefined,
-				signal: controller.signal,
-				isCurrent: () => statusGeneration === menuGeneration && !controller.signal.aborted,
-			});
-		} finally {
-			controller.abort(new DOMException("Usage menu closed", "AbortError"));
-			activeControllers.delete(controller);
-		}
-	};
+  pi.registerCommand("usage", {
+    description: "Show usage for the current runtime account",
+    handler: commandHandler,
+  });
 
-	const commandHandler = async (args: string, ctx: ExtensionCommandContext) => {
-		if (args.trim()) {
-			ctx.ui.notify("/usage does not accept arguments; choose an action from its menu.", "warning");
-			return;
-		}
-		try {
-			await showMenu(ctx);
-		} catch (error) {
-			if (isStaleExtensionContextError(error) || isAbortError(error)) return;
-			throw error;
-		}
-	};
-
-	pi.registerCommand("usage", {
-		description: "Show usage for the current runtime account",
-		handler: commandHandler,
-	});
-
-	pi.on("session_start", (_event, ctx) => {
-		sessionActive = true;
-		startStatusRefresh(ctx, ctx.model, false);
-	});
-	pi.on("session_tree", (_event, ctx) => {
-		startStatusRefresh(ctx, ctx.model, false);
-	});
-	pi.on("model_select", (event, ctx) => {
-		startStatusRefresh(ctx, event.model, false);
-	});
-	pi.on("turn_start", (_event, ctx) => {
-		startStatusRefresh(ctx, ctx.model, false);
-	});
-	pi.on("session_shutdown", (_event, ctx) => {
-		sessionActive = false;
-		statusGeneration += 1;
-		clearStatusTimer();
-		for (const controller of activeControllers) controller.abort();
-		activeControllers.clear();
-		statusController = undefined;
-		cache.clear();
-		failureBackoff.clear();
-		latestQueries.clear();
-		activeCurrentIdentity = undefined;
-		safeSetStatus(ctx, undefined);
-	});
+  pi.on("session_start", (_event, ctx) => {
+    sessionActive = true;
+    startStatusRefresh(ctx, ctx.model, false);
+  });
+  pi.on("session_tree", (_event, ctx) => {
+    startStatusRefresh(ctx, ctx.model, false);
+  });
+  pi.on("model_select", (event, ctx) => {
+    startStatusRefresh(ctx, event.model, false);
+  });
+  pi.on("turn_start", (_event, ctx) => {
+    startStatusRefresh(ctx, ctx.model, false);
+  });
+  pi.on("session_shutdown", (_event, ctx) => {
+    sessionActive = false;
+    statusGeneration += 1;
+    for (const controller of activeControllers) controller.abort();
+    activeControllers.clear();
+    statusController = undefined;
+    cache.clear();
+    failureBackoff.clear();
+    latestQueries.clear();
+    activeCurrentIdentity = undefined;
+    safeSetStatus(ctx, undefined);
+  });
 }
 
 function configuredAdapters(ctx: ExtensionContext): UsageProviderAdapter[] {
-	return SUPPORTED_ADAPTERS.filter(
-		(adapter) => adapter.id === ctx.model?.provider || providerIsConfigured(ctx, adapter.id),
-	);
+  return SUPPORTED_ADAPTERS.filter(
+    (adapter) => adapter.id === ctx.model?.provider || providerIsConfigured(ctx, adapter.id),
+  );
 }
 
 function providerDisplayName(ctx: ExtensionContext, providerId: string): string {
-	try {
-		return sanitizeDisplayText(ctx.modelRegistry.getProviderDisplayName(providerId), 80);
-	} catch {
-		return sanitizeDisplayText(providerId, 80);
-	}
+  try {
+    return sanitizeDisplayText(ctx.modelRegistry.getProviderDisplayName(providerId), 80);
+  } catch {
+    return sanitizeDisplayText(providerId, 80);
+  }
 }
 
 function setBoundedMap<T>(map: Map<string, T>, key: string, value: T, limit: number): void {
-	map.delete(key);
-	while (map.size >= limit) {
-		const oldest = map.keys().next().value;
-		if (oldest === undefined) break;
-		map.delete(oldest);
-	}
-	map.set(key, value);
+  map.delete(key);
+  while (map.size >= limit) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+  map.set(key, value);
 }
 
 function modelIdentity(model: PiModel | undefined): string | undefined {
-	return model ? `${model.provider}/${model.id}` : undefined;
+  return model ? `${model.provider}/${model.id}` : undefined;
 }
 
 function isAbortError(error: unknown): boolean {
-	return error instanceof Error && error.name === "AbortError";
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function isTimeoutError(error: unknown): boolean {
-	return error instanceof Error && error.name === "TimeoutError";
+  return error instanceof Error && error.name === "TimeoutError";
 }

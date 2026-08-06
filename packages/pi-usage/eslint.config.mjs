@@ -6,13 +6,9 @@ export default tseslint.config(
     ignores: [
       ".stryker-tmp/**",
       "coverage/**",
-      "dist/**",
-      "**/dist/**",
-      "node_modules/**",
       "eslint.config.mjs",
-      "packages/**/eslint.config.mjs",
-      "packages/**/stryker.config.mjs",
       "stryker.config.mjs",
+      "vitest.config.ts",
     ],
   },
   js.configs.recommended,
@@ -21,9 +17,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["packages/regrafter-driver/skills/regrafter/scripts/regrafter.mjs"],
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -43,13 +37,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/turn-fold/render-patches.ts"],
-    rules: {
-      "@typescript-eslint/unbound-method": "off",
-    },
-  },
-  {
-    files: ["packages/unified-exec/**/*.ts"],
+    // Vendored upstream sources keep their audited style; strictness relaxations mirror the
+    // unified-exec vendoring so future regraft updates stay mechanical.
+    files: ["src/**/*.ts", "test/**/*.ts"],
     rules: {
       "@typescript-eslint/array-type": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
@@ -70,43 +60,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/unified-exec/tests/**/*.test.ts"],
-    rules: {
-      "max-lines-per-function": "off",
-    },
-  },
-  {
-    files: ["packages/**/*.test.ts"],
-    ignores: ["packages/unified-exec/tests/**/*.test.ts"],
-    rules: {
-      "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],
-    },
-  },
-  {
-    // Vendored upstream sources keep their audited style; relaxations mirror unified-exec.
-    files: ["packages/pi-tui-kit/**/*.ts", "packages/pi-usage/**/*.ts"],
-    rules: {
-      "@typescript-eslint/array-type": "off",
-      "@typescript-eslint/consistent-type-definitions": "off",
-      "@typescript-eslint/no-confusing-void-expression": "off",
-      "@typescript-eslint/no-empty-function": "off",
-      "@typescript-eslint/no-misused-spread": "off",
-      "@typescript-eslint/no-non-null-assertion": "off",
-      "@typescript-eslint/no-unnecessary-boolean-literal-compare": "off",
-      "@typescript-eslint/no-unnecessary-condition": "off",
-      "@typescript-eslint/no-unnecessary-type-assertion": "off",
-      "@typescript-eslint/prefer-nullish-coalescing": "off",
-      "@typescript-eslint/prefer-optional-chain": "off",
-      "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/restrict-template-expressions": "off",
-      "@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
-      "no-control-regex": "off",
-      "prefer-const": "off",
-    },
-  },
-  {
-    // Ported upstream tests, fixtures, and mock harnesses stay close to the originals.
-    files: ["packages/pi-tui-kit/test/**/*.ts", "packages/pi-usage/test/**/*.ts"],
+    // Ported upstream tests, fixtures, and the shared mock harness; keep them close to upstream.
+    files: ["test/**/*.ts"],
     rules: {
       "@typescript-eslint/no-base-to-string": "off",
       "@typescript-eslint/no-unused-expressions": "off",

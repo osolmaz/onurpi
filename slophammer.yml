@@ -11,6 +11,16 @@ typescript:
       - "**/*.test.ts"
       - pattern: "**/eslint.config.mjs"
         reason: Independent packages keep self-contained lint configuration for standalone checks.
+      - pattern: "**/test/support.ts"
+        reason:
+          Ported pi-extensions monorepo test harness; each vendored package keeps an independent
+          copy.
+      - pattern: "packages/pi-tui-kit/test/**"
+        reason:
+          Ported upstream test fixtures kept close to the node:test originals for regraft fidelity.
+      - pattern: "packages/pi-usage/test/**"
+        reason:
+          Ported upstream test fixtures kept close to the node:test originals for regraft fidelity.
     copied_blocks:
       enabled: true
       min_tokens: 100
@@ -48,6 +58,12 @@ typescript:
       - packages/codex-usage/src/codex-usage.ts
       - packages/codex-usage/src/format.ts
       - packages/codex-usage/src/normalize.ts
+      - packages/pi-usage/src/core.ts
+      - packages/pi-usage/src/format.ts
+      - packages/pi-usage/src/query.ts
+      - packages/pi-tui-kit/src/interaction.ts
+      - packages/pi-tui-kit/src/model.ts
+      - packages/pi-tui-kit/src/navigator.ts
       - packages/plan-checklist/plan-context.ts
       - packages/plan-checklist/plan-render.ts
       - packages/plan-checklist/plan-replay.ts
@@ -84,6 +100,13 @@ typescript:
     - from: packages/codex-usage
       allow:
         - packages/codex-usage
+    - from: packages/pi-usage
+      allow:
+        - packages/pi-usage
+        - packages/pi-tui-kit
+    - from: packages/pi-tui-kit
+      allow:
+        - packages/pi-tui-kit
     - from: packages/plan-checklist
       allow:
         - packages/plan-checklist
