@@ -17,7 +17,6 @@ configuration.
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                 |
-| [`@onurpi/codex-usage`](packages/codex-usage/)                     | Codex reports and model-gated weekly usage                       |
 | [`@onurpi/pi-usage`](packages/pi-usage/)                           | Multi-provider usage reports and model-gated usage status        |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake |

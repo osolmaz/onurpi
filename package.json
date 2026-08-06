@@ -20,7 +20,6 @@
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
       "./packages/infinite-retry/index.ts",
-      "./packages/codex-usage/index.ts",
       "./packages/pi-usage/index.ts",
       "./packages/plan-checklist/index.ts",
       "./packages/unified-exec/index.ts",
