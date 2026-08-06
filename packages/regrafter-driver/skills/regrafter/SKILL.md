@@ -11,6 +11,20 @@ description:
 Use this skill only when the user explicitly asks to use Regrafter or when a vendored-code
 maintenance request should be delegated to the installed dedicated app.
 
+## Model configuration
+
+Regrafter runs with the ambient Pi profile when a model is configured — the host profile's
+providers, models, and credentials are read in place and never copied. Configure once before the
+first run:
+
+```bash
+node <driver> config set model huggingface/moonshotai/Kimi-K3:fireworks-ai
+node <driver> config show
+```
+
+The config lives at `~/.config/regrafter/config.json`. `config reset` returns to the bundled local
+endpoint default (`http://127.0.0.1:1234/v1`), which requires a running local model server.
+
 ## Start
 
 1. Resolve `scripts/regrafter.mjs` relative to this `SKILL.md` and keep its absolute path as
