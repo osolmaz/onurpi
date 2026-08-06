@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@onurpi/unified-exec": "0.1.0",
-    "pi-must-win": "0.4.0"
+    "pi-must-win": "0.5.0"
   },
   "pi": {
     "extensions": [
