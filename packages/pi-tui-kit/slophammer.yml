@@ -1,0 +1,24 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - .
+    exclude:
+      - "**/*.test.ts"
+      - pattern: "test/**"
+        reason: Ported upstream test fixtures and harness kept verbatim for regraft fidelity.
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  mutation:
+    targets:
+      - src/model.ts
+      - src/navigator.ts
+      - src/interaction.ts
+  dependency_boundaries:
+    - from: .
+      allow: []

@@ -1,14 +1,14 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as production from "../src/index.js";
 import {
-	createRpcHarness,
-	createTuiHarness,
-	type RpcDialogRecord,
-	type RpcHarness,
-	type RpcHarnessStep,
-	type TuiHarness,
-	type TuiHarnessKey,
-	type TuiHarnessOptions,
+  createRpcHarness,
+  createTuiHarness,
+  type RpcDialogRecord,
+  type RpcHarness,
+  type RpcHarnessStep,
+  type TuiHarness,
+  type TuiHarnessKey,
+  type TuiHarnessOptions,
 } from "../src/testing/index.js";
 
 const tuiOptions: TuiHarnessOptions = { width: 80, rows: 24 };
@@ -19,8 +19,8 @@ void custom;
 void key;
 
 const steps: readonly RpcHarnessStep[] = [
-	{ kind: "input", title: "Value", response: "12" },
-	{ kind: "select", title: "Apply?", options: ["Apply", "Back"], response: "Apply" },
+  { kind: "input", title: "Value", response: "12" },
+  { kind: "select", title: "Apply?", options: ["Apply", "Back"], response: "Apply" },
 ];
 const rpc: RpcHarness = createRpcHarness(steps);
 const rpcUi: Pick<ExtensionContext["ui"], "input" | "select" | "custom"> = rpc.ui;
@@ -35,6 +35,8 @@ production.createRpcHarness;
 // @ts-expect-error The TUI harness never exposes its raw component.
 tui.component;
 // @ts-expect-error Dialog observations are immutable.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Intentional @ts-expect-error contract fixture; the call is deliberately unresolvable.
 rpc.dialogs.push({ kind: "input", title: "bad", signalWasAborted: false });
 // @ts-expect-error Script observations cannot be mutated through their readonly choice list.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Intentional @ts-expect-error contract fixture; the call is deliberately unresolvable.
 rpc.dialogs[0]?.options?.push("bad");
