@@ -62,7 +62,7 @@ const externalPackages = [
   {
     directory: "regrafter-driver",
     dependency: "pi-regraft",
-    source: "0.4.0",
+    source: "0.5.0",
   },
   {
     directory: "workflows",
@@ -173,8 +173,15 @@ describe("OnurPi package loading", () => {
     const pi = resourceManifest();
     expect(pi["extensions"]).toContain("./packages/regrafter-driver/index.ts");
     expect(pi["skills"]).toContain("./packages/regrafter-driver/skills");
-    expect(
-      existsSync(join(root, "packages", "regrafter-driver", "node_modules", ".bin", "regrafter")),
-    ).toBe(true);
+    const nestedBin = join(
+      root,
+      "packages",
+      "regrafter-driver",
+      "node_modules",
+      ".bin",
+      "regrafter",
+    );
+    const hoistedBin = join(root, "node_modules", ".bin", "regrafter");
+    expect(existsSync(nestedBin) || existsSync(hoistedBin)).toBe(true);
   });
 });
