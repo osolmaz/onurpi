@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # pi-coding-agent requires Node >= 22.19.0 (its bundled undici 8
+        # uses worker_threads.markAsUncloneable, absent on Node 20).
+        node: ["22", "24"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Windows only: run the PTY e2e file directly (not via --test) so
+      # per-test output streams live instead of being buffered until file
+      # completion — if a ConPTY hang recurs, the log shows exactly which
+      # test. Linux/macOS never exhibited the hang; they run the file once
+      # via the glob below.
+      - name: Test (PTY e2e, direct)
+        if: runner.os == 'Windows'
+        # pty-load first: the e2e file skips itself when PTY is unavailable,
+        # so without the load assertion this diagnostic could "pass" by
+        # skipping everything.
+        run: npx tsx tests/pty-load.test.ts && npx tsx tests/e2e-pty.test.ts
+        timeout-minutes: 5
+        env:
+          EXPECT_PTY: "1"
+
+      - name: Test
+        run: npm test
+        timeout-minutes: 10
+        env:
+          # All matrix platforms have node-pty prebuilds; a load failure
+          # must be a red build, not a silent skip of the PTY suite.
+          EXPECT_PTY: "1"

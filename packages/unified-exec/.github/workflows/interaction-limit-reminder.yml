@@ -1,0 +1,60 @@
+# Reminder: repo interaction limits (collaborators_only) expire after at
+# most 6 months — GitHub has no permanent setting for public repos.
+#
+# This workflow FAILS (turning the badge/checks red and emailing the owner)
+# starting 7 days before the expiry date below, until the limit is
+# re-applied and EXPIRES_AT is updated.
+#
+# To extend, run:
+#
+#   gh api -X PUT repos/iamwrm/pi-unified-exec/interaction-limits \
+#     -f limit=collaborators_only -f expiry=six_months
+#
+# then copy the "expires_at" from the response into EXPIRES_AT below.
+#
+# Note: the default GITHUB_TOKEN cannot read the interaction-limits API
+# (requires repo administration permission), hence the hardcoded date.
+# Also: GitHub disables scheduled workflows after 60 days of repo
+# inactivity; the failure emails themselves keep it alive once it starts
+# failing, but re-enable it manually if GitHub pauses it.
+
+name: Interaction limit reminder
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # every Monday 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check-expiry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if interaction limit is expired or expiring soon
+        env:
+          # Keep in sync with the actual limit (see header comment).
+          EXPIRES_AT: "2027-01-22T13:28:30Z"
+          WARN_DAYS: "7"
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          exp=$(date -u -d "$EXPIRES_AT" +%s)
+          warn=$(( exp - WARN_DAYS * 86400 ))
+          remaining_days=$(( (exp - now) / 86400 ))
+
+          if [ "$now" -ge "$exp" ]; then
+            echo "::error::Interaction limit EXPIRED on $EXPIRES_AT. Outsiders can open PRs again!"
+          elif [ "$now" -ge "$warn" ]; then
+            echo "::error::Interaction limit expires in ~$remaining_days day(s) ($EXPIRES_AT)."
+          else
+            echo "OK: interaction limit valid until $EXPIRES_AT (~$remaining_days days left)."
+            exit 0
+          fi
+
+          echo ""
+          echo "To extend, run:"
+          echo "  gh api -X PUT repos/iamwrm/pi-unified-exec/interaction-limits \\"
+          echo "    -f limit=collaborators_only -f expiry=six_months"
+          echo "then update EXPIRES_AT in .github/workflows/interaction-limit-reminder.yml"
+          exit 1

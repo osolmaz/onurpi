@@ -12,53 +12,53 @@
  */
 
 import { strict as assert } from "node:assert";
-import { describe, it } from "vitest";
+import { describe, it } from "node:test";
 import { disposeWindowsConpty, getPtyLoadError, isPtyAvailable } from "../src/pty.ts";
 
 describe("PTY module loading", () => {
-  it("loads when EXPECT_PTY=1", { skip: process.env["EXPECT_PTY"] !== "1" }, () => {
-    assert.equal(isPtyAvailable(), true, `PTY module failed to load: ${getPtyLoadError()}`);
-  });
+	it("loads when EXPECT_PTY=1", { skip: process.env.EXPECT_PTY !== "1" }, () => {
+		assert.equal(isPtyAvailable(), true, `PTY module failed to load: ${getPtyLoadError()}`);
+	});
 
-  it("reports a load error message when unavailable", () => {
-    if (isPtyAvailable()) {
-      assert.equal(getPtyLoadError(), undefined);
-    } else {
-      assert.match(getPtyLoadError() ?? "", /node-pty-prebuilt-multiarch/);
-    }
-  });
+	it("reports a load error message when unavailable", () => {
+		if (isPtyAvailable()) {
+			assert.equal(getPtyLoadError(), undefined);
+		} else {
+			assert.match(getPtyLoadError() ?? "", /node-pty-prebuilt-multiarch/);
+		}
+	});
 });
 
 describe("disposeWindowsConpty", () => {
-  it("destroys both sockets and disposes the conout worker", () => {
-    const calls: string[] = [];
-    const child = {
-      _agent: {
-        _inSocket: { destroy: () => calls.push("in") },
-        _outSocket: { destroy: () => calls.push("out") },
-        _conoutSocketWorker: { dispose: () => calls.push("worker") },
-      },
-    };
-    disposeWindowsConpty(child);
-    assert.deepEqual(calls.sort(), ["in", "out", "worker"]);
-  });
+	it("destroys both sockets and disposes the conout worker", () => {
+		const calls: string[] = [];
+		const child = {
+			_agent: {
+				_inSocket: { destroy: () => calls.push("in") },
+				_outSocket: { destroy: () => calls.push("out") },
+				_conoutSocketWorker: { dispose: () => calls.push("worker") },
+			},
+		};
+		disposeWindowsConpty(child);
+		assert.deepEqual(calls.sort(), ["in", "out", "worker"]);
+	});
 
-  it("tolerates missing agent or fields (undocumented internals may change)", () => {
-    disposeWindowsConpty(undefined);
-    disposeWindowsConpty({});
-    disposeWindowsConpty({ _agent: {} });
-    disposeWindowsConpty({ _agent: { _inSocket: {}, _outSocket: null } });
-  });
+	it("tolerates missing agent or fields (undocumented internals may change)", () => {
+		disposeWindowsConpty(undefined);
+		disposeWindowsConpty({});
+		disposeWindowsConpty({ _agent: {} });
+		disposeWindowsConpty({ _agent: { _inSocket: {}, _outSocket: null } });
+	});
 
-  it("swallows exceptions from the internals", () => {
-    disposeWindowsConpty({
-      _agent: {
-        _inSocket: {
-          destroy: () => {
-            throw new Error("boom");
-          },
-        },
-      },
-    });
-  });
+	it("swallows exceptions from the internals", () => {
+		disposeWindowsConpty({
+			_agent: {
+				_inSocket: {
+					destroy: () => {
+						throw new Error("boom");
+					},
+				},
+			},
+		});
+	});
 });

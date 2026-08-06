@@ -23,7 +23,9 @@
         "subdir": ".pi/extensions/pi-goal"
       },
       "commit": "3f100be5434454d3388755a119d01caca9127c16",
-      "notes": ["Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."]
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."
+      ]
     },
     {
       "name": "nyan-mode",
@@ -46,7 +48,7 @@
         "ref": "main",
         "subdir": "."
       },
-      "commit": "3cad4a93f430b16bb4fb59cdf4a42cc005a933e7",
+      "commit": "7c8c1d809ef80d25fb60b5129248b2077b2422e9",
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/unified-exec/UPSTREAM.md."
       ]

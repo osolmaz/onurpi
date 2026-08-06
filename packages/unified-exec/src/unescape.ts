@@ -33,18 +33,18 @@
  */
 
 const SIMPLE_ESCAPES: Record<string, string> = {
-  "\\": "\\",
-  '"': '"',
-  "'": "'",
-  n: "\n",
-  r: "\r",
-  t: "\t",
-  b: "\b",
-  f: "\f",
-  v: "\v",
-  "0": "\0",
-  a: "\x07",
-  e: "\x1b",
+	"\\": "\\",
+	'"': '"',
+	"'": "'",
+	n: "\n",
+	r: "\r",
+	t: "\t",
+	b: "\b",
+	f: "\f",
+	v: "\v",
+	"0": "\0",
+	a: "\x07",
+	e: "\x1b",
 };
 
 /**
@@ -53,94 +53,93 @@ const SIMPLE_ESCAPES: Record<string, string> = {
  * Raw characters (including real LF / ESC / UTF-8) pass through untouched.
  * UTF-8 encoding of the result is the caller's responsibility.
  */
-// eslint-disable-next-line complexity -- Preserve the upstream single-pass C-style escape decoder.
 export function unescapeChars(input: string): string {
-  if (!input.includes("\\")) return input; // fast path
-  let out = "";
-  let i = 0;
-  const len = input.length;
-  while (i < len) {
-    const ch = input.charAt(i);
-    if (ch !== "\\") {
-      out += ch;
-      i++;
-      continue;
-    }
-    // `\` at end of string — preserve literally.
-    if (i + 1 >= len) {
-      out += "\\";
-      break;
-    }
-    const next = input.charAt(i + 1);
+	if (!input.includes("\\")) return input; // fast path
+	let out = "";
+	let i = 0;
+	const len = input.length;
+	while (i < len) {
+		const ch = input[i]!;
+		if (ch !== "\\") {
+			out += ch;
+			i++;
+			continue;
+		}
+		// `\` at end of string — preserve literally.
+		if (i + 1 >= len) {
+			out += "\\";
+			break;
+		}
+		const next = input[i + 1]!;
 
-    // \xHH — exactly 2 hex digits.
-    if (next === "x") {
-      const hex = input.slice(i + 2, i + 4);
-      if (hex.length === 2 && isHex(hex)) {
-        out += String.fromCharCode(parseInt(hex, 16));
-        i += 4;
-        continue;
-      }
-      // Short or non-hex — preserve both chars literally, then advance
-      // by 1 so the following char gets re-scanned.
-      out += "\\x";
-      i += 2;
-      continue;
-    }
+		// \xHH — exactly 2 hex digits.
+		if (next === "x") {
+			const hex = input.slice(i + 2, i + 4);
+			if (hex.length === 2 && isHex(hex)) {
+				out += String.fromCharCode(parseInt(hex, 16));
+				i += 4;
+				continue;
+			}
+			// Short or non-hex — preserve both chars literally, then advance
+			// by 1 so the following char gets re-scanned.
+			out += "\\x";
+			i += 2;
+			continue;
+		}
 
-    // \u{H…H} — 1..6 hex digits
-    if (next === "u" && input[i + 2] === "{") {
-      const close = input.indexOf("}", i + 3);
-      if (close > i + 2 && close - (i + 3) >= 1 && close - (i + 3) <= 6) {
-        const hex = input.slice(i + 3, close);
-        if (isHex(hex)) {
-          const cp = parseInt(hex, 16);
-          if (cp <= 0x10ffff) {
-            out += String.fromCodePoint(cp);
-            i = close + 1;
-            continue;
-          }
-        }
-      }
-      out += "\\u";
-      i += 2;
-      continue;
-    }
+		// \u{H…H} — 1..6 hex digits
+		if (next === "u" && input[i + 2] === "{") {
+			const close = input.indexOf("}", i + 3);
+			if (close > i + 2 && close - (i + 3) >= 1 && close - (i + 3) <= 6) {
+				const hex = input.slice(i + 3, close);
+				if (isHex(hex)) {
+					const cp = parseInt(hex, 16);
+					if (cp <= 0x10ffff) {
+						out += String.fromCodePoint(cp);
+						i = close + 1;
+						continue;
+					}
+				}
+			}
+			out += "\\u";
+			i += 2;
+			continue;
+		}
 
-    // \uHHHH — exactly 4 hex digits.
-    if (next === "u") {
-      const hex = input.slice(i + 2, i + 6);
-      if (hex.length === 4 && isHex(hex)) {
-        out += String.fromCharCode(parseInt(hex, 16));
-        i += 6;
-        continue;
-      }
-      out += "\\u";
-      i += 2;
-      continue;
-    }
+		// \uHHHH — exactly 4 hex digits.
+		if (next === "u") {
+			const hex = input.slice(i + 2, i + 6);
+			if (hex.length === 4 && isHex(hex)) {
+				out += String.fromCharCode(parseInt(hex, 16));
+				i += 6;
+				continue;
+			}
+			out += "\\u";
+			i += 2;
+			continue;
+		}
 
-    // Simple one-char escape.
-    const mapped = SIMPLE_ESCAPES[next];
-    if (mapped !== undefined) {
-      out += mapped;
-      i += 2;
-      continue;
-    }
+		// Simple one-char escape.
+		const mapped = SIMPLE_ESCAPES[next];
+		if (mapped !== undefined) {
+			out += mapped;
+			i += 2;
+			continue;
+		}
 
-    // Unknown escape — preserve literally.
-    out += "\\" + next;
-    i += 2;
-  }
-  return out;
+		// Unknown escape — preserve literally.
+		out += "\\" + next;
+		i += 2;
+	}
+	return out;
 }
 
 function isHex(s: string): boolean {
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (!((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x46) || (c >= 0x61 && c <= 0x66))) {
-      return false;
-    }
-  }
-  return true;
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i);
+		if (!((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x46) || (c >= 0x61 && c <= 0x66))) {
+			return false;
+		}
+	}
+	return true;
 }
