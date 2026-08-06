@@ -57,7 +57,7 @@ const externalPackages = [
   {
     directory: "pi-must-win",
     dependency: "pi-must-win",
-    source: "0.4.0",
+    source: "0.5.0",
   },
   {
     directory: "regrafter-driver",

@@ -74,6 +74,30 @@ describe("repository disable gate", () => {
     expect(eventsOn).not.toHaveBeenCalled();
   });
 
+  it("carries the hook-time matcher environment into child processes", () => {
+    const { pi, emitEnvironment } = createMockPi();
+    const configPath = tempConfig('{"disabledRepos": ["github.com/openclaw"]}');
+    onurPiMustWin(pi, {
+      configPath,
+      identity: { urlKey: undefined, repoPath: undefined },
+    });
+    const event = {
+      command: "git status",
+      cwd: "/repo",
+      shell: "bash",
+      model: { id: "model-id", name: "Model Name", provider: "provider" },
+      environment: {},
+      reject: vi.fn(),
+    };
+    emitEnvironment(event);
+    expect(event.environment).toMatchObject({
+      PI_MUST_WIN_DISABLED_URLS: '["github.com/openclaw"]',
+      PI_MUST_WIN_DISABLED_PATHS: "[]",
+      PI_MUST_WIN_NODE: process.execPath,
+      PI_MUST_WIN_CHECK: expect.stringMatching(/check-disabled\.mjs$/u) as string,
+    });
+  });
+
   it("resolves identity from an explicit cwd and stays enabled outside Git", () => {
     const { pi, handlers } = createMockPi();
     const configPath = tempConfig('{"disabledRepos": ["github.com/otherorg"]}');
