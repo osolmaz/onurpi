@@ -3,8 +3,8 @@
 | Item          | Reviewed value                                                  |
 | ------------- | --------------------------------------------------------------- |
 | Repository    | https://github.com/osolmaz/yarp                                 |
-| Commit        | `d56d07093b8adecda94c409412ec0bfc369d636f`                      |
-| Retrieved     | 2026-08-05                                                      |
+| Commit        | `303e390695e2edd994057e2345496a7d72c34310`                      |
+| Retrieved     | 2026-08-06                                                      |
 | License       | MIT                                                             |
 | Local changes | None. `index.ts` only re-exports the pinned upstream extension. |
 

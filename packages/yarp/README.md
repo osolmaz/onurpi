@@ -19,12 +19,7 @@ cap marker to proven recovery output.
 The extension requires the matching `yarp` binary on `PATH`:
 
 ```sh
-cargo install \
-  --git https://github.com/osolmaz/yarp.git \
-  --rev d56d07093b8adecda94c409412ec0bfc369d636f \
-  --locked \
-  --force \
-  yarp-cli
+cargo install yarp-cli --version 0.2.1 --locked --force
 ```
 
 ## Configuration
