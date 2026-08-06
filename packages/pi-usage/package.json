@@ -1,0 +1,50 @@
+{
+	"name": "@narumitw/pi-usage",
+	"version": "0.49.4",
+	"description": "Pi extension that shows current-account usage for Codex, GitHub Copilot, and OpenRouter.",
+	"type": "module",
+	"license": "MIT",
+	"private": false,
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"pi",
+		"usage",
+		"quota",
+		"codex",
+		"copilot",
+		"openrouter"
+	],
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"scripts": {
+		"check": "biome check --vcs-use-ignore-file=false src test package.json tsconfig.json README.md && npm run typecheck",
+		"format": "biome check --write --vcs-use-ignore-file=false src test package.json tsconfig.json README.md",
+		"typecheck": "tsc --noEmit"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.7",
+		"@earendil-works/pi-coding-agent": "0.83.0",
+		"@types/node": "26.1.2",
+		"typescript": "7.0.2"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/narumiruna/pi-extensions",
+		"directory": "extensions/pi-usage"
+	},
+	"dependencies": {
+		"@narumitw/pi-tui-kit": "^0.49.1"
+	}
+}

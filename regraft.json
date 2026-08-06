@@ -54,6 +54,19 @@
       ]
     },
     {
+      "name": "pi-usage",
+      "dest": "packages/pi-usage",
+      "source": {
+        "url": "https://github.com/narumiruna/pi-extensions.git",
+        "ref": "main",
+        "subdir": "extensions/pi-usage"
+      },
+      "commit": "ce66737cc3222383529c1f3fd712828bd58239a9",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/pi-usage/UPSTREAM.md."
+      ]
+    },
+    {
       "name": "unified-exec",
       "dest": "packages/unified-exec",
       "source": {
