@@ -1,57 +1,60 @@
 {
-	"name": "pi-unified-exec",
-	"version": "0.9.0",
-	"description": "Codex-style unified_exec for pi: long-lived shell sessions the LLM polls and drives with write_stdin (Ctrl-C, arrow keys, PTY, REPLs, ssh, dev servers). Full output logged to disk.",
-	"keywords": [
-		"pi-package",
-		"pi-extension",
-		"codex",
-		"unified-exec",
-		"bash",
-		"pty"
-	],
-	"license": "MIT",
-	"author": "Ren Wang <iamwrm@gmail.com>",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/iamwrm/pi-unified-exec.git"
-	},
-	"homepage": "https://github.com/iamwrm/pi-unified-exec#readme",
-	"type": "module",
-	"scripts": {
-		"check": "tsc --noEmit",
-		"test": "npm run check && tsx --test tests/*.test.ts"
-	},
-	"engines": {
-		"node": ">=22.19.0"
-	},
-	"files": [
-		"src",
-		"README.md",
-		"LICENSE"
-	],
-	"pi": {
-		"extensions": [
-			"./src/index.ts"
-		]
-	},
-	"publishConfig": {
-		"access": "public"
-	},
-	"peerDependencies": {
-		"@earendil-works/pi-coding-agent": ">=0.80.5",
-		"@earendil-works/pi-tui": "*",
-		"typebox": "*"
-	},
-	"optionalDependencies": {
-		"@homebridge/node-pty-prebuilt-multiarch": "0.13.1"
-	},
-	"devDependencies": {
-		"@earendil-works/pi-coding-agent": "0.83.0",
-		"@earendil-works/pi-tui": "0.83.0",
-		"@types/node": "^22.0.0",
-		"tsx": "^4.19.0",
-		"typebox": "1.1.24",
-		"typescript": "^5.6.0"
-	}
+  "name": "@onurpi/unified-exec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persistent Codex-style command sessions for Pi",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./command-environment": "./src/command-environment.ts"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "format": "prettier --check .",
+    "lint": "eslint . --config eslint.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "coverage": "vitest run --coverage --config vitest.config.ts",
+    "dry": "slophammer-ts dry .",
+    "mutate": "stryker run stryker.config.mjs",
+    "slophammer": "sh scripts/run-slophammer.sh",
+    "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": ">=0.80.5",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "optionalDependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "0.13.1"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-tui": "0.82.1",
+    "@eslint/js": "9.39.2",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/typescript-checker": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
+    "@types/node": "22.19.11",
+    "@vitest/coverage-v8": "3.2.7",
+    "eslint": "9.39.2",
+    "prettier": "3.8.1",
+    "slophammer-ts": "0.4.0",
+    "typebox": "1.1.38",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.53.1",
+    "vitest": "3.2.7"
+  },
+  "overrides": {
+    "qs": "6.15.3"
+  }
 }
