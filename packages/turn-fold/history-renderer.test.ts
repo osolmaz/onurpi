@@ -194,6 +194,33 @@ describe("Turn Fold history layout and tool presentation", () => {
     expect(backgrounds.some((entry) => entry.startsWith("toolErrorBg:"))).toBe(true);
   });
 
+  it("separates boxed blocks with a colorless blank line", () => {
+    const bgs: string[] = [];
+    const styledTheme = {
+      bg: (color: string, text: string) => {
+        bgs.push(`${color}:${text.trim().slice(0, 30)}`);
+        return text;
+      },
+      bold: (text: string) => text,
+      fg: (_color: string, text: string) => text,
+      italic: (text: string) => text,
+    };
+    const renderer = new HistoryEntryRenderer(styledTheme);
+    const result = (id: string) => ({
+      id,
+      message: { content: "out", role: "toolResult", timestamp: 1, toolName: "exec" },
+      type: "message",
+    });
+
+    const first = renderer.render(result("r1"), 0, 80, state());
+
+    // Leading blank stays colorless; the rest of the block is background-tinted.
+    expect(bgs[0]?.trim().length ?? 0).toBeGreaterThan(0);
+    expect(bgs.length).toBe(first.length - 1);
+    expect(first[0]?.trim()).toBe("");
+    expect(first.at(-1)?.trim()).toBe("");
+  });
+
   it("keeps matched fences and drops only the dangling opener in previews", () => {
     const renderer = new HistoryEntryRenderer(theme);
     const entry = {
@@ -293,11 +320,12 @@ describe("Turn Fold history role styling", () => {
 
     const lines = renderer.render(user, 0, 80, state());
 
-    expect(backgrounds.length).toBe(lines.length);
-    expect(backgrounds.length).toBeGreaterThanOrEqual(3);
-    expect(backgrounds[0]?.trim()).toBe("");
-    expect(backgrounds[1]).toContain("Question body");
+    // Every line except the leading colorless separator carries the user background.
+    expect(backgrounds.length).toBe(lines.length - 1);
+    expect(backgrounds[0]).toContain("Question body");
     expect(backgrounds.at(-1)?.trim()).toBe("");
+    expect(lines[0]?.trim()).toBe("");
+    expect(lines.at(-1)?.trim()).toBe("");
   });
 
   it("highlights literal search text and selected headers", () => {

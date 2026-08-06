@@ -296,11 +296,18 @@ function renderedSegment(
   );
   const foreground = blockForeground(prepared.presentation);
   const body = markdown.render(width).map((line) => styleBodyLine(line, foreground, theme));
-  const lines = segmentLines(prepared, segmentIndex, pageIndex, body, width, theme, callSummary);
   const background = blockBackground(prepared.presentation);
-  return background === undefined
-    ? lines
-    : styleBackgroundBlock(lines, width, background, foreground, theme);
+  const lines = segmentLines(prepared, segmentIndex, pageIndex, body, width, theme, callSummary);
+  if (background === undefined) return lines;
+  const firstSegment = pageIndex === 0 && segmentIndex === 0;
+  const styled = styleBackgroundBlock(
+    firstSegment ? lines.slice(1) : lines,
+    width,
+    background,
+    foreground,
+    theme,
+  );
+  return firstSegment ? ["", ...styled] : styled;
 }
 
 function segmentLines(
