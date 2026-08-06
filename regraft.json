@@ -23,7 +23,9 @@
         "subdir": ".pi/extensions/pi-goal"
       },
       "commit": "3f100be5434454d3388755a119d01caca9127c16",
-      "notes": ["Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."]
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/goal/UPSTREAM.md."
+      ]
     },
     {
       "name": "nyan-mode",
@@ -36,6 +38,19 @@
       "commit": "7e47605c37fbb143b379ae39305dc36810c6566b",
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/nyan-mode/UPSTREAM.md."
+      ]
+    },
+    {
+      "name": "pi-tui-kit",
+      "dest": "packages/pi-tui-kit",
+      "source": {
+        "url": "https://github.com/narumiruna/pi-extensions.git",
+        "ref": "main",
+        "subdir": "packages/pi-tui-kit"
+      },
+      "commit": "ce66737cc3222383529c1f3fd712828bd58239a9",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/pi-tui-kit/UPSTREAM.md."
       ]
     },
     {
