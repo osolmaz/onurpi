@@ -116,7 +116,7 @@ export type RequestLimiter = {
 };
 
 export function installRequestLimiter(
-  session: Pick<AgentSession, "abort" | "prompt" | "subscribe">,
+  session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName" | "subscribe">,
   limit: number | null,
 ): RequestLimiter {
   if (limit === null) return { finish: () => Promise.resolve(), dispose: () => undefined };
@@ -128,7 +128,9 @@ export function installRequestLimiter(
     if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
       return;
     }
-    finalReview = finishBoundedReview(session);
+    finalReview = Promise.resolve().then(async () => {
+      await finishBoundedReview(session);
+    });
   });
   return {
     finish: async () => {
@@ -138,8 +140,11 @@ export function installRequestLimiter(
   };
 }
 
-async function finishBoundedReview(session: Pick<AgentSession, "abort" | "prompt">): Promise<void> {
+async function finishBoundedReview(
+  session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName">,
+): Promise<void> {
   await session.abort();
+  session.setActiveToolsByName([]);
   await session.prompt(
     "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
   );
