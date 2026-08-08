@@ -57,6 +57,9 @@ describe("request limiter", () => {
           calls.push(`prompt:${content}`);
           return Promise.resolve();
         },
+        setActiveToolsByName: (tools) => {
+          calls.push(`tools:${tools.join(",")}`);
+        },
       },
       2,
     );
@@ -85,9 +88,10 @@ describe("request limiter", () => {
     listener(event);
     listener(event);
     await limiter.finish();
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0]).toBe("abort");
-    expect(calls[1]).toContain("Return the final review JSON");
+    expect(calls[1]).toBe("tools:");
+    expect(calls[2]).toContain("Return the final review JSON");
     limiter.dispose();
     expect(removed).toBe(true);
   });
