@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatReviewProgress } from "../src/cli.js";
 import { PiEventCollector } from "../src/pi-events.js";
-import { renderReview } from "../src/render.js";
+import { renderReview, renderReviewJson } from "../src/render.js";
 import { parseReviewOutput } from "../src/review-output.js";
 
 const VALID = {
@@ -76,6 +76,11 @@ describe("review output", () => {
     expect(unsafe).not.toContain("\u001b");
     expect(unsafe).not.toContain("\u0007");
     expect(unsafe).toContain("�");
+  });
+
+  it("renders the machine-readable Codex-compatible schema", () => {
+    const output = parseReviewOutput(JSON.stringify(VALID));
+    expect(JSON.parse(renderReviewJson(output))).toEqual(VALID);
   });
 
   it("sanitizes untrusted review progress", () => {

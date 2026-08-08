@@ -1,5 +1,7 @@
 import {
+  OUTPUT_FORMATS,
   THINKING_LEVELS,
+  type OutputFormat,
   type ReviewRequest,
   type ReviewTarget,
   type ThinkingLevel,
@@ -22,6 +24,7 @@ type ReviewFields = {
   cwd: string;
   model?: string;
   thinking?: ThinkingLevel;
+  format?: OutputFormat;
   title?: string;
   target?: ReviewTarget;
   custom: string[];
@@ -100,9 +103,11 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
     cwd: string;
     model?: string;
     thinking?: ThinkingLevel;
+    format?: OutputFormat;
   } = { target: withCommitTitle(fields.target, fields.title), cwd: fields.cwd };
   if (fields.model !== undefined) request.model = fields.model;
   if (fields.thinking !== undefined) request.thinking = fields.thinking;
+  if (fields.format !== undefined) request.format = fields.format;
   return request;
 }
 
@@ -150,6 +155,7 @@ function consumeReviewOption(
   if (arg === "--title") fields.title = requiredValue(next, arg);
   else if (arg === "--model") fields.model = validateModel(requiredValue(next, arg));
   else if (arg === "--thinking") fields.thinking = validateThinking(requiredValue(next, arg));
+  else if (arg === "--format") fields.format = validateOutputFormat(requiredValue(next, arg));
   else if (arg === "--cwd") fields.cwd = requiredValue(next, arg);
   else return undefined;
   return 1;
@@ -185,6 +191,11 @@ export function validateThinking(value: string): ThinkingLevel {
   throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}`);
 }
 
+export function validateOutputFormat(value: string): OutputFormat {
+  if (OUTPUT_FORMATS.some((format) => format === value)) return value as OutputFormat;
+  throw new Error(`format must be one of ${OUTPUT_FORMATS.join(", ")}`);
+}
+
 function requiredValue(value: string | undefined, option: string): string {
   return required(value, `${option} requires a value`);
 }
@@ -195,5 +206,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--thinking LEVEL] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

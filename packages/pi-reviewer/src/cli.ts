@@ -8,7 +8,7 @@ import { loginReviewerApp } from "./auth.js";
 import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./config.js";
 import { resolveTarget } from "./git-target.js";
 import { listReviewerModels } from "./models.js";
-import { renderReview } from "./render.js";
+import { renderReview, renderReviewJson } from "./render.js";
 import { runReview } from "./runner.js";
 import { terminalText } from "./terminal-text.js";
 import type { ModelSelection, ReviewRequest, ThinkingLevel, UserConfig } from "./types.js";
@@ -85,7 +85,7 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
     prompt: target.prompt,
     stderr: process.stderr,
   });
-  process.stdout.write(renderReview(output));
+  process.stdout.write(request.format === "json" ? renderReviewJson(output) : renderReview(output));
   return 0;
 }
 

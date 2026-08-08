@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseArgs, parseModel, validateThinking } from "../src/args.js";
+import { parseArgs, parseModel, validateOutputFormat, validateThinking } from "../src/args.js";
 import { resolveSelection } from "../src/cli.js";
 
 describe("review arguments", () => {
@@ -10,12 +10,22 @@ describe("review arguments", () => {
       request: { cwd: "/repo", target: { kind: "uncommitted" } },
     });
     expect(
-      parseArgs(["--base", "main", "--model", "openai-codex/reviewer", "--thinking", "high"]),
+      parseArgs([
+        "--base",
+        "main",
+        "--model",
+        "openai-codex/reviewer",
+        "--thinking",
+        "high",
+        "--format",
+        "json",
+      ]),
     ).toMatchObject({
       request: {
         target: { kind: "base", branch: "main" },
         model: "openai-codex/reviewer",
         thinking: "high",
+        format: "json",
       },
     });
     expect(parseArgs(["--commit", "abc", "--title", "Fix it"])).toMatchObject({
@@ -68,6 +78,8 @@ describe("review arguments", () => {
     expect(() => parseModel("missing-provider")).toThrow("provider/model");
     expect(() => parseModel("/missing")).toThrow("provider/model");
     expect(() => validateThinking("extreme")).toThrow("thinking must be one of");
+    expect(validateOutputFormat("json")).toBe("json");
+    expect(() => validateOutputFormat("xml")).toThrow("format must be one of");
   });
 
   it("resolves external model defaults without a model in the extension", () => {
