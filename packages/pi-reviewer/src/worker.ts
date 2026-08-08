@@ -5,6 +5,7 @@ import {
   ModelRuntime,
   SessionManager,
   SettingsManager,
+  type AgentSession,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 
@@ -50,7 +51,7 @@ export async function createDefaultExecution(
     modelsStorePath: canonicalModelsStorePath(request.authPath),
     allowModelNetwork: false,
   });
-  await registerHuggingFaceOAuthProvider(modelRuntime);
+  if (!request.customModel) await registerHuggingFaceOAuthProvider(modelRuntime);
   const model = modelRuntime.getModel(request.provider, request.model);
   if (model === undefined) {
     throw new Error(`review model not found: ${request.provider}/${request.model}`);
@@ -92,18 +93,74 @@ export async function createDefaultExecution(
     settingsManager,
     sessionManager: SessionManager.inMemory(request.cwd),
   });
+  const requestLimiter = installRequestLimiter(session, request.maxModelRequests);
   return {
     subscribe: (listener) => session.subscribe(listener),
     prompt: async (prompt) => {
       await session.prompt(prompt);
+      await requestLimiter.finish();
     },
     dispose: () => {
+      requestLimiter.dispose();
       session.dispose();
     },
     flush: async () => {
       await settingsManager.flush();
     },
   };
+}
+
+export type RequestLimiter = {
+  readonly finish: () => Promise<void>;
+  readonly dispose: () => void;
+};
+
+export function installRequestLimiter(
+  session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName" | "subscribe">,
+  limit: number | null,
+): RequestLimiter {
+  if (limit === null) return { finish: () => Promise.resolve(), dispose: () => undefined };
+  let requests = 0;
+  let finalPhase = false;
+  let finalAbort: Promise<void> | undefined;
+  let finalReview: Promise<void> | undefined;
+  const dispose = session.subscribe((event) => {
+    if (event.type !== "message_end" || event.message.role !== "assistant") return;
+    requests += 1;
+    if (finalPhase) {
+      finalAbort = abortFinalToolUse(session, event.message.stopReason, finalAbort);
+      return;
+    }
+    if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
+      return;
+    }
+    finalReview = Promise.resolve().then(async () => {
+      await session.abort();
+      session.setActiveToolsByName([]);
+      finalPhase = true;
+      await session.prompt(
+        "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
+      );
+      await finalAbort;
+    });
+  });
+  return {
+    finish: async () => {
+      await finalReview;
+    },
+    dispose,
+  };
+}
+
+function abortFinalToolUse(
+  session: Pick<AgentSession, "abort">,
+  stopReason: string,
+  existing: Promise<void> | undefined,
+): Promise<void> | undefined {
+  if (existing !== undefined || stopReason !== "toolUse") return existing;
+  return Promise.resolve().then(async () => {
+    await session.abort();
+  });
 }
 
 function writeEvent(event: AgentSessionEvent): void {

@@ -1,5 +1,7 @@
 import {
+  OUTPUT_FORMATS,
   THINKING_LEVELS,
+  type OutputFormat,
   type ReviewRequest,
   type ReviewTarget,
   type ThinkingLevel,
@@ -21,7 +23,11 @@ export type ParsedCommand =
 type ReviewFields = {
   cwd: string;
   model?: string;
+  modelManifest?: string;
+  metricsFile?: string;
+  maxModelRequests?: number;
   thinking?: ThinkingLevel;
+  format?: OutputFormat;
   title?: string;
   target?: ReviewTarget;
   custom: string[];
@@ -95,15 +101,22 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
   if (custom !== "") setTarget(fields, { kind: "custom", instructions: custom });
   if (fields.target === undefined) throw new Error(reviewUsage());
   assertTitleTarget(fields);
-  const request: {
-    target: ReviewTarget;
-    cwd: string;
-    model?: string;
-    thinking?: ThinkingLevel;
-  } = { target: withCommitTitle(fields.target, fields.title), cwd: fields.cwd };
-  if (fields.model !== undefined) request.model = fields.model;
-  if (fields.thinking !== undefined) request.thinking = fields.thinking;
-  return request;
+  return {
+    target: withCommitTitle(fields.target, fields.title),
+    cwd: fields.cwd,
+    ...reviewOptions(fields),
+  };
+}
+
+function reviewOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
+    ...(fields.model === undefined ? {} : { model: fields.model }),
+    ...(fields.modelManifest === undefined ? {} : { modelManifest: fields.modelManifest }),
+    ...(fields.metricsFile === undefined ? {} : { metricsFile: fields.metricsFile }),
+    ...(fields.maxModelRequests === undefined ? {} : { maxModelRequests: fields.maxModelRequests }),
+    ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }),
+    ...(fields.format === undefined ? {} : { format: fields.format }),
+  };
 }
 
 function assertTitleTarget(fields: ReviewFields): void {
@@ -147,12 +160,27 @@ function consumeReviewOption(
   arg: string,
   next: string | undefined,
 ): number | undefined {
+  if (consumeExecutionOption(fields, arg, next)) return 1;
   if (arg === "--title") fields.title = requiredValue(next, arg);
   else if (arg === "--model") fields.model = validateModel(requiredValue(next, arg));
   else if (arg === "--thinking") fields.thinking = validateThinking(requiredValue(next, arg));
+  else if (arg === "--format") fields.format = validateOutputFormat(requiredValue(next, arg));
   else if (arg === "--cwd") fields.cwd = requiredValue(next, arg);
   else return undefined;
   return 1;
+}
+
+function consumeExecutionOption(
+  fields: ReviewFields,
+  arg: string,
+  next: string | undefined,
+): boolean {
+  if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
+  else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
+  else if (arg === "--max-model-requests") {
+    fields.maxModelRequests = validateMaxModelRequests(requiredValue(next, arg));
+  } else return false;
+  return true;
 }
 
 function setTarget(fields: ReviewFields, target: ReviewTarget): void {
@@ -180,9 +208,21 @@ export function validateModel(value: string): string {
   return trimmed;
 }
 
+export function validateMaxModelRequests(value: string): number {
+  if (!/^[1-9][0-9]*$/u.test(value)) throw new Error("max model requests must be an integer");
+  const requests = Number(value);
+  if (requests > 100) throw new Error("max model requests must be at most 100");
+  return requests;
+}
+
 export function validateThinking(value: string): ThinkingLevel {
   if (THINKING_LEVELS.some((level) => level === value)) return value as ThinkingLevel;
   throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}`);
+}
+
+export function validateOutputFormat(value: string): OutputFormat {
+  if (OUTPUT_FORMATS.some((format) => format === value)) return value as OutputFormat;
+  throw new Error(`format must be one of ${OUTPUT_FORMATS.join(", ")}`);
 }
 
 function requiredValue(value: string | undefined, option: string): string {
@@ -195,5 +235,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--thinking LEVEL] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--max-model-requests N] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

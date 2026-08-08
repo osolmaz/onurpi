@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatReviewProgress } from "../src/cli.js";
 import { PiEventCollector } from "../src/pi-events.js";
-import { renderReview } from "../src/render.js";
+import { renderReview, renderReviewJson } from "../src/render.js";
 import { parseReviewOutput } from "../src/review-output.js";
 
 const VALID = {
@@ -76,6 +76,11 @@ describe("review output", () => {
     expect(unsafe).not.toContain("\u001b");
     expect(unsafe).not.toContain("\u0007");
     expect(unsafe).toContain("�");
+  });
+
+  it("renders the machine-readable Codex-compatible schema", () => {
+    const output = parseReviewOutput(JSON.stringify(VALID));
+    expect(JSON.parse(renderReviewJson(output))).toEqual(VALID);
   });
 
   it("sanitizes untrusted review progress", () => {
@@ -200,6 +205,39 @@ describe("review output", () => {
   });
 });
 
+describe("relative review paths", () => {
+  it("resolves paths inside the checkout and rejects paths outside it", () => {
+    const relative = {
+      ...VALID,
+      findings: [
+        {
+          ...VALID.findings[0],
+          code_location: {
+            absolute_file_path: "src/parser.ts",
+            line_range: { start: 10, end: 11 },
+          },
+        },
+      ],
+    };
+    const output = parseReviewOutput(JSON.stringify(relative), "/repo");
+    expect(output.findings[0]?.codeLocation.absoluteFilePath).toBe("/repo/src/parser.ts");
+
+    const outside = {
+      ...relative,
+      findings: [
+        {
+          ...relative.findings[0],
+          code_location: {
+            absolute_file_path: "../secret.ts",
+            line_range: { start: 1, end: 1 },
+          },
+        },
+      ],
+    };
+    expect(() => parseReviewOutput(JSON.stringify(outside), "/repo")).toThrow("must stay inside");
+  });
+});
+
 describe("Pi JSON events", () => {
   it("collects a completed assistant response across arbitrary UTF-8 chunks", () => {
     const collector = new PiEventCollector();
@@ -217,6 +255,62 @@ describe("Pi JSON events", () => {
     for (let index = 0; index < event.length; index += 1)
       collector.feed(event.subarray(index, index + 1));
     expect(collector.finish().finalText).toBe(expected);
+  });
+
+  it("aggregates model usage and route attestations", () => {
+    const collector = new PiEventCollector();
+    collector.feed(
+      `${JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          provider: "huggingface",
+          model: "organization/model:route",
+          responseModel: "organization/model-revision",
+          stopReason: "stop",
+          content: [{ type: "text", text: "done" }],
+          usage: {
+            input: 100,
+            output: 20,
+            cacheRead: 30,
+            cacheWrite: 0,
+            reasoning: 8,
+            totalTokens: 120,
+            cost: { total: 0.004 },
+          },
+        },
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+    );
+    expect(collector.finish().finalText).toBe("done");
+    expect(collector.metrics()).toEqual({
+      version: 1,
+      requests: 1,
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 30,
+      cacheWriteTokens: 0,
+      reasoningTokens: 8,
+      totalTokens: 120,
+      costUsd: 0.004,
+      observedProviders: ["huggingface"],
+      observedModels: ["organization/model:route"],
+      observedResponseModels: ["organization/model-revision"],
+    });
+  });
+
+  it("retains text from a bounded final response that still requests a tool", () => {
+    const collector = new PiEventCollector();
+    collector.feed(
+      `${JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          stopReason: "toolUse",
+          content: [{ type: "text", text: "bounded final" }],
+        },
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+    );
+    expect(collector.finish().finalText).toBe("bounded final");
   });
 
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {

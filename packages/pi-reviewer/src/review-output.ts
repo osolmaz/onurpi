@@ -2,7 +2,7 @@ import path from "node:path";
 
 import type { ReviewFinding, ReviewOutput } from "./types.js";
 
-export function parseReviewOutput(text: string): ReviewOutput {
+export function parseReviewOutput(text: string, cwd?: string): ReviewOutput {
   const raw = extractSingleObject(text);
   if (!isRecord(raw)) throw new Error("review output must be a JSON object");
   exactKeys(
@@ -16,14 +16,14 @@ export function parseReviewOutput(text: string): ReviewOutput {
     throw new Error("overall_correctness is invalid");
   }
   return {
-    findings: raw["findings"].map((finding, index) => parseFinding(finding, index)),
+    findings: raw["findings"].map((finding, index) => parseFinding(finding, index, cwd)),
     overallCorrectness: correctness,
     overallExplanation: nonemptyString(raw["overall_explanation"], "overall_explanation"),
     overallConfidenceScore: confidence(raw["overall_confidence_score"], "overall_confidence_score"),
   };
 }
 
-function parseFinding(value: unknown, index: number): ReviewFinding {
+function parseFinding(value: unknown, index: number, cwd: string | undefined): ReviewFinding {
   const label = `findings[${String(index)}]`;
   if (!isRecord(value)) throw new Error(`${label} must be an object`);
   exactKeys(value, ["title", "body", "confidence_score", "priority", "code_location"], label);
@@ -39,7 +39,7 @@ function parseFinding(value: unknown, index: number): ReviewFinding {
     body: nonemptyString(value["body"], `${label}.body`),
     confidenceScore: confidence(value["confidence_score"], `${label}.confidence_score`),
     priority,
-    codeLocation: parseLocation(value["code_location"], `${label}.code_location`),
+    codeLocation: parseLocation(value["code_location"], `${label}.code_location`, cwd),
   };
 }
 
@@ -50,22 +50,39 @@ function assertTitlePriority(title: string, priority: number, label: string): vo
   }
 }
 
-function parseLocation(value: unknown, label: string): ReviewFinding["codeLocation"] {
+function parseLocation(
+  value: unknown,
+  label: string,
+  cwd: string | undefined,
+): ReviewFinding["codeLocation"] {
   if (!isRecord(value)) throw new Error(`${label} must be an object`);
   exactKeys(value, ["absolute_file_path", "line_range"], label);
   const absoluteFilePath = nonemptyString(
     value["absolute_file_path"],
     `${label}.absolute_file_path`,
   );
-  if (!path.isAbsolute(absoluteFilePath))
-    throw new Error(`${label}.absolute_file_path must be absolute`);
+  const resolvedFilePath = resolveFilePath(absoluteFilePath, cwd, label);
   const range = value["line_range"];
   if (!isRecord(range)) throw new Error(`${label}.line_range must be an object`);
   exactKeys(range, ["start", "end"], `${label}.line_range`);
   const start = positiveInteger(range["start"], `${label}.line_range.start`);
   const end = positiveInteger(range["end"], `${label}.line_range.end`);
   if (end < start) throw new Error(`${label}.line_range.end must be at least start`);
-  return { absoluteFilePath, lineRange: { start, end } };
+  return { absoluteFilePath: resolvedFilePath, lineRange: { start, end } };
+}
+
+function resolveFilePath(value: string, cwd: string | undefined, label: string): string {
+  if (cwd === undefined) {
+    if (!path.isAbsolute(value)) throw new Error(`${label}.absolute_file_path must be absolute`);
+    return value;
+  }
+  const root = path.resolve(cwd);
+  const resolved = path.resolve(root, value);
+  const relative = path.relative(root, resolved);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`${label}.absolute_file_path must stay inside the review checkout`);
+  }
+  return resolved;
 }
 
 function extractSingleObject(text: string): unknown {

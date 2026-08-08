@@ -45,6 +45,34 @@ pi-reviewer config set thinking high
 
 If the canonical auth file has no Hugging Face credential yet, run `pi-reviewer login huggingface` or regular Pi's Hugging Face login once. Both write the same canonical credential through regular Pi's auth file. Token refreshes stay shared through that file, so the reviewer never holds its own copy.
 
+For a model that is not yet in Pi's catalog, pass a strict model manifest. The selected provider and model must match the manifest. `apiKeyEnv` names an environment variable; the manifest does not contain the credential.
+
+```json
+{
+  "version": 1,
+  "provider": {
+    "id": "example",
+    "baseUrl": "https://api.example.com/v1",
+    "apiKeyEnv": "EXAMPLE_API_KEY",
+    "compat": { "supportsDeveloperRole": false }
+  },
+  "model": {
+    "id": "organization/model:route",
+    "name": "Model via pinned route",
+    "reasoning": true,
+    "input": ["text"],
+    "contextWindow": 131072,
+    "maxTokens": 32768,
+    "cost": { "input": 0.1, "output": 0.2, "cacheRead": 0, "cacheWrite": 0 }
+  }
+}
+```
+
+```bash
+pi-reviewer --model example/organization/model:route \
+  --model-manifest ./model.json --base main
+```
+
 ## Review
 
 ```bash
@@ -54,7 +82,21 @@ pi-reviewer --commit <sha>
 pi-reviewer "focus on cancellation safety"
 ```
 
-The command writes progress to stderr and the final report to stdout. A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
+The command writes progress to stderr and the final report to stdout. Use `--format json` to emit the validated Codex-compatible result object without terminal prose:
+
+```bash
+pi-reviewer --base main --format json > review.json
+```
+
+Use `--metrics-file` to record cumulative token use, estimated cost from the pinned model prices, and the provider, requested model, and response model reported by Pi. The file is refreshed after each model response, including during a review that later fails.
+
+```bash
+pi-reviewer --base main --format json --metrics-file ./review-metrics.json > review.json
+```
+
+`--max-model-requests N` stops pending tool work after the Nth complete model response, disables tools, and makes one final request for the required JSON using the evidence already gathered. It does not truncate a model response or silently turn a timed-out review into a clean result.
+
+A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
 
 Normal reviews use an in-memory Pi SDK session and do not write Pi session history. Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 

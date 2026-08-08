@@ -2,9 +2,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createDefaultExecution, runReviewWorker, workerMessagePayload } from "../src/worker.js";
+import {
+  createDefaultExecution,
+  installRequestLimiter,
+  runReviewWorker,
+  workerMessagePayload,
+} from "../src/worker.js";
 import type { ReviewWorkerRequest } from "../src/worker-protocol.js";
 
 const cleanup: string[] = [];
@@ -20,12 +26,77 @@ const REQUEST = {
   systemPrompt: "review",
   provider: "provider",
   model: "model",
+  customModel: false,
+  maxModelRequests: null,
   thinking: "high",
   tools: ["read"],
 } satisfies ReviewWorkerRequest;
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
+});
+
+describe("request limiter", () => {
+  it("steers a tool-using review to its final answer at the request limit", async () => {
+    let listener: (event: AgentSessionEvent) => void = () => undefined;
+    let removed = false;
+    const calls: string[] = [];
+    const event: AgentSessionEvent = {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        api: "openai-completions",
+        provider: "custom",
+        model: "review-model",
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "toolUse",
+        timestamp: 1,
+      },
+    };
+    const limiter = installRequestLimiter(
+      {
+        subscribe: (next) => {
+          listener = next;
+          return () => {
+            removed = true;
+          };
+        },
+        abort: () => {
+          calls.push("abort");
+          return Promise.resolve();
+        },
+        prompt: (content) => {
+          calls.push(`prompt:${content}`);
+          listener(event);
+          return Promise.resolve();
+        },
+        setActiveToolsByName: (tools) => {
+          calls.push(`tools:${tools.join(",")}`);
+        },
+      },
+      2,
+    );
+
+    listener(event);
+    listener(event);
+    listener(event);
+    await limiter.finish();
+    expect(calls).toHaveLength(4);
+    expect(calls[0]).toBe("abort");
+    expect(calls[1]).toBe("tools:");
+    expect(calls[2]).toContain("Return the final review JSON");
+    expect(calls[3]).toBe("abort");
+    limiter.dispose();
+    expect(removed).toBe(true);
+  });
 });
 
 describe("review worker events", () => {
@@ -53,6 +124,52 @@ describe("review worker events", () => {
     });
     const unsubscribe = execution.subscribe(() => undefined);
     unsubscribe();
+    execution.dispose();
+    await execution.flush();
+  });
+
+  it("uses a manifest-defined custom model without dynamic provider registration", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-custom-worker-"));
+    cleanup.push(root);
+    const configDir = path.join(root, "config");
+    const modelsPath = path.join(configDir, "models.json");
+    const extensionPath = path.join(root, "empty-extension.ts");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      modelsPath,
+      JSON.stringify({
+        providers: {
+          custom: {
+            baseUrl: "https://example.test/v1",
+            api: "openai-completions",
+            apiKey: "test-key",
+            models: [
+              {
+                id: "review-model",
+                name: "Review model",
+                reasoning: true,
+                input: ["text"],
+                contextWindow: 131_072,
+                maxTokens: 32_768,
+              },
+            ],
+          },
+        },
+      }),
+    );
+    await writeFile(extensionPath, "export default function extension() {}\n");
+
+    const execution = await createDefaultExecution({
+      ...REQUEST,
+      customModel: true,
+      cwd: root,
+      authPath: path.join(root, "auth.json"),
+      modelsPath,
+      configDir,
+      extensionPath,
+      provider: "custom",
+      model: "review-model",
+    });
     execution.dispose();
     await execution.flush();
   });

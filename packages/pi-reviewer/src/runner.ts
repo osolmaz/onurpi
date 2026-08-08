@@ -3,10 +3,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
 import { regularPiAuthPath } from "./auth-path.js";
-import { PiEventCollector } from "./pi-events.js";
+import { PiEventCollector, type PiRunMetrics } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import { selectAppModel } from "./app.js";
-import type { ModelSelection, ReviewOutput } from "./types.js";
+import type { CustomModelManifest, ModelSelection, ReviewOutput } from "./types.js";
 import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
 const MAX_RUNTIME_MS = 20 * 60_000;
@@ -17,13 +17,16 @@ const MAX_STDERR_BYTES = 128 * 1024;
 export type RunReviewInput = {
   readonly app: PiAppDefinition;
   readonly selection: ModelSelection;
+  readonly modelManifest?: CustomModelManifest;
+  readonly maxModelRequests?: number;
   readonly cwd: string;
   readonly prompt: string;
   readonly stderr?: NodeJS.WritableStream;
+  readonly onMetrics?: (metrics: PiRunMetrics) => void;
 };
 
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
-  const app = selectAppModel(input.app, input.selection);
+  const app = selectAppModel(input.app, input.selection, input.modelManifest);
   const runtime = await writePiRuntimeConfig(app);
   const extension = app.extensions?.[0];
   if (extension === undefined) throw new Error("Pi Reviewer extension is not configured");
@@ -40,11 +43,19 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     systemPrompt: app.systemPrompt,
     provider: input.selection.provider,
     model: input.selection.model,
+    customModel: input.modelManifest !== undefined,
+    maxModelRequests: input.maxModelRequests ?? null,
     thinking: input.selection.thinking,
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };
-  const finalText = await executeWorker(app.piCommand, request, app.env, input.stderr);
-  return parseReviewOutput(finalText);
+  const finalText = await executeWorker(
+    app.piCommand,
+    request,
+    app.env,
+    input.stderr,
+    input.onMetrics,
+  );
+  return parseReviewOutput(finalText, input.cwd);
 }
 
 async function executeWorker(
@@ -52,6 +63,7 @@ async function executeWorker(
   request: ReviewWorkerRequest,
   appEnv: Readonly<Record<string, string>> | undefined,
   stderr: NodeJS.WritableStream | undefined,
+  onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
 ): Promise<string> {
   const [program, ...args] = command;
   if (program === undefined) throw new Error("Pi Reviewer worker command is empty");
@@ -70,12 +82,13 @@ async function executeWorker(
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdin.end(JSON.stringify(request));
-  return await collectChild(child, stderr);
+  return await collectChild(child, stderr, onMetrics);
 }
 
 async function collectChild(
   child: ChildProcessWithoutNullStreams,
   stderr: NodeJS.WritableStream | undefined,
+  onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
 ): Promise<string> {
   const collector = new PiEventCollector();
   let stderrBytes = 0;
@@ -111,6 +124,7 @@ async function collectChild(
     resetInactivity();
     try {
       collector.feed(chunk);
+      onMetrics?.(collector.metrics());
     } catch (error) {
       failure = error instanceof Error ? error : new Error(String(error));
       terminate(failure.message);

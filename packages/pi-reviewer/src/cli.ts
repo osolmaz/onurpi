@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -7,8 +8,10 @@ import { parseArgs, parseModel, reviewUsage } from "./args.js";
 import { loginReviewerApp } from "./auth.js";
 import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./config.js";
 import { resolveTarget } from "./git-target.js";
+import { loadCustomModelManifest } from "./model-manifest.js";
 import { listReviewerModels } from "./models.js";
-import { renderReview } from "./render.js";
+import type { PiRunMetrics } from "./pi-events.js";
+import { renderReview, renderReviewJson } from "./render.js";
 import { runReview } from "./runner.js";
 import { terminalText } from "./terminal-text.js";
 import type { ModelSelection, ReviewRequest, ThinkingLevel, UserConfig } from "./types.js";
@@ -75,18 +78,38 @@ async function runModels(search: string | undefined): Promise<number> {
 async function runReviewCommand(request: ReviewRequest): Promise<number> {
   const config = await loadConfig();
   const selection = resolveSelection(request.model, request.thinking, config);
+  const modelManifest =
+    request.modelManifest === undefined
+      ? undefined
+      : await loadCustomModelManifest(request.modelManifest, selection);
   const target = await resolveTarget(request.target, request.cwd);
   const app = await loadReviewerApp();
+  const metricsFile = request.metricsFile;
   process.stderr.write(formatReviewProgress(target.hint, selection));
   const output = await runReview({
     app,
     selection,
+    ...(modelManifest === undefined ? {} : { modelManifest }),
+    ...(request.maxModelRequests === undefined
+      ? {}
+      : { maxModelRequests: request.maxModelRequests }),
     cwd: target.cwd,
     prompt: target.prompt,
     stderr: process.stderr,
+    ...(metricsFile === undefined
+      ? {}
+      : {
+          onMetrics: (metrics: PiRunMetrics) => {
+            writeMetrics(metricsFile, metrics);
+          },
+        }),
   });
-  process.stdout.write(renderReview(output));
+  process.stdout.write(request.format === "json" ? renderReviewJson(output) : renderReview(output));
   return 0;
+}
+
+function writeMetrics(path: string, metrics: PiRunMetrics): void {
+  writeFileSync(path, `${JSON.stringify(metrics)}\n`, { mode: 0o600 });
 }
 
 export function formatReviewProgress(hint: string, selection: ModelSelection): string {

@@ -2,10 +2,42 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+export const OUTPUT_FORMATS = ["text", "json"] as const;
+
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
 export type ModelSelection = {
   readonly provider: string;
   readonly model: string;
   readonly thinking: ThinkingLevel;
+};
+
+export type CustomModelManifest = {
+  readonly version: 1;
+  readonly provider: {
+    readonly id: string;
+    readonly baseUrl: string;
+    readonly apiKeyEnv?: string;
+    readonly compat?: {
+      readonly supportsDeveloperRole?: boolean;
+      readonly supportsReasoningEffort?: boolean;
+    };
+  };
+  readonly model: {
+    readonly id: string;
+    readonly name?: string;
+    readonly reasoning?: boolean;
+    readonly thinkingFormat?: "deepseek" | "qwen-chat-template";
+    readonly input?: readonly string[];
+    readonly contextWindow?: number;
+    readonly maxTokens?: number;
+    readonly cost?: {
+      readonly input: number;
+      readonly output: number;
+      readonly cacheRead: number;
+      readonly cacheWrite: number;
+    };
+  };
 };
 
 export type ReviewTarget =
@@ -18,7 +50,11 @@ export type ReviewRequest = {
   readonly target: ReviewTarget;
   readonly cwd: string;
   readonly model?: string;
+  readonly modelManifest?: string;
+  readonly metricsFile?: string;
+  readonly maxModelRequests?: number;
   readonly thinking?: ThinkingLevel;
+  readonly format?: OutputFormat;
 };
 
 export type ReviewFinding = {

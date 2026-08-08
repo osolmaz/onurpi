@@ -14,6 +14,27 @@ export function renderReview(output: ReviewOutput): string {
   return `${sections.join("\n\n")}\n`;
 }
 
+export function renderReviewJson(output: ReviewOutput): string {
+  return `${JSON.stringify({
+    findings: output.findings.map((finding) => ({
+      title: finding.title,
+      body: finding.body,
+      confidence_score: finding.confidenceScore,
+      priority: finding.priority,
+      code_location: {
+        absolute_file_path: finding.codeLocation.absoluteFilePath,
+        line_range: {
+          start: finding.codeLocation.lineRange.start,
+          end: finding.codeLocation.lineRange.end,
+        },
+      },
+    })),
+    overall_correctness: output.overallCorrectness,
+    overall_explanation: output.overallExplanation,
+    overall_confidence_score: output.overallConfidenceScore,
+  })}\n`;
+}
+
 function renderFindings(findings: readonly ReviewFinding[]): string {
   const ordered = [...findings].sort((left, right) => left.priority - right.priority);
   const lines = [findings.length === 1 ? "Review finding:" : "Review findings:"];
