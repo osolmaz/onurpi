@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeFileSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +10,7 @@ import { loadConfig, resetConfig, setConfigModel, setConfigThinking } from "./co
 import { resolveTarget } from "./git-target.js";
 import { loadCustomModelManifest } from "./model-manifest.js";
 import { listReviewerModels } from "./models.js";
+import type { PiRunMetrics } from "./pi-events.js";
 import { renderReview, renderReviewJson } from "./render.js";
 import { runReview } from "./runner.js";
 import { terminalText } from "./terminal-text.js";
@@ -82,6 +84,7 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
       : await loadCustomModelManifest(request.modelManifest, selection);
   const target = await resolveTarget(request.target, request.cwd);
   const app = await loadReviewerApp();
+  const metricsFile = request.metricsFile;
   process.stderr.write(formatReviewProgress(target.hint, selection));
   const output = await runReview({
     app,
@@ -90,9 +93,20 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
     cwd: target.cwd,
     prompt: target.prompt,
     stderr: process.stderr,
+    ...(metricsFile === undefined
+      ? {}
+      : {
+          onMetrics: (metrics: PiRunMetrics) => {
+            writeMetrics(metricsFile, metrics);
+          },
+        }),
   });
   process.stdout.write(request.format === "json" ? renderReviewJson(output) : renderReview(output));
   return 0;
+}
+
+function writeMetrics(path: string, metrics: PiRunMetrics): void {
+  writeFileSync(path, `${JSON.stringify(metrics)}\n`, { mode: 0o600 });
 }
 
 export function formatReviewProgress(hint: string, selection: ModelSelection): string {

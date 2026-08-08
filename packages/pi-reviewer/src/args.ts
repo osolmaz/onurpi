@@ -24,6 +24,7 @@ type ReviewFields = {
   cwd: string;
   model?: string;
   modelManifest?: string;
+  metricsFile?: string;
   thinking?: ThinkingLevel;
   format?: OutputFormat;
   title?: string;
@@ -99,19 +100,21 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
   if (custom !== "") setTarget(fields, { kind: "custom", instructions: custom });
   if (fields.target === undefined) throw new Error(reviewUsage());
   assertTitleTarget(fields);
-  const request: {
-    target: ReviewTarget;
-    cwd: string;
-    model?: string;
-    modelManifest?: string;
-    thinking?: ThinkingLevel;
-    format?: OutputFormat;
-  } = { target: withCommitTitle(fields.target, fields.title), cwd: fields.cwd };
-  if (fields.model !== undefined) request.model = fields.model;
-  if (fields.modelManifest !== undefined) request.modelManifest = fields.modelManifest;
-  if (fields.thinking !== undefined) request.thinking = fields.thinking;
-  if (fields.format !== undefined) request.format = fields.format;
-  return request;
+  return {
+    target: withCommitTitle(fields.target, fields.title),
+    cwd: fields.cwd,
+    ...reviewOptions(fields),
+  };
+}
+
+function reviewOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
+    ...(fields.model === undefined ? {} : { model: fields.model }),
+    ...(fields.modelManifest === undefined ? {} : { modelManifest: fields.modelManifest }),
+    ...(fields.metricsFile === undefined ? {} : { metricsFile: fields.metricsFile }),
+    ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }),
+    ...(fields.format === undefined ? {} : { format: fields.format }),
+  };
 }
 
 function assertTitleTarget(fields: ReviewFields): void {
@@ -158,6 +161,7 @@ function consumeReviewOption(
   if (arg === "--title") fields.title = requiredValue(next, arg);
   else if (arg === "--model") fields.model = validateModel(requiredValue(next, arg));
   else if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
+  else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
   else if (arg === "--thinking") fields.thinking = validateThinking(requiredValue(next, arg));
   else if (arg === "--format") fields.format = validateOutputFormat(requiredValue(next, arg));
   else if (arg === "--cwd") fields.cwd = requiredValue(next, arg);
@@ -210,5 +214,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

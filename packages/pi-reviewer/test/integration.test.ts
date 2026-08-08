@@ -95,16 +95,21 @@ describe("Pi Reviewer app", () => {
     vi.stubEnv("PI_CODING_AGENT_DIR", path.join(fake.root, "overridden-agent"));
     const previousOffline = process.env["PI_OFFLINE"];
     process.env["PI_OFFLINE"] = "0";
+    const metrics: unknown[] = [];
     const result = await runReview({
       app,
       selection: { provider: "openai-codex", model: "external-review-model", thinking: "high" },
       cwd: fake.root,
       prompt: "Review the change",
+      onMetrics: (value) => {
+        metrics.push(value);
+      },
     }).finally(() => {
       if (previousOffline === undefined) delete process.env["PI_OFFLINE"];
       else process.env["PI_OFFLINE"] = previousOffline;
     });
     expect(result.findings[0]?.priority).toBe(1);
+    expect(metrics.at(-1)).toMatchObject({ version: 1, requests: 0 });
     const request = JSON.parse(await readFile(fake.argsFile, "utf8")) as Record<string, unknown>;
     expect(request).toMatchObject({
       version: 1,
