@@ -30,7 +30,7 @@ function huggingFaceRegistration(
     registration.oauth = {
       name: oauth.name,
       login: (callbacks) => oauth.login(callbacks),
-      refreshToken: (credentials) => oauth.refreshToken(credentials),
+      refreshToken: (credentials, signal) => oauth.refreshToken(credentials, signal),
       getApiKey: (credentials) => oauth.getApiKey(credentials),
     };
   }

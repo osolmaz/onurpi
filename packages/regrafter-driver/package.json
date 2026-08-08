@@ -19,7 +19,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.84.1",
     "@eslint/js": "9.39.2",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
@@ -29,7 +29,7 @@
     "@vitest/coverage-v8": "3.2.7",
     "eslint": "9.39.2",
     "prettier": "3.8.1",
-    "slophammer-ts": "0.4.0",
+    "slophammer-ts": "0.4.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.53.1",
     "vitest": "3.2.7"
@@ -49,6 +49,6 @@
     "qs": "6.15.3"
   },
   "dependencies": {
-    "pi-regraft": "0.5.0"
+    "pi-regraft": "0.5.1"
   }
 }

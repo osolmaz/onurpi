@@ -8,7 +8,14 @@ import {
   ToolExecutionComponent,
   UserMessageComponent,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, Text, TUI, type Terminal, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  Container,
+  Spacer,
+  Text,
+  type Terminal,
+  TuiMainScreen,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import { afterEach, expect, it } from "vitest";
 
 import { installRenderPatches, type RestoreRenderPatches } from "./render-patches.ts";
@@ -105,8 +112,8 @@ function compactionComponent(timestamp: number): CompactionSummaryMessageCompone
   });
 }
 
-function stoppedTui(): TUI {
-  const tui = new TUI(new MockTerminal());
+function stoppedTui(): TuiMainScreen {
+  const tui = new TuiMainScreen(new MockTerminal());
   tui.stop();
   return tui;
 }

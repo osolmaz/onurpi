@@ -97,13 +97,14 @@ describe("buildCodexHeaders", () => {
   it("sets auth, account, and feature headers", () => {
     const headers = buildCodexHeaders({
       apiKey: makeToken(),
-      headers: { "x-codex-beta-features": "other_feature" },
+      headers: { "x-codex-beta-features": "other_feature", "x-removed": null },
       sessionId: "session-1",
     });
     expect(headers.get("authorization")).toBe(`Bearer ${makeToken()}`);
     expect(headers.get("chatgpt-account-id")).toBe(FAKE_ACCOUNT_ID);
     expect(headers.get("x-codex-beta-features")).toBe("other_feature,remote_compaction_v2");
     expect(headers.get("session-id")).toBe("session-1");
+    expect(headers.has("x-removed")).toBe(false);
   });
 });
 

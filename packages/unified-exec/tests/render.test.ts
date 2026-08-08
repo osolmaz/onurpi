@@ -30,13 +30,68 @@ import type {
 
 const encoder = new TextEncoder();
 
-// The Theme constructor eagerly resolves thinkingMax/thinkingXhigh.
-const noColors: Record<string, string> = { thinkingMax: "#888888" };
+const noForegrounds: Record<ThemeColor, string> = {
+  accent: "#888888",
+  border: "#888888",
+  borderAccent: "#888888",
+  borderMuted: "#888888",
+  success: "#888888",
+  error: "#888888",
+  warning: "#888888",
+  muted: "#888888",
+  dim: "#888888",
+  text: "#888888",
+  thinkingText: "#888888",
+  userMessageText: "#888888",
+  customMessageText: "#888888",
+  customMessageLabel: "#888888",
+  toolTitle: "#888888",
+  toolOutput: "#888888",
+  mdHeading: "#888888",
+  mdLink: "#888888",
+  mdLinkUrl: "#888888",
+  mdCode: "#888888",
+  mdCodeBlock: "#888888",
+  mdCodeBlockBorder: "#888888",
+  mdQuote: "#888888",
+  mdQuoteBorder: "#888888",
+  mdHr: "#888888",
+  mdListBullet: "#888888",
+  toolDiffAdded: "#888888",
+  toolDiffRemoved: "#888888",
+  toolDiffContext: "#888888",
+  syntaxComment: "#888888",
+  syntaxKeyword: "#888888",
+  syntaxFunction: "#888888",
+  syntaxVariable: "#888888",
+  syntaxString: "#888888",
+  syntaxNumber: "#888888",
+  syntaxType: "#888888",
+  syntaxOperator: "#888888",
+  syntaxPunctuation: "#888888",
+  thinkingOff: "#888888",
+  thinkingMinimal: "#888888",
+  thinkingLow: "#888888",
+  thinkingMedium: "#888888",
+  thinkingHigh: "#888888",
+  thinkingXhigh: "#888888",
+  thinkingMax: "#888888",
+  bashMode: "#888888",
+};
+
+const noBackgrounds: ConstructorParameters<typeof Theme>[1] = {
+  selectedBg: "#000000",
+  userMessageBg: "#000000",
+  customMessageBg: "#000000",
+  toolPendingBg: "#000000",
+  toolSuccessBg: "#000000",
+  toolErrorBg: "#000000",
+};
 
 /** Identity styling: color/format functions return the text unchanged. */
 class PlainTheme extends Theme {
   constructor() {
-    super(noColors, noColors, "truecolor");
+    super(noForegrounds, noBackgrounds, "truecolor");
   }
   override fg(_color: ThemeColor, text: string): string {
     return text;

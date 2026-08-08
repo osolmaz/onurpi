@@ -77,7 +77,10 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
   });
   writeFileSync(join(terminalDirectory, "file"), "test\n");
   execFileSync("git", ["add", "file"], { cwd: terminalDirectory });
-  execFileSync("git", ["commit", "-q", "-m", "terminal"], { cwd: terminalDirectory });
+  execFileSync("git", ["commit", "-q", "-m", "terminal"], {
+    cwd: terminalDirectory,
+    env: { ...process.env, GIT_CONFIG_COUNT: "0" },
+  });
   const message = execFileSync("git", ["log", "-1", "--format=%B"], {
     cwd: terminalDirectory,
     encoding: "utf8",

@@ -1,7 +1,7 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-huggingface-oauth
-- Package: `pi-huggingface-oauth@0.1.1`
+- Package: `pi-huggingface-oauth@0.2.0`
 - License: MIT
 - Local changes: none; `index.ts` only re-exports the pinned extension
 

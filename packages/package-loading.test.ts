@@ -52,7 +52,7 @@ const externalPackages = [
   {
     directory: "huggingface-oauth",
     dependency: "pi-huggingface-oauth",
-    source: "0.1.1",
+    source: "0.2.0",
   },
   {
     directory: "pi-must-win",
@@ -62,12 +62,12 @@ const externalPackages = [
   {
     directory: "regrafter-driver",
     dependency: "pi-regraft",
-    source: "0.5.0",
+    source: "0.5.1",
   },
   {
     directory: "workflows",
     dependency: "@osolmaz/pi-workflows",
-    source: "0.2.0",
+    source: "github:osolmaz/pi-workflows#b7cc2ab824beef324daa2785bdba89db6a85c9c6",
   },
 ] as const;
 

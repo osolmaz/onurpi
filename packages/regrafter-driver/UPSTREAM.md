@@ -1,8 +1,8 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-regraft
-- Release: `pi-regraft@0.4.0`
-- Release commit: `4a2297b9f932cf758306beb919f014d68b2e01be`
+- Release: `pi-regraft@0.5.1`
+- Release commit: `19873afc1a4b9d38a566dfa8df6aff472ba05e44`
 - License: MIT
 - Local changes: `index.ts` only re-exports the released source extension; the existing driver skill
   delegates to the bundled Regrafter CLI

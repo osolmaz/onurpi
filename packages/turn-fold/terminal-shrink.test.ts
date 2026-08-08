@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TUI, type Component, type Terminal } from "@earendil-works/pi-tui";
+import { type Component, type Terminal, TuiMainScreen } from "@earendil-works/pi-tui";
 
 import { enableTranscriptShrinkClearing } from "./shortcut-editor.ts";
 
@@ -89,7 +89,7 @@ describe("Turn Fold terminal shrinking", () => {
   it("clears obsolete screen and scrollback rows when compact scope shortens the transcript", async () => {
     const terminal = new RecordingTerminal();
     const transcript = new MutableTranscript(128);
-    const tui = new TUI(terminal);
+    const tui = new TuiMainScreen(terminal);
     const restoreShrinkClearing = enableTranscriptShrinkClearing(tui);
     tui.addChild(transcript);
 

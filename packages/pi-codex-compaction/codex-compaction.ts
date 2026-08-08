@@ -158,7 +158,7 @@ function setFeatureHeader(headers: BeforeProviderHeadersEvent["headers"]): void 
 async function resolveCodexAuth(
   ctx: CodexCompactionContext,
   model: CodexModel,
-): Promise<{ apiKey: string; headers: Record<string, string> }> {
+): Promise<{ apiKey: string; headers: BeforeProviderHeadersEvent["headers"] }> {
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
   if (!auth.ok) throw new Error(auth.error);
   if (!auth.apiKey) throw new Error("OpenAI Codex authentication is unavailable.");

@@ -95,10 +95,13 @@ export function mergeFeatureHeader(existing: string | null | undefined): string 
 
 export function buildCodexHeaders(params: {
   apiKey: string;
-  headers?: Record<string, string>;
+  headers?: Readonly<Record<string, string | null>>;
   sessionId: string;
 }): Headers {
-  const headers = new Headers(params.headers);
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(params.headers ?? {})) {
+    if (value !== null) headers.set(name, value);
+  }
   headers.set("authorization", `Bearer ${params.apiKey}`);
   headers.set("chatgpt-account-id", extractCodexAccountId(params.apiKey));
   headers.set("originator", "pi");
