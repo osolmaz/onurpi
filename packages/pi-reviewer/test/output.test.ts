@@ -298,6 +298,21 @@ describe("Pi JSON events", () => {
     });
   });
 
+  it("retains text from a bounded final response that still requests a tool", () => {
+    const collector = new PiEventCollector();
+    collector.feed(
+      `${JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          stopReason: "toolUse",
+          content: [{ type: "text", text: "bounded final" }],
+        },
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+    );
+    expect(collector.finish().finalText).toBe("bounded final");
+  });
+
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {
     const invalid = new PiEventCollector();
     expect(() => {

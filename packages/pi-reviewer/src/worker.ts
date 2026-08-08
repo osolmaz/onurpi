@@ -121,15 +121,27 @@ export function installRequestLimiter(
 ): RequestLimiter {
   if (limit === null) return { finish: () => Promise.resolve(), dispose: () => undefined };
   let requests = 0;
+  let finalPhase = false;
+  let finalAbort: Promise<void> | undefined;
   let finalReview: Promise<void> | undefined;
   const dispose = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
     requests += 1;
+    if (finalPhase) {
+      finalAbort = abortFinalToolUse(session, event.message.stopReason, finalAbort);
+      return;
+    }
     if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
       return;
     }
     finalReview = Promise.resolve().then(async () => {
-      await finishBoundedReview(session);
+      await session.abort();
+      session.setActiveToolsByName([]);
+      finalPhase = true;
+      await session.prompt(
+        "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
+      );
+      await finalAbort;
     });
   });
   return {
@@ -140,14 +152,15 @@ export function installRequestLimiter(
   };
 }
 
-async function finishBoundedReview(
-  session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName">,
-): Promise<void> {
-  await session.abort();
-  session.setActiveToolsByName([]);
-  await session.prompt(
-    "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
-  );
+function abortFinalToolUse(
+  session: Pick<AgentSession, "abort">,
+  stopReason: string,
+  existing: Promise<void> | undefined,
+): Promise<void> | undefined {
+  if (existing !== undefined || stopReason !== "toolUse") return existing;
+  return Promise.resolve().then(async () => {
+    await session.abort();
+  });
 }
 
 function writeEvent(event: AgentSessionEvent): void {

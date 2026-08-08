@@ -41,28 +41,6 @@ describe("request limiter", () => {
     let listener: (event: AgentSessionEvent) => void = () => undefined;
     let removed = false;
     const calls: string[] = [];
-    const limiter = installRequestLimiter(
-      {
-        subscribe: (next) => {
-          listener = next;
-          return () => {
-            removed = true;
-          };
-        },
-        abort: () => {
-          calls.push("abort");
-          return Promise.resolve();
-        },
-        prompt: (content) => {
-          calls.push(`prompt:${content}`);
-          return Promise.resolve();
-        },
-        setActiveToolsByName: (tools) => {
-          calls.push(`tools:${tools.join(",")}`);
-        },
-      },
-      2,
-    );
     const event: AgentSessionEvent = {
       type: "message_end",
       message: {
@@ -83,15 +61,39 @@ describe("request limiter", () => {
         timestamp: 1,
       },
     };
+    const limiter = installRequestLimiter(
+      {
+        subscribe: (next) => {
+          listener = next;
+          return () => {
+            removed = true;
+          };
+        },
+        abort: () => {
+          calls.push("abort");
+          return Promise.resolve();
+        },
+        prompt: (content) => {
+          calls.push(`prompt:${content}`);
+          listener(event);
+          return Promise.resolve();
+        },
+        setActiveToolsByName: (tools) => {
+          calls.push(`tools:${tools.join(",")}`);
+        },
+      },
+      2,
+    );
 
     listener(event);
     listener(event);
     listener(event);
     await limiter.finish();
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(calls[0]).toBe("abort");
     expect(calls[1]).toBe("tools:");
     expect(calls[2]).toContain("Return the final review JSON");
+    expect(calls[3]).toBe("abort");
     limiter.dispose();
     expect(removed).toBe(true);
   });
