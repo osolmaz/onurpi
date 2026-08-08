@@ -2,6 +2,10 @@ export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhig
 
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
+export const OUTPUT_FORMATS = ["text", "json"] as const;
+
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
 export type ModelSelection = {
   readonly provider: string;
   readonly model: string;
@@ -19,6 +23,7 @@ export type ReviewRequest = {
   readonly cwd: string;
   readonly model?: string;
   readonly thinking?: ThinkingLevel;
+  readonly format?: OutputFormat;
 };
 
 export type ReviewFinding = {

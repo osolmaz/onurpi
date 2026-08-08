@@ -54,7 +54,13 @@ pi-reviewer --commit <sha>
 pi-reviewer "focus on cancellation safety"
 ```
 
-The command writes progress to stderr and the final report to stdout. A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
+The command writes progress to stderr and the final report to stdout. Use `--format json` to emit the validated Codex-compatible result object without terminal prose:
+
+```bash
+pi-reviewer --base main --format json > review.json
+```
+
+A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
 
 Normal reviews use an in-memory Pi SDK session and do not write Pi session history. Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 
