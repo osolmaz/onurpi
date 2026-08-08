@@ -19,6 +19,8 @@ describe("review arguments", () => {
         "/tmp/model.json",
         "--metrics-file",
         "/tmp/metrics.json",
+        "--max-model-requests",
+        "12",
         "--thinking",
         "high",
         "--format",
@@ -30,6 +32,7 @@ describe("review arguments", () => {
         model: "openai-codex/reviewer",
         modelManifest: "/tmp/model.json",
         metricsFile: "/tmp/metrics.json",
+        maxModelRequests: 12,
         thinking: "high",
         format: "json",
       },
@@ -83,6 +86,12 @@ describe("review arguments", () => {
     });
     expect(() => parseModel("missing-provider")).toThrow("provider/model");
     expect(() => parseModel("/missing")).toThrow("provider/model");
+    expect(() => parseArgs(["--base", "main", "--max-model-requests", "0"])).toThrow(
+      "must be an integer",
+    );
+    expect(() => parseArgs(["--base", "main", "--max-model-requests", "101"])).toThrow(
+      "at most 100",
+    );
     expect(() => validateThinking("extreme")).toThrow("thinking must be one of");
     expect(validateOutputFormat("json")).toBe("json");
     expect(() => validateOutputFormat("xml")).toThrow("format must be one of");

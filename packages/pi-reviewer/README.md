@@ -94,6 +94,8 @@ Use `--metrics-file` to record cumulative token use, estimated cost from the pin
 pi-reviewer --base main --format json --metrics-file ./review-metrics.json > review.json
 ```
 
+`--max-model-requests N` asks a tool-using review to stop investigating and return its final JSON after the Nth model response. It does not truncate a response or silently turn a timed-out review into a clean result.
+
 A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
 
 Normal reviews use an in-memory Pi SDK session and do not write Pi session history. Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.

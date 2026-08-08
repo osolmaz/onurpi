@@ -5,6 +5,7 @@ import {
   ModelRuntime,
   SessionManager,
   SettingsManager,
+  type AgentSession,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 
@@ -92,18 +93,45 @@ export async function createDefaultExecution(
     settingsManager,
     sessionManager: SessionManager.inMemory(request.cwd),
   });
+  const removeRequestLimiter = installRequestLimiter(session, request.maxModelRequests);
   return {
     subscribe: (listener) => session.subscribe(listener),
     prompt: async (prompt) => {
       await session.prompt(prompt);
     },
     dispose: () => {
+      removeRequestLimiter();
       session.dispose();
     },
     flush: async () => {
       await settingsManager.flush();
     },
   };
+}
+
+export function installRequestLimiter(
+  session: Pick<AgentSession, "subscribe" | "sendUserMessage">,
+  limit: number | null,
+): () => void {
+  if (limit === null) return () => undefined;
+  let requests = 0;
+  let steered = false;
+  return session.subscribe((event) => {
+    if (event.type !== "message_end" || event.message.role !== "assistant") return;
+    requests += 1;
+    if (steered || requests < limit || event.message.stopReason !== "toolUse") return;
+    steered = true;
+    void session
+      .sendUserMessage(
+        "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
+        { deliverAs: "steer" },
+      )
+      .catch((error: unknown) => {
+        process.stderr.write(
+          `${terminalText(`could not steer review to completion: ${error instanceof Error ? error.message : String(error)}`)}\n`,
+        );
+      });
+  });
 }
 
 function writeEvent(event: AgentSessionEvent): void {
