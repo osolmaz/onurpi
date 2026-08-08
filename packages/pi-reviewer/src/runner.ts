@@ -46,7 +46,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };
   const finalText = await executeWorker(app.piCommand, request, app.env, input.stderr);
-  return parseReviewOutput(finalText);
+  return parseReviewOutput(finalText, input.cwd);
 }
 
 async function executeWorker(

@@ -21,7 +21,7 @@ const OUTPUT = {
       confidence_score: 0.91,
       priority: 1,
       code_location: {
-        absolute_file_path: "/repo/src/run.ts",
+        absolute_file_path: "src/run.ts",
         line_range: { start: 10, end: 11 },
       },
     },
