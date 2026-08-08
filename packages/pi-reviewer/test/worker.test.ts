@@ -76,7 +76,7 @@ describe("request limiter", () => {
         prompt: (content) => {
           calls.push(`prompt:${content}`);
           listener(event);
-          return Promise.resolve();
+          return new Promise<void>(() => undefined);
         },
         setActiveToolsByName: (tools) => {
           calls.push(`tools:${tools.join(",")}`);
@@ -89,11 +89,10 @@ describe("request limiter", () => {
     listener(event);
     listener(event);
     await limiter.finish();
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(3);
     expect(calls[0]).toBe("abort");
     expect(calls[1]).toBe("tools:");
     expect(calls[2]).toContain("Return the final review JSON");
-    expect(calls[3]).toBe("abort");
     limiter.dispose();
     expect(removed).toBe(true);
   });

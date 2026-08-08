@@ -308,9 +308,9 @@ describe("Pi JSON events", () => {
           stopReason: "toolUse",
           content: [{ type: "text", text: "bounded final" }],
         },
-      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+      })}\n`,
     );
-    expect(collector.finish().finalText).toBe("bounded final");
+    expect(collector.finish()).toEqual({ finalText: "bounded final", sawAgentEnd: false });
   });
 
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {
