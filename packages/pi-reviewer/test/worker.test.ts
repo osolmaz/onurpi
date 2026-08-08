@@ -88,6 +88,7 @@ describe("request limiter", () => {
     listener(event);
     listener(event);
     listener(event);
+    await limiter.triggered;
     await limiter.finish();
     expect(calls).toHaveLength(3);
     expect(calls[0]).toBe("abort");
