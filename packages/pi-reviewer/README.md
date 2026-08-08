@@ -94,7 +94,7 @@ Use `--metrics-file` to record cumulative token use, estimated cost from the pin
 pi-reviewer --base main --format json --metrics-file ./review-metrics.json > review.json
 ```
 
-`--max-model-requests N` asks a tool-using review to stop investigating and return its final JSON after the Nth model response. It does not truncate a response or silently turn a timed-out review into a clean result.
+`--max-model-requests N` stops pending tool work after the Nth complete model response and makes one final request for the required JSON using the evidence already gathered. It does not truncate a model response or silently turn a timed-out review into a clean result.
 
 A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
 
