@@ -106,16 +106,20 @@ export class PiEventCollector {
     if (!isRecord(message) || message["role"] !== "assistant") return;
     this.consumeMetrics(message);
     const stopReason = message["stopReason"];
-    if (stopReason === "stop") {
-      const text = assistantText(message["content"]);
-      if (text.length > MAX_FINAL_TEXT_CHARS) throw new Error("review output exceeded size limit");
-      if (text.trim() !== "") this.finalText = text;
-      this.terminalError = undefined;
+    if (stopReason === "stop" || stopReason === "toolUse") {
+      this.consumeCandidate(message);
+      if (stopReason === "stop") this.terminalError = undefined;
       return;
     }
     if (stopReason === "error" || stopReason === "aborted") {
       this.terminalError = optionalError(message["errorMessage"], stopReason);
     }
+  }
+
+  private consumeCandidate(message: Readonly<Record<string, unknown>>): void {
+    const text = assistantText(message["content"]);
+    if (text.length > MAX_FINAL_TEXT_CHARS) throw new Error("review output exceeded size limit");
+    if (text.trim() !== "") this.finalText = text;
   }
 
   private consumeMetrics(message: Readonly<Record<string, unknown>>): void {
