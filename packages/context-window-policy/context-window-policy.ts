@@ -7,7 +7,17 @@ import type {
 const AUTO_COMPACT_NUMERATOR = 9;
 const AUTO_COMPACT_DENOMINATOR = 10;
 
-type SelectedModel = Pick<NonNullable<ExtensionContext["model"]>, "contextWindow">;
+type SelectedModel = Pick<NonNullable<ExtensionContext["model"]>, "contextWindow"> &
+  Partial<Pick<NonNullable<ExtensionContext["model"]>, "provider" | "api">>;
+
+/**
+ * True when `@onurpi/pi-codex-compaction` owns compaction for this model. The built-in Codex
+ * provider compacts natively through that extension (90% turn-boundary trigger plus fail-closed
+ * remote checkpoints), so this policy must not request a second, racing text compaction for it.
+ */
+export function isCodexNativeModel(model: SelectedModel | undefined): boolean {
+  return model?.provider === "openai-codex" && model.api === "openai-codex-responses";
+}
 
 export type ContextWindowPolicyContext = {
   model: SelectedModel | undefined;
@@ -52,7 +62,7 @@ type PolicyInput = {
 };
 
 function readPolicyInput(ctx: ContextWindowPolicyContext): PolicyInput | undefined {
-  if (!ctx.model) return undefined;
+  if (!ctx.model || isCodexNativeModel(ctx.model)) return undefined;
   const limit = autoCompactTokenLimit(ctx.model.contextWindow);
   const tokens = ctx.getContextUsage()?.tokens;
   if (limit === undefined || tokens === null || tokens === undefined || !isTokenCount(tokens)) {

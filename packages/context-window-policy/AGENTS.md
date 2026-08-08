@@ -10,6 +10,9 @@
   compaction entry.
 - Call Pi's aborting manual compaction API only after `agent_settled` or during an idle model
   change; never interrupt an active tool continuation.
+- Pass built-in `openai-codex` models through: `@onurpi/pi-codex-compaction` owns their compaction.
+  Keep the settlement policy for every other provider, including custom providers on the
+  `openai-codex-responses` API.
 - Keep duplicate-prevention state ephemeral and session-scoped.
 - Run `npm run check` and `npm run slophammer` before finishing. Mutation testing is optional and
   manual.

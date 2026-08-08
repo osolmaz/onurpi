@@ -21,12 +21,12 @@ import {
 type HookEvent = Parameters<SessionBeforeCompactHandler>[0];
 type HookContext = Parameters<SessionBeforeCompactHandler>[1];
 
-function model(api: Api = "openai-codex-responses"): Model<Api> {
+function model(api: Api = "openai-codex-responses", provider = "custom-codex"): Model<Api> {
   return {
     id: "test-model",
     name: "Test model",
     api,
-    provider: "openai-codex",
+    provider,
     baseUrl: "https://proxy.example.test",
     reasoning: true,
     input: ["text"],
@@ -141,6 +141,10 @@ describe("reliable compaction policy", () => {
 
   it("passes through models without a reliability policy", () => {
     expect(policyForModel(model("anthropic-messages"))).toBeUndefined();
+  });
+
+  it("passes through the built-in Codex provider owned by native compaction", () => {
+    expect(policyForModel(model("openai-codex-responses", "openai-codex"))).toBeUndefined();
   });
 
   it("counts one or two summary calls from Pi's public preparation", () => {
@@ -301,7 +305,7 @@ describe("session_before_compact handler", () => {
     source.end(assistant());
     await returned.result();
     await Promise.resolve();
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
   });
 
   it("keeps the override for both parts of a split-turn summary", async () => {
@@ -329,7 +333,7 @@ describe("session_before_compact handler", () => {
     sources[1]?.end(assistant());
     await second.result();
     await Promise.resolve();
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
   });
 
   it("removes a split-turn override immediately after failure", async () => {
@@ -344,7 +348,7 @@ describe("session_before_compact handler", () => {
     source.end(assistant("error"));
     await returned.result();
     await Promise.resolve();
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
   });
 
   it("unregisters the copied provider config returned by Pi", async () => {
@@ -366,7 +370,7 @@ describe("session_before_compact handler", () => {
     source.end(assistant());
     await returned.result();
     await Promise.resolve();
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
   });
 
   it("does not unregister a provider that replaced its temporary override", async () => {
@@ -397,7 +401,7 @@ describe("session_before_compact handler", () => {
 
     await handler(event(), context());
     await handler(event(), context());
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
     expect(state.registered()).toBeDefined();
   });
 });
@@ -415,6 +419,6 @@ describe("extension registration", () => {
 
     await handler(event(), context());
     state.cleanupHandlers[0]?.();
-    expect(state.unregistered).toEqual(["openai-codex"]);
+    expect(state.unregistered).toEqual(["custom-codex"]);
   });
 });

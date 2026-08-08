@@ -16,6 +16,11 @@ reserve, this extension reaches 90% first for context windows of at least 163,84
 windows, Pi's fixed reserve can compact earlier. `@onurpi/reliable-compaction` can independently
 select a stable transport after this extension requests compaction.
 
+Models on the built-in Codex provider (`openai-codex` with the `openai-codex-responses` API) pass
+through untouched: `@onurpi/pi-codex-compaction` owns their 90% turn-boundary trigger and native
+remote compaction, so this policy never requests a second, racing text compaction for them. Custom
+providers using the same API keep this policy's normal behavior.
+
 ## Install
 
 From the OnurPi repository root, install the local package and reload Pi:

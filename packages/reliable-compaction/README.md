@@ -3,10 +3,16 @@
 `@onurpi/reliable-compaction` makes Pi compaction use a stable transport when a provider's default
 transport is unsuitable for long summaries.
 
-For models using the `openai-codex-responses` API, the extension sends compaction summaries over SSE
-instead of WebSocket. Pi still performs the compaction through its configured provider pipeline, so
-base URL and authentication overrides, request headers, timeout settings, split-turn handling,
-custom instructions, file tracking, thinking level, and automatic overflow recovery are preserved.
+For models using the `openai-codex-responses` API on a custom provider, the extension sends
+compaction summaries over SSE instead of WebSocket. Pi still performs the compaction through its
+configured provider pipeline, so base URL and authentication overrides, request headers, timeout
+settings, split-turn handling, custom instructions, file tracking, thinking level, and automatic
+overflow recovery are preserved.
+
+The built-in `openai-codex` provider is **not** covered: `@onurpi/pi-codex-compaction` owns native
+remote compaction for it, so Pi never makes a text-summary call whose transport this extension could
+stabilize. The policy passes that provider through instead of arming an override that would be left
+dangling when native compaction cancels Pi's compaction.
 
 A failed summary request is retried once because Pi does not append the compaction entry until a
 complete result exists. Cancellation is never retried. Both attempts stay on SSE, so failure does

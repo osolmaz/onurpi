@@ -9,6 +9,7 @@ import {
   autoCompactTokenLimit,
   createContextWindowPolicyController,
   installContextWindowPolicy,
+  isCodexNativeModel,
   type ContextWindowPolicyApi,
   type ContextWindowPolicyContext,
 } from "./context-window-policy.ts";
@@ -24,12 +25,21 @@ type ContextOptions = {
   contextWindow?: number;
   idle?: boolean;
   tokens?: number | null;
+  provider?: string;
+  api?: string;
 };
 
 function context(options: ContextOptions = {}): ContextWindowPolicyContext {
   const contextWindow = options.contextWindow;
   return {
-    model: contextWindow === undefined ? undefined : { contextWindow },
+    model:
+      contextWindow === undefined
+        ? undefined
+        : {
+            contextWindow,
+            ...(options.provider ? { provider: options.provider } : {}),
+            ...(options.api ? { api: options.api } : {}),
+          },
     compact: (compactOptions = {}) => {
       options.compact?.(compactOptions);
     },
@@ -308,5 +318,65 @@ describe("extension registration", () => {
       state.agentSettled(ctx);
     }
     expect(requests).toHaveLength(4);
+  });
+});
+
+describe("Codex native compaction ownership", () => {
+  it("leaves Codex native compaction to @onurpi/pi-codex-compaction", () => {
+    const requests: CompactOptions[] = [];
+    const controller = createContextWindowPolicyController();
+
+    expect(
+      controller.evaluate(
+        context({
+          contextWindow: 272_000,
+          tokens: 272_000,
+          provider: "openai-codex",
+          api: "openai-codex-responses",
+          compact: (value) => requests.push(value),
+        }),
+      ),
+    ).toBe("unavailable");
+    expect(requests).toHaveLength(0);
+
+    // A custom provider using the same API is still text-compacted by this policy.
+    expect(
+      controller.evaluate(
+        context({
+          contextWindow: 272_000,
+          tokens: 244_800,
+          provider: "custom-codex",
+          api: "openai-codex-responses",
+          compact: (value) => requests.push(value),
+        }),
+      ),
+    ).toBe("triggered");
+    expect(requests).toHaveLength(1);
+  });
+
+  it("identifies only the built-in Codex provider and API pair", () => {
+    expect(
+      isCodexNativeModel({
+        contextWindow: 272_000,
+        provider: "openai-codex",
+        api: "openai-codex-responses",
+      }),
+    ).toBe(true);
+    expect(
+      isCodexNativeModel({
+        contextWindow: 272_000,
+        provider: "custom-codex",
+        api: "openai-codex-responses",
+      }),
+    ).toBe(false);
+    expect(
+      isCodexNativeModel({
+        contextWindow: 272_000,
+        provider: "openai-codex",
+        api: "openai-responses",
+      }),
+    ).toBe(false);
+    expect(isCodexNativeModel({ contextWindow: 272_000 })).toBe(false);
+    expect(isCodexNativeModel(undefined)).toBe(false);
   });
 });

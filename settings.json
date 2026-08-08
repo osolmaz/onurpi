@@ -8,6 +8,7 @@
     "../../repos/onurpi/packages/goal",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
+    "../../repos/onurpi/packages/pi-codex-compaction",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
     "../../repos/onurpi/packages/infinite-retry",
@@ -23,10 +24,10 @@
     "../../repos/onurpi/packages/skill-slug",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.83.0",
-  "defaultProvider": "huggingface",
-  "defaultModel": "moonshotai/Kimi-K3:fireworks-ai",
-  "defaultThinkingLevel": "max",
+  "lastChangelogVersion": "0.84.1",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "high",
   "outputPad": 0,
   "theme": "onur-dark"
 }

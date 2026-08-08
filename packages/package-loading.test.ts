@@ -161,6 +161,15 @@ describe("OnurPi package loading", () => {
     );
   });
 
+  it("owns Codex compaction before the text-compaction policies", () => {
+    const extensions = resourceManifest()["extensions"];
+    if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
+    const codex = extensions.indexOf("./packages/pi-codex-compaction/index.ts");
+    expect(codex).toBeGreaterThanOrEqual(0);
+    expect(codex).toBeLessThan(extensions.indexOf("./packages/reliable-compaction/index.ts"));
+    expect(codex).toBeLessThan(extensions.indexOf("./packages/context-window-policy/index.ts"));
+  });
+
   it("runs Loop Guard before Goal settlement handlers", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");

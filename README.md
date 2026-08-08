@@ -14,6 +14,7 @@ configuration.
 | [`@onurpi/skill-slug`](packages/skill-slug/)                       | Invoke skills by typing their bare slug                          |
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                          |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager        |
+| [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)     | OpenAI Codex native remote compaction (vendored)                 |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                   |
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                      |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                 |
@@ -45,6 +46,11 @@ repositories.
 | [`regrafter-driver`](packages/regrafter-driver/)   | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit    |
 | [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.2.0    |
 | [`demo-mode`](packages/demo-mode/)                 | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
+
+Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
+provider natively, while `context-window-policy` and `reliable-compaction` pass that provider
+through and keep covering every other model. See the
+[package README](packages/pi-codex-compaction/README.md#compaction-ownership-in-onurpi).
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts
 unless its driver skill matches an explicit delegation or vendored-code maintenance request. YARP

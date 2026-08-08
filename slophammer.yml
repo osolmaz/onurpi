@@ -55,6 +55,11 @@ typescript:
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
       - packages/context-window-policy/context-window-policy.ts
+      - packages/pi-codex-compaction/codex-compaction.ts
+      - packages/pi-codex-compaction/config.ts
+      - packages/pi-codex-compaction/native-checkpoint.ts
+      - packages/pi-codex-compaction/remote-compaction.ts
+      - packages/pi-codex-compaction/responses-input.ts
       - packages/pi-usage/src/core.ts
       - packages/pi-usage/src/format.ts
       - packages/pi-usage/src/query.ts
@@ -94,6 +99,9 @@ typescript:
     - from: packages/context-window-policy
       allow:
         - packages/context-window-policy
+    - from: packages/pi-codex-compaction
+      allow:
+        - packages/pi-codex-compaction
     - from: packages/pi-usage
       allow:
         - packages/pi-usage
