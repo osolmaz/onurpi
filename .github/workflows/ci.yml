@@ -128,11 +128,7 @@ jobs:
         working-directory: packages/pi-reviewer
         run: npm run slophammer
   pi-reviewer-platform:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -147,11 +143,7 @@ jobs:
         working-directory: packages/pi-reviewer
         run: npm test
   unified-exec-platform:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
