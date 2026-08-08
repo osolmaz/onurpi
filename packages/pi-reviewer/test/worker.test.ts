@@ -20,6 +20,7 @@ const REQUEST = {
   systemPrompt: "review",
   provider: "provider",
   model: "model",
+  customModel: false,
   thinking: "high",
   tools: ["read"],
 } satisfies ReviewWorkerRequest;
@@ -53,6 +54,52 @@ describe("review worker events", () => {
     });
     const unsubscribe = execution.subscribe(() => undefined);
     unsubscribe();
+    execution.dispose();
+    await execution.flush();
+  });
+
+  it("uses a manifest-defined custom model without dynamic provider registration", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-custom-worker-"));
+    cleanup.push(root);
+    const configDir = path.join(root, "config");
+    const modelsPath = path.join(configDir, "models.json");
+    const extensionPath = path.join(root, "empty-extension.ts");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(
+      modelsPath,
+      JSON.stringify({
+        providers: {
+          custom: {
+            baseUrl: "https://example.test/v1",
+            api: "openai-completions",
+            apiKey: "test-key",
+            models: [
+              {
+                id: "review-model",
+                name: "Review model",
+                reasoning: true,
+                input: ["text"],
+                contextWindow: 131_072,
+                maxTokens: 32_768,
+              },
+            ],
+          },
+        },
+      }),
+    );
+    await writeFile(extensionPath, "export default function extension() {}\n");
+
+    const execution = await createDefaultExecution({
+      ...REQUEST,
+      customModel: true,
+      cwd: root,
+      authPath: path.join(root, "auth.json"),
+      modelsPath,
+      configDir,
+      extensionPath,
+      provider: "custom",
+      model: "review-model",
+    });
     execution.dispose();
     await execution.flush();
   });

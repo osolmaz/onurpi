@@ -50,7 +50,7 @@ export async function createDefaultExecution(
     modelsStorePath: canonicalModelsStorePath(request.authPath),
     allowModelNetwork: false,
   });
-  await registerHuggingFaceOAuthProvider(modelRuntime);
+  if (!request.customModel) await registerHuggingFaceOAuthProvider(modelRuntime);
   const model = modelRuntime.getModel(request.provider, request.model);
   if (model === undefined) {
     throw new Error(`review model not found: ${request.provider}/${request.model}`);

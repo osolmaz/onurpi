@@ -6,7 +6,7 @@ import { regularPiAuthPath } from "./auth-path.js";
 import { PiEventCollector } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import { selectAppModel } from "./app.js";
-import type { ModelSelection, ReviewOutput } from "./types.js";
+import type { CustomModelManifest, ModelSelection, ReviewOutput } from "./types.js";
 import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
 const MAX_RUNTIME_MS = 20 * 60_000;
@@ -17,13 +17,14 @@ const MAX_STDERR_BYTES = 128 * 1024;
 export type RunReviewInput = {
   readonly app: PiAppDefinition;
   readonly selection: ModelSelection;
+  readonly modelManifest?: CustomModelManifest;
   readonly cwd: string;
   readonly prompt: string;
   readonly stderr?: NodeJS.WritableStream;
 };
 
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
-  const app = selectAppModel(input.app, input.selection);
+  const app = selectAppModel(input.app, input.selection, input.modelManifest);
   const runtime = await writePiRuntimeConfig(app);
   const extension = app.extensions?.[0];
   if (extension === undefined) throw new Error("Pi Reviewer extension is not configured");
@@ -40,6 +41,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     systemPrompt: app.systemPrompt,
     provider: input.selection.provider,
     model: input.selection.model,
+    customModel: input.modelManifest !== undefined,
     thinking: input.selection.thinking,
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };

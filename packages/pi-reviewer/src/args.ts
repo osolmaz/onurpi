@@ -23,6 +23,7 @@ export type ParsedCommand =
 type ReviewFields = {
   cwd: string;
   model?: string;
+  modelManifest?: string;
   thinking?: ThinkingLevel;
   format?: OutputFormat;
   title?: string;
@@ -102,10 +103,12 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
     target: ReviewTarget;
     cwd: string;
     model?: string;
+    modelManifest?: string;
     thinking?: ThinkingLevel;
     format?: OutputFormat;
   } = { target: withCommitTitle(fields.target, fields.title), cwd: fields.cwd };
   if (fields.model !== undefined) request.model = fields.model;
+  if (fields.modelManifest !== undefined) request.modelManifest = fields.modelManifest;
   if (fields.thinking !== undefined) request.thinking = fields.thinking;
   if (fields.format !== undefined) request.format = fields.format;
   return request;
@@ -154,6 +157,7 @@ function consumeReviewOption(
 ): number | undefined {
   if (arg === "--title") fields.title = requiredValue(next, arg);
   else if (arg === "--model") fields.model = validateModel(requiredValue(next, arg));
+  else if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
   else if (arg === "--thinking") fields.thinking = validateThinking(requiredValue(next, arg));
   else if (arg === "--format") fields.format = validateOutputFormat(requiredValue(next, arg));
   else if (arg === "--cwd") fields.cwd = requiredValue(next, arg);
@@ -206,5 +210,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

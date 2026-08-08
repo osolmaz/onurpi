@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadPiApp, manifestToDefinition, type PiAppDefinition } from "@osolmaz/pi-factory";
 
-import type { ModelSelection } from "./types.js";
+import type { CustomModelManifest, ModelSelection } from "./types.js";
 
 export type AppOptions = {
   readonly packageRoot?: string;
@@ -23,16 +23,32 @@ export async function loadReviewerApp(options: AppOptions = {}): Promise<PiAppDe
   };
 }
 
-export function selectAppModel(app: PiAppDefinition, selection: ModelSelection): PiAppDefinition {
+export function selectAppModel(
+  app: PiAppDefinition,
+  selection: ModelSelection,
+  manifest?: CustomModelManifest,
+): PiAppDefinition {
+  const provider =
+    manifest === undefined
+      ? {
+          id: selection.provider,
+          source: "pi" as const,
+          models: [{ id: selection.model, reasoning: true }],
+        }
+      : {
+          id: manifest.provider.id,
+          source: "custom" as const,
+          baseUrl: manifest.provider.baseUrl,
+          api: "openai-completions" as const,
+          ...(manifest.provider.apiKeyEnv === undefined
+            ? {}
+            : { apiKey: `$${manifest.provider.apiKeyEnv}` }),
+          ...(manifest.provider.compat === undefined ? {} : { compat: manifest.provider.compat }),
+          models: [manifest.model],
+        };
   return {
     ...app,
-    providers: [
-      {
-        id: selection.provider,
-        source: "pi",
-        models: [{ id: selection.model, reasoning: true }],
-      },
-    ],
+    providers: [provider],
     defaultProvider: selection.provider,
     defaultModel: selection.model,
     thinking: selection.thinking,
