@@ -80,11 +80,13 @@ export class PiEventCollector {
     this.feedText(this.decoder.end());
     if (this.buffer.trim() !== "") this.consume(this.buffer);
     this.buffer = "";
-    if (!this.agentEnded) throw new Error("Pi exited before agent_end");
+    if (!this.agentEnded && this.finalText === undefined) {
+      throw new Error("Pi exited before agent_end");
+    }
     if (this.finalText === undefined) {
       throw new Error(this.terminalError ?? "Pi produced no completed assistant response");
     }
-    return { finalText: this.finalText, sawAgentEnd: true };
+    return { finalText: this.finalText, sawAgentEnd: this.agentEnded };
   }
 
   private consume(line: string): void {
