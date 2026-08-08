@@ -51,6 +51,7 @@ export type ReviewRequest = {
   readonly cwd: string;
   readonly model?: string;
   readonly modelManifest?: string;
+  readonly metricsFile?: string;
   readonly thinking?: ThinkingLevel;
   readonly format?: OutputFormat;
 };

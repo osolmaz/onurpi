@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory";
 
 import { regularPiAuthPath } from "./auth-path.js";
-import { PiEventCollector } from "./pi-events.js";
+import { PiEventCollector, type PiRunMetrics } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import { selectAppModel } from "./app.js";
 import type { CustomModelManifest, ModelSelection, ReviewOutput } from "./types.js";
@@ -21,6 +21,7 @@ export type RunReviewInput = {
   readonly cwd: string;
   readonly prompt: string;
   readonly stderr?: NodeJS.WritableStream;
+  readonly onMetrics?: (metrics: PiRunMetrics) => void;
 };
 
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
@@ -45,7 +46,13 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     thinking: input.selection.thinking,
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };
-  const finalText = await executeWorker(app.piCommand, request, app.env, input.stderr);
+  const finalText = await executeWorker(
+    app.piCommand,
+    request,
+    app.env,
+    input.stderr,
+    input.onMetrics,
+  );
   return parseReviewOutput(finalText, input.cwd);
 }
 
@@ -54,6 +61,7 @@ async function executeWorker(
   request: ReviewWorkerRequest,
   appEnv: Readonly<Record<string, string>> | undefined,
   stderr: NodeJS.WritableStream | undefined,
+  onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
 ): Promise<string> {
   const [program, ...args] = command;
   if (program === undefined) throw new Error("Pi Reviewer worker command is empty");
@@ -72,12 +80,13 @@ async function executeWorker(
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdin.end(JSON.stringify(request));
-  return await collectChild(child, stderr);
+  return await collectChild(child, stderr, onMetrics);
 }
 
 async function collectChild(
   child: ChildProcessWithoutNullStreams,
   stderr: NodeJS.WritableStream | undefined,
+  onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
 ): Promise<string> {
   const collector = new PiEventCollector();
   let stderrBytes = 0;
@@ -113,6 +122,7 @@ async function collectChild(
     resetInactivity();
     try {
       collector.feed(chunk);
+      onMetrics?.(collector.metrics());
     } catch (error) {
       failure = error instanceof Error ? error : new Error(String(error));
       terminate(failure.message);

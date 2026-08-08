@@ -8,12 +8,38 @@ export type PiRunResult = {
   readonly sawAgentEnd: boolean;
 };
 
+export type PiRunMetrics = {
+  readonly version: 1;
+  readonly requests: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly reasoningTokens: number;
+  readonly totalTokens: number;
+  readonly costUsd: number;
+  readonly observedProviders: readonly string[];
+  readonly observedModels: readonly string[];
+  readonly observedResponseModels: readonly string[];
+};
+
 export class PiEventCollector {
   private buffer = "";
   private readonly decoder = new StringDecoder("utf8");
   private finalText: string | undefined;
   private terminalError: string | undefined;
   private agentEnded = false;
+  private requests = 0;
+  private inputTokens = 0;
+  private outputTokens = 0;
+  private cacheReadTokens = 0;
+  private cacheWriteTokens = 0;
+  private reasoningTokens = 0;
+  private totalTokens = 0;
+  private costUsd = 0;
+  private readonly observedProviders = new Set<string>();
+  private readonly observedModels = new Set<string>();
+  private readonly observedResponseModels = new Set<string>();
 
   feed(chunk: string | Buffer): void {
     this.feedText(typeof chunk === "string" ? chunk : this.decoder.write(chunk));
@@ -31,6 +57,23 @@ export class PiEventCollector {
       this.consume(line);
       newline = this.buffer.indexOf("\n");
     }
+  }
+
+  metrics(): PiRunMetrics {
+    return {
+      version: 1,
+      requests: this.requests,
+      inputTokens: this.inputTokens,
+      outputTokens: this.outputTokens,
+      cacheReadTokens: this.cacheReadTokens,
+      cacheWriteTokens: this.cacheWriteTokens,
+      reasoningTokens: this.reasoningTokens,
+      totalTokens: this.totalTokens,
+      costUsd: this.costUsd,
+      observedProviders: [...this.observedProviders].sort(),
+      observedModels: [...this.observedModels].sort(),
+      observedResponseModels: [...this.observedResponseModels].sort(),
+    };
   }
 
   finish(): PiRunResult {
@@ -61,6 +104,7 @@ export class PiEventCollector {
 
   private consumeMessage(message: unknown): void {
     if (!isRecord(message) || message["role"] !== "assistant") return;
+    this.consumeMetrics(message);
     const stopReason = message["stopReason"];
     if (stopReason === "stop") {
       const text = assistantText(message["content"]);
@@ -73,6 +117,40 @@ export class PiEventCollector {
       this.terminalError = optionalError(message["errorMessage"], stopReason);
     }
   }
+
+  private consumeMetrics(message: Readonly<Record<string, unknown>>): void {
+    addObservedString(message["provider"], this.observedProviders);
+    addObservedString(message["model"], this.observedModels);
+    addObservedString(message["responseModel"], this.observedResponseModels);
+    const usage = message["usage"];
+    if (usage === undefined) return;
+    if (!isRecord(usage) || !isRecord(usage["cost"])) {
+      throw new Error("Pi emitted invalid usage metrics");
+    }
+    this.requests += 1;
+    this.inputTokens += metricNumber(usage["input"]);
+    this.outputTokens += metricNumber(usage["output"]);
+    this.cacheReadTokens += metricNumber(usage["cacheRead"]);
+    this.cacheWriteTokens += metricNumber(usage["cacheWrite"]);
+    this.reasoningTokens += optionalMetricNumber(usage["reasoning"]);
+    this.totalTokens += metricNumber(usage["totalTokens"]);
+    this.costUsd += metricNumber(usage["cost"]["total"]);
+  }
+}
+
+function addObservedString(value: unknown, destination: Set<string>): void {
+  if (typeof value === "string" && value !== "") destination.add(value);
+}
+
+function metricNumber(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error("Pi emitted invalid usage metrics");
+  }
+  return value;
+}
+
+function optionalMetricNumber(value: unknown): number {
+  return value === undefined ? 0 : metricNumber(value);
 }
 
 function assistantText(content: unknown): string {

@@ -257,6 +257,47 @@ describe("Pi JSON events", () => {
     expect(collector.finish().finalText).toBe(expected);
   });
 
+  it("aggregates model usage and route attestations", () => {
+    const collector = new PiEventCollector();
+    collector.feed(
+      `${JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          provider: "huggingface",
+          model: "organization/model:route",
+          responseModel: "organization/model-revision",
+          stopReason: "stop",
+          content: [{ type: "text", text: "done" }],
+          usage: {
+            input: 100,
+            output: 20,
+            cacheRead: 30,
+            cacheWrite: 0,
+            reasoning: 8,
+            totalTokens: 120,
+            cost: { total: 0.004 },
+          },
+        },
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+    );
+    expect(collector.finish().finalText).toBe("done");
+    expect(collector.metrics()).toEqual({
+      version: 1,
+      requests: 1,
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 30,
+      cacheWriteTokens: 0,
+      reasoningTokens: 8,
+      totalTokens: 120,
+      costUsd: 0.004,
+      observedProviders: ["huggingface"],
+      observedModels: ["organization/model:route"],
+      observedResponseModels: ["organization/model-revision"],
+    });
+  });
+
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {
     const invalid = new PiEventCollector();
     expect(() => {
