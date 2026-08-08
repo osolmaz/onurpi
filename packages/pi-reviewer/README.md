@@ -45,6 +45,34 @@ pi-reviewer config set thinking high
 
 If the canonical auth file has no Hugging Face credential yet, run `pi-reviewer login huggingface` or regular Pi's Hugging Face login once. Both write the same canonical credential through regular Pi's auth file. Token refreshes stay shared through that file, so the reviewer never holds its own copy.
 
+For a model that is not yet in Pi's catalog, pass a strict model manifest. The selected provider and model must match the manifest. `apiKeyEnv` names an environment variable; the manifest does not contain the credential.
+
+```json
+{
+  "version": 1,
+  "provider": {
+    "id": "example",
+    "baseUrl": "https://api.example.com/v1",
+    "apiKeyEnv": "EXAMPLE_API_KEY",
+    "compat": { "supportsDeveloperRole": false }
+  },
+  "model": {
+    "id": "organization/model:route",
+    "name": "Model via pinned route",
+    "reasoning": true,
+    "input": ["text"],
+    "contextWindow": 131072,
+    "maxTokens": 32768,
+    "cost": { "input": 0.1, "output": 0.2, "cacheRead": 0, "cacheWrite": 0 }
+  }
+}
+```
+
+```bash
+pi-reviewer --model example/organization/model:route \
+  --model-manifest ./model.json --base main
+```
+
 ## Review
 
 ```bash

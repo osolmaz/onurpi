@@ -15,6 +15,7 @@ const REQUEST = {
   systemPrompt: "Review code",
   provider: "openai-codex",
   model: "review-model",
+  customModel: false,
   thinking: "high",
   tools: ["read", "review_shell"],
 } as const;
@@ -34,6 +35,9 @@ describe("review worker protocol", () => {
       "thinking level",
     );
     expect(() => validateWorkerRequest({ ...REQUEST, tools: [""] })).toThrow("nonempty strings");
+    expect(() => validateWorkerRequest({ ...REQUEST, customModel: "yes" })).toThrow(
+      "customModel is required",
+    );
   });
 
   it("bounds worker input before parsing", async () => {

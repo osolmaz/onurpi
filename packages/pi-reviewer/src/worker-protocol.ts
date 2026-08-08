@@ -11,6 +11,7 @@ export type ReviewWorkerRequest = {
   readonly systemPrompt: string;
   readonly provider: string;
   readonly model: string;
+  readonly customModel: boolean;
   readonly thinking: ThinkingLevel;
   readonly tools: readonly string[];
 };
@@ -52,6 +53,7 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     "systemPrompt",
     "provider",
     "model",
+    "customModel",
     "thinking",
     "tools",
   ]);
@@ -73,6 +75,7 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     systemPrompt: requiredString(value, "systemPrompt"),
     provider: requiredString(value, "provider"),
     model: requiredString(value, "model"),
+    customModel: requiredBoolean(value, "customModel"),
     thinking: thinkingLevel(value["thinking"]),
     tools,
   };
@@ -82,6 +85,12 @@ function requiredString(value: Readonly<Record<string, unknown>>, key: string): 
   const entry = value[key];
   if (typeof entry !== "string" || entry === "")
     throw new Error(`review worker ${key} is required`);
+  return entry;
+}
+
+function requiredBoolean(value: Readonly<Record<string, unknown>>, key: string): boolean {
+  const entry = value[key];
+  if (typeof entry !== "boolean") throw new Error(`review worker ${key} is required`);
   return entry;
 }
 

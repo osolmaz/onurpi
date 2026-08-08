@@ -15,6 +15,8 @@ describe("review arguments", () => {
         "main",
         "--model",
         "openai-codex/reviewer",
+        "--model-manifest",
+        "/tmp/model.json",
         "--thinking",
         "high",
         "--format",
@@ -24,6 +26,7 @@ describe("review arguments", () => {
       request: {
         target: { kind: "base", branch: "main" },
         model: "openai-codex/reviewer",
+        modelManifest: "/tmp/model.json",
         thinking: "high",
         format: "json",
       },
