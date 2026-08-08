@@ -40,8 +40,8 @@ describe("request limiter", () => {
   it("steers a tool-using review to its final answer at the request limit", async () => {
     let listener: (event: AgentSessionEvent) => void = () => undefined;
     let removed = false;
-    const messages: string[] = [];
-    const remove = installRequestLimiter(
+    const calls: string[] = [];
+    const limiter = installRequestLimiter(
       {
         subscribe: (next) => {
           listener = next;
@@ -49,8 +49,12 @@ describe("request limiter", () => {
             removed = true;
           };
         },
-        sendUserMessage: (content) => {
-          if (typeof content === "string") messages.push(content);
+        abort: () => {
+          calls.push("abort");
+          return Promise.resolve();
+        },
+        prompt: (content) => {
+          calls.push(`prompt:${content}`);
           return Promise.resolve();
         },
       },
@@ -80,10 +84,11 @@ describe("request limiter", () => {
     listener(event);
     listener(event);
     listener(event);
-    await Promise.resolve();
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("Return the final review JSON");
-    remove();
+    await limiter.finish();
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toBe("abort");
+    expect(calls[1]).toContain("Return the final review JSON");
+    limiter.dispose();
     expect(removed).toBe(true);
   });
 });

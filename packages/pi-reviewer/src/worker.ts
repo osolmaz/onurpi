@@ -93,14 +93,15 @@ export async function createDefaultExecution(
     settingsManager,
     sessionManager: SessionManager.inMemory(request.cwd),
   });
-  const removeRequestLimiter = installRequestLimiter(session, request.maxModelRequests);
+  const requestLimiter = installRequestLimiter(session, request.maxModelRequests);
   return {
     subscribe: (listener) => session.subscribe(listener),
     prompt: async (prompt) => {
       await session.prompt(prompt);
+      await requestLimiter.finish();
     },
     dispose: () => {
-      removeRequestLimiter();
+      requestLimiter.dispose();
       session.dispose();
     },
     flush: async () => {
@@ -109,29 +110,39 @@ export async function createDefaultExecution(
   };
 }
 
+export type RequestLimiter = {
+  readonly finish: () => Promise<void>;
+  readonly dispose: () => void;
+};
+
 export function installRequestLimiter(
-  session: Pick<AgentSession, "subscribe" | "sendUserMessage">,
+  session: Pick<AgentSession, "abort" | "prompt" | "subscribe">,
   limit: number | null,
-): () => void {
-  if (limit === null) return () => undefined;
+): RequestLimiter {
+  if (limit === null) return { finish: () => Promise.resolve(), dispose: () => undefined };
   let requests = 0;
-  let steered = false;
-  return session.subscribe((event) => {
+  let finalReview: Promise<void> | undefined;
+  const dispose = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
     requests += 1;
-    if (steered || requests < limit || event.message.stopReason !== "toolUse") return;
-    steered = true;
-    void session
-      .sendUserMessage(
-        "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
-        { deliverAs: "steer" },
-      )
-      .catch((error: unknown) => {
-        process.stderr.write(
-          `${terminalText(`could not steer review to completion: ${error instanceof Error ? error.message : String(error)}`)}\n`,
-        );
-      });
+    if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
+      return;
+    }
+    finalReview = finishBoundedReview(session);
   });
+  return {
+    finish: async () => {
+      await finalReview;
+    },
+    dispose,
+  };
+}
+
+async function finishBoundedReview(session: Pick<AgentSession, "abort" | "prompt">): Promise<void> {
+  await session.abort();
+  await session.prompt(
+    "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
+  );
 }
 
 function writeEvent(event: AgentSessionEvent): void {
