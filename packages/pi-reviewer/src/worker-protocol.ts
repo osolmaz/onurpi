@@ -12,6 +12,7 @@ export type ReviewWorkerRequest = {
   readonly provider: string;
   readonly model: string;
   readonly customModel: boolean;
+  readonly maxModelRequests: number | null;
   readonly thinking: ThinkingLevel;
   readonly tools: readonly string[];
 };
@@ -54,6 +55,7 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     "provider",
     "model",
     "customModel",
+    "maxModelRequests",
     "thinking",
     "tools",
   ]);
@@ -76,6 +78,7 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     provider: requiredString(value, "provider"),
     model: requiredString(value, "model"),
     customModel: requiredBoolean(value, "customModel"),
+    maxModelRequests: optionalRequestLimit(value["maxModelRequests"]),
     thinking: thinkingLevel(value["thinking"]),
     tools,
   };
@@ -92,6 +95,14 @@ function requiredBoolean(value: Readonly<Record<string, unknown>>, key: string):
   const entry = value[key];
   if (typeof entry !== "boolean") throw new Error(`review worker ${key} is required`);
   return entry;
+}
+
+function optionalRequestLimit(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > 100) {
+    throw new Error("review worker maxModelRequests must be between 1 and 100");
+  }
+  return value;
 }
 
 function thinkingLevel(value: unknown): ThinkingLevel {

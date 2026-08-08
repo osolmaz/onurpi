@@ -16,6 +16,7 @@ const REQUEST = {
   provider: "openai-codex",
   model: "review-model",
   customModel: false,
+  maxModelRequests: null,
   thinking: "high",
   tools: ["read", "review_shell"],
 } as const;
@@ -37,6 +38,9 @@ describe("review worker protocol", () => {
     expect(() => validateWorkerRequest({ ...REQUEST, tools: [""] })).toThrow("nonempty strings");
     expect(() => validateWorkerRequest({ ...REQUEST, customModel: "yes" })).toThrow(
       "customModel is required",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, maxModelRequests: 101 })).toThrow(
+      "between 1 and 100",
     );
   });
 

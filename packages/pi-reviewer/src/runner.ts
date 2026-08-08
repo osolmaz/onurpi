@@ -18,6 +18,7 @@ export type RunReviewInput = {
   readonly app: PiAppDefinition;
   readonly selection: ModelSelection;
   readonly modelManifest?: CustomModelManifest;
+  readonly maxModelRequests?: number;
   readonly cwd: string;
   readonly prompt: string;
   readonly stderr?: NodeJS.WritableStream;
@@ -43,6 +44,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     provider: input.selection.provider,
     model: input.selection.model,
     customModel: input.modelManifest !== undefined,
+    maxModelRequests: input.maxModelRequests ?? null,
     thinking: input.selection.thinking,
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };

@@ -25,6 +25,7 @@ type ReviewFields = {
   model?: string;
   modelManifest?: string;
   metricsFile?: string;
+  maxModelRequests?: number;
   thinking?: ThinkingLevel;
   format?: OutputFormat;
   title?: string;
@@ -112,6 +113,7 @@ function reviewOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cw
     ...(fields.model === undefined ? {} : { model: fields.model }),
     ...(fields.modelManifest === undefined ? {} : { modelManifest: fields.modelManifest }),
     ...(fields.metricsFile === undefined ? {} : { metricsFile: fields.metricsFile }),
+    ...(fields.maxModelRequests === undefined ? {} : { maxModelRequests: fields.maxModelRequests }),
     ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }),
     ...(fields.format === undefined ? {} : { format: fields.format }),
   };
@@ -158,15 +160,27 @@ function consumeReviewOption(
   arg: string,
   next: string | undefined,
 ): number | undefined {
+  if (consumeExecutionOption(fields, arg, next)) return 1;
   if (arg === "--title") fields.title = requiredValue(next, arg);
   else if (arg === "--model") fields.model = validateModel(requiredValue(next, arg));
-  else if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
-  else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
   else if (arg === "--thinking") fields.thinking = validateThinking(requiredValue(next, arg));
   else if (arg === "--format") fields.format = validateOutputFormat(requiredValue(next, arg));
   else if (arg === "--cwd") fields.cwd = requiredValue(next, arg);
   else return undefined;
   return 1;
+}
+
+function consumeExecutionOption(
+  fields: ReviewFields,
+  arg: string,
+  next: string | undefined,
+): boolean {
+  if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
+  else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
+  else if (arg === "--max-model-requests") {
+    fields.maxModelRequests = validateMaxModelRequests(requiredValue(next, arg));
+  } else return false;
+  return true;
 }
 
 function setTarget(fields: ReviewFields, target: ReviewTarget): void {
@@ -194,6 +208,13 @@ export function validateModel(value: string): string {
   return trimmed;
 }
 
+export function validateMaxModelRequests(value: string): number {
+  if (!/^[1-9][0-9]*$/u.test(value)) throw new Error("max model requests must be an integer");
+  const requests = Number(value);
+  if (requests > 100) throw new Error("max model requests must be at most 100");
+  return requests;
+}
+
 export function validateThinking(value: string): ThinkingLevel {
   if (THINKING_LEVELS.some((level) => level === value)) return value as ThinkingLevel;
   throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}`);
@@ -214,5 +235,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--max-model-requests N] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

@@ -2,9 +2,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createDefaultExecution, runReviewWorker, workerMessagePayload } from "../src/worker.js";
+import {
+  createDefaultExecution,
+  installRequestLimiter,
+  runReviewWorker,
+  workerMessagePayload,
+} from "../src/worker.js";
 import type { ReviewWorkerRequest } from "../src/worker-protocol.js";
 
 const cleanup: string[] = [];
@@ -21,12 +27,65 @@ const REQUEST = {
   provider: "provider",
   model: "model",
   customModel: false,
+  maxModelRequests: null,
   thinking: "high",
   tools: ["read"],
 } satisfies ReviewWorkerRequest;
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
+});
+
+describe("request limiter", () => {
+  it("steers a tool-using review to its final answer at the request limit", async () => {
+    let listener: (event: AgentSessionEvent) => void = () => undefined;
+    let removed = false;
+    const messages: string[] = [];
+    const remove = installRequestLimiter(
+      {
+        subscribe: (next) => {
+          listener = next;
+          return () => {
+            removed = true;
+          };
+        },
+        sendUserMessage: (content) => {
+          if (typeof content === "string") messages.push(content);
+          return Promise.resolve();
+        },
+      },
+      2,
+    );
+    const event: AgentSessionEvent = {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        api: "openai-completions",
+        provider: "custom",
+        model: "review-model",
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "toolUse",
+        timestamp: 1,
+      },
+    };
+
+    listener(event);
+    listener(event);
+    listener(event);
+    await Promise.resolve();
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Return the final review JSON");
+    remove();
+    expect(removed).toBe(true);
+  });
 });
 
 describe("review worker events", () => {

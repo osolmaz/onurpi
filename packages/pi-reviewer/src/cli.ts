@@ -90,6 +90,9 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
     app,
     selection,
     ...(modelManifest === undefined ? {} : { modelManifest }),
+    ...(request.maxModelRequests === undefined
+      ? {}
+      : { maxModelRequests: request.maxModelRequests }),
     cwd: target.cwd,
     prompt: target.prompt,
     stderr: process.stderr,
