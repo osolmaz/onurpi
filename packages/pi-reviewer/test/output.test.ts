@@ -205,6 +205,39 @@ describe("review output", () => {
   });
 });
 
+describe("relative review paths", () => {
+  it("resolves paths inside the checkout and rejects paths outside it", () => {
+    const relative = {
+      ...VALID,
+      findings: [
+        {
+          ...VALID.findings[0],
+          code_location: {
+            absolute_file_path: "src/parser.ts",
+            line_range: { start: 10, end: 11 },
+          },
+        },
+      ],
+    };
+    const output = parseReviewOutput(JSON.stringify(relative), "/repo");
+    expect(output.findings[0]?.codeLocation.absoluteFilePath).toBe("/repo/src/parser.ts");
+
+    const outside = {
+      ...relative,
+      findings: [
+        {
+          ...relative.findings[0],
+          code_location: {
+            absolute_file_path: "../secret.ts",
+            line_range: { start: 1, end: 1 },
+          },
+        },
+      ],
+    };
+    expect(() => parseReviewOutput(JSON.stringify(outside), "/repo")).toThrow("must stay inside");
+  });
+});
+
 describe("Pi JSON events", () => {
   it("collects a completed assistant response across arbitrary UTF-8 chunks", () => {
     const collector = new PiEventCollector();
