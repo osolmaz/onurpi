@@ -97,7 +97,7 @@ export async function createDefaultExecution(
   return {
     subscribe: (listener) => session.subscribe(listener),
     prompt: async (prompt) => {
-      await session.prompt(prompt);
+      await Promise.race([session.prompt(prompt), requestLimiter.triggered]);
       await requestLimiter.finish();
     },
     dispose: () => {
@@ -111,6 +111,7 @@ export async function createDefaultExecution(
 }
 
 export type RequestLimiter = {
+  readonly triggered: Promise<void>;
   readonly finish: () => Promise<void>;
   readonly dispose: () => void;
 };
@@ -119,7 +120,17 @@ export function installRequestLimiter(
   session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName" | "subscribe">,
   limit: number | null,
 ): RequestLimiter {
-  if (limit === null) return { finish: () => Promise.resolve(), dispose: () => undefined };
+  if (limit === null) {
+    return {
+      triggered: new Promise<void>(() => undefined),
+      finish: () => Promise.resolve(),
+      dispose: () => undefined,
+    };
+  }
+  let markTriggered: () => void = () => undefined;
+  const triggered = new Promise<void>((resolve) => {
+    markTriggered = resolve;
+  });
   let requests = 0;
   let finalPhase = false;
   let markFinalResponse: (() => void) | undefined;
@@ -134,6 +145,7 @@ export function installRequestLimiter(
     if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
       return;
     }
+    markTriggered();
     finalReview = Promise.resolve().then(async () => {
       await session.abort();
       session.setActiveToolsByName([]);
@@ -148,6 +160,7 @@ export function installRequestLimiter(
     });
   });
   return {
+    triggered,
     finish: async () => {
       await finalReview;
     },
