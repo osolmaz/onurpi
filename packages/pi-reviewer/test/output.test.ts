@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { formatReviewProgress } from "../src/cli.js";
@@ -220,7 +222,9 @@ describe("relative review paths", () => {
       ],
     };
     const output = parseReviewOutput(JSON.stringify(relative), "/repo");
-    expect(output.findings[0]?.codeLocation.absoluteFilePath).toBe("/repo/src/parser.ts");
+    expect(output.findings[0]?.codeLocation.absoluteFilePath).toBe(
+      resolve("/repo", "src/parser.ts"),
+    );
 
     const outside = {
       ...relative,
