@@ -7,7 +7,6 @@ import {
   type Api,
   type AssistantMessage,
   type Model,
-  type Provider,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
@@ -23,7 +22,7 @@ import extension, {
 const NOW = Date.UTC(2026, 7, 9);
 const directories: string[] = [];
 type CodexModel = Model<"openai-codex-responses">;
-type CodexStreamSimple = Provider<"openai-codex-responses">["streamSimple"];
+type CodexStreamSimple = NonNullable<ProviderConfig["streamSimple"]>;
 
 function jwt(accountId: string, marker: string): string {
   const payload = Buffer.from(
