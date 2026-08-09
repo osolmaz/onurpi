@@ -1,5 +1,5 @@
-import { hasApi, lazyStream, type Model, type Provider } from "@earendil-works/pi-ai";
-import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
+import { hasApi, lazyStream, type Model } from "@earendil-works/pi-ai";
+import { getApiProvider } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -9,7 +9,7 @@ import {
 } from "./credential-source.ts";
 
 type CodexModel = Model<"openai-codex-responses">;
-type CodexStreamSimple = Provider<"openai-codex-responses">["streamSimple"];
+type CodexStreamSimple = NonNullable<ProviderConfig["streamSimple"]>;
 
 type CodexRequestOptions = {
   apiKey?: string;
@@ -54,8 +54,11 @@ export async function reloadCodexRequestOptions<T extends CodexRequestOptions>(
 }
 
 function builtInCodexStream(): CodexStreamSimple {
-  const provider = openaiCodexProvider();
-  return provider.streamSimple.bind(provider);
+  return (model, context, options) => {
+    const provider = getApiProvider(model.api);
+    if (!provider) throw new Error(`No API provider registered for ${model.api}.`);
+    return provider.streamSimple(model, context, options);
+  };
 }
 
 export function createCodexAuthReloadStream(
