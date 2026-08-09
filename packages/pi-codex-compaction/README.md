@@ -11,7 +11,9 @@ When the active model uses the built-in Codex provider (`openai-codex` with the
 `openai-codex-responses` API), the extension intercepts Pi's manual, threshold, and overflow
 compaction events. It sends the finalized Responses history to the official Codex endpoint with a
 trailing `compaction_trigger`, stores the returned opaque `compaction` item in Pi's real
-`CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary.
+`CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary. Direct
+compaction requests use `@onurpi/codex-auth-reload`, so a new same-account Codex CLI credential is
+selected only for the official Codex endpoint and is never copied into Pi's auth store.
 
 During a tool-driven run, the extension checks Pi's reported context usage after each completed
 turn. At 90% it aborts before the next provider request, waits for `agent_settled`, and invokes Pi's

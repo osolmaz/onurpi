@@ -59,6 +59,8 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
   narrow context and API surfaces.
 - **Endpoint allowlist for credentials** (see above) — new behavior, deliberately stricter than
   upstream.
+- Resolves same-account Codex CLI credential changes through `@onurpi/codex-auth-reload` after the
+  endpoint guard, without copying credentials into Pi's auth store.
 - Bounded HTTP error bodies in error messages (300 characters).
 - Added test coverage for credential/base-URL safety, model-mismatched checkpoints, auth resolution
   failure, and non-Codex pass-through of every hook.

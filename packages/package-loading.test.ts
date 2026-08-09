@@ -161,11 +161,13 @@ describe("OnurPi package loading", () => {
     );
   });
 
-  it("owns Codex compaction before the text-compaction policies", () => {
+  it("loads Codex auth reload before native and text compaction", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
+    const authReload = extensions.indexOf("./packages/codex-auth-reload/index.ts");
     const codex = extensions.indexOf("./packages/pi-codex-compaction/index.ts");
-    expect(codex).toBeGreaterThanOrEqual(0);
+    expect(authReload).toBeGreaterThanOrEqual(0);
+    expect(authReload).toBeLessThan(codex);
     expect(codex).toBeLessThan(extensions.indexOf("./packages/reliable-compaction/index.ts"));
     expect(codex).toBeLessThan(extensions.indexOf("./packages/context-window-policy/index.ts"));
   });
