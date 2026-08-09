@@ -55,6 +55,8 @@ typescript:
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
       - packages/context-window-policy/context-window-policy.ts
+      - packages/codex-auth-reload/credential-source.ts
+      - packages/codex-auth-reload/index.ts
       - packages/pi-codex-compaction/codex-compaction.ts
       - packages/pi-codex-compaction/config.ts
       - packages/pi-codex-compaction/native-checkpoint.ts
@@ -99,9 +101,13 @@ typescript:
     - from: packages/context-window-policy
       allow:
         - packages/context-window-policy
+    - from: packages/codex-auth-reload
+      allow:
+        - packages/codex-auth-reload
     - from: packages/pi-codex-compaction
       allow:
         - packages/pi-codex-compaction
+        - packages/codex-auth-reload
     - from: packages/pi-usage
       allow:
         - packages/pi-usage

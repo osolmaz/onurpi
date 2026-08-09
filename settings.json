@@ -8,6 +8,7 @@
     "../../repos/onurpi/packages/goal",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
+    "../../repos/onurpi/packages/codex-auth-reload",
     "../../repos/onurpi/packages/pi-codex-compaction",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",

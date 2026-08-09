@@ -51,6 +51,12 @@ jobs:
       - name: Check @onurpi/skill-slug package with Slophammer
         working-directory: packages/skill-slug
         run: npm run slophammer
+      - name: Check @onurpi/codex-auth-reload package
+        working-directory: packages/codex-auth-reload
+        run: npm run check
+      - name: Check @onurpi/codex-auth-reload package with Slophammer
+        working-directory: packages/codex-auth-reload
+        run: npm run slophammer
       - name: Check @onurpi/nyan-mode package
         working-directory: packages/nyan-mode
         run: npm run check

@@ -48,6 +48,8 @@ export default defineConfig({
         "packages/prompt-queue/window-state.ts",
         "packages/reliable-compaction/reliable-compaction.ts",
         "packages/context-window-policy/context-window-policy.ts",
+        "packages/codex-auth-reload/credential-source.ts",
+        "packages/codex-auth-reload/index.ts",
         "packages/pi-codex-compaction/codex-compaction.ts",
         "packages/pi-codex-compaction/config.ts",
         "packages/pi-codex-compaction/native-checkpoint.ts",
