@@ -67,7 +67,7 @@ const externalPackages = [
   {
     directory: "workflows",
     dependency: "@osolmaz/pi-workflows",
-    source: "github:osolmaz/pi-workflows#21935920df857c1eb4e439682b14c67b22068778",
+    source: "github:osolmaz/pi-workflows#be8c33c34f3917fa1266136f4ed57608f14ff5f8",
   },
 ] as const;
 
