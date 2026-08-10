@@ -52,9 +52,10 @@ Warnings are repeatable. A percentage means the percentage of the exploration bu
 duration means that exact duration remaining. Explicit warnings replace the default 50% and 25%
 remaining warnings.
 
-The default remains a 20-minute exploration budget, but reaching it starts finalization instead of
-terminating the worker. The default finalization grace is five minutes. The parent worker watchdog
-allows an additional five-minute infrastructure margin.
+The default is a 10-minute exploration budget followed by at most two minutes for finalization. At
+12 minutes the worker aborts model execution, records an explicit finalization failure, flushes its
+session and metrics, and exits. A fixed 30-second parent allowance exists only to reap a worker that
+freezes while shutting down; it is not model time and is not exposed as review configuration.
 
 ## Runtime design
 
@@ -73,15 +74,17 @@ FINALIZING
   grace exhausted   -> INFRASTRUCTURE_FAILURE
 ```
 
-The controller starts its clock immediately before the initial review prompt. Warning messages say
-how much time remains and ask the model to prioritize actionable findings or finalize early. They
-are normal Pi user messages and therefore remain visible in the native session.
+The controller records one monotonic start time immediately before the initial review prompt and
+derives the exploration and finalization deadlines from it. Warning messages say how much time
+remains and ask the model to prioritize actionable findings or finalize early. They are normal Pi
+user messages and therefore remain visible in the native session.
 
 On finalization, the controller uses public `AgentSession` methods to abort the active turn, clear
 queued reminders, leave only `submit_review` active, and send one finalization prompt. A missing
-tool submission receives one corrective prompt if grace remains. The parent process kills the worker
-only if the cooperative controller exceeds the exploration budget, finalization grace, and
-infrastructure margin.
+tool submission receives one corrective prompt if time remains. Transition work consumes the same
+two-minute finalization window rather than moving the deadline. The parent process force-kills the
+complete worker process group only when it has not exited within the separate 30-second shutdown
+allowance.
 
 The submission tool validates the existing public review schema and ends the agent turn with
 `terminate: true`. Pi Reviewer's external text and JSON output stay unchanged.
@@ -124,8 +127,12 @@ The submission tool validates the existing public review schema and ends the age
 - Finalization has no investigation tools and can use only `submit_review`.
 - A valid submission produces the existing `ReviewOutput` and CLI formats.
 - Text without `submit_review` is rejected and receives one bounded corrective prompt.
-- Finalization-grace expiry fails explicitly and leaves the native session intact.
-- Parent signals and a truly stuck worker still terminate the complete process group.
+- Finalization-grace expiry stops model execution at the derived absolute deadline and fails
+  explicitly.
+- The worker normally flushes the native session and metrics after that failure.
+- A worker still alive 30 seconds after the review deadline is force-killed as a complete process
+  group.
+- Parent signals still terminate the complete process group.
 - Existing model usage and route-attestation metrics remain unchanged.
 
 ## Verification

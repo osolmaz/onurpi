@@ -31,9 +31,9 @@ const REQUEST = {
   sessionDir: "/sessions",
   sessionReceipt: null,
   maxModelRequests: null,
-  timeBudgetMs: 20 * 60_000,
-  warningRemainingMs: [10 * 60_000, 5 * 60_000],
-  finalizationGraceMs: 5 * 60_000,
+  timeBudgetMs: 10 * 60_000,
+  warningRemainingMs: [5 * 60_000, 150_000],
+  finalizationGraceMs: 2 * 60_000,
   thinking: "high",
   tools: ["read"],
 } satisfies ReviewWorkerRequest;

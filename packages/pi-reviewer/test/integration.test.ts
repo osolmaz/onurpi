@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadReviewerApp, selectAppModel } from "../src/app.js";
 import { regularPiAuthPath } from "../src/auth-path.js";
-import { runReview } from "../src/runner.js";
+import { runReview, scheduleWorkerWatchdog } from "../src/runner.js";
 
 const cleanup: string[] = [];
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +32,7 @@ const OUTPUT = {
 };
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
 });
@@ -160,9 +161,27 @@ describe("Pi Reviewer app", () => {
     expect(request["persistSession"]).toBe(true);
     expect(request["sessionDir"]).toBe(path.join(stateDir, "sessions"));
     expect(request["sessionReceipt"]).toBeNull();
-    expect(request["timeBudgetMs"]).toBe(20 * 60_000);
-    expect(request["warningRemainingMs"]).toEqual([10 * 60_000, 5 * 60_000]);
-    expect(request["finalizationGraceMs"]).toBe(5 * 60_000);
+    expect(request["timeBudgetMs"]).toBe(10 * 60_000);
+    expect(request["warningRemainingMs"]).toEqual([5 * 60_000, 150_000]);
+    expect(request["finalizationGraceMs"]).toBe(2 * 60_000);
+  });
+
+  it("force-kills a worker after its cleanup allowance", async () => {
+    vi.useFakeTimers();
+    const failures: string[] = [];
+    const terminations: boolean[] = [];
+    scheduleWorkerWatchdog(
+      { pid: 123, kill: () => true },
+      30_000,
+      (error) => failures.push(error.message),
+      (_child, force) => terminations.push(force ?? false),
+    );
+
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(failures).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(failures).toEqual(["review worker did not exit after its cooperative deadline"]);
+    expect(terminations).toEqual([true]);
   });
 
   it("surfaces child failure instead of returning a clean review", async () => {
