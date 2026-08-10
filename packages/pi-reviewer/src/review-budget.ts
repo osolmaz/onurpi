@@ -2,9 +2,9 @@ import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-
 
 import type { TimeWarning } from "./types.js";
 
-export const DEFAULT_TIME_BUDGET_MS = 20 * 60_000;
-export const DEFAULT_FINALIZATION_GRACE_MS = 5 * 60_000;
-export const WORKER_INFRASTRUCTURE_MARGIN_MS = 5 * 60_000;
+export const DEFAULT_TIME_BUDGET_MS = 10 * 60_000;
+export const DEFAULT_FINALIZATION_GRACE_MS = 2 * 60_000;
+export const WORKER_SHUTDOWN_ALLOWANCE_MS = 30_000;
 const DEFAULT_WARNING_PERCENTAGES = [50, 25] as const;
 const SUBMIT_REVIEW_TOOL = "submit_review";
 
@@ -24,6 +24,10 @@ type ControlledSession = Pick<
 type PromptResult =
   | { readonly kind: "settled" }
   | { readonly kind: "failed"; readonly error: unknown };
+
+type MonotonicNow = () => number;
+
+const monotonicNow: MonotonicNow = () => performance.now();
 
 export function resolveReviewTimePolicy(
   timeBudgetMs = DEFAULT_TIME_BUDGET_MS,
@@ -59,8 +63,8 @@ export function resolveReviewTimePolicy(
   };
 }
 
-export function workerHardTimeoutMs(policy: ReviewTimePolicy): number {
-  return policy.timeBudgetMs + policy.finalizationGraceMs + WORKER_INFRASTRUCTURE_MARGIN_MS;
+export function workerWatchdogTimeoutMs(policy: ReviewTimePolicy): number {
+  return policy.timeBudgetMs + policy.finalizationGraceMs + WORKER_SHUTDOWN_ALLOWANCE_MS;
 }
 
 export async function runReviewWithBudget(
@@ -69,7 +73,9 @@ export async function runReviewWithBudget(
   policy: ReviewTimePolicy,
   maxModelRequests: number | null,
   hasSubmission: () => boolean,
+  now: MonotonicNow = monotonicNow,
 ): Promise<FinalizationReason | null> {
+  const reviewStartedAtMs = now();
   let triggerFinalization: (reason: FinalizationReason) => void = () => undefined;
   const finalizationTriggered = new Promise<FinalizationReason>((resolve) => {
     triggerFinalization = resolve;
@@ -80,13 +86,7 @@ export async function runReviewWithBudget(
     triggered = true;
     triggerFinalization(reason);
   };
-  const warningTimers = policy.warningRemainingMs.map((remainingMs) =>
-    setTimeout(() => {
-      if (triggered || hasSubmission()) return;
-      session.clearQueue();
-      void session.steer(warningMessage(remainingMs)).catch(() => undefined);
-    }, policy.timeBudgetMs - remainingMs),
-  );
+  const warningTimers = scheduleWarnings(session, policy, () => triggered, hasSubmission);
   const deadlineTimer = setTimeout(() => {
     trigger("time_budget");
   }, policy.timeBudgetMs);
@@ -120,27 +120,78 @@ export async function runReviewWithBudget(
       if (hasSubmission()) return null;
       return await finalizeReview(
         session,
+        finalDeadline(reviewStartedAtMs, policy, now),
         policy.finalizationGraceMs,
         "missing_submission",
         hasSubmission,
+        now,
       );
     }
     if (outcome.kind === "failed") throw outcome.error;
     stopExploration();
-    await session.abort();
-    await initial;
-    return await finalizeReview(session, policy.finalizationGraceMs, outcome.reason, hasSubmission);
+    const finalizationDeadlineMs = finalDeadline(reviewStartedAtMs, policy, now);
+    await abortExploration(session, initial, finalizationDeadlineMs, policy, now);
+    return await finalizeReview(
+      session,
+      finalizationDeadlineMs,
+      policy.finalizationGraceMs,
+      outcome.reason,
+      hasSubmission,
+      now,
+    );
   } finally {
     stopExploration();
     unsubscribe();
   }
 }
 
+function scheduleWarnings(
+  session: Pick<ControlledSession, "clearQueue" | "steer">,
+  policy: ReviewTimePolicy,
+  isTriggered: () => boolean,
+  hasSubmission: () => boolean,
+): NodeJS.Timeout[] {
+  return policy.warningRemainingMs.map((remainingMs) =>
+    setTimeout(() => {
+      if (isTriggered() || hasSubmission()) return;
+      session.clearQueue();
+      void session.steer(warningMessage(remainingMs)).catch(() => undefined);
+    }, policy.timeBudgetMs - remainingMs),
+  );
+}
+
+function finalDeadline(
+  reviewStartedAtMs: number,
+  policy: ReviewTimePolicy,
+  now: MonotonicNow,
+): number {
+  const absoluteDeadlineMs = reviewStartedAtMs + policy.timeBudgetMs + policy.finalizationGraceMs;
+  return Math.min(absoluteDeadlineMs, now() + policy.finalizationGraceMs);
+}
+
+async function abortExploration(
+  session: ControlledSession,
+  initial: Promise<PromptResult>,
+  deadlineMs: number,
+  policy: ReviewTimePolicy,
+  now: MonotonicNow,
+): Promise<void> {
+  await withFinalizationDeadline(
+    Promise.all([session.abort(), initial]).then(() => undefined),
+    session,
+    deadlineMs,
+    policy.finalizationGraceMs,
+    now,
+  );
+}
+
 async function finalizeReview(
   session: ControlledSession,
+  deadlineMs: number,
   graceMs: number,
   reason: FinalizationReason,
   hasSubmission: () => boolean,
+  now: MonotonicNow,
 ): Promise<FinalizationReason> {
   session.clearQueue();
   session.setActiveToolsByName([SUBMIT_REVIEW_TOOL]);
@@ -152,21 +203,26 @@ async function finalizeReview(
     );
     if (!hasSubmission()) throw new Error("review completed without submit_review");
   };
-  await withFinalizationGrace(finalization(), session, graceMs);
+  await withFinalizationDeadline(finalization(), session, deadlineMs, graceMs, now);
   return reason;
 }
 
-async function withFinalizationGrace(
+async function withFinalizationDeadline(
   finalization: Promise<void>,
   session: Pick<AgentSession, "abort">,
+  deadlineMs: number,
   graceMs: number,
+  now: MonotonicNow,
 ): Promise<void> {
   let timer: NodeJS.Timeout | undefined;
   const expired = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      void session.abort();
-      reject(new Error(`review finalization exceeded ${formatDuration(graceMs)} grace period`));
-    }, graceMs);
+    timer = setTimeout(
+      () => {
+        void session.abort().catch(() => undefined);
+        reject(new Error(`review finalization exceeded ${formatDuration(graceMs)} grace period`));
+      },
+      Math.max(0, Math.ceil(deadlineMs - now())),
+    );
   });
   try {
     await Promise.race([finalization, expired]);

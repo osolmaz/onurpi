@@ -7,7 +7,7 @@ import { PiEventCollector, type PiRunMetrics } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
 import {
   resolveReviewTimePolicy,
-  workerHardTimeoutMs,
+  workerWatchdogTimeoutMs,
   type ReviewTimePolicy,
 } from "./review-budget.js";
 import { selectAppModel } from "./app.js";
@@ -16,6 +16,9 @@ import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
 const TERMINATION_GRACE_MS = 2_000;
 const MAX_STDERR_BYTES = 128 * 1024;
+
+type WorkerProcess = Pick<ChildProcessWithoutNullStreams, "kill" | "pid">;
+type WorkerTerminator = (child: WorkerProcess, force?: boolean) => void;
 
 export type RunReviewInput = {
   readonly app: PiAppDefinition;
@@ -61,7 +64,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     app.env,
     input.stderr,
     input.onMetrics,
-    workerHardTimeoutMs(policy),
+    workerWatchdogTimeoutMs(policy),
   );
   return parseReviewOutput(finalText, input.cwd);
 }
@@ -117,7 +120,7 @@ async function executeWorker(
   appEnv: Readonly<Record<string, string>> | undefined,
   stderr: NodeJS.WritableStream | undefined,
   onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
-  hardTimeoutMs: number,
+  watchdogTimeoutMs: number,
 ): Promise<string> {
   const [program, ...args] = command;
   if (program === undefined) throw new Error("Pi Reviewer worker command is empty");
@@ -136,22 +139,22 @@ async function executeWorker(
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdin.end(JSON.stringify(request));
-  return await collectChild(child, stderr, onMetrics, hardTimeoutMs);
+  return await collectChild(child, stderr, onMetrics, watchdogTimeoutMs);
 }
 
 async function collectChild(
   child: ChildProcessWithoutNullStreams,
   stderr: NodeJS.WritableStream | undefined,
   onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
-  hardTimeoutMs: number,
+  watchdogTimeoutMs: number,
 ): Promise<string> {
   const collector = new PiEventCollector();
   let stderrBytes = 0;
   let failure: Error | undefined;
   let killTimer: NodeJS.Timeout | undefined;
-  const absoluteTimer = setTimeout(() => {
-    terminate("review worker exceeded cooperative deadline and infrastructure margin");
-  }, hardTimeoutMs);
+  const absoluteTimer = scheduleWorkerWatchdog(child, watchdogTimeoutMs, (error) => {
+    failure ??= error;
+  });
   const terminate = (message: string): void => {
     failure ??= new Error(message);
     terminateProcess(child);
@@ -206,7 +209,19 @@ async function collectChild(
   });
 }
 
-function terminateProcess(child: ChildProcessWithoutNullStreams, force = false): void {
+export function scheduleWorkerWatchdog(
+  child: WorkerProcess,
+  timeoutMs: number,
+  onTimeout: (error: Error) => void,
+  terminate: WorkerTerminator = terminateProcess,
+): NodeJS.Timeout {
+  return setTimeout(() => {
+    onTimeout(new Error("review worker did not exit after its cooperative deadline"));
+    terminate(child, true);
+  }, timeoutMs);
+}
+
+function terminateProcess(child: WorkerProcess, force = false): void {
   const signal = force ? "SIGKILL" : "SIGTERM";
   if (child.pid === undefined) return;
   if (process.platform !== "win32") {

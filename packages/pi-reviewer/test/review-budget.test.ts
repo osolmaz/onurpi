@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   resolveReviewTimePolicy,
   runReviewWithBudget,
-  workerHardTimeoutMs,
+  workerWatchdogTimeoutMs,
 } from "../src/review-budget.js";
 
 const TOOL_EVENT: AgentSessionEvent = {
@@ -48,8 +48,15 @@ describe("review time policy", () => {
       warningRemainingMs: [15 * 60_000, 10 * 60_000, 5 * 60_000],
       finalizationGraceMs: 10 * 60_000,
     });
-    expect(workerHardTimeoutMs(policy)).toBe(45 * 60_000);
+    expect(workerWatchdogTimeoutMs(policy)).toBe(40 * 60_000 + 30_000);
     expect(resolveReviewTimePolicy(1_000).warningRemainingMs).toEqual([500, 250]);
+    const defaults = resolveReviewTimePolicy();
+    expect(defaults).toEqual({
+      timeBudgetMs: 10 * 60_000,
+      warningRemainingMs: [5 * 60_000, 150_000],
+      finalizationGraceMs: 2 * 60_000,
+    });
+    expect(workerWatchdogTimeoutMs(defaults)).toBe(12 * 60_000 + 30_000);
   });
 
   it("rejects duplicate and out-of-range warnings", () => {
@@ -205,6 +212,34 @@ describe("review budget finalization failures", () => {
     await expect(review).resolves.toBe("model_request_limit");
     expect(finalPrompts).toBe(2);
     expect(steers).toBe(0);
+  });
+
+  it("keeps the final deadline absolute when exploration abort hangs", async () => {
+    vi.useFakeTimers();
+    let aborts = 0;
+    const never = new Promise<void>(() => undefined);
+    const review = runReviewWithBudget(
+      {
+        abort: () => {
+          aborts += 1;
+          return never;
+        },
+        clearQueue: () => ({ steering: [], followUp: [] }),
+        prompt: () => never,
+        setActiveToolsByName: () => undefined,
+        steer: () => Promise.resolve(),
+        subscribe: () => () => undefined,
+      },
+      "Review",
+      { timeBudgetMs: 10_000, warningRemainingMs: [], finalizationGraceMs: 2_000 },
+      null,
+      () => false,
+    );
+
+    const rejection = expect(review).rejects.toThrow("finalization exceeded 2s");
+    await vi.advanceTimersByTimeAsync(12_000);
+    await rejection;
+    expect(aborts).toBe(2);
   });
 
   it("fails explicitly when finalization grace expires", async () => {
