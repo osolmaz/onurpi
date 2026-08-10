@@ -93,6 +93,7 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
     ...(request.maxModelRequests === undefined
       ? {}
       : { maxModelRequests: request.maxModelRequests }),
+    ...budgetRunOptions(request),
     ...sessionRunOptions(request),
     cwd: target.cwd,
     prompt: target.prompt,
@@ -107,6 +108,18 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
   });
   process.stdout.write(request.format === "json" ? renderReviewJson(output) : renderReview(output));
   return 0;
+}
+
+function budgetRunOptions(
+  request: ReviewRequest,
+): Partial<Pick<RunReviewInput, "timeBudgetMs" | "timeWarnings" | "finalizationGraceMs">> {
+  return {
+    ...(request.timeBudgetMs === undefined ? {} : { timeBudgetMs: request.timeBudgetMs }),
+    ...(request.timeWarnings === undefined ? {} : { timeWarnings: request.timeWarnings }),
+    ...(request.finalizationGraceMs === undefined
+      ? {}
+      : { finalizationGraceMs: request.finalizationGraceMs }),
+  };
 }
 
 function sessionRunOptions(

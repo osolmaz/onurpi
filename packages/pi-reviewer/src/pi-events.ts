@@ -1,7 +1,7 @@
 import { StringDecoder } from "node:string_decoder";
 
 const MAX_EVENT_LINE_BYTES = 2 * 1024 * 1024;
-const MAX_FINAL_TEXT_CHARS = 512 * 1024;
+const MAX_REVIEW_RESULT_CHARS = 512 * 1024;
 
 export type PiRunResult = {
   readonly finalText: string;
@@ -80,11 +80,9 @@ export class PiEventCollector {
     this.feedText(this.decoder.end());
     if (this.buffer.trim() !== "") this.consume(this.buffer);
     this.buffer = "";
-    if (!this.agentEnded && this.finalText === undefined) {
-      throw new Error("Pi exited before agent_end");
-    }
     if (this.finalText === undefined) {
-      throw new Error(this.terminalError ?? "Pi produced no completed assistant response");
+      if (!this.agentEnded) throw new Error("Pi exited before agent_end");
+      throw new Error(this.terminalError ?? "Pi produced no submit_review result");
     }
     return { finalText: this.finalText, sawAgentEnd: this.agentEnded };
   }
@@ -102,26 +100,25 @@ export class PiEventCollector {
     }
     if (value["type"] === "agent_end") this.agentEnded = true;
     if (value["type"] === "message_end") this.consumeMessage(value["message"]);
+    if (value["type"] === "review_submission") this.consumeSubmission(value["review"]);
   }
 
   private consumeMessage(message: unknown): void {
     if (!isRecord(message) || message["role"] !== "assistant") return;
     this.consumeMetrics(message);
     const stopReason = message["stopReason"];
-    if (stopReason === "stop" || stopReason === "toolUse") {
-      this.consumeCandidate(message);
-      if (stopReason === "stop") this.terminalError = undefined;
-      return;
-    }
     if (stopReason === "error" || stopReason === "aborted") {
       this.terminalError = optionalError(message["errorMessage"], stopReason);
     }
   }
 
-  private consumeCandidate(message: Readonly<Record<string, unknown>>): void {
-    const text = assistantText(message["content"]);
-    if (text.length > MAX_FINAL_TEXT_CHARS) throw new Error("review output exceeded size limit");
-    if (text.trim() !== "") this.finalText = text;
+  private consumeSubmission(review: unknown): void {
+    if (!isRecord(review)) throw new Error("Pi emitted an invalid review submission");
+    const text = JSON.stringify(review);
+    if (text.length > MAX_REVIEW_RESULT_CHARS) throw new Error("review output exceeded size limit");
+    if (this.finalText !== undefined) throw new Error("Pi emitted more than one review submission");
+    this.finalText = text;
+    this.terminalError = undefined;
   }
 
   private consumeMetrics(message: Readonly<Record<string, unknown>>): void {
@@ -157,18 +154,6 @@ function metricNumber(value: unknown): number {
 
 function optionalMetricNumber(value: unknown): number {
   return value === undefined ? 0 : metricNumber(value);
-}
-
-function assistantText(content: unknown): string {
-  if (!Array.isArray(content)) return "";
-  return content
-    .flatMap((block) => {
-      if (!isRecord(block) || block["type"] !== "text" || typeof block["text"] !== "string") {
-        return [];
-      }
-      return [block["text"]];
-    })
-    .join("");
 }
 
 function optionalError(value: unknown, fallback: string): string {

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { parseArgs, parseModel, validateOutputFormat, validateThinking } from "../src/args.js";
+import {
+  parseArgs,
+  parseModel,
+  validateDuration,
+  validateOutputFormat,
+  validateThinking,
+  validateTimeWarning,
+} from "../src/args.js";
 import { resolveSelection } from "../src/cli.js";
 
 describe("review arguments", () => {
@@ -25,6 +32,14 @@ describe("review arguments", () => {
         "/tmp/session.json",
         "--max-model-requests",
         "12",
+        "--time-budget",
+        "30m",
+        "--time-warning",
+        "50%",
+        "--time-warning",
+        "5m",
+        "--finalization-grace",
+        "10m",
         "--thinking",
         "high",
         "--format",
@@ -39,6 +54,12 @@ describe("review arguments", () => {
         sessionDir: "/tmp/sessions",
         sessionReceipt: "/tmp/session.json",
         maxModelRequests: 12,
+        timeBudgetMs: 1_800_000,
+        timeWarnings: [
+          { kind: "percentage", percentage: 50 },
+          { kind: "duration", milliseconds: 300_000 },
+        ],
+        finalizationGraceMs: 600_000,
         thinking: "high",
         format: "json",
       },
@@ -107,6 +128,11 @@ describe("review arguments", () => {
     expect(() => parseArgs(["--base", "main", "--max-model-requests", "101"])).toThrow(
       "at most 100",
     );
+    expect(validateDuration("30m")).toBe(1_800_000);
+    expect(validateTimeWarning("25%")).toEqual({ kind: "percentage", percentage: 25 });
+    expect(() => validateDuration("30")).toThrow("positive ms, s, m, or h");
+    expect(() => validateDuration("999ms")).toThrow("between 1s and 24h");
+    expect(() => validateTimeWarning("100%")).toThrow("between 1% and 99%");
     expect(() => validateThinking("extreme")).toThrow("thinking must be one of");
     expect(validateOutputFormat("json")).toBe("json");
     expect(() => validateOutputFormat("xml")).toThrow("format must be one of");

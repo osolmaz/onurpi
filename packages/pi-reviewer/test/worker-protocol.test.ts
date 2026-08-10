@@ -20,6 +20,9 @@ const REQUEST = {
   sessionDir: "/reviewer/sessions",
   sessionReceipt: "/reviewer/session.json",
   maxModelRequests: null,
+  timeBudgetMs: 1_800_000,
+  warningRemainingMs: [900_000, 300_000],
+  finalizationGraceMs: 600_000,
   thinking: "high",
   tools: ["read", "review_shell"],
 } as const;
@@ -53,6 +56,16 @@ describe("review worker protocol", () => {
     );
     expect(() => validateWorkerRequest({ ...REQUEST, maxModelRequests: 101 })).toThrow(
       "between 1 and 100",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, timeBudgetMs: true })).toThrow("timeBudgetMs");
+    expect(() =>
+      validateWorkerRequest({ ...REQUEST, warningRemainingMs: [300_000, 900_000] }),
+    ).toThrow("descending order");
+    expect(() => validateWorkerRequest({ ...REQUEST, warningRemainingMs: [1_800_000] })).toThrow(
+      "less than timeBudgetMs",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, finalizationGraceMs: 999 })).toThrow(
+      "finalizationGraceMs",
     );
   });
 

@@ -4,7 +4,7 @@ import { Type } from "typebox";
 
 import { executeShellCommand, validateCheckoutPath, validateShellCommand } from "./shell-policy.ts";
 
-const ACTIVE_TOOLS = new Set(["read", "grep", "find", "ls", "review_shell"]);
+const ACTIVE_TOOLS = new Set(["read", "grep", "find", "ls", "review_shell", "submit_review"]);
 
 export default function reviewGuard(pi: ExtensionAPI): void {
   pi.registerTool({
