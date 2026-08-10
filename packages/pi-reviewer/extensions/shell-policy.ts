@@ -300,14 +300,32 @@ function safeGitArgs(args: readonly string[]): readonly string[] {
   ];
 }
 
-function safeEnvironment(): NodeJS.ProcessEnv {
-  const environment: NodeJS.ProcessEnv = {
-    ...process.env,
+const SAFE_ENVIRONMENT_NAMES = [
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "PATH",
+  "PATHEXT",
+  "SYSTEMROOT",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "TZ",
+  "USER",
+  "WINDIR",
+] as const;
+
+export function safeEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {};
+  for (const name of SAFE_ENVIRONMENT_NAMES) {
+    if (source[name] !== undefined) environment[name] = source[name];
+  }
+  return {
+    ...environment,
     GIT_EXTERNAL_DIFF: "",
     GIT_OPTIONAL_LOCKS: "0",
     GIT_PAGER: "cat",
     PAGER: "cat",
   };
-  delete environment["RIPGREP_CONFIG_PATH"];
-  return environment;
 }

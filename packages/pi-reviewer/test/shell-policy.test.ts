@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   containsPath,
   executeShellCommand,
+  safeEnvironment,
   safeProgramArgs,
   validateCheckoutPath,
   validateShellCommand,
@@ -102,6 +103,27 @@ describe("read-only shell policy", () => {
 
   it("forces ripgrep to ignore configuration", () => {
     expect(safeProgramArgs("rg", ["needle", "."])).toEqual(["--no-config", "needle", "."]);
+  });
+
+  it("removes model credentials from command environments", () => {
+    const environment = safeEnvironment({
+      PATH: "/usr/bin",
+      HOME: "/home/reviewer",
+      HF_TOKEN: "secret",
+      OPENAI_API_KEY: "secret",
+      RIPGREP_CONFIG_PATH: "/tmp/unsafe",
+    });
+    expect(environment).toMatchObject({
+      PATH: "/usr/bin",
+      HOME: "/home/reviewer",
+      GIT_EXTERNAL_DIFF: "",
+      GIT_OPTIONAL_LOCKS: "0",
+      GIT_PAGER: "cat",
+      PAGER: "cat",
+    });
+    expect(environment).not.toHaveProperty("HF_TOKEN");
+    expect(environment).not.toHaveProperty("OPENAI_API_KEY");
+    expect(environment).not.toHaveProperty("RIPGREP_CONFIG_PATH");
   });
 
   it("bounds output and supports cancellation", async () => {
