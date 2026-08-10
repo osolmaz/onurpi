@@ -16,6 +16,9 @@ const REQUEST = {
   provider: "openai-codex",
   model: "review-model",
   customModel: false,
+  persistSession: true,
+  sessionDir: "/reviewer/sessions",
+  sessionReceipt: "/reviewer/session.json",
   maxModelRequests: null,
   thinking: "high",
   tools: ["read", "review_shell"],
@@ -38,6 +41,15 @@ describe("review worker protocol", () => {
     expect(() => validateWorkerRequest({ ...REQUEST, tools: [""] })).toThrow("nonempty strings");
     expect(() => validateWorkerRequest({ ...REQUEST, customModel: "yes" })).toThrow(
       "customModel is required",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, persistSession: "yes" })).toThrow(
+      "persistSession is required",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, sessionDir: "" })).toThrow(
+      "sessionDir is required",
+    );
+    expect(() => validateWorkerRequest({ ...REQUEST, sessionReceipt: "" })).toThrow(
+      "sessionReceipt must be a nonempty string or null",
     );
     expect(() => validateWorkerRequest({ ...REQUEST, maxModelRequests: 101 })).toThrow(
       "between 1 and 100",

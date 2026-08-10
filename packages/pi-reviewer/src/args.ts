@@ -25,6 +25,9 @@ type ReviewFields = {
   model?: string;
   modelManifest?: string;
   metricsFile?: string;
+  sessionDir?: string;
+  sessionReceipt?: string;
+  persistSession?: boolean;
   maxModelRequests?: number;
   thinking?: ThinkingLevel;
   format?: OutputFormat;
@@ -101,6 +104,7 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
   if (custom !== "") setTarget(fields, { kind: "custom", instructions: custom });
   if (fields.target === undefined) throw new Error(reviewUsage());
   assertTitleTarget(fields);
+  assertSessionOptions(fields);
   return {
     target: withCommitTitle(fields.target, fields.title),
     cwd: fields.cwd,
@@ -110,10 +114,31 @@ function finalizeReviewFields(fields: ReviewFields): ReviewRequest {
 
 function reviewOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
   return {
+    ...modelOptions(fields),
+    ...sessionOptions(fields),
+    ...presentationOptions(fields),
+  };
+}
+
+function modelOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
     ...(fields.model === undefined ? {} : { model: fields.model }),
     ...(fields.modelManifest === undefined ? {} : { modelManifest: fields.modelManifest }),
     ...(fields.metricsFile === undefined ? {} : { metricsFile: fields.metricsFile }),
     ...(fields.maxModelRequests === undefined ? {} : { maxModelRequests: fields.maxModelRequests }),
+  };
+}
+
+function sessionOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
+    ...(fields.sessionDir === undefined ? {} : { sessionDir: fields.sessionDir }),
+    ...(fields.sessionReceipt === undefined ? {} : { sessionReceipt: fields.sessionReceipt }),
+    ...(fields.persistSession === undefined ? {} : { persistSession: fields.persistSession }),
+  };
+}
+
+function presentationOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
     ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }),
     ...(fields.format === undefined ? {} : { format: fields.format }),
   };
@@ -125,9 +150,20 @@ function assertTitleTarget(fields: ReviewFields): void {
   }
 }
 
+function assertSessionOptions(fields: ReviewFields): void {
+  if (fields.persistSession !== false) return;
+  if (fields.sessionDir !== undefined || fields.sessionReceipt !== undefined) {
+    throw new Error("--no-session cannot be combined with session output options");
+  }
+}
+
 function consumeReviewArg(fields: ReviewFields, arg: string, next: string | undefined): number {
   const target = consumeTargetArg(fields, arg, next);
   if (target !== undefined) return target;
+  if (arg === "--no-session") {
+    fields.persistSession = false;
+    return 0;
+  }
   const option = consumeReviewOption(fields, arg, next);
   if (option !== undefined) return option;
   if (arg.startsWith("-")) throw new Error(`unknown option: ${arg}`);
@@ -177,6 +213,8 @@ function consumeExecutionOption(
 ): boolean {
   if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
   else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
+  else if (arg === "--session-dir") fields.sessionDir = requiredValue(next, arg);
+  else if (arg === "--session-receipt") fields.sessionReceipt = requiredValue(next, arg);
   else if (arg === "--max-model-requests") {
     fields.maxModelRequests = validateMaxModelRequests(requiredValue(next, arg));
   } else return false;
@@ -235,5 +273,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--max-model-requests N] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--session-dir DIR] [--session-receipt PATH] [--no-session] [--max-model-requests N] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

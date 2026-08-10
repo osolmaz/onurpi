@@ -94,11 +94,15 @@ Use `--metrics-file` to record cumulative token use, estimated cost from the pin
 pi-reviewer --base main --format json --metrics-file ./review-metrics.json > review.json
 ```
 
+Every review saves a native Pi JSONL session under `~/.local/state/pi-reviewer/sessions`. Sessions preserve messages, tool calls, tool results, model errors, and usage for later debugging, resume workflows, audits, or training-data preparation. They can contain reviewed source code and tool output, so protect and retain them like the repository itself.
+
+Integrations can isolate a run with `--session-dir DIR` and request a mode-0600 receipt with `--session-receipt PATH`. The receipt contains only Pi's generated session-file path. Use `--no-session` only when persistence is deliberately unwanted; it cannot be combined with either session-output option.
+
 `--max-model-requests N` stops pending tool work after the Nth complete model response, disables tools, and makes one final request for the required JSON using the evidence already gathered. It does not truncate a model response or silently turn a timed-out review into a clean result.
 
-A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero.
+A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero. A persistent session remains available after review or output-validation failure once model execution has started.
 
-Normal reviews use an in-memory Pi SDK session and do not write Pi session history. Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
+Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 
 ## Codex compatibility
 

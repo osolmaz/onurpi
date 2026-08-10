@@ -101,6 +101,7 @@ describe("Pi Reviewer app", () => {
       selection: { provider: "openai-codex", model: "external-review-model", thinking: "high" },
       cwd: fake.root,
       prompt: "Review the change",
+      persistSession: false,
       onMetrics: (value) => {
         metrics.push(value);
       },
@@ -118,6 +119,9 @@ describe("Pi Reviewer app", () => {
       thinking: "high",
       prompt: "Review the change",
       cwd: fake.root,
+      persistSession: false,
+      sessionDir: path.join(stateDir, "sessions"),
+      sessionReceipt: null,
     });
     expect(request["authPath"]).toBe(regularPiAuthPath());
     expect(request["authPath"]).not.toBe(path.join(fake.root, "overridden-agent", "auth.json"));
@@ -153,6 +157,9 @@ describe("Pi Reviewer app", () => {
     expect(request["authPath"]).toBe(regularPiAuthPath());
     expect(request["modelsPath"]).toBe(path.join(stateDir, "pi-config-runtime", "models.json"));
     expect(request["configDir"]).toBe(path.join(stateDir, "pi-config-runtime"));
+    expect(request["persistSession"]).toBe(true);
+    expect(request["sessionDir"]).toBe(path.join(stateDir, "sessions"));
+    expect(request["sessionReceipt"]).toBeNull();
   });
 
   it("surfaces child failure instead of returning a clean review", async () => {

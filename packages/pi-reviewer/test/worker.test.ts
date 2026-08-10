@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   createDefaultExecution,
+  createReviewSessionManager,
   installRequestLimiter,
   runReviewWorker,
   workerMessagePayload,
@@ -27,6 +28,9 @@ const REQUEST = {
   provider: "provider",
   model: "model",
   customModel: false,
+  persistSession: false,
+  sessionDir: "/sessions",
+  sessionReceipt: null,
   maxModelRequests: null,
   thinking: "high",
   tools: ["read"],
@@ -34,6 +38,64 @@ const REQUEST = {
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((entry) => rm(entry, { recursive: true, force: true })));
+});
+
+describe("session persistence", () => {
+  it("creates a native Pi session and a private receipt by default", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "pi-reviewer-session-"));
+    cleanup.push(root);
+    const sessionDir = path.join(root, "sessions");
+    const sessionReceipt = path.join(root, "session-receipt.json");
+    const manager = createReviewSessionManager({
+      ...REQUEST,
+      cwd: root,
+      persistSession: true,
+      sessionDir,
+      sessionReceipt,
+    });
+
+    expect(manager.isPersisted()).toBe(true);
+    const sessionFile = manager.getSessionFile();
+    if (sessionFile === undefined) throw new Error("missing test session file");
+    expect(JSON.parse(await readFile(sessionReceipt, "utf8"))).toEqual({
+      version: 1,
+      sessionFile,
+    });
+    expect((await stat(sessionReceipt)).mode & 0o777).toBe(0o600);
+    manager.appendMessage({
+      role: "user",
+      content: [{ type: "text", text: "Review" }],
+      timestamp: Date.now(),
+    });
+    manager.appendMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "Result" }],
+      api: "openai-completions",
+      provider: "test",
+      model: "reviewer",
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    });
+    await expect(readFile(sessionFile, "utf8")).resolves.toContain('"type":"session"');
+  });
+
+  it("supports explicit in-memory reviews without a receipt", () => {
+    const manager = createReviewSessionManager({
+      ...REQUEST,
+      persistSession: false,
+      sessionReceipt: null,
+    });
+    expect(manager.isPersisted()).toBe(false);
+    expect(manager.getSessionFile()).toBeUndefined();
+  });
 });
 
 describe("request limiter", () => {

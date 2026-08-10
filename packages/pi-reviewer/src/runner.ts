@@ -18,6 +18,9 @@ export type RunReviewInput = {
   readonly app: PiAppDefinition;
   readonly selection: ModelSelection;
   readonly modelManifest?: CustomModelManifest;
+  readonly persistSession?: boolean;
+  readonly sessionDir?: string;
+  readonly sessionReceipt?: string;
   readonly maxModelRequests?: number;
   readonly cwd: string;
   readonly prompt: string;
@@ -32,22 +35,14 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
   if (extension === undefined) throw new Error("Pi Reviewer extension is not configured");
   if (app.systemPrompt === undefined)
     throw new Error("Pi Reviewer system prompt is not configured");
-  const request: ReviewWorkerRequest = {
-    version: 1,
-    cwd: input.cwd,
-    prompt: input.prompt,
-    authPath: regularPiAuthPath(),
-    modelsPath: runtime.modelsPath,
-    configDir: runtime.configDir,
-    extensionPath: extension.path,
-    systemPrompt: app.systemPrompt,
-    provider: input.selection.provider,
-    model: input.selection.model,
-    customModel: input.modelManifest !== undefined,
-    maxModelRequests: input.maxModelRequests ?? null,
-    thinking: input.selection.thinking,
-    tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
-  };
+  const request = createWorkerRequest(
+    input,
+    app,
+    extension.path,
+    app.systemPrompt,
+    runtime.modelsPath,
+    runtime.configDir,
+  );
   const finalText = await executeWorker(
     app.piCommand,
     request,
@@ -56,6 +51,47 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     input.onMetrics,
   );
   return parseReviewOutput(finalText, input.cwd);
+}
+
+function createWorkerRequest(
+  input: RunReviewInput,
+  app: PiAppDefinition,
+  extensionPath: string,
+  systemPrompt: string,
+  modelsPath: string,
+  configDir: string,
+): ReviewWorkerRequest {
+  return {
+    version: 1,
+    cwd: input.cwd,
+    prompt: input.prompt,
+    authPath: regularPiAuthPath(),
+    modelsPath,
+    configDir,
+    extensionPath,
+    systemPrompt,
+    provider: input.selection.provider,
+    model: input.selection.model,
+    customModel: input.modelManifest !== undefined,
+    ...sessionRequestOptions(input),
+    maxModelRequests: input.maxModelRequests ?? null,
+    thinking: input.selection.thinking,
+    tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
+  };
+}
+
+function sessionRequestOptions(
+  input: RunReviewInput,
+): Pick<ReviewWorkerRequest, "persistSession" | "sessionDir" | "sessionReceipt"> {
+  const persistSession = input.persistSession ?? true;
+  if (!persistSession && input.sessionReceipt !== undefined) {
+    throw new Error("session receipt requires persistent sessions");
+  }
+  return {
+    persistSession,
+    sessionDir: input.sessionDir ?? input.app.sessionDir,
+    sessionReceipt: input.sessionReceipt ?? null,
+  };
 }
 
 async function executeWorker(
