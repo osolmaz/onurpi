@@ -62,28 +62,7 @@ describe("session persistence", () => {
       sessionFile,
     });
     expect((await stat(sessionReceipt)).mode & 0o777).toBe(0o600);
-    manager.appendMessage({
-      role: "user",
-      content: [{ type: "text", text: "Review" }],
-      timestamp: Date.now(),
-    });
-    manager.appendMessage({
-      role: "assistant",
-      content: [{ type: "text", text: "Result" }],
-      api: "openai-completions",
-      provider: "test",
-      model: "reviewer",
-      usage: {
-        input: 1,
-        output: 1,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 2,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: "stop",
-      timestamp: Date.now(),
-    });
+    expect((await stat(sessionFile)).mode & 0o777).toBe(0o600);
     await expect(readFile(sessionFile, "utf8")).resolves.toContain('"type":"session"');
   });
 

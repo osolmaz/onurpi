@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 import {
   createAgentSession,
@@ -115,7 +117,7 @@ export async function createDefaultExecution(
 
 export function createReviewSessionManager(request: ReviewWorkerRequest): SessionManager {
   if (!request.persistSession) return SessionManager.inMemory(request.cwd);
-  const manager = SessionManager.create(request.cwd, request.sessionDir);
+  const manager = createInitializedSessionManager(request.cwd, request.sessionDir);
   const sessionFile = manager.getSessionFile();
   if (sessionFile === undefined) throw new Error("Pi did not create a persistent session file");
   if (request.sessionReceipt !== null) {
@@ -126,6 +128,18 @@ export function createReviewSessionManager(request: ReviewWorkerRequest): Sessio
     renameSync(temporaryReceipt, request.sessionReceipt);
   }
   return manager;
+}
+
+function createInitializedSessionManager(cwd: string, sessionDir: string): SessionManager {
+  mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+  const sessionFile = path.join(sessionDir, `pi-reviewer-${randomUUID()}.jsonl`);
+  writeFileSync(sessionFile, "", { flag: "wx", mode: 0o600 });
+  try {
+    return SessionManager.open(sessionFile, sessionDir, cwd);
+  } catch (error) {
+    unlinkSync(sessionFile);
+    throw error;
+  }
 }
 
 export type RequestLimiter = {
