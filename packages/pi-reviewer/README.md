@@ -102,7 +102,7 @@ Integrations can isolate a run with `--session-dir DIR` and request a mode-0600 
 
 A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero. A persistent session remains available after review or output-validation failure once model execution has started.
 
-Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
+Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Guarded command subprocesses receive a minimal environment without model-provider credentials. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 
 ## Codex compatibility
 
