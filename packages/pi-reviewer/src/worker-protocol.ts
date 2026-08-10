@@ -12,6 +12,9 @@ export type ReviewWorkerRequest = {
   readonly provider: string;
   readonly model: string;
   readonly customModel: boolean;
+  readonly persistSession: boolean;
+  readonly sessionDir: string;
+  readonly sessionReceipt: string | null;
   readonly maxModelRequests: number | null;
   readonly thinking: ThinkingLevel;
   readonly tools: readonly string[];
@@ -55,6 +58,9 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     "provider",
     "model",
     "customModel",
+    "persistSession",
+    "sessionDir",
+    "sessionReceipt",
     "maxModelRequests",
     "thinking",
     "tools",
@@ -78,6 +84,9 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     provider: requiredString(value, "provider"),
     model: requiredString(value, "model"),
     customModel: requiredBoolean(value, "customModel"),
+    persistSession: requiredBoolean(value, "persistSession"),
+    sessionDir: requiredString(value, "sessionDir"),
+    sessionReceipt: optionalString(value["sessionReceipt"], "sessionReceipt"),
     maxModelRequests: optionalRequestLimit(value["maxModelRequests"]),
     thinking: thinkingLevel(value["thinking"]),
     tools,
@@ -95,6 +104,14 @@ function requiredBoolean(value: Readonly<Record<string, unknown>>, key: string):
   const entry = value[key];
   if (typeof entry !== "boolean") throw new Error(`review worker ${key} is required`);
   return entry;
+}
+
+function optionalString(value: unknown, key: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || value === "") {
+    throw new Error(`review worker ${key} must be a nonempty string or null`);
+  }
+  return value;
 }
 
 function optionalRequestLimit(value: unknown): number | null {

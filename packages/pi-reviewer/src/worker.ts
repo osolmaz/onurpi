@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { renameSync, writeFileSync } from "node:fs";
+
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -82,6 +84,7 @@ export async function createDefaultExecution(
     );
   }
 
+  const sessionManager = createReviewSessionManager(request);
   const { session } = await createAgentSession({
     cwd: request.cwd,
     agentDir: request.configDir,
@@ -91,7 +94,7 @@ export async function createDefaultExecution(
     tools: [...request.tools],
     resourceLoader,
     settingsManager,
-    sessionManager: SessionManager.inMemory(request.cwd),
+    sessionManager,
   });
   const requestLimiter = installRequestLimiter(session, request.maxModelRequests);
   return {
@@ -108,6 +111,21 @@ export async function createDefaultExecution(
       await settingsManager.flush();
     },
   };
+}
+
+export function createReviewSessionManager(request: ReviewWorkerRequest): SessionManager {
+  if (!request.persistSession) return SessionManager.inMemory(request.cwd);
+  const manager = SessionManager.create(request.cwd, request.sessionDir);
+  const sessionFile = manager.getSessionFile();
+  if (sessionFile === undefined) throw new Error("Pi did not create a persistent session file");
+  if (request.sessionReceipt !== null) {
+    const temporaryReceipt = `${request.sessionReceipt}.${String(process.pid)}.tmp`;
+    writeFileSync(temporaryReceipt, `${JSON.stringify({ version: 1, sessionFile })}\n`, {
+      mode: 0o600,
+    });
+    renameSync(temporaryReceipt, request.sessionReceipt);
+  }
+  return manager;
 }
 
 export type RequestLimiter = {

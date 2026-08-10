@@ -19,6 +19,10 @@ describe("review arguments", () => {
         "/tmp/model.json",
         "--metrics-file",
         "/tmp/metrics.json",
+        "--session-dir",
+        "/tmp/sessions",
+        "--session-receipt",
+        "/tmp/session.json",
         "--max-model-requests",
         "12",
         "--thinking",
@@ -32,6 +36,8 @@ describe("review arguments", () => {
         model: "openai-codex/reviewer",
         modelManifest: "/tmp/model.json",
         metricsFile: "/tmp/metrics.json",
+        sessionDir: "/tmp/sessions",
+        sessionReceipt: "/tmp/session.json",
         maxModelRequests: 12,
         thinking: "high",
         format: "json",
@@ -77,6 +83,15 @@ describe("review arguments", () => {
     expect(() => parseArgs(["config", "set"])).toThrow("usage");
     expect(() => parseArgs(["login", "a", "b"])).toThrow("usage");
     expect(() => parseArgs(["models", "a", "b"])).toThrow("usage");
+    expect(parseArgs(["--base", "main", "--no-session"])).toMatchObject({
+      request: { persistSession: false },
+    });
+    expect(() =>
+      parseArgs(["--base", "main", "--no-session", "--session-receipt", "/tmp/session"]),
+    ).toThrow("cannot be combined");
+    expect(() =>
+      parseArgs(["--base", "main", "--no-session", "--session-dir", "/tmp/sessions"]),
+    ).toThrow("cannot be combined");
   });
 
   it("validates model and thinking values", () => {

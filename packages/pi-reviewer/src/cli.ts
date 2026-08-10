@@ -12,7 +12,7 @@ import { loadCustomModelManifest } from "./model-manifest.js";
 import { listReviewerModels } from "./models.js";
 import type { PiRunMetrics } from "./pi-events.js";
 import { renderReview, renderReviewJson } from "./render.js";
-import { runReview } from "./runner.js";
+import { runReview, type RunReviewInput } from "./runner.js";
 import { terminalText } from "./terminal-text.js";
 import type { ModelSelection, ReviewRequest, ThinkingLevel, UserConfig } from "./types.js";
 
@@ -93,6 +93,7 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
     ...(request.maxModelRequests === undefined
       ? {}
       : { maxModelRequests: request.maxModelRequests }),
+    ...sessionRunOptions(request),
     cwd: target.cwd,
     prompt: target.prompt,
     stderr: process.stderr,
@@ -106,6 +107,16 @@ async function runReviewCommand(request: ReviewRequest): Promise<number> {
   });
   process.stdout.write(request.format === "json" ? renderReviewJson(output) : renderReview(output));
   return 0;
+}
+
+function sessionRunOptions(
+  request: ReviewRequest,
+): Partial<Pick<RunReviewInput, "persistSession" | "sessionDir" | "sessionReceipt">> {
+  return {
+    ...(request.persistSession === undefined ? {} : { persistSession: request.persistSession }),
+    ...(request.sessionDir === undefined ? {} : { sessionDir: request.sessionDir }),
+    ...(request.sessionReceipt === undefined ? {} : { sessionReceipt: request.sessionReceipt }),
+  };
 }
 
 function writeMetrics(path: string, metrics: PiRunMetrics): void {
