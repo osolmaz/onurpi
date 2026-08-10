@@ -75,9 +75,12 @@ FINALIZING
 ```
 
 The controller records one monotonic start time immediately before the initial review prompt and
-derives the exploration and finalization deadlines from it. Warning messages say how much time
-remains and ask the model to prioritize actionable findings or finalize early. They are normal Pi
-user messages and therefore remain visible in the native session.
+derives the exploration and finalization deadlines from it. At that boundary the worker emits one
+validated `review_started` protocol event, and only then does the parent arm its review watchdog.
+Worker initialization has its own fixed one-minute bound, so startup cannot consume review or
+shutdown time and cannot hang indefinitely. Warning messages say how much time remains and ask the
+model to prioritize actionable findings or finalize early. They are normal Pi user messages and
+therefore remain visible in the native session.
 
 On finalization, the controller uses public `AgentSession` methods to abort the active turn, clear
 queued reminders, leave only `submit_review` active, and send one finalization prompt. A missing
@@ -130,6 +133,8 @@ The submission tool validates the existing public review schema and ends the age
 - Finalization-grace expiry stops model execution at the derived absolute deadline and fails
   explicitly.
 - The worker normally flushes the native session and metrics after that failure.
+- The parent review watchdog starts only after one validated worker start marker.
+- Worker initialization fails separately if that marker does not arrive within one minute.
 - A worker still alive 30 seconds after the review deadline is force-killed as a complete process
   group.
 - Parent signals still terminate the complete process group.

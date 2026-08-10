@@ -40,6 +40,7 @@ export async function runReviewWorker(
   const execution = await createExecution(request);
   const unsubscribe = execution.subscribe(writeEvent);
   try {
+    writeJson({ type: "review_started" });
     await execution.prompt(request.prompt);
     const submission = execution.submission();
     if (submission === undefined) throw new Error("review completed without submit_review");

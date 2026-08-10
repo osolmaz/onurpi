@@ -15,6 +15,7 @@ import type { CustomModelManifest, ModelSelection, ReviewOutput, TimeWarning } f
 import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
 const TERMINATION_GRACE_MS = 2_000;
+const WORKER_STARTUP_TIMEOUT_MS = 60_000;
 const MAX_STDERR_BYTES = 128 * 1024;
 
 type WorkerProcess = Pick<ChildProcessWithoutNullStreams, "kill" | "pid">;
@@ -152,9 +153,7 @@ async function collectChild(
   let stderrBytes = 0;
   let failure: Error | undefined;
   let killTimer: NodeJS.Timeout | undefined;
-  const absoluteTimer = scheduleWorkerWatchdog(child, watchdogTimeoutMs, (error) => {
-    failure ??= error;
-  });
+  let watchdogTimer: NodeJS.Timeout | undefined;
   const terminate = (message: string): void => {
     failure ??= new Error(message);
     terminateProcess(child);
@@ -162,6 +161,9 @@ async function collectChild(
       terminateProcess(child, true);
     }, TERMINATION_GRACE_MS);
   };
+  watchdogTimer = setTimeout(() => {
+    terminate("review worker did not start within 1m");
+  }, WORKER_STARTUP_TIMEOUT_MS);
   const onInterrupt = (): void => {
     terminate("review cancelled");
   };
@@ -172,7 +174,14 @@ async function collectChild(
   process.once("SIGTERM", onTerminate);
   child.stdout.on("data", (chunk: Buffer) => {
     try {
+      const reviewWasStarted = collector.hasReviewStarted();
       collector.feed(chunk);
+      if (!reviewWasStarted && collector.hasReviewStarted()) {
+        if (watchdogTimer !== undefined) clearTimeout(watchdogTimer);
+        watchdogTimer = scheduleWorkerWatchdog(child, watchdogTimeoutMs, (error) => {
+          failure ??= error;
+        });
+      }
       onMetrics?.(collector.metrics());
     } catch (error) {
       failure = error instanceof Error ? error : new Error(String(error));
@@ -191,7 +200,7 @@ async function collectChild(
       failure = error;
     });
     child.on("close", (code, signal) => {
-      clearTimeout(absoluteTimer);
+      if (watchdogTimer !== undefined) clearTimeout(watchdogTimer);
       if (killTimer !== undefined) clearTimeout(killTimer);
       process.removeListener("SIGINT", onInterrupt);
       process.removeListener("SIGTERM", onTerminate);

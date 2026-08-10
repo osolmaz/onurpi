@@ -29,6 +29,7 @@ export class PiEventCollector {
   private finalText: string | undefined;
   private terminalError: string | undefined;
   private agentEnded = false;
+  private reviewStarted = false;
   private requests = 0;
   private inputTokens = 0;
   private outputTokens = 0;
@@ -57,6 +58,10 @@ export class PiEventCollector {
       this.consume(line);
       newline = this.buffer.indexOf("\n");
     }
+  }
+
+  hasReviewStarted(): boolean {
+    return this.reviewStarted;
   }
 
   metrics(): PiRunMetrics {
@@ -98,9 +103,17 @@ export class PiEventCollector {
     if (!isRecord(value) || typeof value["type"] !== "string") {
       throw new Error("Pi emitted an invalid event object");
     }
-    if (value["type"] === "agent_end") this.agentEnded = true;
-    if (value["type"] === "message_end") this.consumeMessage(value["message"]);
-    if (value["type"] === "review_submission") this.consumeSubmission(value["review"]);
+    this.consumeEvent(value["type"], value);
+  }
+
+  private consumeEvent(type: string, value: Readonly<Record<string, unknown>>): void {
+    if (type === "review_started") {
+      if (this.reviewStarted) throw new Error("Pi emitted more than one review_started event");
+      this.reviewStarted = true;
+    }
+    if (type === "agent_end") this.agentEnded = true;
+    if (type === "message_end") this.consumeMessage(value["message"]);
+    if (type === "review_submission") this.consumeSubmission(value["review"]);
   }
 
   private consumeMessage(message: unknown): void {

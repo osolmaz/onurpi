@@ -115,7 +115,7 @@ Explicit warnings replace the defaults. When the exploration budget ends, Pi Rev
 
 A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, finalization failures, hard worker timeouts, or cancellation return nonzero. Pi Reviewer never fabricates a clean result when the provider cannot finalize. A persistent session remains available after review or output-validation failure once model execution has started, including budget warnings and finalization prompts.
 
-Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Guarded command subprocesses receive a minimal environment without model-provider credentials. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
+Review execution stays in a bounded child worker that is separate from the CLI process. Worker initialization has its own one-minute limit and does not consume review time; the parent starts its review watchdog only after the worker reports that model review is starting. Tools can inspect only the current checkout. Guarded command subprocesses receive a minimal environment without model-provider credentials. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 
 ## Codex compatibility
 

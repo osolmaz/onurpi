@@ -243,6 +243,16 @@ describe("relative review paths", () => {
 });
 
 describe("Pi JSON events", () => {
+  it("records exactly one review start marker", () => {
+    const collector = new PiEventCollector();
+    expect(collector.hasReviewStarted()).toBe(false);
+    collector.feed(`${JSON.stringify({ type: "review_started" })}\n`);
+    expect(collector.hasReviewStarted()).toBe(true);
+    expect(() => {
+      collector.feed(`${JSON.stringify({ type: "review_started" })}\n`);
+    }).toThrow("more than one review_started");
+  });
+
   it("collects a structured review submission across arbitrary UTF-8 chunks", () => {
     const collector = new PiEventCollector();
     const expected = { ...VALID, overall_explanation: "The café change is valid." };
