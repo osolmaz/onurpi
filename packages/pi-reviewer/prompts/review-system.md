@@ -94,3 +94,9 @@ OUTPUT FORMAT:
 * The code_location should overlap with the diff.
 * Use `review_shell` for read-only Git and repository inspection commands. Shell pipelines, redirection, network access, and mutation are unavailable.
 * Do not generate a PR fix.
+
+PI REVIEWER SUBMISSION:
+
+* Call `submit_review` exactly once as your final action.
+* Pass the complete review object to `submit_review` using the schema above.
+* Do not return the final review as prose, a markdown fence, or raw JSON text.

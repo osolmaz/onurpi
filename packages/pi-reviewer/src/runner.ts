@@ -5,12 +5,15 @@ import { writePiRuntimeConfig, type PiAppDefinition } from "@osolmaz/pi-factory"
 import { regularPiAuthPath } from "./auth-path.js";
 import { PiEventCollector, type PiRunMetrics } from "./pi-events.js";
 import { parseReviewOutput } from "./review-output.js";
+import {
+  resolveReviewTimePolicy,
+  workerHardTimeoutMs,
+  type ReviewTimePolicy,
+} from "./review-budget.js";
 import { selectAppModel } from "./app.js";
-import type { CustomModelManifest, ModelSelection, ReviewOutput } from "./types.js";
+import type { CustomModelManifest, ModelSelection, ReviewOutput, TimeWarning } from "./types.js";
 import type { ReviewWorkerRequest } from "./worker-protocol.js";
 
-const MAX_RUNTIME_MS = 20 * 60_000;
-const MAX_INACTIVITY_MS = 2 * 60_000;
 const TERMINATION_GRACE_MS = 2_000;
 const MAX_STDERR_BYTES = 128 * 1024;
 
@@ -22,6 +25,9 @@ export type RunReviewInput = {
   readonly sessionDir?: string;
   readonly sessionReceipt?: string;
   readonly maxModelRequests?: number;
+  readonly timeBudgetMs?: number;
+  readonly timeWarnings?: readonly TimeWarning[];
+  readonly finalizationGraceMs?: number;
   readonly cwd: string;
   readonly prompt: string;
   readonly stderr?: NodeJS.WritableStream;
@@ -29,6 +35,11 @@ export type RunReviewInput = {
 };
 
 export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
+  const policy = resolveReviewTimePolicy(
+    input.timeBudgetMs,
+    input.timeWarnings,
+    input.finalizationGraceMs,
+  );
   const app = selectAppModel(input.app, input.selection, input.modelManifest);
   const runtime = await writePiRuntimeConfig(app);
   const extension = app.extensions?.[0];
@@ -42,6 +53,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     app.systemPrompt,
     runtime.modelsPath,
     runtime.configDir,
+    policy,
   );
   const finalText = await executeWorker(
     app.piCommand,
@@ -49,6 +61,7 @@ export async function runReview(input: RunReviewInput): Promise<ReviewOutput> {
     app.env,
     input.stderr,
     input.onMetrics,
+    workerHardTimeoutMs(policy),
   );
   return parseReviewOutput(finalText, input.cwd);
 }
@@ -60,6 +73,7 @@ function createWorkerRequest(
   systemPrompt: string,
   modelsPath: string,
   configDir: string,
+  policy: ReviewTimePolicy,
 ): ReviewWorkerRequest {
   return {
     version: 1,
@@ -75,6 +89,9 @@ function createWorkerRequest(
     customModel: input.modelManifest !== undefined,
     ...sessionRequestOptions(input),
     maxModelRequests: input.maxModelRequests ?? null,
+    timeBudgetMs: policy.timeBudgetMs,
+    warningRemainingMs: policy.warningRemainingMs,
+    finalizationGraceMs: policy.finalizationGraceMs,
     thinking: input.selection.thinking,
     tools: app.tools?.split(",").filter((tool) => tool !== "") ?? [],
   };
@@ -100,6 +117,7 @@ async function executeWorker(
   appEnv: Readonly<Record<string, string>> | undefined,
   stderr: NodeJS.WritableStream | undefined,
   onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
+  hardTimeoutMs: number,
 ): Promise<string> {
   const [program, ...args] = command;
   if (program === undefined) throw new Error("Pi Reviewer worker command is empty");
@@ -118,28 +136,22 @@ async function executeWorker(
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdin.end(JSON.stringify(request));
-  return await collectChild(child, stderr, onMetrics);
+  return await collectChild(child, stderr, onMetrics, hardTimeoutMs);
 }
 
 async function collectChild(
   child: ChildProcessWithoutNullStreams,
   stderr: NodeJS.WritableStream | undefined,
   onMetrics: ((metrics: PiRunMetrics) => void) | undefined,
+  hardTimeoutMs: number,
 ): Promise<string> {
   const collector = new PiEventCollector();
   let stderrBytes = 0;
   let failure: Error | undefined;
   let killTimer: NodeJS.Timeout | undefined;
-  let inactivityTimer: NodeJS.Timeout;
   const absoluteTimer = setTimeout(() => {
-    terminate("review exceeded 20 minute limit");
-  }, MAX_RUNTIME_MS);
-  const resetInactivity = (): void => {
-    clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(() => {
-      terminate("review produced no events for 2 minutes");
-    }, MAX_INACTIVITY_MS);
-  };
+    terminate("review worker exceeded cooperative deadline and infrastructure margin");
+  }, hardTimeoutMs);
   const terminate = (message: string): void => {
     failure ??= new Error(message);
     terminateProcess(child);
@@ -155,9 +167,7 @@ async function collectChild(
   };
   process.once("SIGINT", onInterrupt);
   process.once("SIGTERM", onTerminate);
-  resetInactivity();
   child.stdout.on("data", (chunk: Buffer) => {
-    resetInactivity();
     try {
       collector.feed(chunk);
       onMetrics?.(collector.metrics());
@@ -167,7 +177,6 @@ async function collectChild(
     }
   });
   child.stderr.on("data", (chunk: Buffer) => {
-    resetInactivity();
     const remaining = MAX_STDERR_BYTES - stderrBytes;
     if (remaining <= 0) return;
     const output = chunk.subarray(0, remaining);
@@ -180,7 +189,6 @@ async function collectChild(
     });
     child.on("close", (code, signal) => {
       clearTimeout(absoluteTimer);
-      clearTimeout(inactivityTimer);
       if (killTimer !== undefined) clearTimeout(killTimer);
       process.removeListener("SIGINT", onInterrupt);
       process.removeListener("SIGTERM", onTerminate);

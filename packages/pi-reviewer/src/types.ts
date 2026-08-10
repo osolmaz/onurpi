@@ -6,6 +6,10 @@ export const OUTPUT_FORMATS = ["text", "json"] as const;
 
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
+export type TimeWarning =
+  | { readonly kind: "percentage"; readonly percentage: number }
+  | { readonly kind: "duration"; readonly milliseconds: number };
+
 export type ModelSelection = {
   readonly provider: string;
   readonly model: string;
@@ -56,6 +60,9 @@ export type ReviewRequest = {
   readonly sessionReceipt?: string;
   readonly persistSession?: boolean;
   readonly maxModelRequests?: number;
+  readonly timeBudgetMs?: number;
+  readonly timeWarnings?: readonly TimeWarning[];
+  readonly finalizationGraceMs?: number;
   readonly thinking?: ThinkingLevel;
   readonly format?: OutputFormat;
 };

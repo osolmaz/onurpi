@@ -2,16 +2,15 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
   createDefaultExecution,
   createReviewSessionManager,
-  installRequestLimiter,
   runReviewWorker,
   workerMessagePayload,
 } from "../src/worker.js";
+import type { ReviewSubmission } from "../src/submit-review.js";
 import type { ReviewWorkerRequest } from "../src/worker-protocol.js";
 
 const cleanup: string[] = [];
@@ -32,6 +31,9 @@ const REQUEST = {
   sessionDir: "/sessions",
   sessionReceipt: null,
   maxModelRequests: null,
+  timeBudgetMs: 20 * 60_000,
+  warningRemainingMs: [10 * 60_000, 5 * 60_000],
+  finalizationGraceMs: 5 * 60_000,
   thinking: "high",
   tools: ["read"],
 } satisfies ReviewWorkerRequest;
@@ -77,68 +79,12 @@ describe("session persistence", () => {
   });
 });
 
-describe("request limiter", () => {
-  it("steers a tool-using review to its final answer at the request limit", async () => {
-    let listener: (event: AgentSessionEvent) => void = () => undefined;
-    let removed = false;
-    const calls: string[] = [];
-    const event: AgentSessionEvent = {
-      type: "message_end",
-      message: {
-        role: "assistant",
-        content: [],
-        api: "openai-completions",
-        provider: "custom",
-        model: "review-model",
-        usage: {
-          input: 1,
-          output: 1,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 2,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-        },
-        stopReason: "toolUse",
-        timestamp: 1,
-      },
-    };
-    const limiter = installRequestLimiter(
-      {
-        subscribe: (next) => {
-          listener = next;
-          return () => {
-            removed = true;
-          };
-        },
-        abort: () => {
-          calls.push("abort");
-          return Promise.resolve();
-        },
-        prompt: (content) => {
-          calls.push(`prompt:${content}`);
-          listener(event);
-          return new Promise<void>(() => undefined);
-        },
-        setActiveToolsByName: (tools) => {
-          calls.push(`tools:${tools.join(",")}`);
-        },
-      },
-      2,
-    );
-
-    listener(event);
-    listener(event);
-    listener(event);
-    await limiter.triggered;
-    await limiter.finish();
-    expect(calls).toHaveLength(3);
-    expect(calls[0]).toBe("abort");
-    expect(calls[1]).toBe("tools:");
-    expect(calls[2]).toContain("Return the final review JSON");
-    limiter.dispose();
-    expect(removed).toBe(true);
-  });
-});
+const SUBMISSION: ReviewSubmission = {
+  findings: [],
+  overall_correctness: "patch is correct",
+  overall_explanation: "No actionable defects were found.",
+  overall_confidence_score: 0.9,
+};
 
 describe("review worker events", () => {
   it("creates an isolated in-memory Pi execution", async () => {
@@ -252,6 +198,7 @@ describe("review worker events", () => {
           calls.push(`prompt:${prompt}`);
           return Promise.resolve();
         },
+        submission: () => SUBMISSION,
         dispose: () => calls.push("dispose"),
         flush: () => {
           calls.push("flush");
@@ -262,6 +209,25 @@ describe("review worker events", () => {
     expect(calls).toEqual(["subscribe", "prompt:review this", "unsubscribe", "dispose", "flush"]);
   });
 
+  it("rejects a settled review without submit_review", async () => {
+    const calls: string[] = [];
+    await expect(
+      runReviewWorker(REQUEST, () =>
+        Promise.resolve({
+          subscribe: () => () => calls.push("unsubscribe"),
+          prompt: () => Promise.resolve(),
+          submission: () => undefined,
+          dispose: () => calls.push("dispose"),
+          flush: () => {
+            calls.push("flush");
+            return Promise.resolve();
+          },
+        }),
+      ),
+    ).rejects.toThrow("without submit_review");
+    expect(calls).toEqual(["unsubscribe", "dispose", "flush"]);
+  });
+
   it("cleans up when prompting fails", async () => {
     const calls: string[] = [];
     await expect(
@@ -269,6 +235,7 @@ describe("review worker events", () => {
         Promise.resolve({
           subscribe: () => () => calls.push("unsubscribe"),
           prompt: () => Promise.reject(new Error("failed")),
+          submission: () => undefined,
           dispose: () => calls.push("dispose"),
           flush: () => {
             calls.push("flush");

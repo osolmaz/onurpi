@@ -243,22 +243,15 @@ describe("relative review paths", () => {
 });
 
 describe("Pi JSON events", () => {
-  it("collects a completed assistant response across arbitrary UTF-8 chunks", () => {
+  it("collects a structured review submission across arbitrary UTF-8 chunks", () => {
     const collector = new PiEventCollector();
-    const expected = JSON.stringify({ ...VALID, overall_explanation: "The café change is valid." });
+    const expected = { ...VALID, overall_explanation: "The café change is valid." };
     const event = Buffer.from(
-      `${JSON.stringify({
-        type: "message_end",
-        message: {
-          role: "assistant",
-          stopReason: "stop",
-          content: [{ type: "text", text: expected }],
-        },
-      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+      `${JSON.stringify({ type: "review_submission", review: expected })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
     );
     for (let index = 0; index < event.length; index += 1)
       collector.feed(event.subarray(index, index + 1));
-    expect(collector.finish().finalText).toBe(expected);
+    expect(collector.finish().finalText).toBe(JSON.stringify(expected));
   });
 
   it("aggregates model usage and route attestations", () => {
@@ -283,9 +276,9 @@ describe("Pi JSON events", () => {
             cost: { total: 0.004 },
           },
         },
-      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+      })}\n${JSON.stringify({ type: "review_submission", review: VALID })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
     );
-    expect(collector.finish().finalText).toBe("done");
+    expect(collector.finish().finalText).toBe(JSON.stringify(VALID));
     expect(collector.metrics()).toEqual({
       version: 1,
       requests: 1,
@@ -302,19 +295,19 @@ describe("Pi JSON events", () => {
     });
   });
 
-  it("retains text from a bounded final response that still requests a tool", () => {
+  it("rejects assistant text without a structured submission", () => {
     const collector = new PiEventCollector();
     collector.feed(
       `${JSON.stringify({
         type: "message_end",
         message: {
           role: "assistant",
-          stopReason: "toolUse",
-          content: [{ type: "text", text: "bounded final" }],
+          stopReason: "stop",
+          content: [{ type: "text", text: JSON.stringify(VALID) }],
         },
-      })}\n`,
+      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
     );
-    expect(collector.finish()).toEqual({ finalText: "bounded final", sawAgentEnd: false });
+    expect(() => collector.finish()).toThrow("no submit_review result");
   });
 
   it("rejects invalid, incomplete, errored, and oversized event streams", () => {
@@ -342,16 +335,9 @@ describe("Pi JSON events", () => {
       `${JSON.stringify({
         type: "message_end",
         message: { role: "assistant", stopReason: "error" },
-      })}\n${JSON.stringify({
-        type: "message_end",
-        message: {
-          role: "assistant",
-          stopReason: "stop",
-          content: [{ type: "text", text: "recovered" }],
-        },
-      })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
+      })}\n${JSON.stringify({ type: "review_submission", review: VALID })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
     );
-    expect(recovered.finish().finalText).toBe("recovered");
+    expect(recovered.finish().finalText).toBe(JSON.stringify(VALID));
     const ignored = new PiEventCollector();
     ignored.feed(
       `${JSON.stringify({
@@ -366,7 +352,7 @@ describe("Pi JSON events", () => {
         },
       })}\n${JSON.stringify({ type: "agent_end", messages: [] })}\n`,
     );
-    expect(() => ignored.finish()).toThrow("no completed assistant response");
+    expect(() => ignored.finish()).toThrow("no submit_review result");
     const oversized = new PiEventCollector();
     expect(() => {
       oversized.feed("x".repeat(2 * 1024 * 1024 + 1));

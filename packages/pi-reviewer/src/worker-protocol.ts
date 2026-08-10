@@ -16,6 +16,9 @@ export type ReviewWorkerRequest = {
   readonly sessionDir: string;
   readonly sessionReceipt: string | null;
   readonly maxModelRequests: number | null;
+  readonly timeBudgetMs: number;
+  readonly warningRemainingMs: readonly number[];
+  readonly finalizationGraceMs: number;
   readonly thinking: ThinkingLevel;
   readonly tools: readonly string[];
 };
@@ -62,6 +65,9 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     "sessionDir",
     "sessionReceipt",
     "maxModelRequests",
+    "timeBudgetMs",
+    "warningRemainingMs",
+    "finalizationGraceMs",
     "thinking",
     "tools",
   ]);
@@ -72,6 +78,8 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
   if (!Array.isArray(tools) || !tools.every((tool) => typeof tool === "string" && tool !== "")) {
     throw new Error("review worker tools must be nonempty strings");
   }
+  const timeBudgetMs = positiveMilliseconds(value["timeBudgetMs"], "timeBudgetMs");
+  const warningRemainingMs = warningTimes(value["warningRemainingMs"], timeBudgetMs);
   return {
     version: 1,
     cwd: requiredString(value, "cwd"),
@@ -88,6 +96,9 @@ export function validateWorkerRequest(value: unknown): ReviewWorkerRequest {
     sessionDir: requiredString(value, "sessionDir"),
     sessionReceipt: optionalString(value["sessionReceipt"], "sessionReceipt"),
     maxModelRequests: optionalRequestLimit(value["maxModelRequests"]),
+    timeBudgetMs,
+    warningRemainingMs,
+    finalizationGraceMs: positiveMilliseconds(value["finalizationGraceMs"], "finalizationGraceMs"),
     thinking: thinkingLevel(value["thinking"]),
     tools,
   };
@@ -110,6 +121,42 @@ function optionalString(value: unknown, key: string): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || value === "") {
     throw new Error(`review worker ${key} must be a nonempty string or null`);
+  }
+  return value;
+}
+
+function positiveMilliseconds(value: unknown, key: string): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < 1_000 ||
+    value > 86_400_000
+  ) {
+    throw new Error(`review worker ${key} must be between 1000 and 86400000`);
+  }
+  return value;
+}
+
+function warningTimes(value: unknown, timeBudgetMs: number): readonly number[] {
+  if (!Array.isArray(value)) throw new Error("review worker warningRemainingMs must be an array");
+  const warnings = value.map((entry) => positiveIntegerMilliseconds(entry));
+  if (warnings.some((entry) => entry >= timeBudgetMs)) {
+    throw new Error("review worker warnings must be less than timeBudgetMs");
+  }
+  if (new Set(warnings).size !== warnings.length) {
+    throw new Error("review worker warnings must be unique");
+  }
+  for (let index = 1; index < warnings.length; index += 1) {
+    if ((warnings[index - 1] ?? 0) <= (warnings[index] ?? 0)) {
+      throw new Error("review worker warnings must be in descending order");
+    }
+  }
+  return warnings;
+}
+
+function positiveIntegerMilliseconds(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    throw new Error("review worker warningRemainingMs entries must be positive integers");
   }
   return value;
 }

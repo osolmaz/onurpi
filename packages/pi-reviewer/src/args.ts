@@ -5,6 +5,7 @@ import {
   type ReviewRequest,
   type ReviewTarget,
   type ThinkingLevel,
+  type TimeWarning,
 } from "./types.js";
 
 const MAX_INPUT_CHARS = 16_384;
@@ -29,6 +30,9 @@ type ReviewFields = {
   sessionReceipt?: string;
   persistSession?: boolean;
   maxModelRequests?: number;
+  timeBudgetMs?: number;
+  timeWarnings: TimeWarning[];
+  finalizationGraceMs?: number;
   thinking?: ThinkingLevel;
   format?: OutputFormat;
   title?: string;
@@ -90,7 +94,7 @@ function parseModels(args: readonly string[]): ParsedCommand {
 }
 
 function parseReview(args: readonly string[], cwd: string): ReviewRequest {
-  const fields: ReviewFields = { cwd, custom: [] };
+  const fields: ReviewFields = { cwd, custom: [], timeWarnings: [] };
   for (let index = 0; index < args.length; index += 1) {
     const arg = required(args[index], "missing argument");
     index += consumeReviewArg(fields, arg, args[index + 1]);
@@ -116,6 +120,7 @@ function reviewOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cw
   return {
     ...modelOptions(fields),
     ...sessionOptions(fields),
+    ...budgetOptions(fields),
     ...presentationOptions(fields),
   };
 }
@@ -134,6 +139,16 @@ function sessionOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "c
     ...(fields.sessionDir === undefined ? {} : { sessionDir: fields.sessionDir }),
     ...(fields.sessionReceipt === undefined ? {} : { sessionReceipt: fields.sessionReceipt }),
     ...(fields.persistSession === undefined ? {} : { persistSession: fields.persistSession }),
+  };
+}
+
+function budgetOptions(fields: ReviewFields): Omit<ReviewRequest, "target" | "cwd"> {
+  return {
+    ...(fields.timeBudgetMs === undefined ? {} : { timeBudgetMs: fields.timeBudgetMs }),
+    ...(fields.timeWarnings.length === 0 ? {} : { timeWarnings: fields.timeWarnings }),
+    ...(fields.finalizationGraceMs === undefined
+      ? {}
+      : { finalizationGraceMs: fields.finalizationGraceMs }),
   };
 }
 
@@ -211,12 +226,24 @@ function consumeExecutionOption(
   arg: string,
   next: string | undefined,
 ): boolean {
+  if (consumeBudgetOption(fields, arg, next)) return true;
   if (arg === "--model-manifest") fields.modelManifest = requiredValue(next, arg);
   else if (arg === "--metrics-file") fields.metricsFile = requiredValue(next, arg);
   else if (arg === "--session-dir") fields.sessionDir = requiredValue(next, arg);
   else if (arg === "--session-receipt") fields.sessionReceipt = requiredValue(next, arg);
   else if (arg === "--max-model-requests") {
     fields.maxModelRequests = validateMaxModelRequests(requiredValue(next, arg));
+  } else return false;
+  return true;
+}
+
+function consumeBudgetOption(fields: ReviewFields, arg: string, next: string | undefined): boolean {
+  if (arg === "--time-budget") {
+    fields.timeBudgetMs = validateDuration(requiredValue(next, arg), "time budget");
+  } else if (arg === "--time-warning") {
+    fields.timeWarnings.push(validateTimeWarning(requiredValue(next, arg)));
+  } else if (arg === "--finalization-grace") {
+    fields.finalizationGraceMs = validateDuration(requiredValue(next, arg), "finalization grace");
   } else return false;
   return true;
 }
@@ -253,6 +280,35 @@ export function validateMaxModelRequests(value: string): number {
   return requests;
 }
 
+export function validateDuration(value: string, label = "duration"): number {
+  const match = /^([1-9][0-9]*)(ms|s|m|h)$/u.exec(value);
+  if (match === null) throw new Error(`${label} must use a positive ms, s, m, or h duration`);
+  const amount = Number(match[1]);
+  const unit = match[2] ?? "";
+  const multipliers: Readonly<Record<string, number>> = {
+    ms: 1,
+    s: 1_000,
+    m: 60_000,
+    h: 3_600_000,
+  };
+  const milliseconds = amount * (multipliers[unit] ?? Number.NaN);
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 1_000 || milliseconds > 86_400_000) {
+    throw new Error(`${label} must be between 1s and 24h`);
+  }
+  return milliseconds;
+}
+
+export function validateTimeWarning(value: string): TimeWarning {
+  if (value.endsWith("%")) {
+    const percentage = /^([1-9][0-9]?)%$/u.exec(value);
+    if (percentage === null) {
+      throw new Error("time warning percentage must be between 1% and 99%");
+    }
+    return { kind: "percentage", percentage: Number(percentage[1]) };
+  }
+  return { kind: "duration", milliseconds: validateDuration(value, "time warning") };
+}
+
 export function validateThinking(value: string): ThinkingLevel {
   if (THINKING_LEVELS.some((level) => level === value)) return value as ThinkingLevel;
   throw new Error(`thinking must be one of ${THINKING_LEVELS.join(", ")}`);
@@ -273,5 +329,5 @@ function required(value: string | undefined, message: string): string {
 }
 
 export function reviewUsage(): string {
-  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--session-dir DIR] [--session-receipt PATH] [--no-session] [--max-model-requests N] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
+  return "usage: pi-reviewer (--uncommitted | --base BRANCH | --commit SHA | INSTRUCTIONS) [--model PROVIDER/MODEL] [--model-manifest PATH] [--metrics-file PATH] [--session-dir DIR] [--session-receipt PATH] [--no-session] [--max-model-requests N] [--time-budget DURATION] [--time-warning PERCENT|DURATION] [--finalization-grace DURATION] [--thinking LEVEL] [--format text|json] [--cwd DIR]";
 }

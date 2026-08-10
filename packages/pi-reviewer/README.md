@@ -98,9 +98,22 @@ Every review saves a native Pi JSONL session under `~/.local/state/pi-reviewer/s
 
 Integrations can isolate a run with `--session-dir DIR` and request a mode-0600 receipt with `--session-receipt PATH`. The receipt contains only Pi's generated session-file path. Use `--no-session` only when persistence is deliberately unwanted; it cannot be combined with either session-output option.
 
-`--max-model-requests N` stops pending tool work after the Nth complete model response, disables tools, and makes one final request for the required JSON using the evidence already gathered. It does not truncate a model response or silently turn a timed-out review into a clean result.
+Pi Reviewer treats time limits as an exploration budget rather than an immediate process kill. The default budget is 20 minutes with reminders at 50% and 25% remaining, followed by a five-minute finalization grace period. Configure a run with repeatable percentage or duration warnings:
 
-A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, malformed output, timeouts or cancellation return nonzero. A persistent session remains available after review or output-validation failure once model execution has started.
+```bash
+pi-reviewer --base main \
+  --time-budget 30m \
+  --time-warning 50% \
+  --time-warning 10m \
+  --time-warning 5m \
+  --finalization-grace 10m
+```
+
+Explicit warnings replace the defaults. When the exploration budget ends, Pi Reviewer aborts unfinished investigation, clears pending reminders, disables investigation tools, and asks the model to call the typed `submit_review` tool using evidence already gathered. A separate parent watchdog allows five additional minutes beyond the exploration and finalization periods before treating the worker as stuck.
+
+`--max-model-requests N` uses the same finalization path after the Nth complete model response. Time and request limits cannot start competing finalization turns. Final review output must come through `submit_review`; raw JSON or prose is not accepted as a second submission protocol.
+
+A successful review returns zero even when it has findings. Invalid targets, authentication failures, model failures, finalization failures, hard worker timeouts, or cancellation return nonzero. Pi Reviewer never fabricates a clean result when the provider cannot finalize. A persistent session remains available after review or output-validation failure once model execution has started, including budget warnings and finalization prompts.
 
 Review execution stays in a bounded child worker that is separate from the CLI process. Tools can inspect only the current checkout. Guarded command subprocesses receive a minimal environment without model-provider credentials. Mutation, network clients, shell operators, external Git helpers, and paths outside the checkout are blocked.
 

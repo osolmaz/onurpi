@@ -9,7 +9,6 @@ import {
   ModelRuntime,
   SessionManager,
   SettingsManager,
-  type AgentSession,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 
@@ -17,12 +16,15 @@ import {
   canonicalModelsStorePath,
   registerHuggingFaceOAuthProvider,
 } from "./huggingface-provider.js";
+import { runReviewWithBudget } from "./review-budget.js";
+import { createSubmitReviewTool, type ReviewSubmission } from "./submit-review.js";
 import { terminalText } from "./terminal-text.js";
 import { readWorkerRequest, type ReviewWorkerRequest } from "./worker-protocol.js";
 
 type ReviewWorkerExecution = {
   readonly subscribe: (listener: (event: AgentSessionEvent) => void) => () => void;
   readonly prompt: (prompt: string) => Promise<void>;
+  readonly submission: () => ReviewSubmission | undefined;
   readonly dispose: () => void;
   readonly flush: () => Promise<void>;
 };
@@ -39,6 +41,9 @@ export async function runReviewWorker(
   const unsubscribe = execution.subscribe(writeEvent);
   try {
     await execution.prompt(request.prompt);
+    const submission = execution.submission();
+    if (submission === undefined) throw new Error("review completed without submit_review");
+    writeJson({ type: "review_submission", review: submission });
   } finally {
     unsubscribe();
     execution.dispose();
@@ -87,26 +92,39 @@ export async function createDefaultExecution(
   }
 
   const sessionManager = createReviewSessionManager(request);
+  let submission: ReviewSubmission | undefined;
+  const submitReview = createSubmitReviewTool(request.cwd, (value) => {
+    submission = value;
+  });
   const { session } = await createAgentSession({
     cwd: request.cwd,
     agentDir: request.configDir,
     modelRuntime,
     model,
     thinkingLevel: request.thinking,
-    tools: [...request.tools],
+    tools: [...new Set([...request.tools, "submit_review"])],
+    customTools: [submitReview],
     resourceLoader,
     settingsManager,
     sessionManager,
   });
-  const requestLimiter = installRequestLimiter(session, request.maxModelRequests);
   return {
     subscribe: (listener) => session.subscribe(listener),
     prompt: async (prompt) => {
-      await Promise.race([session.prompt(prompt), requestLimiter.triggered]);
-      await requestLimiter.finish();
+      await runReviewWithBudget(
+        session,
+        prompt,
+        {
+          timeBudgetMs: request.timeBudgetMs,
+          warningRemainingMs: request.warningRemainingMs,
+          finalizationGraceMs: request.finalizationGraceMs,
+        },
+        request.maxModelRequests,
+        () => submission !== undefined,
+      );
     },
+    submission: () => submission,
     dispose: () => {
-      requestLimiter.dispose();
       session.dispose();
     },
     flush: async () => {
@@ -140,64 +158,6 @@ function createInitializedSessionManager(cwd: string, sessionDir: string): Sessi
     unlinkSync(sessionFile);
     throw error;
   }
-}
-
-export type RequestLimiter = {
-  readonly triggered: Promise<void>;
-  readonly finish: () => Promise<void>;
-  readonly dispose: () => void;
-};
-
-export function installRequestLimiter(
-  session: Pick<AgentSession, "abort" | "prompt" | "setActiveToolsByName" | "subscribe">,
-  limit: number | null,
-): RequestLimiter {
-  if (limit === null) {
-    return {
-      triggered: new Promise<void>(() => undefined),
-      finish: () => Promise.resolve(),
-      dispose: () => undefined,
-    };
-  }
-  let markTriggered: () => void = () => undefined;
-  const triggered = new Promise<void>((resolve) => {
-    markTriggered = resolve;
-  });
-  let requests = 0;
-  let finalPhase = false;
-  let markFinalResponse: (() => void) | undefined;
-  let finalReview: Promise<void> | undefined;
-  const dispose = session.subscribe((event) => {
-    if (event.type !== "message_end" || event.message.role !== "assistant") return;
-    requests += 1;
-    if (finalPhase) {
-      markFinalResponse?.();
-      return;
-    }
-    if (finalReview !== undefined || requests < limit || event.message.stopReason !== "toolUse") {
-      return;
-    }
-    markTriggered();
-    finalReview = Promise.resolve().then(async () => {
-      await session.abort();
-      session.setActiveToolsByName([]);
-      finalPhase = true;
-      const finalResponse = new Promise<void>((resolve) => {
-        markFinalResponse = resolve;
-      });
-      const prompt = session.prompt(
-        "Stop investigating now. Return the final review JSON object in the required schema using the evidence already gathered. Do not call more tools.",
-      );
-      await Promise.race([prompt, finalResponse]);
-    });
-  });
-  return {
-    triggered,
-    finish: async () => {
-      await finalReview;
-    },
-    dispose,
-  };
 }
 
 function writeEvent(event: AgentSessionEvent): void {

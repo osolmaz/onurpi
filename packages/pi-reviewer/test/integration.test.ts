@@ -52,8 +52,8 @@ for await (const chunk of process.stdin) input += chunk;
 writeFileSync(process.env.PI_REVIEWER_ARGS_FILE, input);
 writeFileSync(process.env.PI_REVIEWER_OFFLINE_FILE, process.env.PI_OFFLINE ?? "");
 if (${String(exitCode)} !== 0) process.exit(${String(exitCode)});
-const output = process.env.PI_REVIEWER_OUTPUT;
-console.log(JSON.stringify({type:"message_end", message:{role:"assistant", stopReason:"stop", content:[{type:"text", text:output}]}}));
+const output = JSON.parse(process.env.PI_REVIEWER_OUTPUT ?? "null");
+console.log(JSON.stringify({type:"review_submission", review:output}));
 console.log(JSON.stringify({type:"agent_end", messages:[]}));
 `,
   );
@@ -160,6 +160,9 @@ describe("Pi Reviewer app", () => {
     expect(request["persistSession"]).toBe(true);
     expect(request["sessionDir"]).toBe(path.join(stateDir, "sessions"));
     expect(request["sessionReceipt"]).toBeNull();
+    expect(request["timeBudgetMs"]).toBe(20 * 60_000);
+    expect(request["warningRemainingMs"]).toEqual([10 * 60_000, 5 * 60_000]);
+    expect(request["finalizationGraceMs"]).toBe(5 * 60_000);
   });
 
   it("surfaces child failure instead of returning a clean review", async () => {
@@ -190,7 +193,8 @@ describe("Pi Reviewer app", () => {
     const normalized = prompt.replaceAll("\r\n", "\n");
     const localLine =
       "* Use `review_shell` for read-only Git and repository inspection commands. Shell pipelines, redirection, network access, and mutation are unavailable.\n";
-    const upstream = normalized.replace(localLine, "");
+    const submissionBlock = `\nPI REVIEWER SUBMISSION:\n\n* Call \`submit_review\` exactly once as your final action.\n* Pass the complete review object to \`submit_review\` using the schema above.\n* Do not return the final review as prose, a markdown fence, or raw JSON text.\n`;
+    const upstream = normalized.replace(localLine, "").replace(submissionBlock, "");
     expect(createHash("sha256").update(upstream).digest("hex")).toBe(
       "ec60e7f36a1d1c2679ce095c0205ecc56f7dd8fb57707a13ef362072390f219f",
     );
