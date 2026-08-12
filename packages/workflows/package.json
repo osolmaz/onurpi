@@ -46,6 +46,6 @@
     "qs": "6.15.3"
   },
   "dependencies": {
-    "@osolmaz/pi-workflows": "github:osolmaz/pi-workflows#cd9c950fbeb736050cde0a8c6bcd421ad4195806"
+    "@osolmaz/pi-workflows": "0.4.0"
   }
 }
