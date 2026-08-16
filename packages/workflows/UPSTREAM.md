@@ -1,17 +1,17 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.5.3`
-- Source commit: `5e148e71a2c470e0acf0aee7d2e53c7f99126b75`
-- Package source: exact npm release `0.5.3`
+- Latest release at review: `v0.6.0`
+- Source commit: `f6c6017a2e90f457ec6c1f12d5123d4ff7cbc22f`
+- Package source: exact npm release `0.6.0`
 - License: MIT
 - Local changes: none; `index.ts` only re-exports the pinned extension
 
 The reviewed source provides workflow and controller commands, model-managed workflow controls, the
 built-in monitor workflow, durable controller state, child workflow scheduling, and the standalone
-workflow host. Release `0.5.3` uses Pi's current theme in the compact widget. The full active row
-uses the accent color and a bold node name. Waiting, completed, and failed states use their matching
-theme colors, while glyphs keep each state clear without color. Pending and secondary details stay
-dim. RPC mode still receives plain serializable strings with no terminal escape codes. Workflow runs
-and controller state are stored under Pi's user data directory as documented upstream. The wrapper
-adds no state or runtime behavior.
+workflow host. Release `0.6.0` adds durable workflow updates, optional multi-track progress,
+measured and source ETAs, compact workflow step cards, and a monitor that reports every check by
+notification. The monitor defaults to a 30-minute interval and can infer its stop rule from the
+request. Progress history, update size, update rate, and terminal rendering are bounded and
+validated. Workflow runs and controller state stay under Pi's user data directory as documented
+upstream. The wrapper adds no state or runtime behavior.
