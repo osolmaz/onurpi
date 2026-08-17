@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { replaceDirectory } from "./scripts/atomic-directory.ts";
+import { recoverDirectoryReplacement, replaceDirectory } from "./scripts/atomic-directory.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -11,6 +11,10 @@ function temporaryDirectory(): string {
   const path = mkdtempSync(join(tmpdir(), "onurpi-atomic-directory-"));
   temporaryDirectories.push(path);
   return path;
+}
+
+function backup(root: string): string {
+  return join(root, ".destination.onurpi-backup");
 }
 
 afterEach(() => {
@@ -27,10 +31,10 @@ describe("replaceDirectory", () => {
     writeFileSync(join(destination, "value"), "old\n", "utf8");
     writeFileSync(join(staged, "value"), "new\n", "utf8");
 
-    replaceDirectory(staged, destination, root);
+    replaceDirectory(staged, destination);
 
     expect(readFileSync(join(destination, "value"), "utf8")).toBe("new\n");
-    expect(existsSync(join(root, ".previous"))).toBe(false);
+    expect(existsSync(backup(root))).toBe(false);
   });
 
   it("restores the previous directory when the staged rename fails", () => {
@@ -40,10 +44,36 @@ describe("replaceDirectory", () => {
     writeFileSync(join(destination, "value"), "old\n", "utf8");
 
     expect(() => {
-      replaceDirectory(join(root, "missing"), destination, root);
+      replaceDirectory(join(root, "missing"), destination);
     }).toThrow();
 
     expect(readFileSync(join(destination, "value"), "utf8")).toBe("old\n");
-    expect(existsSync(join(root, ".previous"))).toBe(false);
+    expect(existsSync(backup(root))).toBe(false);
+  });
+
+  it("recovers a backup left before staged content became active", () => {
+    const root = temporaryDirectory();
+    const destination = join(root, "destination");
+    mkdirSync(backup(root));
+    writeFileSync(join(backup(root), "value"), "old\n", "utf8");
+
+    recoverDirectoryReplacement(destination);
+
+    expect(readFileSync(join(destination, "value"), "utf8")).toBe("old\n");
+    expect(existsSync(backup(root))).toBe(false);
+  });
+
+  it("removes a backup left after staged content became active", () => {
+    const root = temporaryDirectory();
+    const destination = join(root, "destination");
+    mkdirSync(destination);
+    mkdirSync(backup(root));
+    writeFileSync(join(destination, "value"), "new\n", "utf8");
+    writeFileSync(join(backup(root), "value"), "old\n", "utf8");
+
+    recoverDirectoryReplacement(destination);
+
+    expect(readFileSync(join(destination, "value"), "utf8")).toBe("new\n");
+    expect(existsSync(backup(root))).toBe(false);
   });
 });

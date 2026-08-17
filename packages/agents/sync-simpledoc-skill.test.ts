@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -129,6 +130,26 @@ describe("SimpleDoc skill synchronization", () => {
     expect(checked.changed).toBe(false);
     expect(dryRun.changed).toBe(false);
     expect(readFileSync(join(destination, "SKILL.md"), "utf8")).toContain("# Old");
+  });
+
+  it("recovers an interrupted replacement before checking drift", () => {
+    const root = temporaryDirectory();
+    const source = join(root, "source");
+    const destination = join(root, "destination");
+    createSimpleDocSkill(source);
+    createSimpleDocSkill(destination);
+    renameSync(destination, join(root, ".destination.onurpi-backup"));
+
+    const result = syncSimpleDocSkill({
+      source,
+      destination,
+      check: true,
+      dryRun: false,
+      log: () => undefined,
+    });
+
+    expect(result).toEqual({ changed: false, exitCode: 0, drift: [] });
+    expect(existsSync(join(destination, "SKILL.md"))).toBe(true);
   });
 
   it("reports no change for matching trees", () => {

@@ -62,6 +62,12 @@ type SyncState = {
   version: 1;
   sourceRoot: string;
   managedSkillIds: string[];
+  pendingSkillIds: string[];
+};
+
+type LoadedSyncState = {
+  managed: Set<string>;
+  pending: Set<string>;
 };
 
 type CliOptions = {
@@ -151,19 +157,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readManagedIds(path: string, legacy: boolean): string[] {
-  if (!existsSync(path)) return [];
+function readSkillIds(parsed: Record<string, unknown>, key: string, path: string): string[] {
+  const value = parsed[key];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`Invalid ${key.replaceAll("_", " ")} in ${path}`);
+  }
+  for (const id of value) assertSkillId(id as string, path);
+  return value as string[];
+}
+
+function readSyncState(path: string, legacy: boolean): LoadedSyncState {
+  if (!existsSync(path)) return { managed: new Set(), pending: new Set() };
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (!isRecord(parsed) || !Array.isArray(parsed["managed_skill_ids"])) {
-    throw new Error(`Invalid synchronization state in ${path}`);
-  }
+  if (!isRecord(parsed)) throw new Error(`Invalid synchronization state in ${path}`);
   if (legacy) validateLegacySource(parsed["source_root"], path);
-  const ids = parsed["managed_skill_ids"];
-  if (ids.some((value) => typeof value !== "string")) {
-    throw new Error(`Invalid managed skill ids in ${path}`);
-  }
-  for (const id of ids) assertSkillId(id as string, path);
-  return ids as string[];
+  const managed = new Set(readSkillIds(parsed, "managed_skill_ids", path));
+  const pendingValue = parsed["pending_skill_ids"];
+  const pending = new Set(
+    pendingValue === undefined ? [] : readSkillIds(parsed, "pending_skill_ids", path),
+  );
+  return { managed, pending };
 }
 
 function validateLegacySource(sourceRoot: unknown, statePath: string): void {
@@ -178,23 +191,27 @@ function statePath(root: string, fileName: string): string {
   return join(root, fileName);
 }
 
-function loadManagedIds(skillsRoot: string): Set<string> {
-  return new Set([
-    ...readManagedIds(statePath(skillsRoot, STATE_FILE_NAME), false),
-    ...readManagedIds(statePath(skillsRoot, LEGACY_STATE_FILE_NAME), true),
-  ]);
+function loadSyncState(skillsRoot: string): LoadedSyncState {
+  const current = readSyncState(statePath(skillsRoot, STATE_FILE_NAME), false);
+  const legacy = readSyncState(statePath(skillsRoot, LEGACY_STATE_FILE_NAME), true);
+  return {
+    managed: new Set([...current.managed, ...legacy.managed]),
+    pending: current.pending,
+  };
 }
 
-function writeState(path: string, sourceRoot: string, managedSkillIds: string[]): void {
-  const state: SyncState = {
+function writeState(path: string, sourceRoot: string, state: LoadedSyncState): void {
+  const serializedState: SyncState = {
     version: 1,
     sourceRoot,
-    managedSkillIds: [...managedSkillIds].sort(),
+    managedSkillIds: [...state.managed].sort(),
+    pendingSkillIds: [...state.pending].sort(),
   };
   const serialized = {
-    version: state.version,
-    source_root: state.sourceRoot,
-    managed_skill_ids: state.managedSkillIds,
+    version: serializedState.version,
+    source_root: serializedState.sourceRoot,
+    managed_skill_ids: serializedState.managedSkillIds,
+    pending_skill_ids: serializedState.pendingSkillIds,
   };
   mkdirSync(dirname(path), { recursive: true });
   const temporaryDirectory = mkdtempSync(join(dirname(path), `.${basename(path)}.tmp-`));
@@ -207,8 +224,8 @@ function writeState(path: string, sourceRoot: string, managedSkillIds: string[])
   }
 }
 
-function persistManagedState(skillsRoot: string, sourceRoot: string, managed: Set<string>): void {
-  writeState(statePath(skillsRoot, STATE_FILE_NAME), sourceRoot, [...managed]);
+function persistSyncState(skillsRoot: string, sourceRoot: string, state: LoadedSyncState): void {
+  writeState(statePath(skillsRoot, STATE_FILE_NAME), sourceRoot, state);
 }
 
 function removePath(path: string, dryRun: boolean): void {
@@ -293,7 +310,7 @@ function syncSkill(skill: Skill, destRoot: string, dryRun: boolean): void {
       preserveTimestamps: true,
       filter: (path) => shouldCopySkillPath(skill.sourcePath, path),
     });
-    replaceDirectory(temporaryPath, destPath, temporaryDirectory);
+    replaceDirectory(temporaryPath, destPath);
   } finally {
     rmSync(temporaryDirectory, { force: true, recursive: true });
   }
@@ -320,17 +337,13 @@ export function resolveSelection(skills: Skill[], selectors: string[]): Skill[] 
 function assertNoUnownedCollisions(
   skillsRoot: string,
   selected: Skill[],
-  oldManaged: Set<string>,
+  state: LoadedSyncState,
 ): void {
   for (const skill of selected) {
     const destinationPath = join(skillsRoot, skill.skillId);
-    if (
-      existsSync(destinationPath) &&
-      !oldManaged.has(skill.skillId) &&
-      !skillTreesMatch(skill, destinationPath)
-    ) {
-      throw new Error(`Refusing to replace unowned skill ${skill.skillId} at ${destinationPath}`);
-    }
+    if (!existsSync(destinationPath) || state.managed.has(skill.skillId)) continue;
+    if (state.pending.has(skill.skillId) && skillTreesMatch(skill, destinationPath)) continue;
+    throw new Error(`Refusing to replace unowned skill ${skill.skillId} at ${destinationPath}`);
   }
 }
 
@@ -339,7 +352,7 @@ type CopySyncOptions = Pick<SyncOptions, "agentsSource" | "sourceRoot" | "prune"
 function removeStaleSkills(
   skillsRoot: string,
   staleIds: string[],
-  managed: Set<string>,
+  state: LoadedSyncState,
   options: CopySyncOptions,
   log: Logger,
 ): void {
@@ -347,8 +360,24 @@ function removeStaleSkills(
     log(`Removing stale managed skill ${staleId}`);
     removePath(join(skillsRoot, staleId), options.dryRun);
     if (!options.dryRun) {
-      managed.delete(staleId);
-      persistManagedState(skillsRoot, options.sourceRoot, managed);
+      state.managed.delete(staleId);
+      persistSyncState(skillsRoot, options.sourceRoot, state);
+    }
+  }
+}
+
+function releaseStalePendingSkills(
+  skillsRoot: string,
+  staleIds: string[],
+  state: LoadedSyncState,
+  options: CopySyncOptions,
+  log: Logger,
+): void {
+  for (const staleId of staleIds) {
+    log(`Releasing incomplete ownership record ${staleId}`);
+    if (!options.dryRun) {
+      state.pending.delete(staleId);
+      persistSyncState(skillsRoot, options.sourceRoot, state);
     }
   }
 }
@@ -356,16 +385,21 @@ function removeStaleSkills(
 function copySelectedSkills(
   skillsRoot: string,
   selected: Skill[],
-  managed: Set<string>,
+  state: LoadedSyncState,
   options: CopySyncOptions,
   log: Logger,
 ): void {
   for (const skill of selected) {
     log(`Syncing ${skill.skillId} -> ${join(skillsRoot, skill.skillId)}`);
+    if (!options.dryRun && !state.managed.has(skill.skillId)) {
+      state.pending.add(skill.skillId);
+      persistSyncState(skillsRoot, options.sourceRoot, state);
+    }
     syncSkill(skill, skillsRoot, options.dryRun);
-    if (!options.dryRun && !managed.has(skill.skillId)) {
-      managed.add(skill.skillId);
-      persistManagedState(skillsRoot, options.sourceRoot, managed);
+    if (!options.dryRun && !state.managed.has(skill.skillId)) {
+      state.pending.delete(skill.skillId);
+      state.managed.add(skill.skillId);
+      persistSyncState(skillsRoot, options.sourceRoot, state);
     }
   }
 }
@@ -376,20 +410,25 @@ function syncCopyDestination(
   selected: Skill[],
   log: Logger,
 ): void {
-  const oldManaged = loadManagedIds(destination.skillsRoot);
+  const state = loadSyncState(destination.skillsRoot);
   const selectedIds = new Set(selected.map((skill) => skill.skillId));
-  const staleIds = options.prune ? [...oldManaged].filter((id) => !selectedIds.has(id)).sort() : [];
-  assertNoUnownedCollisions(destination.skillsRoot, selected, oldManaged);
+  const staleManagedIds = options.prune
+    ? [...state.managed].filter((id) => !selectedIds.has(id)).sort()
+    : [];
+  const stalePendingIds = options.prune
+    ? [...state.pending].filter((id) => !selectedIds.has(id)).sort()
+    : [];
+  assertNoUnownedCollisions(destination.skillsRoot, selected, state);
   log(`== ${destination.name} ==`);
-  const managed = new Set(oldManaged);
   if (!options.dryRun) {
-    persistManagedState(destination.skillsRoot, options.sourceRoot, managed);
+    persistSyncState(destination.skillsRoot, options.sourceRoot, state);
     removePath(statePath(destination.skillsRoot, LEGACY_STATE_FILE_NAME), false);
   }
   log(`Syncing instructions -> ${destination.agentsDest}`);
   syncFile(options.agentsSource, destination.agentsDest, options.dryRun);
-  removeStaleSkills(destination.skillsRoot, staleIds, managed, options, log);
-  copySelectedSkills(destination.skillsRoot, selected, managed, options, log);
+  removeStaleSkills(destination.skillsRoot, staleManagedIds, state, options, log);
+  releaseStalePendingSkills(destination.skillsRoot, stalePendingIds, state, options, log);
+  copySelectedSkills(destination.skillsRoot, selected, state, options, log);
   if (!options.dryRun) log(destination.restartHint);
 }
 
@@ -403,8 +442,8 @@ function syncPiDestination(
   const agentsDest = join(destination.configRoot, "AGENTS.md");
   log(`Syncing instructions -> ${agentsDest}`);
   syncFile(agentsSource, agentsDest, dryRun);
-  const managed = loadManagedIds(destination.skillsRoot);
-  for (const skillId of [...managed].sort()) {
+  const state = loadSyncState(destination.skillsRoot);
+  for (const skillId of [...state.managed].sort()) {
     log(`Removing legacy Pi skill copy ${skillId}`);
     removePath(join(destination.skillsRoot, skillId), dryRun);
   }
