@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -14,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { replaceDirectory } from "./atomic-directory.ts";
@@ -237,6 +238,49 @@ function shouldCopySkillPath(root: string, path: string): boolean {
   return basename(path) !== "SKILL.md" || dirname(path) === root;
 }
 
+type TreeManifest = Map<string, string>;
+
+function addTreeEntries(
+  root: string,
+  directory: string,
+  manifest: TreeManifest,
+  source: boolean,
+): void {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (source && !shouldCopySkillPath(root, path)) continue;
+    const stats = lstatSync(path);
+    if (stats.isSymbolicLink()) throw new Error(`Skill trees must not contain symlinks: ${path}`);
+    if (stats.isDirectory()) addTreeEntries(root, path, manifest, source);
+    else if (stats.isFile()) {
+      const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
+      manifest.set(
+        relative(root, path).split(sep).join("/"),
+        `${String(stats.mode & 0o777)}:${digest}`,
+      );
+    }
+  }
+}
+
+function treeManifest(root: string, source: boolean): TreeManifest {
+  if (lstatSync(root).isSymbolicLink())
+    throw new Error(`Skill trees must not contain symlinks: ${root}`);
+  const manifest: TreeManifest = new Map();
+  addTreeEntries(root, root, manifest, source);
+  return manifest;
+}
+
+function skillTreesMatch(skill: Skill, destination: string): boolean {
+  const destinationStats = lstatSync(destination);
+  if (!destinationStats.isDirectory() || destinationStats.isSymbolicLink()) return false;
+  const sourceManifest = treeManifest(skill.sourcePath, true);
+  const destinationManifest = treeManifest(destination, false);
+  return (
+    sourceManifest.size === destinationManifest.size &&
+    [...sourceManifest].every(([path, value]) => destinationManifest.get(path) === value)
+  );
+}
+
 function syncSkill(skill: Skill, destRoot: string, dryRun: boolean): void {
   const destPath = join(destRoot, skill.skillId);
   if (dryRun) return;
@@ -280,7 +324,11 @@ function assertNoUnownedCollisions(
 ): void {
   for (const skill of selected) {
     const destinationPath = join(skillsRoot, skill.skillId);
-    if (existsSync(destinationPath) && !oldManaged.has(skill.skillId)) {
+    if (
+      existsSync(destinationPath) &&
+      !oldManaged.has(skill.skillId) &&
+      !skillTreesMatch(skill, destinationPath)
+    ) {
       throw new Error(`Refusing to replace unowned skill ${skill.skillId} at ${destinationPath}`);
     }
   }
@@ -314,11 +362,11 @@ function copySelectedSkills(
 ): void {
   for (const skill of selected) {
     log(`Syncing ${skill.skillId} -> ${join(skillsRoot, skill.skillId)}`);
+    syncSkill(skill, skillsRoot, options.dryRun);
     if (!options.dryRun && !managed.has(skill.skillId)) {
       managed.add(skill.skillId);
       persistManagedState(skillsRoot, options.sourceRoot, managed);
     }
-    syncSkill(skill, skillsRoot, options.dryRun);
   }
 }
 

@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -201,7 +202,9 @@ describe("cross-harness synchronization", () => {
       "beta",
     ]);
   });
+});
 
+describe("synchronization recovery", () => {
   it("can retry after a skill copy fails during its first synchronization", () => {
     const root = temporaryDirectory();
     const sourceRoot = join(root, "source", "skills");
@@ -225,9 +228,7 @@ describe("cross-harness synchronization", () => {
     expect(() => {
       syncSkills(options);
     }).toThrow();
-    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).managed_skill_ids).toEqual([
-      "alpha",
-    ]);
+    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).managed_skill_ids).toEqual([]);
 
     chmodSync(unreadable, 0o644);
     expect(() => {
@@ -238,6 +239,41 @@ describe("cross-harness synchronization", () => {
     );
   });
 
+  it("recovers when a completed copy was not added to ownership state", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    const alpha = createSkill(sourceRoot, "alpha");
+    write(join(alpha, "helper.txt"), "copied before interruption\n");
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const target = destination(join(root, "target"));
+    mkdirSync(target.skillsRoot, { recursive: true });
+    cpSync(alpha, join(target.skillsRoot, "alpha"), {
+      recursive: true,
+      preserveTimestamps: true,
+    });
+
+    expect(() => {
+      syncSkills({
+        sourceRoot,
+        agentsSource,
+        destinations: [target],
+        selectors: [],
+        prune: true,
+        dryRun: false,
+        log: () => undefined,
+      });
+    }).not.toThrow();
+    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).managed_skill_ids).toEqual([
+      "alpha",
+    ]);
+    expect(readFileSync(join(target.skillsRoot, "alpha", "helper.txt"), "utf8")).toBe(
+      "copied before interruption\n",
+    );
+  });
+});
+
+describe("synchronization ownership", () => {
   it("rejects a collision with a skill it does not manage", () => {
     const root = temporaryDirectory();
     const sourceRoot = join(root, "source", "skills");
@@ -246,6 +282,7 @@ describe("cross-harness synchronization", () => {
     write(agentsSource, "instructions\n");
     const target = destination(join(root, "target"));
     createSkill(target.skillsRoot, "alpha");
+    write(join(target.skillsRoot, "alpha", "user-owned.txt"), "do not replace\n");
 
     expect(() => {
       syncSkills({
