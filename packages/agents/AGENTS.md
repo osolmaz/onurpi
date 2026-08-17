@@ -270,7 +270,7 @@
 - When creating or managing a project in a language supported by Slophammer, apply Slophammer
   standards and add the relevant checker/config/CI so the quality gate is enforceable locally and in
   CI.
-- Do not place unrelated external repository clones inside this tools repo unless the user
+- Do not place unrelated external repository clones inside the OnurPi repository unless the user
   explicitly asks for vendored or source-controlled contents.
 - Keep local scratch work, downloaded papers, generated experiment outputs, and temporary datasets
-  outside this tools repo unless the user explicitly asks to track them here.
+  outside the OnurPi repository unless the user explicitly asks to track them there.

@@ -104,7 +104,7 @@ See [Store format and interpretation](references/store-format.md) for fields, th
 - Do not expose `contributed_by`, pool membership, private configuration, credentials, or browsing patterns unless Onur explicitly asks for that information.
 - Treat subscriber-only or otherwise restricted posts as restricted content. Do not quote or redistribute them beyond what the user explicitly requests and is entitled to access.
 - Minimize retrieval: download and inspect the smallest useful date range, then expand only when needed.
-- Keep temporary search data outside the tools repository and remove it when it contains sensitive or unrelated material that no longer needs to be audited.
+- Keep temporary search data outside the OnurPi repository and remove it when it contains sensitive or unrelated material that no longer needs to be audited.
 
 ## Answer Shape
 

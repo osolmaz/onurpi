@@ -117,4 +117,4 @@ The raw posts are mostly public-source material, but the collection is private a
 - Private by default: contributor identity, pool membership, capture volume, unrelated records, service-account configuration, credentials, and browsing-history patterns.
 - Restricted: subscriber-only posts and any content no longer available to the user through its original access controls.
 
-Do not turn a focused lookup into a bulk export. Do not commit downloaded records or temporary search artifacts to the tools repository.
+Do not turn a focused lookup into a bulk export. Do not commit downloaded records or temporary search artifacts to the OnurPi repository.
