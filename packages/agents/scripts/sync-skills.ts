@@ -127,9 +127,11 @@ export function discoverSkills(sourceRoot: string): Skill[] {
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true }).sort((a, b) =>
     a.name.localeCompare(b.name),
   )) {
-    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     const sourcePath = join(sourceRoot, entry.name);
-    if (!existsSync(join(sourcePath, "SKILL.md"))) continue;
+    if (entry.isSymbolicLink()) {
+      throw new Error(`Skill trees must not contain symlinks: ${sourcePath}`);
+    }
+    if (!entry.isDirectory() || !existsSync(join(sourcePath, "SKILL.md"))) continue;
     rejectSymlinks(sourcePath);
     const skillId = parseSkillId(sourcePath);
     const previous = seenIds.get(skillId);
