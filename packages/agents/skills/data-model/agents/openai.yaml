@@ -1,0 +1,4 @@
+interface:
+  display_name: "Data Model"
+  short_description: "Create Lindy data models with Schemator"
+  default_prompt: "Use $data-model to create a Lindy data model by routing this schema task through Schemator and its bundled schemator skill."

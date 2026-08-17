@@ -1,0 +1,4 @@
+interface:
+  display_name: "ACPX"
+  short_description: "Delegate work to ACP coding agents safely"
+  default_prompt: "Use ACPX to delegate this task to the appropriate coding agent with a 30-minute timeout, collect the full result, and verify its findings."

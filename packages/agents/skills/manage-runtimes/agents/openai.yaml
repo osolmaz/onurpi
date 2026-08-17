@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Runtimes"
+  short_description: "Standardize local inference runtimes"
+  default_prompt: "Use $manage-runtimes to create, audit, promote, or clean up local inference runtimes safely."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Name Claim"
+  short_description: "Check names across accounts and domains"
+  default_prompt: "Use $name-claim to check whether this project name is free across domains, registries, code hosts, and social handles."

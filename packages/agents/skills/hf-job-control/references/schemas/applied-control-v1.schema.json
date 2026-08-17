@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/osolmaz/hf-job-control/blob/main/schemas/applied-control-v1.schema.json",
+  "title": "Applied HF Job Control receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "attempt_id", "control_repo", "control_revision",
+    "control_path", "control_sha256", "generation", "action", "observed_at",
+    "applied_at", "outcome"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "attempt_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "job_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "control_repo": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "control_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "control_path": {"type": "string", "pattern": "^controls/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\\.json$"},
+    "control_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "generation": {"type": "integer", "minimum": 1},
+    "action": {"enum": ["run", "pause", "stop", "abort"]},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "applied_at": {"type": "string", "format": "date-time"},
+    "outcome": {"type": "string", "minLength": 1, "maxLength": 200},
+    "evidence": {"type": "object"},
+    "boundary": {"type": "object"},
+    "checkpoint": {"type": "object"}
+  }
+}

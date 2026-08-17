@@ -1,0 +1,11 @@
+---
+sidebar_position: 2
+sidebar_custom_props:
+    icon: /img/cpu.svg
+---
+
+# Planning your deployment
+
+Before you can run an LLM in production, you first need to make a few key
+decisions. These early choices will shape your infrastructure needs, costs, and
+how well the model performs for your use case.

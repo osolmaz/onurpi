@@ -1,0 +1,4 @@
+interface:
+  display_name: "Conventional Commit"
+  short_description: "Draft and validate conventional titles"
+  default_prompt: "Use $conventional-commit to draft or validate a commit message or PR title using Conventional Commits and repo-local rules."

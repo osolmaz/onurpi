@@ -42,6 +42,12 @@ function packageName(entry: string): string {
   return match[1];
 }
 
+function resourceEntryExists(entry: string): boolean {
+  const wildcard = entry.indexOf("*");
+  const path = wildcard < 0 ? entry : entry.slice(0, wildcard);
+  return existsSync(join(root, path));
+}
+
 const externalPackages = [
   {
     directory: "demo-mode",
@@ -76,7 +82,7 @@ describe("OnurPi package loading", () => {
     for (const entry of resourceEntries()) {
       const directory = packageName(entry);
       expect(existsSync(join(root, "packages", directory, "package.json"))).toBe(true);
-      expect(existsSync(join(root, entry))).toBe(true);
+      expect(resourceEntryExists(entry)).toBe(true);
     }
   });
 

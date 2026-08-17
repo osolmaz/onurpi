@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check Ingredients"
+  short_description: "Audit ingredient safety claims"
+  default_prompt: "Use $check-ingredients to verify this product ingredient list, compare safety-rating claims such as Yuka-style concerns without relying on a Yuka API, and produce a source-backed risk verdict."

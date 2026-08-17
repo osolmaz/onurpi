@@ -1,0 +1,4 @@
+interface:
+  display_name: "Amk"
+  short_description: "Explain technical ideas plainly and directly"
+  default_prompt: "Use $amk to explain this more simply and directly."

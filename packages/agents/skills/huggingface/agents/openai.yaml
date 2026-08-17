@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hugging Face"
+  short_description: "Onur's Hugging Face tips and tricks"
+  default_prompt: "Use $huggingface with the relevant official Hugging Face skills. For paid accelerator work, also apply $paid-compute-launch and $hf-job-control before launch."

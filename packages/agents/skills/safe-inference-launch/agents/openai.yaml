@@ -1,0 +1,7 @@
+interface:
+  display_name: "Safe Inference Launch"
+  short_description: "Guard local LLM servers against OOM"
+  default_prompt: "Use $safe-inference-launch before starting a local vLLM, llama.cpp, or similar inference server."
+
+policy:
+  allow_implicit_invocation: true

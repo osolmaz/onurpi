@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/osolmaz/hf-job-control/blob/main/schemas/control-v1.schema.json",
+  "title": "HF Job Control desired state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "generation", "action"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "generation": {"type": "integer", "minimum": 1},
+    "action": {"enum": ["run", "pause", "stop", "abort"]},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "resume_from": {"$ref": "#/$defs/artifact_reference"}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["resume_from"]},
+      "then": {"properties": {"action": {"const": "run"}}}
+    }
+  ],
+  "$defs": {
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket", "key", "sha256", "bytes"],
+      "properties": {
+        "bucket": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "key": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\\\].*$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

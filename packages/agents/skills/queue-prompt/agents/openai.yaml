@@ -1,0 +1,4 @@
+interface:
+  display_name: "Queue Prompt"
+  short_description: "Handle repeated queued prompts safely"
+  default_prompt: "Use $queue-prompt when this looks like a queued, repeated, scheduled, or reminder-style prompt. Check whether the requested outcome is already complete; ignore completed duplicates, continue only unfinished work, and avoid duplicate side effects."

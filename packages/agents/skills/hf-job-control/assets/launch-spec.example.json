@@ -1,0 +1,28 @@
+{
+  "command": [
+    "uv",
+    "run",
+    "--with",
+    "hf-job-control @ git+https://github.com/osolmaz/hf-job-control@<commit>",
+    "python",
+    "/workspace/worker.py"
+  ],
+  "environment": {
+    "HF_JOB_ARTIFACT_BUCKET": "owner/jobs-artifacts",
+    "HF_JOB_CONTROL_REPO": "owner/jobs-control",
+    "HF_JOB_STATUS_PREFIX": "runs",
+    "HF_JOB_STATUS_REPO": "owner/project-status",
+    "WORKER_CODE_REVISION": "<immutable-revision>"
+  },
+  "flavor": "cpu-basic",
+  "image": "ghcr.io/astral-sh/uv:python3.13-bookworm",
+  "labels": {
+    "kind": "controlled-worker",
+    "project": "replace-me"
+  },
+  "schema_version": 1,
+  "secret_names": [
+    "HF_TOKEN"
+  ],
+  "timeout": "2h"
+}

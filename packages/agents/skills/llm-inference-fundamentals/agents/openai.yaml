@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Inference Fundamentals"
+  short_description: "Domain knowledge for LLM inference performance"
+  default_prompt: "Use $llm-inference-fundamentals to define the workload, apply consistent inference metrics, and ground serving recommendations in the merged BentoML and Modular handbook corpus."

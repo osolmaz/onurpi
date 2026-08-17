@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sanitize PNG Metadata"
+  short_description: "Inspect and remove private PNG metadata"
+  default_prompt: "Use $sanitize-png-metadata to inspect and sanitize PNG metadata without changing image pixels."

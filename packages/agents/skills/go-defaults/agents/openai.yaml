@@ -1,0 +1,4 @@
+interface:
+  display_name: "Go Defaults"
+  short_description: "Choose standard Go libraries consistently"
+  default_prompt: "Use $go-defaults to choose a production-ready Go library stack for this project."

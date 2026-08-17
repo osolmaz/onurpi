@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daily Work Summary"
+  short_description: "Summarize recent GitHub work in plain bullets"
+  default_prompt: "Use $daily-work-summary to summarize one person's GitHub work from the last 24 hours in plain bullets with links at the end."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Localmaxxing"
+  short_description: "Measure realistic local LLM performance"
+  default_prompt: "Use $localmaxxing to measure and report an objective, representative Localmaxxing benchmark without warmed-prefix or short-output inflation."
+
+policy:
+  allow_implicit_invocation: true

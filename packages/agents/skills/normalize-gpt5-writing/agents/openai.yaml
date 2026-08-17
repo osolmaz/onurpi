@@ -1,0 +1,4 @@
+interface:
+  display_name: "Normalize GPT-5 Writing"
+  short_description: "Write in a clearer, more human GPT-5 style"
+  default_prompt: "Use $normalize-gpt5-writing to rewrite this in a more natural, direct style."
