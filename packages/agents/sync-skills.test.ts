@@ -105,6 +105,12 @@ describe("skill discovery", () => {
     writeFileSync(join(root, "target"), "target\n", "utf8");
     symlinkSync(join(root, "target"), join(linked, "link"));
     expect(() => discoverSkills(skillsRoot)).toThrow(/must not contain symlinks/u);
+
+    const topLevelRoot = join(root, "top-level-skills");
+    mkdirSync(topLevelRoot);
+    const targetSkill = createSkill(join(root, "targets"), "target-skill");
+    symlinkSync(targetSkill, join(topLevelRoot, "linked-skill"));
+    expect(() => discoverSkills(topLevelRoot)).toThrow(/must not contain symlinks/u);
   });
 
   it("supports source names and skill ids as selectors", () => {
