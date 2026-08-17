@@ -170,6 +170,17 @@ describe("SimpleDoc skill synchronization", () => {
       }),
     ).toThrow(/must be different/u);
 
+    const linkedSource = join(root, "linked-source");
+    symlinkSync(source, linkedSource, "dir");
+    expect(() =>
+      syncSimpleDocSkill({
+        source: linkedSource,
+        destination: join(root, "linked-destination"),
+        check: false,
+        dryRun: false,
+      }),
+    ).toThrow(/must not be a symlink/u);
+
     symlinkSync(join(source, "SKILL.md"), join(source, "linked.md"));
     expect(() => fileManifest(source)).toThrow(/must not contain symlinks/u);
     expect(existsSync(join(source, "linked.md"))).toBe(true);

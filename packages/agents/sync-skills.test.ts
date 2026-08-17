@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -199,6 +200,42 @@ describe("cross-harness synchronization", () => {
       "alpha",
       "beta",
     ]);
+  });
+
+  it("can retry after a skill copy fails during its first synchronization", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    const alpha = createSkill(sourceRoot, "alpha");
+    const unreadable = join(alpha, "unreadable.txt");
+    write(unreadable, "retry me\n");
+    chmodSync(unreadable, 0o000);
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const target = destination(join(root, "target"));
+    const options = {
+      sourceRoot,
+      agentsSource,
+      destinations: [target],
+      selectors: [],
+      prune: true,
+      dryRun: false,
+      log: () => undefined,
+    };
+
+    expect(() => {
+      syncSkills(options);
+    }).toThrow();
+    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).managed_skill_ids).toEqual([
+      "alpha",
+    ]);
+
+    chmodSync(unreadable, 0o644);
+    expect(() => {
+      syncSkills(options);
+    }).not.toThrow();
+    expect(readFileSync(join(target.skillsRoot, "alpha", "unreadable.txt"), "utf8")).toBe(
+      "retry me\n",
+    );
   });
 
   it("rejects a collision with a skill it does not manage", () => {
