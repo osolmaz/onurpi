@@ -252,10 +252,13 @@ llama.cpp, SGLang, TensorRT-LLM, FlashInfer/modelopt, Ollama, or similar local
 serving processes directly.
 
 When promoting a local runtime, install automatic guarded shims for the runtime
-entrypoint if possible. For vLLM this means wrapping the promoted executable:
+entrypoint if possible. Resolve
+`../safe-inference-launch/scripts/install-shims.sh` relative to the directory
+that contains this `SKILL.md`. For vLLM this means wrapping the promoted
+executable:
 
 ```bash
-~/.codex/skills/safe-inference-launch/scripts/install-shims.sh \
+../safe-inference-launch/scripts/install-shims.sh \
   --wrap ~/runtimes/vllm/current/.venv/bin/vllm
 ```
 

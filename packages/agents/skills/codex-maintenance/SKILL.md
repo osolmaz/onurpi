@@ -159,6 +159,9 @@ cargo test
 cargo clippy -- -D warnings
 ```
 
-Keep edits in `~/repos/tools`, then run
-`~/repos/tools/agents/sync-skills.py` if the installed skill copy under
-`~/.codex/skills` should be refreshed.
+Keep edits in `~/repos/tools`. To refresh installed agent resources, switch to
+the OnurPi checkout and run:
+
+```bash
+npm run agents:sync -- codex-maintenance
+```
