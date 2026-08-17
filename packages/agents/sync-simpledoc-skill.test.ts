@@ -168,7 +168,7 @@ describe("SimpleDoc skill synchronization", () => {
         check: false,
         dryRun: false,
       }),
-    ).toThrow(/must be different/u);
+    ).toThrow(/non-overlapping/u);
 
     const linkedSource = join(root, "linked-source");
     symlinkSync(source, linkedSource, "dir");
@@ -184,5 +184,35 @@ describe("SimpleDoc skill synchronization", () => {
     symlinkSync(join(source, "SKILL.md"), join(source, "linked.md"));
     expect(() => fileManifest(source)).toThrow(/must not contain symlinks/u);
     expect(existsSync(join(source, "linked.md"))).toBe(true);
+  });
+});
+
+describe("SimpleDoc path safety", () => {
+  it("rejects destinations above or below the source", () => {
+    const root = temporaryDirectory();
+    const checkout = join(root, "checkout");
+    const source = join(checkout, "skills", "simpledoc");
+    createSimpleDocSkill(source);
+    writeFileSync(join(checkout, "keep.txt"), "keep\n", "utf8");
+
+    expect(() =>
+      syncSimpleDocSkill({
+        source,
+        destination: checkout,
+        check: false,
+        dryRun: false,
+      }),
+    ).toThrow(/non-overlapping/u);
+    expect(readFileSync(join(checkout, "keep.txt"), "utf8")).toBe("keep\n");
+
+    expect(() =>
+      syncSimpleDocSkill({
+        source,
+        destination: join(source, "copy"),
+        check: false,
+        dryRun: false,
+      }),
+    ).toThrow(/non-overlapping/u);
+    expect(existsSync(join(source, "SKILL.md"))).toBe(true);
   });
 });
