@@ -145,6 +145,26 @@ setsid "$@" &
 child_pid=$!
 pgid="$child_pid"
 pressure_killed=0
+child_reaped=0
+child_status=0
+
+reap_child_if_exited() {
+  local state=""
+  if [[ "$child_reaped" == "1" ]]; then
+    return
+  fi
+  if [[ -r "/proc/$child_pid/stat" ]]; then
+    state="$(awk '{ print $3 }' "/proc/$child_pid/stat" 2>/dev/null || true)"
+  fi
+  if [[ ! -e "/proc/$child_pid" || "$state" == "Z" ]]; then
+    if wait "$child_pid"; then
+      child_status=0
+    else
+      child_status=$?
+    fi
+    child_reaped=1
+  fi
+}
 
 cleanup() {
   local status=$?
@@ -156,22 +176,31 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-while group_alive "$pgid"; do
+while true; do
+  reap_child_if_exited
+  group_alive "$pgid" || break
   avail_kb="$(mem_kb MemAvailable)"
   swap_kb="$(mem_kb SwapFree)"
   if (( avail_kb < min_mem_kb )); then
     pressure_killed=1
     kill_group "$pgid" "MemAvailable ${avail_kb}KiB below ${min_mem_kb}KiB"
-    wait "$child_pid" 2>/dev/null || true
+    [[ "$child_reaped" == "1" ]] || wait "$child_pid" 2>/dev/null || true
     exit 137
   fi
   if (( swap_kb < min_swap_kb )); then
     pressure_killed=1
     kill_group "$pgid" "SwapFree ${swap_kb}KiB below ${min_swap_kb}KiB"
-    wait "$child_pid" 2>/dev/null || true
+    [[ "$child_reaped" == "1" ]] || wait "$child_pid" 2>/dev/null || true
     exit 137
   fi
   sleep "$poll_sec"
 done
 
-wait "$child_pid"
+if [[ "$child_reaped" == "0" ]]; then
+  if wait "$child_pid"; then
+    child_status=0
+  else
+    child_status=$?
+  fi
+fi
+exit "$child_status"
