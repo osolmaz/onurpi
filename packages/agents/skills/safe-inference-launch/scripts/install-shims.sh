@@ -94,6 +94,7 @@ if [[ ! -x "$guard" ]]; then
   echo "guard script is missing or not executable: $guard" >&2
   exit 2
 fi
+guard="$(realpath "$guard")"
 
 say() {
   printf '%s\n' "$*"
@@ -110,6 +111,13 @@ run() {
 is_managed_shim() {
   local path="$1"
   [[ -f "$path" ]] && grep -q "safe-inference-launch managed shim" "$path" 2>/dev/null
+}
+
+validate_tool_name() {
+  if ! [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+    echo "invalid tool name: $1" >&2
+    exit 2
+  fi
 }
 
 write_path_shim() {
@@ -244,6 +252,9 @@ unwrap_in_place_wrapper() {
 }
 
 IFS=, read -r -a tools <<< "$tools_csv"
+for tool in "${tools[@]}"; do
+  [[ -n "$tool" ]] && validate_tool_name "$tool"
+done
 
 if [[ "$uninstall" == "1" ]]; then
   for tool in "${tools[@]}"; do
