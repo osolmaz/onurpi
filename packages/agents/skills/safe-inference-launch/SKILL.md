@@ -59,7 +59,8 @@ Never start local inference with a raw command. Resolve
 `SKILL.md`, then use that absolute path for the bundled watchdog:
 
 ```bash
-scripts/guarded-launch.sh \
+SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+"$SAFE_INFERENCE_SKILL_DIR/scripts/guarded-launch.sh" \
   --label qwen-vllm \
   --min-mem-gb 24 \
   --min-swap-gb 4 \
@@ -87,7 +88,8 @@ Resolve every `scripts/install-shims.sh` path below relative to this skill
 directory before running it.
 
 ```bash
-scripts/install-shims.sh
+SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+"$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh"
 ```
 
 That creates guarded command names such as `~/.local/bin/vllm` and
@@ -97,7 +99,8 @@ run it through `guarded-launch.sh`.
 For scripts that call an absolute runtime path, wrap the binary in place:
 
 ```bash
-scripts/install-shims.sh \
+SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+"$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" \
   --wrap ~/runtimes/vllm/current/.venv/bin/vllm
 ```
 
@@ -115,8 +118,9 @@ Override those environment variables only for a specific command or benchmark.
 Uninstall managed shims with:
 
 ```bash
-scripts/install-shims.sh --uninstall
-scripts/install-shims.sh \
+SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+"$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" --uninstall
+"$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" \
   --uninstall --wrap ~/runtimes/vllm/current/.venv/bin/vllm
 ```
 
