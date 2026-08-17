@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { replaceDirectory } from "./atomic-directory.ts";
@@ -107,9 +107,15 @@ function copySkill(source: string, destination: string): void {
   }
 }
 
+function containsPath(parent: string, candidate: string): boolean {
+  const path = relative(parent, candidate);
+  return path === "" || (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`));
+}
+
 function validateSyncPaths(source: string, destination: string): void {
-  if (source === destination)
-    throw new Error("Source and destination must be different directories");
+  if (containsPath(source, destination) || containsPath(destination, source)) {
+    throw new Error("Source and destination must be separate, non-overlapping directories");
+  }
   if (!existsSync(source)) throw new Error(`Missing SimpleDoc skill source: ${source}`);
   if (lstatSync(source).isSymbolicLink()) {
     throw new Error(`SimpleDoc skill source must not be a symlink: ${source}`);
