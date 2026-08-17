@@ -1,0 +1,25 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - src
+    exclude:
+      - "**/*.test.ts"
+      - pattern: "eslint.config.mjs"
+        reason: Standalone package lint configuration.
+      - pattern: "stryker.config.mjs"
+        reason: Mutation testing configuration.
+  mutation:
+    targets:
+      - src/args.ts
+      - src/load.ts
+      - src/redact.ts
+      - src/select.ts
+  dependency_boundaries:
+    - from: src
+      allow:
+        - src
