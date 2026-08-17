@@ -8,7 +8,7 @@ import {
   type AgentStepExecutor,
   type AgentStepRequest,
   type AgentStepSubmission,
-} from "pi-workflows";
+} from "@onurpi/workflows";
 
 import { buildWorkflowInput, parseIssueReference } from "./maintainer.ts";
 import workflow, {
@@ -91,9 +91,7 @@ describe("OpenClaw maintainer workflow", () => {
     const outputRoot = await mkdtemp(join(tmpdir(), "openclaw-maintainer-runs-"));
     vi.stubEnv("PI_WORKFLOWS_RUNS_DIR", outputRoot);
     const executor = new MaintainerExecutor();
-    const result = await new WorkflowEngine({ executor, outputRoot }).run(workflow, input, {
-      workflowPath: "/test/openclaw-maintainer.workflow.ts",
-    });
+    const result = await new WorkflowEngine({ executor, outputRoot }).run(workflow, input);
 
     expect(result.state.status).toBe("completed");
     expect(result.state.finalOutput).toEqual({

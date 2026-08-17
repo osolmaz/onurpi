@@ -5,33 +5,34 @@ global configuration.
 
 ## Packages
 
-| Package                                                            | Purpose                                                           |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| [`@onurpi/agents`](packages/agents/)                               | Personal agent instructions, skills, and cross-harness sync       |
-| [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and run-level folding                   |
-| [`@onurpi/goal`](packages/goal/)                                   | Bounded autonomous goals with no-progress circuit breakers        |
-| [`@onurpi/loop-guard`](packages/loop-guard/)                       | Opt-in bounded detection and interruption of repeated work        |
-| [`@onurpi/live-stats`](packages/live-stats/)                       | Shimmering Turkish working messages with live response metrics    |
-| [`@onurpi/skill-slug`](packages/skill-slug/)                       | Invoke skills by typing their bare slug                           |
-| [`@onurpi/nyan-mode`](packages/nyan-mode/)                         | Animated bitmap Nyan Cat context runway                           |
-| [`@onurpi/prompt-queue`](packages/prompt-queue/)                   | Editable prompt queue, steer control, and history manager         |
-| [`@onurpi/codex-auth-reload`](packages/codex-auth-reload/)         | Same-account Codex CLI credential reloads for running Pi sessions |
-| [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)     | OpenAI Codex native remote compaction (vendored)                  |
-| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)     | Stable transport policy for context compaction                    |
-| [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                       |
-| [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                  |
-| [`@onurpi/pi-usage`](packages/pi-usage/)                           | Multi-provider usage reports and model-gated usage status         |
-| [`@onurpi/pi-session`](packages/pi-session/)                       | Bounded, read-only recovery views for Pi sessions                 |
-| [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                   |
-| [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake  |
-| [`@onurpi/yarp`](packages/yarp/)                                   | Prunes long output from supported developer commands              |
-| [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)         | Pinned Hugging Face OAuth and provider routes                     |
-| [`@onurpi/pi-must-win`](packages/pi-must-win/)                     | Pi attribution and Unified Exec integration                       |
-| [`@onurpi/workflows`](packages/workflows/)                         | Pinned workflow command and control tool                          |
-| [`@onurpi/demo-mode`](packages/demo-mode/)                         | Opt-in self-driving demo mode                                     |
-| [`@onurpi/regrafter-driver`](packages/regrafter-driver/)           | Regraft command and optional Regrafter delegation                 |
-| [`@osolmaz/pi-reviewer`](packages/pi-reviewer/)                    | Standalone Pi Factory reviewer with P0–P3 findings                |
-| [`@onurpi/theme`](packages/onur-theme/)                            | Portable `onur-dark` Pi theme                                     |
+| Package                                                                  | Purpose                                                           |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync       |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                   |
+| [`@onurpi/goal`](packages/goal/)                                         | Bounded autonomous goals with no-progress circuit breakers        |
+| [`@onurpi/loop-guard`](packages/loop-guard/)                             | Opt-in bounded detection and interruption of repeated work        |
+| [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering Turkish working messages with live response metrics    |
+| [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                           |
+| [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                           |
+| [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager         |
+| [`@onurpi/codex-auth-reload`](packages/codex-auth-reload/)               | Same-account Codex CLI credential reloads for running Pi sessions |
+| [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                  |
+| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                    |
+| [`@onurpi/context-window-policy`](packages/context-window-policy/)       | Model-relative context compaction threshold                       |
+| [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                  |
+| [`@onurpi/onur-openclaw-maintainer`](packages/onur-openclaw-maintainer/) | Read-only OpenClaw local-model issue workflow                     |
+| [`@onurpi/pi-usage`](packages/pi-usage/)                                 | Multi-provider usage reports and model-gated usage status         |
+| [`@onurpi/pi-session`](packages/pi-session/)                             | Bounded, read-only recovery views for Pi sessions                 |
+| [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                   |
+| [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake  |
+| [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands              |
+| [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)               | Pinned Hugging Face OAuth and provider routes                     |
+| [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                       |
+| [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                          |
+| [`@onurpi/demo-mode`](packages/demo-mode/)                               | Opt-in self-driving demo mode                                     |
+| [`@onurpi/regrafter-driver`](packages/regrafter-driver/)                 | Regraft command and optional Regrafter delegation                 |
+| [`@osolmaz/pi-reviewer`](packages/pi-reviewer/)                          | Standalone Pi Factory reviewer with P0–P3 findings                |
+| [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                     |
 
 [`@onurpi/pi-tui-kit`](packages/pi-tui-kit/) is a vendored library package (declarative Pi TUI
 menus), not a Pi extension; it backs `@onurpi/pi-usage` and is not loaded as a Pi resource.
@@ -47,7 +48,7 @@ repositories.
 | [`huggingface-oauth`](packages/huggingface-oauth/) | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | [`pi-must-win`](packages/pi-must-win/)             | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) at an immutable commit  |
 | [`regrafter-driver`](packages/regrafter-driver/)   | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit    |
-| [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.2.0    |
+| [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.7.0    |
 | [`demo-mode`](packages/demo-mode/)                 | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`

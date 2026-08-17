@@ -4,6 +4,7 @@
   "private": true,
   "description": "Pinned Pi Workflows extension for OnurPi",
   "type": "module",
+  "exports": "./index.ts",
   "engines": {
     "node": ">=22.19.0"
   },
