@@ -184,6 +184,13 @@
   latest-information request.
 - Personal agent skills live in `packages/agents/skills/<skill-name>/SKILL.md` in the OnurPi
   repository.
+- Treat an unqualified request to add, update, or remove a skill as a change to the personal skills
+  in the OnurPi repository. Treat an unqualified request to add or change `AGENTS.md` as a change to
+  `packages/agents/AGENTS.md`. Use another repository only when the user names that repository or
+  clearly requests project-local instructions.
+- After changing personal skills or `packages/agents/AGENTS.md`, verify the change and run
+  `npm run agents:sync` from the OnurPi repository. Do not edit the tools repository or installed
+  harness copies for these requests.
 - `npm run agents:sync` mirrors personal skills into Codex, Claude Code, and Cursor. It also mirrors
   global instructions into those harnesses and Pi.
 - To update local agent instructions or personal skills, pull the latest OnurPi version, then run
