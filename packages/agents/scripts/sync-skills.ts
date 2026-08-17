@@ -195,7 +195,19 @@ function writeState(path: string, sourceRoot: string, managedSkillIds: string[])
     source_root: state.sourceRoot,
     managed_skill_ids: state.managedSkillIds,
   };
-  writeFileSync(path, `${JSON.stringify(serialized, null, 2)}\n`, "utf8");
+  mkdirSync(dirname(path), { recursive: true });
+  const temporaryDirectory = mkdtempSync(join(dirname(path), `.${basename(path)}.tmp-`));
+  const temporaryPath = join(temporaryDirectory, basename(path));
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(serialized, null, 2)}\n`, "utf8");
+    renameSync(temporaryPath, path);
+  } finally {
+    rmSync(temporaryDirectory, { force: true, recursive: true });
+  }
+}
+
+function persistManagedState(skillsRoot: string, sourceRoot: string, managed: Set<string>): void {
+  writeState(statePath(skillsRoot, STATE_FILE_NAME), sourceRoot, [...managed]);
 }
 
 function removePath(path: string, dryRun: boolean): void {
@@ -274,9 +286,45 @@ function assertNoUnownedCollisions(
   }
 }
 
+type CopySyncOptions = Pick<SyncOptions, "agentsSource" | "sourceRoot" | "prune" | "dryRun">;
+
+function removeStaleSkills(
+  skillsRoot: string,
+  staleIds: string[],
+  managed: Set<string>,
+  options: CopySyncOptions,
+  log: Logger,
+): void {
+  for (const staleId of staleIds) {
+    log(`Removing stale managed skill ${staleId}`);
+    removePath(join(skillsRoot, staleId), options.dryRun);
+    if (!options.dryRun) {
+      managed.delete(staleId);
+      persistManagedState(skillsRoot, options.sourceRoot, managed);
+    }
+  }
+}
+
+function copySelectedSkills(
+  skillsRoot: string,
+  selected: Skill[],
+  managed: Set<string>,
+  options: CopySyncOptions,
+  log: Logger,
+): void {
+  for (const skill of selected) {
+    log(`Syncing ${skill.skillId} -> ${join(skillsRoot, skill.skillId)}`);
+    if (!options.dryRun && !managed.has(skill.skillId)) {
+      managed.add(skill.skillId);
+      persistManagedState(skillsRoot, options.sourceRoot, managed);
+    }
+    syncSkill(skill, skillsRoot, options.dryRun);
+  }
+}
+
 function syncCopyDestination(
   destination: CopyDestination,
-  options: Pick<SyncOptions, "agentsSource" | "sourceRoot" | "prune" | "dryRun">,
+  options: CopySyncOptions,
   selected: Skill[],
   log: Logger,
 ): void {
@@ -285,26 +333,16 @@ function syncCopyDestination(
   const staleIds = options.prune ? [...oldManaged].filter((id) => !selectedIds.has(id)).sort() : [];
   assertNoUnownedCollisions(destination.skillsRoot, selected, oldManaged);
   log(`== ${destination.name} ==`);
+  const managed = new Set(oldManaged);
+  if (!options.dryRun) {
+    persistManagedState(destination.skillsRoot, options.sourceRoot, managed);
+    removePath(statePath(destination.skillsRoot, LEGACY_STATE_FILE_NAME), false);
+  }
   log(`Syncing instructions -> ${destination.agentsDest}`);
   syncFile(options.agentsSource, destination.agentsDest, options.dryRun);
-  for (const staleId of staleIds) {
-    log(`Removing stale managed skill ${staleId}`);
-    removePath(join(destination.skillsRoot, staleId), options.dryRun);
-  }
-  for (const skill of selected) {
-    log(`Syncing ${skill.skillId} -> ${join(destination.skillsRoot, skill.skillId)}`);
-    syncSkill(skill, destination.skillsRoot, options.dryRun);
-  }
-  if (options.dryRun) return;
-  mkdirSync(destination.skillsRoot, { recursive: true });
-  const managedIds = options.prune
-    ? selectedIds
-    : new Set([...oldManaged, ...selected.map((skill) => skill.skillId)]);
-  writeState(statePath(destination.skillsRoot, STATE_FILE_NAME), options.sourceRoot, [
-    ...managedIds,
-  ]);
-  removePath(statePath(destination.skillsRoot, LEGACY_STATE_FILE_NAME), false);
-  log(destination.restartHint);
+  removeStaleSkills(destination.skillsRoot, staleIds, managed, options, log);
+  copySelectedSkills(destination.skillsRoot, selected, managed, options, log);
+  if (!options.dryRun) log(destination.restartHint);
 }
 
 function syncPiDestination(

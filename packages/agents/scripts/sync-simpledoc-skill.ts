@@ -107,13 +107,21 @@ function copySkill(source: string, destination: string): void {
   }
 }
 
+function validateSyncPaths(source: string, destination: string): void {
+  if (source === destination)
+    throw new Error("Source and destination must be different directories");
+  if (!existsSync(source)) throw new Error(`Missing SimpleDoc skill source: ${source}`);
+  if (lstatSync(source).isSymbolicLink()) {
+    throw new Error(`SimpleDoc skill source must not be a symlink: ${source}`);
+  }
+  validateSimpleDocSkill(source);
+}
+
 export function syncSimpleDocSkill(options: SimpleDocSyncOptions): SimpleDocSyncResult {
   const log = options.log ?? console.log;
   const source = resolve(options.source);
   const destination = resolve(options.destination);
-  if (source === destination)
-    throw new Error("Source and destination must be different directories");
-  validateSimpleDocSkill(source);
+  validateSyncPaths(source, destination);
   const drift = describeDrift(fileManifest(source), fileManifest(destination));
   if (drift.length === 0) {
     log(`SimpleDoc skill is up to date: ${destination}`);
