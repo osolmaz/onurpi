@@ -26,6 +26,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - packages/agents/scripts/atomic-directory.ts
       - packages/agents/scripts/sync-skills.ts
       - packages/agents/scripts/sync-simpledoc-skill.ts
       - packages/turn-fold/compaction-visibility.ts

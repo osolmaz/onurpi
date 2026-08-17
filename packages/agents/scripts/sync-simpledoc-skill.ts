@@ -8,13 +8,14 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { replaceDirectory } from "./atomic-directory.ts";
 
 const FRONTMATTER_RE = /^---\n(.*?)\n---(?:\n|$)/su;
 const NAME_RE = /^name:\s*simpledoc\s*$/mu;
@@ -100,8 +101,7 @@ function copySkill(source: string, destination: string): void {
   const staged = join(temporaryDirectory, "simpledoc");
   try {
     cpSync(source, staged, { recursive: true, preserveTimestamps: true });
-    if (existsSync(destination)) rmSync(destination, { recursive: true });
-    renameSync(staged, destination);
+    replaceDirectory(staged, destination, temporaryDirectory);
   } finally {
     rmSync(temporaryDirectory, { force: true, recursive: true });
   }
