@@ -129,6 +129,10 @@ describe("skill discovery", () => {
     const targetSkill = createSkill(join(root, "targets"), "target-skill");
     symlinkSync(targetSkill, join(topLevelRoot, "linked-skill"));
     expect(() => discoverSkills(topLevelRoot)).toThrow(/must not contain symlinks/u);
+
+    const linkedRoot = join(root, "linked-root");
+    symlinkSync(join(root, "targets"), linkedRoot);
+    expect(() => discoverSkills(linkedRoot)).toThrow(/source root must not be a symlink/u);
   });
 
   it("supports source names and skill ids as selectors", () => {
