@@ -44,6 +44,26 @@ Before proposing or implementing a solution:
 Do not skip this workflow for architecture discussions. Proposals are subject
 to the same boundary as implementations.
 
+## Existing-Capability Gate
+
+Before adding a Pi API, schema, transport, store, adapter, or package, identify
+the complete existing model-and-tool path. The regular Pi model is an active
+part of the architecture. If it can observe the target and submit the result
+through an existing tool, use that path instead of replacing its judgment with
+a deterministic integration.
+
+For Pi Workflows monitoring, the regular Pi model running the check is the
+observation adapter. It uses `workflow update` and `submit` to publish factual
+progress. Do not make monitored Jobs or applications import Pi Workflows, emit
+a Pi schema, write a Pi progress file, expose a Pi endpoint, create a progress
+store, or add a progress reader command solely for monitoring. Do not add
+provider-specific clients or credentials to Pi Workflows.
+
+A new deterministic integration is justified only when the requirement
+explicitly needs operation without a Pi model turn and the user approves that
+boundary. If target facts are insufficient for ETA, report the limitation
+instead of creating infrastructure or inventing values.
+
 ## Extension-First Design
 
 Prefer, in order:

@@ -20,6 +20,13 @@ Do not produce an architecture proposal for changing Pi behavior until
 `extending-pi` has been read. A request to change behavior does not authorize a
 Pi source or internal change.
 
+Treat the regular Pi model and its documented tools as part of the existing
+architecture. Before adding a deterministic API or integration, check whether
+the model can already observe the target and submit the result through a public
+tool. In particular, Pi Workflows monitoring uses the regular Pi model and the
+existing `workflow update` and `submit` actions. It does not require monitored
+targets or providers to know about Pi.
+
 ## Locate the Installed Documentation
 
 Resolve the package from the active `pi` executable instead of hardcoding a

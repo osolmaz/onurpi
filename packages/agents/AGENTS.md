@@ -62,6 +62,21 @@
   systemd units) unless the user explicitly asks for a service. A request to "serve" something means
   use a temporary process, not a persistent service.
 
+## Pi workflow progress boundary
+
+- For Pi Workflows monitoring, the regular Pi model running the check inspects the target and
+  publishes observed progress through the existing `workflow` tool. There is no separate monitor
+  model.
+- Keep target-specific observation in the workflow task and the model's authorized tools. Pi
+  Workflows must not import provider clients or require monitored applications to implement a
+  Pi-specific API, file, store, schema, command, or dependency.
+- Before adding a progress API, transport, schema, or persistence layer, prove that the regular Pi
+  model cannot observe the needed facts and use `workflow update` or `submit`.
+- If the target does not expose factual completed and total values or a source estimate, report that
+  ETA is unavailable. Do not create infrastructure or invent values to manufacture an ETA.
+- Application telemetry changes require separate scope. Such telemetry must expose normal
+  operational facts for all operators rather than a Pi-specific reporting protocol.
+
 ## Consequential comparison policy
 
 - Use the `practical-significance` skill before a measured difference determines spending, scaling,
