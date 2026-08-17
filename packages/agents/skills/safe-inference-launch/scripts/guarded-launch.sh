@@ -109,6 +109,13 @@ mem_kb() {
   awk -v key="$1" '$1 == key ":" { print $2; exit }' /proc/meminfo
 }
 
+group_alive() {
+  ps -eo pgid=,stat= 2>/dev/null | awk -v target="$1" '
+    $1 == target && $2 !~ /^Z/ { found = 1 }
+    END { exit !found }
+  '
+}
+
 kill_group() {
   local pgid="$1"
   local why="$2"
@@ -142,14 +149,14 @@ pressure_killed=0
 cleanup() {
   local status=$?
   trap - EXIT INT TERM
-  if [[ "${pressure_killed:-0}" == "0" ]] && kill -0 "$child_pid" 2>/dev/null; then
+  if [[ "${pressure_killed:-0}" == "0" ]] && group_alive "$pgid"; then
     kill_group "$pgid" "guard script exiting"
   fi
   exit "$status"
 }
 trap cleanup EXIT INT TERM
 
-while kill -0 "$child_pid" 2>/dev/null; do
+while group_alive "$pgid"; do
   avail_kb="$(mem_kb MemAvailable)"
   swap_kb="$(mem_kb SwapFree)"
   if (( avail_kb < min_mem_kb )); then

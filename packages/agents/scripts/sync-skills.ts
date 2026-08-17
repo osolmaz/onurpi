@@ -129,6 +129,9 @@ function rejectSymlinks(root: string): void {
 
 export function discoverSkills(sourceRoot: string): Skill[] {
   if (!existsSync(sourceRoot)) throw new Error(`Missing skill source root: ${sourceRoot}`);
+  if (lstatSync(sourceRoot).isSymbolicLink()) {
+    throw new Error(`Skill source root must not be a symlink: ${sourceRoot}`);
+  }
   const skills: Skill[] = [];
   const seenIds = new Map<string, string>();
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true }).sort((a, b) =>
