@@ -89,6 +89,14 @@ if ! [[ "$min_swap_gb" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
   echo "--min-swap-gb must be numeric" >&2
   exit 2
 fi
+if ! [[ "$poll_sec" =~ ^[0-9]+([.][0-9]+)?$ ]] || ! awk -v value="$poll_sec" 'BEGIN { exit !(value > 0) }'; then
+  echo "--poll-sec must be a positive number" >&2
+  exit 2
+fi
+if ! [[ "$grace_sec" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+  echo "--grace-sec must be numeric" >&2
+  exit 2
+fi
 
 gb_to_kb() {
   awk -v gb="$1" 'BEGIN { printf "%.0f\n", gb * 1024 * 1024 }'
@@ -133,12 +141,13 @@ pressure_killed=0
 
 cleanup() {
   local status=$?
+  trap - EXIT INT TERM
   if [[ "${pressure_killed:-0}" == "0" ]] && kill -0 "$child_pid" 2>/dev/null; then
     kill_group "$pgid" "guard script exiting"
   fi
   exit "$status"
 }
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 
 while kill -0 "$child_pid" 2>/dev/null; do
   avail_kb="$(mem_kb MemAvailable)"
