@@ -1,6 +1,6 @@
 ---
 name: paid-compute-launch
-description: Use before paid accelerator work that launches, scales, retries, or automatically continues. This includes training and batch inference plus synthetic-data generation, evaluations and sweeps, or multi-Job fleets. Allows bounded experiments below $5 without asking. Requires measured cost and hardware evidence, durable partial outputs, tested pause and resume, explicit approval at larger spending boundaries, and fleet-wide containment after shared failures.
+description: Use before paid accelerator work that launches, scales, retries, or automatically continues. This includes training and batch inference plus synthetic-data generation, evaluations and sweeps, or multi-Job fleets. Allows bounded, non-substantial experiments below $5 without asking. Requires measured cost and hardware evidence, durable partial outputs, tested pause and resume, explicit approval for every substantial launch, and fleet-wide containment after shared failures.
 ---
 
 # Paid Compute Launch
@@ -15,12 +15,11 @@ are involved. For Hugging Face Jobs, also use the official `hf-cli` skill, the p
 `huggingface` skill, and `hf-job-control`. For local inference launches, also use
 `safe-inference-launch`.
 
-## Allow experiments below $5 without asking
+## Allow small experiments below $5 without asking
 
-An experiment may proceed without asking for approval when its hard total cost
-ceiling is less than $5. This permission applies even when another substantial
-launch condition, such as multiple accelerator Jobs, is present. It removes the
-approval pause only. Keep the price check, timeout, durable outputs, recovery,
+A non-substantial experiment may proceed without asking for approval when its
+hard total cost ceiling is less than $5. Every substantial launch still needs
+explicit approval. Keep the price check, timeout, durable outputs, recovery,
 containment, and evidence requirements that apply to the work.
 
 Count all related attempts, retries, setup, and recovery Jobs against one
@@ -44,13 +43,14 @@ A launch is substantial when any condition below applies:
 - It produces more than 100,000 outputs.
 - Losing one attempt would materially delay the work.
 
-Unless the bounded experiment rule above applies, stop before a substantial
-launch and present a launch review. Obtain explicit approval after the user has
-seen it. Approval for an earlier plan does not cover a later hardware choice,
-larger fleet, slower decoding method, higher price, or new cost estimate.
+Stop before every substantial launch and present a launch review. Obtain
+explicit approval after the user has seen it. Approval for an earlier plan does
+not cover a later hardware choice, larger fleet, slower decoding method, higher
+price, or new cost estimate.
 
-A bounded experiment below $5 does not require a formal approval round. It
-still needs a price check, an operational timeout, and a clear output location.
+A non-substantial bounded experiment below $5 does not require a formal
+approval round. It still needs a price check, an operational timeout, and a
+clear output location.
 
 ## Write the launch review
 
