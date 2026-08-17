@@ -12,6 +12,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - scripts/atomic-directory.ts
       - scripts/sync-skills.ts
       - scripts/sync-simpledoc-skill.ts
   dependency_boundaries:

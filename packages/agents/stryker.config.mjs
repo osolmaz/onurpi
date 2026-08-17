@@ -1,5 +1,9 @@
 export default {
-  mutate: ["scripts/sync-skills.ts", "scripts/sync-simpledoc-skill.ts"],
+  mutate: [
+    "scripts/atomic-directory.ts",
+    "scripts/sync-skills.ts",
+    "scripts/sync-simpledoc-skill.ts",
+  ],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

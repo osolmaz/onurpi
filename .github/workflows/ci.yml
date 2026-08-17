@@ -21,6 +21,12 @@ jobs:
       - run: npm run check
       - run: KEEP_SLOPHAMMER_WORKFLOWS=1 npm run slophammer
       - run: npx --no-install slophammer-ts check .
+      - name: Check @onurpi/agents package
+        working-directory: packages/agents
+        run: npm run check
+      - name: Check @onurpi/agents package with Slophammer
+        working-directory: packages/agents
+        run: npm run slophammer
       - name: Check @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run check

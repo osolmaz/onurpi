@@ -75,6 +75,15 @@ afterEach(() => {
 });
 
 describe("skill discovery", () => {
+  it("rejects a missing source root but allows an existing empty source", () => {
+    const root = temporaryDirectory();
+    const empty = join(root, "empty");
+    mkdirSync(empty);
+
+    expect(discoverSkills(empty)).toEqual([]);
+    expect(() => discoverSkills(join(root, "missing"))).toThrow(/Missing skill source root/u);
+  });
+
   it("reads top-level skill names and rejects duplicate ids", () => {
     const root = temporaryDirectory();
     const skillsRoot = join(root, "skills");
@@ -184,6 +193,32 @@ describe("cross-harness synchronization", () => {
       "alpha",
       "beta",
     ]);
+  });
+
+  it("rejects a collision with a skill it does not manage", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    createSkill(sourceRoot, "alpha");
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const target = destination(join(root, "target"));
+    createSkill(target.skillsRoot, "alpha");
+
+    expect(() => {
+      syncSkills({
+        sourceRoot,
+        agentsSource,
+        destinations: [target],
+        selectors: [],
+        prune: true,
+        dryRun: false,
+        log: () => undefined,
+      });
+    }).toThrow(/Refusing to replace unowned skill/u);
+    expect(readFileSync(join(target.skillsRoot, "alpha", "SKILL.md"), "utf8")).toContain(
+      "Test skill alpha",
+    );
+    expect(existsSync(target.agentsDest)).toBe(false);
   });
 
   it("does not write during a dry run", () => {

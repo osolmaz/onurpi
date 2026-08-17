@@ -17,6 +17,8 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { replaceDirectory } from "./atomic-directory.ts";
+
 export const STATE_FILE_NAME = ".onurpi-agents-sync.json";
 export const LEGACY_STATE_FILE_NAME = ".tools-agents-skill-sync.json";
 
@@ -119,7 +121,7 @@ function rejectSymlinks(root: string): void {
 }
 
 export function discoverSkills(sourceRoot: string): Skill[] {
-  if (!existsSync(sourceRoot)) return [];
+  if (!existsSync(sourceRoot)) throw new Error(`Missing skill source root: ${sourceRoot}`);
   const skills: Skill[] = [];
   const seenIds = new Map<string, string>();
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true }).sort((a, b) =>
@@ -233,8 +235,7 @@ function syncSkill(skill: Skill, destRoot: string, dryRun: boolean): void {
       preserveTimestamps: true,
       filter: (path) => shouldCopySkillPath(skill.sourcePath, path),
     });
-    removePath(destPath, false);
-    renameSync(temporaryPath, destPath);
+    replaceDirectory(temporaryPath, destPath, temporaryDirectory);
   } finally {
     rmSync(temporaryDirectory, { force: true, recursive: true });
   }
@@ -258,6 +259,19 @@ export function resolveSelection(skills: Skill[], selectors: string[]): Skill[] 
   return selected;
 }
 
+function assertNoUnownedCollisions(
+  skillsRoot: string,
+  selected: Skill[],
+  oldManaged: Set<string>,
+): void {
+  for (const skill of selected) {
+    const destinationPath = join(skillsRoot, skill.skillId);
+    if (existsSync(destinationPath) && !oldManaged.has(skill.skillId)) {
+      throw new Error(`Refusing to replace unowned skill ${skill.skillId} at ${destinationPath}`);
+    }
+  }
+}
+
 function syncCopyDestination(
   destination: CopyDestination,
   options: Pick<SyncOptions, "agentsSource" | "sourceRoot" | "prune" | "dryRun">,
@@ -267,6 +281,7 @@ function syncCopyDestination(
   const oldManaged = loadManagedIds(destination.skillsRoot);
   const selectedIds = new Set(selected.map((skill) => skill.skillId));
   const staleIds = options.prune ? [...oldManaged].filter((id) => !selectedIds.has(id)).sort() : [];
+  assertNoUnownedCollisions(destination.skillsRoot, selected, oldManaged);
   log(`== ${destination.name} ==`);
   log(`Syncing instructions -> ${destination.agentsDest}`);
   syncFile(options.agentsSource, destination.agentsDest, options.dryRun);
