@@ -105,6 +105,12 @@ jobs:
       - name: Check @onurpi/pi-usage package with Slophammer
         working-directory: packages/pi-usage
         run: npm run slophammer
+      - name: Check @onurpi/pi-session package
+        working-directory: packages/pi-session
+        run: npm run check
+      - name: Check @onurpi/pi-session package with Slophammer
+        working-directory: packages/pi-session
+        run: npm run slophammer
       - name: Check @onurpi/plan-checklist package
         working-directory: packages/plan-checklist
         run: npm run check
@@ -215,6 +221,9 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/pi-usage package
         working-directory: packages/pi-usage
+        run: npm run mutate
+      - name: Mutate @onurpi/pi-session package
+        working-directory: packages/pi-session
         run: npm run mutate
       - name: Mutate @onurpi/plan-checklist package
         working-directory: packages/plan-checklist

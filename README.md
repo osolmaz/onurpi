@@ -1,7 +1,7 @@
 # OnurPi
 
-OnurPi is a workspace for Pi coding agent extensions, themes, and a reproducible global
-configuration.
+OnurPi is a workspace for Pi coding agent extensions, command-line tools, themes, and a reproducible
+global configuration.
 
 ## Packages
 
@@ -21,6 +21,7 @@ configuration.
 | [`@onurpi/context-window-policy`](packages/context-window-policy/) | Model-relative context compaction threshold                       |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)               | Infinite capped retries with `Alt+R` manual wake                  |
 | [`@onurpi/pi-usage`](packages/pi-usage/)                           | Multi-provider usage reports and model-gated usage status         |
+| [`@onurpi/pi-session`](packages/pi-session/)                       | Bounded, read-only recovery views for Pi sessions                 |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)               | Branch-aware model task plan with live progress                   |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                   | Persistent shell and PTY sessions with race-free completion wake  |
 | [`@onurpi/yarp`](packages/yarp/)                                   | Prunes long output from supported developer commands              |
@@ -111,11 +112,12 @@ During development the live file may point anywhere, including a worktree or a d
 
 ## Structure
 
-Each extension is an independent package under `packages/` with its own `package.json` and entry
-point. Tests and a README live beside the source. The theme follows the same package layout and
-registers its JSON file through `pi.themes`. The private root manifest registers every resource for
-workspace-wide development. See [Adding packages to OnurPi](docs/adding-packages.md) before adopting
-another local or external package.
+Each extension and command-line tool is an independent package under `packages/` with its own
+`package.json` and entry point. Tests and a README live beside the source. The theme follows the
+same package layout and registers its JSON file through `pi.themes`. The private root manifest
+registers every Pi resource for workspace-wide development. See
+[Adding packages to OnurPi](docs/adding-packages.md) before adopting another local or external
+package.
 
 This workspace follows the package-directory structure used by
 [`ogulcancelik/pi-extensions`](https://github.com/ogulcancelik/pi-extensions), while keeping shared
