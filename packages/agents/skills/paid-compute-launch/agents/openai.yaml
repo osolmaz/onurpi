@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Compute Launch"
+  short_description: "Gate paid compute with cost and recovery evidence"
+  default_prompt: "Use $practical-significance to verify that the selected method matters, then use $paid-compute-launch to review measured cost, hardware alternatives, durable partial outputs, pause and resume evidence, and the approval boundary."

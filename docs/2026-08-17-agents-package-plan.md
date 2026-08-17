@@ -6,13 +6,18 @@ date: 2026-08-17
 
 # Move personal agent resources into OnurPi
 
-Onur wants OnurPi to become the single source for his personal agent instructions and skills, in the same broad style as Armin Ronacher's `agent-stuff` package. The existing installation scripts must remain available for Codex, Claude Code, and Cursor. Pi must load the skills from the OnurPi package instead of copied files.
+Onur wants OnurPi to become the single source for his personal agent instructions and skills, in the
+same broad style as Armin Ronacher's `agent-stuff` package. The existing installation scripts must
+remain available for Codex, Claude Code, and Cursor. Pi must load the skills from the OnurPi package
+instead of copied files.
 
-This change replaces `tools/agents` with a private `@onurpi/agents` package. The tools repository will retain only a notice that points to the new source.
+This change replaces `tools/agents` with a private `@onurpi/agents` package. The tools repository
+will retain only a notice that points to the new source.
 
 ## Requirements
 
-- Move every tracked personal instruction, skill, helper, reference, asset, and maintenance script from `tools/agents` into `onurpi/packages/agents`.
+- Move every tracked personal instruction, skill, helper, reference, asset, and maintenance script
+  from `tools/agents` into `onurpi/packages/agents`.
 - Remove the unused prompt and workflow folders. They were deleted before this migration.
 - Keep cross-harness installation for Codex, Claude Code, and Cursor.
 - Copy global `AGENTS.md` instructions to Pi, but do not copy skills into Pi's global skill folder.
@@ -24,9 +29,12 @@ This change replaces `tools/agents` with a private `@onurpi/agents` package. The
 
 ## Assumptions
 
-- OnurPi remains a public repository, while `@onurpi/agents` stays private from npm publication through `private: true`.
-- The current Python synchronization scripts can be replaced with tested TypeScript scripts because OnurPi already requires Node.js and TypeScript.
-- The old synchronization state is trusted only as a list of paths previously managed by the tools repository.
+- OnurPi remains a public repository, while `@onurpi/agents` stays private from npm publication
+  through `private: true`.
+- The current Python synchronization scripts can be replaced with tested TypeScript scripts because
+  OnurPi already requires Node.js and TypeScript.
+- The old synchronization state is trusted only as a list of paths previously managed by the tools
+  repository.
 
 ## Package design
 
@@ -46,9 +54,11 @@ packages/agents/
 └── repository.test.ts
 ```
 
-The package manifest will export only top-level skill files with `./skills/*/SKILL.md`. This prevents the sandbox-specific OpenClaw inventory skill from loading as a normal personal skill.
+The package manifest will export only top-level skill files with `./skills/*/SKILL.md`. This
+prevents the sandbox-specific OpenClaw inventory skill from loading as a normal personal skill.
 
-The root OnurPi manifest will register the same package skill path. Settings synchronization will then produce one canonical local package entry for `packages/agents`.
+The root OnurPi manifest will register the same package skill path. Settings synchronization will
+then produce one canonical local package entry for `packages/agents`.
 
 ## Synchronization behavior
 
@@ -64,7 +74,8 @@ The refactored `sync-skills.ts` script will:
 - Write `.onurpi-agents-sync.json` for destinations that still receive copied skills.
 - Never read, move, or delete unrelated skills.
 
-The refactored `sync-simpledoc-skill.ts` script will preserve source validation, drift checks, dry-run behavior, file modes, and atomic replacement.
+The refactored `sync-simpledoc-skill.ts` script will preserve source validation, drift checks,
+dry-run behavior, file modes, and atomic replacement.
 
 ## Repository changes
 
@@ -86,7 +97,8 @@ The refactored `sync-simpledoc-skill.ts` script will preserve source validation,
 
 - Publishing `@onurpi/agents` to npm.
 - Moving Hugging Face-managed skills from the global `.agents` folder.
-- Changing the meaning of personal skills, except for source-path updates and removal of the duplicate `plain-language` skill.
+- Changing the meaning of personal skills, except for source-path updates and removal of the
+  duplicate `plain-language` skill.
 - Adding Pi extensions or changing Pi internals.
 - Retaining old install commands, copied Pi skills, or source aliases after the replacement.
 
@@ -115,7 +127,9 @@ git diff --check
 pi list
 ```
 
-Run the synchronization tests against temporary homes. Then run a real synchronization after the OnurPi change is merged. Confirm that Pi lists `packages/agents`, that personal skill files resolve from OnurPi, and that external `.agents` skills remain present.
+Run the synchronization tests against temporary homes. Then run a real synchronization after the
+OnurPi change is merged. Confirm that Pi lists `packages/agents`, that personal skill files resolve
+from OnurPi, and that external `.agents` skills remain present.
 
 Run in tools:
 
@@ -124,11 +138,14 @@ npx -y @simpledoc/simpledoc check
 git diff --check
 ```
 
-Finally, search both repositories for stale `tools/agents` installation instructions and for removed prompt or workflow paths.
+Finally, search both repositories for stale `tools/agents` installation instructions and for removed
+prompt or workflow paths.
 
 ## Pi contract impact
 
 - **Session state:** Normal Pi session entries do not change.
-- **Other persistent data:** Pi settings gain the local `packages/agents` entry. Global instruction files and cross-harness skill copies change through the explicit synchronization command.
+- **Other persistent data:** Pi settings gain the local `packages/agents` entry. Global instruction
+  files and cross-harness skill copies change through the explicit synchronization command.
 - **Pi internals:** None.
-- **Public API:** The package uses the documented `pi.skills` manifest field and local package installation behavior.
+- **Public API:** The package uses the documented `pi.skills` manifest field and local package
+  installation behavior.

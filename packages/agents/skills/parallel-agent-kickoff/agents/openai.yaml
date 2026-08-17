@@ -1,0 +1,4 @@
+interface:
+  display_name: "Parallel Agent Kickoff"
+  short_description: "Launch grouped agent triage sessions"
+  default_prompt: "Use $parallel-agent-kickoff to cluster issues/PRs that look similar, create a worktree for each cluster, launch real interactive Codex sessions from those worktrees, and drive each one to human takeover."

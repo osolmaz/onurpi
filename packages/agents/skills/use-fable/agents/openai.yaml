@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use Fable"
+  short_description: "Explicitly requested, costly Fable calls via Claude or requested Cursor"
+  default_prompt: "Use Claude Fable only because the human explicitly requested it. Fable is very expensive, so make the fewest narrowly scoped calls needed. Default to ACPX's local Claude adapter, but use ACPX's Cursor adapter when the human explicitly requests Cursor in the current request. Select the Fable model explicitly, use an appropriately long timeout, never switch adapters silently, and verify the result locally."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Serving Configuration Selection"
+  short_description: "Choose measured LLM serving configurations"
+  default_prompt: "Use $serving-configuration-selection to choose a context, concurrency, and serving configuration for this workload."

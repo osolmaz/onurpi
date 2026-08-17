@@ -1,0 +1,4 @@
+interface:
+  display_name: "HF Job Control"
+  short_description: "Operate and integrate controlled HF Jobs"
+  default_prompt: "Use $hf-job-control to create, launch, monitor, pause, resume, stop, abort, integrate, recover, or audit a cooperatively controlled Hugging Face Job with immutable launch specifications, verified checkpoints, durable status, and receipts."

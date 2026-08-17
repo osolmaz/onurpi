@@ -177,6 +177,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run mutate
+      - name: Mutate @onurpi/agents package
+        working-directory: packages/agents
+        run: npm run mutate
       - name: Mutate @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run mutate

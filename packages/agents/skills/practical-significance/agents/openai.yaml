@@ -1,0 +1,4 @@
+interface:
+  display_name: "Practical Significance"
+  short_description: "Decide whether measured differences matter"
+  default_prompt: "Use $practical-significance to decide whether this measured difference is reliable and large enough to justify its cost, speed, complexity, and operational tradeoffs."

@@ -23,6 +23,7 @@
     "../../repos/onurpi/packages/workflows",
     "../../repos/onurpi/packages/demo-mode",
     "../../repos/onurpi/packages/skill-slug",
+    "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.84.1",

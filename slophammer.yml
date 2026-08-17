@@ -26,6 +26,8 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
+      - packages/agents/scripts/sync-skills.ts
+      - packages/agents/scripts/sync-simpledoc-skill.ts
       - packages/turn-fold/compaction-visibility.ts
       - packages/turn-fold/configuration.ts
       - packages/turn-fold/fold-policy.ts
@@ -86,6 +88,9 @@ typescript:
       - packages/pi-reviewer/src/review-output.ts
       - packages/pi-reviewer/extensions/shell-policy.ts
   dependency_boundaries:
+    - from: packages/agents
+      allow:
+        - packages/agents
     - from: packages/turn-fold
       allow:
         - packages/turn-fold

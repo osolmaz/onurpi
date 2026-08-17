@@ -1,0 +1,15 @@
+---
+sidebar_position: 7
+sidebar_label: Infra and operations
+sidebar_custom_props:
+    icon: /img/setting.svg
+---
+
+# Infrastructure and operations
+
+LLMs don't run in isolation. They need robust infrastructure behind them, from
+high-performance GPUs to deployment automation and comprehensive observability.
+A strong model and solid inference optimization determine how well your
+application performs. But it’s your infrastructure platform and inference
+operation practices that determine how far you can scale and how reliably you
+can grow.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Format Spec"
+  short_description: "Write clear specs for file and resource formats"
+  default_prompt: "Use $write-format-spec to draft or review this format specification."

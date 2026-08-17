@@ -7,6 +7,7 @@ configuration.
 
 | Package                                                            | Purpose                                                           |
 | ------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`@onurpi/agents`](packages/agents/)                               | Personal agent instructions, skills, and cross-harness sync       |
 | [`@onurpi/turn-fold`](packages/turn-fold/)                         | Bounded transcript replay and run-level folding                   |
 | [`@onurpi/goal`](packages/goal/)                                   | Bounded autonomous goals with no-progress circuit breakers        |
 | [`@onurpi/loop-guard`](packages/loop-guard/)                       | Opt-in bounded detection and interruption of repeated work        |
@@ -59,8 +60,8 @@ stays inactive unless its `yarp` binary is on `PATH`; see the [YARP package READ
 
 ## Install
 
-The root manifest registers every extension and the `onur-dark` theme, so one package entry covers
-the whole workspace:
+The root manifest registers every extension, personal skill, and the `onur-dark` theme, so one
+package entry covers the whole workspace:
 
 ```bash
 pi install git:github.com/osolmaz/onurpi
@@ -69,6 +70,13 @@ pi install git:github.com/osolmaz/onurpi
 Run `/reload` in an existing Pi session after installation. After new commits land on `main`, run
 `pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to pick
 them up.
+
+Pi loads personal skills from [`@onurpi/agents`](packages/agents/). To install the same skills for
+Codex, Claude Code, and Cursor, and to refresh global instructions for all four harnesses, run:
+
+```bash
+npm run agents:sync
+```
 
 ## Global settings
 

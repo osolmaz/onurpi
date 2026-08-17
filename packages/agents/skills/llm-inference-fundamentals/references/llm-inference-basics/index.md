@@ -1,0 +1,13 @@
+---
+sidebar_position: 1
+sidebar_custom_props:
+    icon: /img/book.svg
+    collapsed: false
+---
+
+# Foundations
+
+LLM inference is where models meet the real world. It powers everything from
+instant chat replies to code generation, and directly impacts latency, cost, and
+user experience. Understanding how inference works is the first step toward
+building smarter, faster, and more reliable AI applications.

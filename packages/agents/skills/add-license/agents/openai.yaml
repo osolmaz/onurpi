@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add License"
+  short_description: "Add MIT license files and README links"
+  default_prompt: "Use $add-license to add or normalize a project license. Default to MIT unless I say otherwise, use the bundled MIT template, and put the README License section at the very bottom as [MIT](LICENSE)."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "HF Inference Endpoints"
+  short_description: "Deploy and safely shut down HF endpoints"
+  default_prompt: "Use $hf-inference-endpoints to deploy, inspect, or safely shut down a Hugging Face Inference Endpoint."

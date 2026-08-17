@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write Monograph"
+  short_description: "Write rigorous monographs without formula dumps"
+  default_prompt: "Use $write-monograph to plan and draft a technical monograph that builds definitions, proofs, examples, applications, and exercises gradually, with prose around formulas and no invented facts to fit the pattern."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ML Experiment Design"
+  short_description: "Design valid, compute-aware ML experiments"
+  default_prompt: "Use $ml-experiment-design to review this ML plan and identify the cheapest valid experiment. Apply $practical-significance to measured differences and $paid-compute-launch before paid accelerator work."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Online Shopping"
+  short_description: "Verify prices and buy timing"
+  default_prompt: "Use $online-shopping to compare these listings, check price history, normalize unit prices, and tell me whether to buy now or wait."

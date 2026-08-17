@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Description"
+  short_description: "Write PR descriptions with a plain summary and plain sentences before technical details"
+  default_prompt: "Use $pr-description when opening a pull request, or when writing or improving a pull request description. The top summary should answer 'what the hell is this about?' in plain full sentences, and each section should start in plain language before any technical detail or bullets."

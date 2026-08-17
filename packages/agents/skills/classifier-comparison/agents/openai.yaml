@@ -1,0 +1,4 @@
+interface:
+  display_name: "Classifier Comparison"
+  short_description: "Present classifier metrics with aligned decimals and inline winner stars"
+  default_prompt: "Use $classifier-comparison to format classifier metrics clearly. Apply $practical-significance separately before treating a displayed winner as meaningful or worth additional cost."

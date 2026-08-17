@@ -1,0 +1,4 @@
+interface:
+  display_name: "SemVer"
+  short_description: "Choose release version bumps"
+  default_prompt: "Use $semver to decide the next release version from the actual compatibility change and repo release policy."

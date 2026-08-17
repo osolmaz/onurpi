@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/osolmaz/hf-job-control/blob/main/schemas/run-status-v1.schema.json",
+  "title": "HF Job Control observed run status v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "attempt_id", "state", "updated_at",
+    "last_applied_generation", "last_action"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "attempt_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "job_id": {"type": "string", "minLength": 1, "maxLength": 200},
+    "state": {"enum": ["created", "running", "pausing", "paused", "stopping", "completed", "aborting", "aborted", "failed"]},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "last_applied_generation": {"type": "integer", "minimum": 0},
+    "last_action": {"enum": ["run", "pause", "stop", "abort"]},
+    "boundary": {"type": "object"},
+    "checkpoint": {"type": "object"},
+    "metrics": {"type": "object"},
+    "message": {"type": "string", "maxLength": 2000}
+  }
+}

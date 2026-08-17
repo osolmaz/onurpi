@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plain Writing"
+  short_description: "Write clear, natural prose for readers"
+  default_prompt: "Use $plain-writing to rewrite this in clear, direct prose."
