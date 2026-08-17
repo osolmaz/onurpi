@@ -1,17 +1,13 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
 const temporaryDirectories: string[] = [];
-const script = join(
-  import.meta.dirname,
-  "skills",
-  "safe-inference-launch",
-  "scripts",
-  "guarded-launch.sh",
-);
+const scriptDirectory = join(import.meta.dirname, "skills", "safe-inference-launch", "scripts");
+const script = join(scriptDirectory, "guarded-launch.sh");
+const installer = join(scriptDirectory, "install-shims.sh");
 
 function temporaryDirectory(): string {
   const path = mkdtempSync(join(tmpdir(), "onurpi-guarded-launch-"));
@@ -21,6 +17,34 @@ function temporaryDirectory(): string {
 
 afterEach(() => {
   for (const path of temporaryDirectories.splice(0)) rmSync(path, { force: true, recursive: true });
+});
+
+describe("safe inference shim installation", () => {
+  it("rejects unsafe tool names before writing outside the bin directory", () => {
+    const root = temporaryDirectory();
+    const result = spawnSync(
+      installer,
+      ["--bin-dir", join(root, "bin"), "--tools", "../escape", "--force"],
+      { encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("invalid tool name");
+    expect(existsSync(join(root, "escape"))).toBe(false);
+  });
+
+  it("writes an absolute custom guard path into a shim", () => {
+    const root = temporaryDirectory();
+    const bin = join(root, "bin");
+    const result = spawnSync(
+      installer,
+      ["--bin-dir", bin, "--tools", "test-tool", "--guard", relative(root, script)],
+      { cwd: root, encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(join(bin, "test-tool"), "utf8")).toContain(script);
+  });
 });
 
 describe("guarded-launch process groups", () => {
