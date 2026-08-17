@@ -8,11 +8,8 @@ import type {
   ContextEvent,
   ExtensionContext,
   SessionBeforeCompactEvent,
-  SessionCompactEvent,
   ToolInfo,
 } from "@earendil-works/pi-coding-agent";
-
-import { loadConfig, type CodexCompactionConfig } from "./config.ts";
 import {
   findNativeCheckpoint,
   isJsonObject,
@@ -40,16 +37,10 @@ import {
 } from "./responses-input.ts";
 
 export const COMPACTION_STATUS_KIND = "openai-codex-compaction-status";
-export const CONTINUATION_PROMPT = "Compaction completed. Continue.";
 
 export type CompactionStatus = {
   state: "running" | "complete" | "failed";
   error?: string;
-};
-
-type ForcedCompactionState = {
-  sessionId: string;
-  phase: "waitingForSettle" | "compacting" | "compacted";
 };
 
 type CachedPayloadShape = {
@@ -60,17 +51,7 @@ type CachedPayloadShape = {
 /** Minimal context surface the controller needs; `ExtensionContext` satisfies it. */
 export type CodexCompactionContext = Pick<
   ExtensionContext,
-  | "model"
-  | "mode"
-  | "cwd"
-  | "hasUI"
-  | "abort"
-  | "compact"
-  | "isIdle"
-  | "isProjectTrusted"
-  | "hasPendingMessages"
-  | "getContextUsage"
-  | "getSystemPrompt"
+  "model" | "mode" | "hasUI" | "abort" | "getSystemPrompt"
 > & {
   sessionManager: Pick<ExtensionContext["sessionManager"], "getSessionId" | "getBranch">;
   modelRegistry: Pick<ExtensionContext["modelRegistry"], "getApiKeyAndHeaders">;
@@ -100,25 +81,17 @@ export type CodexCompactionApi = {
       ctx: CodexCompactionContext,
     ) => Promise<CompactionHookResult>,
   ): void;
-  onTurnEnd(handler: (ctx: CodexCompactionContext) => void): void;
-  onSessionCompact(
-    handler: (event: SessionCompactEvent, ctx: CodexCompactionContext) => void,
-  ): void;
-  onAgentSettled(handler: (ctx: CodexCompactionContext) => void): void;
   appendEntry(customType: string, data: CompactionStatus): void;
-  sendUserMessage(content: string, options?: { deliverAs: "followUp" }): void;
   getAllTools(): ToolInfo[];
   getActiveTools(): string[];
 };
 
 type ControllerState = {
   payloadShapeBySession: Map<string, CachedPayloadShape>;
-  forcedCompaction: ForcedCompactionState | undefined;
 };
 
 type ControllerDeps = {
   api: CodexCompactionApi;
-  readConfig: (cwd: string, projectTrusted: boolean) => CodexCompactionConfig;
   createCheckpoint: (params: CheckpointParams) => Promise<CheckpointResult>;
   marker: () => string;
 };
@@ -290,14 +263,10 @@ function checkpointParams(
 }
 
 function abandonCompaction(
-  state: ControllerState,
   event: SessionBeforeCompactEvent,
   ctx: CodexCompactionContext,
   error: unknown,
 ): { cancel: true } {
-  if (state.forcedCompaction?.sessionId === ctx.sessionManager.getSessionId()) {
-    state.forcedCompaction = undefined;
-  }
   if (!event.signal.aborted && ctx.hasUI) {
     ctx.ui.notify(`OpenAI Codex native compaction failed: ${errorMessage(error)}`, "error");
   }
@@ -327,145 +296,30 @@ async function handleSessionBeforeCompact(
       },
     };
   } catch (error) {
-    return abandonCompaction(state, event, ctx, error);
+    return abandonCompaction(event, ctx, error);
   }
-}
-
-function thresholdPercent(
-  deps: ControllerDeps,
-  state: ControllerState,
-  ctx: CodexCompactionContext,
-): number | undefined {
-  if (state.forcedCompaction) return undefined;
-  if (!isOpenAICodexModel(ctx.model)) return undefined;
-  const config = deps.readConfig(ctx.cwd, ctx.isProjectTrusted());
-  if (!config.autoCompact) return undefined;
-  const percent = ctx.getContextUsage()?.percent;
-  if (percent === null || percent === undefined) return undefined;
-  return percent >= config.thresholdRatio * 100 ? percent : undefined;
-}
-
-function handleTurnEnd(
-  deps: ControllerDeps,
-  state: ControllerState,
-  ctx: CodexCompactionContext,
-): void {
-  const percent = thresholdPercent(deps, state, ctx);
-  if (percent === undefined) return;
-
-  state.forcedCompaction = {
-    sessionId: ctx.sessionManager.getSessionId(),
-    phase: "waitingForSettle",
-  };
-  if (ctx.hasUI) {
-    ctx.ui.notify(
-      `OpenAI Codex context reached ${percent.toFixed(1)}%; stopping for compaction.`,
-      "warning",
-    );
-  }
-  ctx.abort();
-}
-
-function isOwnNativeCompaction(
-  state: ForcedCompactionState | undefined,
-  event: SessionCompactEvent,
-  ctx: CodexCompactionContext,
-): boolean {
-  return (
-    state?.phase === "waitingForSettle" &&
-    state.sessionId === ctx.sessionManager.getSessionId() &&
-    event.reason !== "manual" &&
-    event.fromExtension &&
-    isOpenAICodexModel(ctx.model) &&
-    isJsonObject(event.compactionEntry.details) &&
-    event.compactionEntry.details["kind"] === NATIVE_COMPACTION_KIND
-  );
-}
-
-function handleSessionCompact(
-  state: ControllerState,
-  event: SessionCompactEvent,
-  ctx: CodexCompactionContext,
-): void {
-  const forced = state.forcedCompaction;
-  if (!isOwnNativeCompaction(forced, event, ctx)) return;
-  if (event.willRetry) {
-    state.forcedCompaction = undefined;
-    return;
-  }
-  if (!forced) return;
-  state.forcedCompaction = { sessionId: forced.sessionId, phase: "compacted" };
-}
-
-function continueAfterCompaction(
-  api: CodexCompactionApi,
-  state: ControllerState,
-  ctx: CodexCompactionContext,
-  expected: ForcedCompactionState,
-): void {
-  if (state.forcedCompaction !== expected) return;
-  state.forcedCompaction = undefined;
-  if (ctx.hasPendingMessages()) return;
-  if (ctx.isIdle()) {
-    api.sendUserMessage(CONTINUATION_PROMPT);
-  } else {
-    api.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" });
-  }
-}
-
-function handleAgentSettled(
-  deps: ControllerDeps,
-  state: ControllerState,
-  ctx: CodexCompactionContext,
-): void {
-  const forced = state.forcedCompaction;
-  if (forced?.sessionId !== ctx.sessionManager.getSessionId()) return;
-  if (!isOpenAICodexModel(ctx.model)) return;
-  if (forced.phase === "compacted") {
-    continueAfterCompaction(deps.api, state, ctx, forced);
-    return;
-  }
-  if (forced.phase !== "waitingForSettle") return;
-
-  const compacting: ForcedCompactionState = { ...forced, phase: "compacting" };
-  state.forcedCompaction = compacting;
-  ctx.compact({
-    onComplete: () => {
-      continueAfterCompaction(deps.api, state, ctx, compacting);
-    },
-    onError: (error) => {
-      if (state.forcedCompaction !== compacting) return;
-      state.forcedCompaction = undefined;
-      if (!ctx.hasUI) return;
-      ctx.ui.notify(`OpenAI Codex compaction failed: ${error.message}`, "error");
-    },
-  });
 }
 
 export function installCodexCompaction(
   api: CodexCompactionApi,
-  overrides: Partial<Pick<ControllerDeps, "readConfig" | "createCheckpoint" | "marker">> = {},
+  overrides: Partial<Pick<ControllerDeps, "createCheckpoint" | "marker">> = {},
 ): void {
   const state: ControllerState = {
     payloadShapeBySession: new Map(),
-    forcedCompaction: undefined,
   };
   const deps: ControllerDeps = {
     api,
-    readConfig: overrides.readConfig ?? loadConfig,
     createCheckpoint: overrides.createCheckpoint ?? createNativeCheckpoint,
     marker: overrides.marker ?? localMarker,
   };
 
   const reset = () => {
     state.payloadShapeBySession.clear();
-    state.forcedCompaction = undefined;
   };
   api.onSessionStart(reset);
   api.onSessionShutdown(reset);
   api.onModelSelect((ctx) => {
     state.payloadShapeBySession.delete(ctx.sessionManager.getSessionId());
-    state.forcedCompaction = undefined;
   });
   api.onContext(handleContext);
   api.onBeforeProviderHeaders((event, ctx) => {
@@ -474,13 +328,4 @@ export function installCodexCompaction(
   });
   api.onBeforeProviderRequest((event, ctx) => handleBeforeProviderRequest(deps, state, event, ctx));
   api.onSessionBeforeCompact((event, ctx) => handleSessionBeforeCompact(deps, state, event, ctx));
-  api.onTurnEnd((ctx) => {
-    handleTurnEnd(deps, state, ctx);
-  });
-  api.onSessionCompact((event, ctx) => {
-    handleSessionCompact(state, event, ctx);
-  });
-  api.onAgentSettled((ctx) => {
-    handleAgentSettled(deps, state, ctx);
-  });
 }

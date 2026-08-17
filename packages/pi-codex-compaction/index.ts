@@ -50,27 +50,8 @@ export default function codexCompactionExtension(pi: ExtensionAPI): void {
     onSessionBeforeCompact: (handler) => {
       pi.on("session_before_compact", (event, ctx) => handler(event, ctx));
     },
-    onTurnEnd: (handler) => {
-      pi.on("turn_end", (_event, ctx) => {
-        handler(ctx);
-      });
-    },
-    onSessionCompact: (handler) => {
-      pi.on("session_compact", (event, ctx) => {
-        handler(event, ctx);
-      });
-    },
-    onAgentSettled: (handler) => {
-      pi.on("agent_settled", (_event, ctx) => {
-        handler(ctx);
-      });
-    },
     appendEntry: (customType, data) => {
       pi.appendEntry(customType, data);
-    },
-    sendUserMessage: (content, options) => {
-      if (options) pi.sendUserMessage(content, options);
-      else pi.sendUserMessage(content);
     },
     getAllTools: () => pi.getAllTools(),
     getActiveTools: () => pi.getActiveTools(),

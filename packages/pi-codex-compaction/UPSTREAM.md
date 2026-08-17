@@ -14,11 +14,11 @@
 ## Reviewed contents
 
 The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.ts`,
-`native-compaction.ts`, and `index.test.ts` at the pinned commit.
+`native-compaction.ts`, and `index.test.ts` at the pinned commit. OnurPi no longer includes the
+upstream config module; see the local adaptations below.
 
 - **Process/shell execution:** none.
-- **Filesystem access:** read-only config lookup of `~/.pi/agent/pi-codex-compaction.json` and, for
-  trusted projects, `.pi/pi-codex-compaction.json`. No writes; no new files are created by default.
+- **Filesystem access:** none. OnurPi removed the upstream config lookup and does not create files.
 - **Network access:** exactly one outbound call shape — `POST <baseUrl>/codex/responses` with the
   session history — plus header-only interception of Pi's own Codex provider requests.
 - **Credential handling:** resolves the active Codex API key through Pi's documented
@@ -41,10 +41,10 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
 - **Session persistence:** native checkpoints are stored in Pi's normal `CompactionEntry.details`;
   TUI status updates are appended as `openai-codex-compaction-status` custom entries. The stored
   `encrypted_content` is opaque provider state, not a credential.
-- **Malformed external data:** SSE streams, checkpoint payloads, config files, and JWT structure are
-  all validated; failures are fail-closed (compaction cancelled or request aborted) rather than
-  fallbacks. Upstream error paths could embed unbounded HTTP error bodies in UI notifications;
-  OnurPi bounds them to a 300-character preview.
+- **Malformed external data:** SSE streams, checkpoint payloads, and JWT structure are validated;
+  failures are fail-closed (compaction cancelled or request aborted) rather than fallbacks. Upstream
+  error paths could embed unbounded HTTP error bodies in UI notifications; OnurPi bounds them to a
+  300-character preview.
 
 ## Local adaptations
 
@@ -68,5 +68,10 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
   [README.md](README.md#compaction-ownership-in-onurpi)): `context-window-policy` passes Codex
   models through to this extension, and `reliable-compaction` no longer arms its SSE retry override
   for the built-in `openai-codex` provider.
-- Omitted nothing else; upstream behavior for hook selection, fail-closed cancellation, duplicate
-  prevention, and continuation messaging is preserved.
+- Removed the upstream proactive controller as a hard cutover. The package no longer reads
+  `autoCompact` or `thresholdRatio`, listens to `turn_end`, calls `ctx.abort()` to schedule
+  compaction, listens to `agent_settled`, or sends a continuation user message. Pi owns manual,
+  threshold, and overflow scheduling and continuation; the package only supplies native checkpoint
+  results through `session_before_compact`.
+- Other upstream behavior for checkpoint creation, fail-closed cancellation, and duplicate
+  prevention is preserved.

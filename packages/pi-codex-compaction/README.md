@@ -15,12 +15,9 @@ trailing `compaction_trigger`, stores the returned opaque `compaction` item in P
 compaction requests use `@onurpi/codex-auth-reload`, so a new same-account Codex CLI credential is
 selected only for the official Codex endpoint and is never copied into Pi's auth store.
 
-During a tool-driven run, the extension checks Pi's reported context usage after each completed
-turn. At 90% it aborts before the next provider request, waits for `agent_settled`, and invokes Pi's
-normal compaction lifecycle. After a successful compaction it sends a visible user continuation
-message ("Compaction completed. Continue."), unless messages are already queued. If Pi's own
-threshold or overflow compaction runs first, the extension uses that result instead of compacting
-twice. Overflow recovery remains owned by Pi.
+Pi owns compaction scheduling and continuation. The extension does not abort an active run or add a
+synthetic user message. Manual compaction, Pi's configured threshold compaction, and overflow retry
+all enter the same `session_before_compact` hook and receive a native Codex checkpoint.
 
 Pi requires compaction events to store a summary string, so entries receive a short local checkpoint
 marker. The marker is filtered from provider context and is never sent to OpenAI. In interactive
@@ -57,19 +54,8 @@ tests assert that ordering.
 
 ## Configuration
 
-Mid-run compaction is enabled at 90% by default:
-
-```json
-{
-  "autoCompact": true,
-  "thresholdRatio": 0.9
-}
-```
-
-Save this as `~/.pi/agent/pi-codex-compaction.json` or project-local `.pi/pi-codex-compaction.json`.
-Project configuration is read only for trusted projects and takes precedence. `thresholdRatio` must
-be greater than 0 and less than 1. No file is created by default; malformed files fall back to
-defaults. Pi's `compaction.reserveTokens` setting still controls Pi's own threshold compaction.
+The extension has no configuration file. Use Pi's compaction settings, including
+`compaction.reserveTokens`, to control threshold compaction.
 
 ## Persistence
 
@@ -89,10 +75,9 @@ mirrors Pi's Codex message conversion and combines it with the latest observed r
 construct the compaction request. Extensions loaded later that independently rewrite provider
 payloads can therefore create order-dependent behavior.
 
-Mid-run compaction uses `ctx.abort()` because Pi does not yet expose a supported way for extensions
-to stop cleanly between tool turns. The abort happens only after `turn_end`, when tool results are
-finalized, but it remains a temporary compatibility path until Pi supports turn-boundary compaction
-directly.
+Pi does not expose a supported extension API for frontier compaction between tool turns. This
+extension does not emulate that API. During long tool loops, Pi's normal threshold and overflow
+behavior applies.
 
 ## License
 
