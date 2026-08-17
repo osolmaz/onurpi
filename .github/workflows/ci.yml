@@ -93,6 +93,12 @@ jobs:
       - name: Check @onurpi/infinite-retry package with Slophammer
         working-directory: packages/infinite-retry
         run: npm run slophammer
+      - name: Check @onurpi/onur-openclaw-maintainer package
+        working-directory: packages/onur-openclaw-maintainer
+        run: npm run check
+      - name: Check @onurpi/onur-openclaw-maintainer package with Slophammer
+        working-directory: packages/onur-openclaw-maintainer
+        run: npm run slophammer
       - name: Check @onurpi/pi-tui-kit package
         working-directory: packages/pi-tui-kit
         run: npm run check

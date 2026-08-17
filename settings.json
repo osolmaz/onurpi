@@ -21,6 +21,7 @@
     "../../repos/onurpi/packages/pi-must-win",
     "../../repos/onurpi/packages/regrafter-driver",
     "../../repos/onurpi/packages/workflows",
+    "../../repos/onurpi/packages/onur-openclaw-maintainer",
     "../../repos/onurpi/packages/demo-mode",
     "../../repos/onurpi/packages/skill-slug",
     "../../repos/onurpi/packages/agents",

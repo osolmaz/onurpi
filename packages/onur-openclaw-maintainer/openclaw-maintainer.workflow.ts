@@ -1,4 +1,4 @@
-import { agent, compute, defineWorkflow } from "pi-workflows";
+import { agent, compute, defineWorkflow } from "@onurpi/workflows";
 
 import type { MaintainerWorkflowInput } from "./maintainer.ts";
 

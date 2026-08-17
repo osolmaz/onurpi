@@ -30,6 +30,7 @@
       "./packages/pi-must-win/index.ts",
       "./packages/regrafter-driver/index.ts",
       "./packages/workflows/index.ts",
+      "./packages/onur-openclaw-maintainer/index.ts",
       "./packages/demo-mode/index.ts",
       "./packages/skill-slug/index.ts"
     ],

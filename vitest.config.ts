@@ -56,6 +56,8 @@ export default defineConfig({
         "packages/pi-codex-compaction/remote-compaction.ts",
         "packages/pi-codex-compaction/responses-input.ts",
         "packages/infinite-retry/infinite-retry.ts",
+        "packages/onur-openclaw-maintainer/maintainer.ts",
+        "packages/onur-openclaw-maintainer/openclaw-maintainer.workflow.ts",
         "packages/pi-usage/src/core.ts",
         "packages/pi-usage/src/format.ts",
         "packages/pi-usage/src/query.ts",
