@@ -258,7 +258,8 @@ that contains this `SKILL.md`. For vLLM this means wrapping the promoted
 executable:
 
 ```bash
-../safe-inference-launch/scripts/install-shims.sh \
+SAFE_INFERENCE_SHIMS='<absolute path to ../safe-inference-launch/scripts/install-shims.sh>'
+"$SAFE_INFERENCE_SHIMS" \
   --wrap ~/runtimes/vllm/current/.venv/bin/vllm
 ```
 
