@@ -55,6 +55,7 @@ export type IntegrityIssue = {
 export type IntegrityReport = {
   readonly status: "ok" | "issues";
   readonly issues: readonly IntegrityIssue[];
+  readonly omittedIssues: number;
 };
 
 export type Excerpt = {
@@ -121,6 +122,7 @@ export type SelectionSummary = {
   readonly totalTurns: number;
   readonly selectedTurns: number;
   readonly omittedTurns: number;
+  readonly omittedControlEvents: number;
   readonly outputTruncated: boolean;
 };
 
@@ -149,6 +151,8 @@ export type SessionListDocument = {
   readonly scope: "cwd" | "all-projects";
   readonly cwd: string;
   readonly limit: number;
+  readonly totalSessions: number;
+  readonly omittedSessions: number;
   readonly sessions: readonly SessionListItem[];
 };
 

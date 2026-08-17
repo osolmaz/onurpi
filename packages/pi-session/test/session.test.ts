@@ -437,7 +437,10 @@ describe("CLI discovery and rendering", () => {
     const json = await execute([path, "--format", "json"]);
     const entryOutput = await execute(["entry", path, "u0000002", "--format", "json"]);
     vi.spyOn(SessionManager, "list").mockResolvedValue([
-      sessionInfo(path, "019fd7b1-1111-7111-8111-111111111111"),
+      {
+        ...sessionInfo(path, "019fd7b1-1111-7111-8111-111111111111"),
+        name: "api_key=must-not-appear",
+      },
     ]);
     const list = await execute(["list", "--format", "json"], "/fixture");
     const help = await execute(["--help"]);
@@ -445,7 +448,11 @@ describe("CLI discovery and rendering", () => {
     expect(show).toContain("Session:");
     expect(JSON.parse(json)).toMatchObject({ schema: "pi-session/v1" });
     expect(JSON.parse(entryOutput)).toMatchObject({ entry: { id: "u0000002" } });
-    expect(JSON.parse(list)).toMatchObject({ scope: "cwd", sessions: [{ path }] });
+    expect(JSON.parse(list)).toMatchObject({
+      scope: "cwd",
+      sessions: [{ path, name: 'api_key="<redacted>"' }],
+    });
+    expect(list).not.toContain("must-not-appear");
     expect(help).toContain("bounded, read-only evidence");
   });
 });

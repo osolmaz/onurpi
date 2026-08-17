@@ -55,10 +55,11 @@ export function boundedExcerpt(value: string, maxBytes: number): Excerpt {
   }
 
   const result = truncateHead(safe, { maxBytes, maxLines: 2_000 });
-  const shownBytes = Buffer.byteLength(result.content);
+  const content = result.firstLineExceedsLimit ? utf8Prefix(safe, maxBytes) : result.content;
+  const shownBytes = Buffer.byteLength(content);
   const omittedBytes = Math.max(0, originalBytes - shownBytes);
   return {
-    text: result.content,
+    text: content,
     originalBytes,
     shownBytes,
     omittedBytes,
@@ -66,6 +67,20 @@ export function boundedExcerpt(value: string, maxBytes: number): Excerpt {
     redactions,
     omissions,
   };
+}
+
+function utf8Prefix(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value);
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let end = Math.min(bytes.length, maxBytes);
+  while (end > 0) {
+    try {
+      return decoder.decode(bytes.subarray(0, end));
+    } catch {
+      end -= 1;
+    }
+  }
+  return "";
 }
 
 function replaceCounted(

@@ -46,6 +46,13 @@ pi-session list --limit 10
 pi-session entry 019fd7b1 a1b2c3d4 --format json
 ```
 
+## JSON output
+
+JSON output uses the `pi-session/v1` schema. Recovery output has stable `session`, `integrity`,
+`selection`, `turns`, and `nextOffset` fields. `nextOffset` is the number of older active-branch
+turns omitted from the view, or `null` when none were omitted. Omission counts cover turns, control
+events, integrity issues, list results, and bytes removed from excerpts.
+
 Normal excerpts are limited to 2 KiB. Workflow and plan excerpts are limited to 8 KiB. Complete text
 and JSON output is limited to 40 KiB. Likely credentials are redacted, and image, binary, base64,
 signature, custom metadata, and raw tool-result bodies are omitted.

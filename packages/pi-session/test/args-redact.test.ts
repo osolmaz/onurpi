@@ -120,4 +120,12 @@ describe("redaction and excerpt limits", () => {
     expect(excerpt.shownBytes).toBeLessThanOrEqual(100);
     expect(excerpt.omittedBytes).toBeGreaterThan(0);
   });
+
+  it("keeps a byte-safe prefix from an oversized first line", () => {
+    const excerpt = boundedExcerpt(`start-${"🙂".repeat(1_000)}`, 101);
+    expect(excerpt.text).toMatch(/^start-/u);
+    expect(excerpt.text).not.toContain("�");
+    expect(excerpt.shownBytes).toBeLessThanOrEqual(101);
+    expect(excerpt.truncated).toBe(true);
+  });
 });

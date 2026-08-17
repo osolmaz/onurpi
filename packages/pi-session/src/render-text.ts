@@ -100,7 +100,7 @@ export function renderListText(document: SessionListDocument): string {
   const lines = [
     `Scope: ${document.scope}`,
     `Directory: ${document.cwd}`,
-    `Sessions: ${String(document.sessions.length)}`,
+    `Sessions: ${String(document.sessions.length)} of ${String(document.totalSessions)}`,
   ];
   for (const session of document.sessions) {
     lines.push(
@@ -130,6 +130,9 @@ function appendIntegrity(
     lines.push(
       `Integrity ${item.severity}: ${item.code}${location === "" ? "" : ` (${location})`}: ${item.message}`,
     );
+  }
+  if (document.integrity.omittedIssues > 0) {
+    lines.push(`Integrity: ${String(document.integrity.omittedIssues)} additional issues omitted.`);
   }
 }
 

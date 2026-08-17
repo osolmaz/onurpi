@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { arrayValue, asRecord } from "../src/load.js";
+import { arrayValue, asRecord, numberValue } from "../src/load.js";
 import { renderEntryJson, renderListJson, renderRecoveryJson } from "../src/render-json.js";
 import { renderEntryText, renderListText, renderRecoveryText } from "../src/render-text.js";
 import {
@@ -80,6 +80,7 @@ function recovery(turns: readonly TurnEvidence[]): RecoveryDocument {
     },
     integrity: {
       status: "issues",
+      omittedIssues: 0,
       issues: Array.from({ length: 100 }, (_, index) => ({
         code: `issue-${String(index)}`,
         severity: "warning" as const,
@@ -94,6 +95,7 @@ function recovery(turns: readonly TurnEvidence[]): RecoveryDocument {
       totalTurns: turns.length,
       selectedTurns: turns.length,
       omittedTurns: 0,
+      omittedControlEvents: 0,
       outputTruncated: false,
     },
     turns,
@@ -102,14 +104,12 @@ function recovery(turns: readonly TurnEvidence[]): RecoveryDocument {
 }
 
 describe("bounded renderers", () => {
-  it("keeps recovery JSON valid while dropping oldest turns, controls, and issue details", () => {
+  it("keeps recovery JSON valid while reporting omitted controls and issue details", () => {
     const document = recovery([
       turn(
         1,
         Array.from({ length: 8 }, (_, index) => control(index)),
       ),
-      turn(2),
-      turn(3),
     ]);
     const output = renderRecoveryJson(document);
     const parsed: unknown = JSON.parse(output) as unknown;
@@ -119,6 +119,13 @@ describe("bounded renderers", () => {
       integrity: { status: "issues" },
       selection: { outputTruncated: true },
     });
+    const parsedRecord = asRecord(parsed);
+    expect(numberValue(asRecord(parsedRecord?.["integrity"])?.["omittedIssues"])).toBeGreaterThan(
+      0,
+    );
+    expect(
+      numberValue(asRecord(parsedRecord?.["selection"])?.["omittedControlEvents"]),
+    ).toBeGreaterThan(0);
   });
 
   it("bounds recovery text and marks omitted rendered evidence", () => {
@@ -151,7 +158,7 @@ describe("bounded renderers", () => {
     const output = renderRecoveryText({
       ...document,
       selection: { ...document.selection, assistant: "text" },
-      integrity: { status: "ok", issues: [] },
+      integrity: { status: "ok", issues: [], omittedIssues: 0 },
     });
     expect(output).toContain("[Assistant output omitted by --assistant none]");
     expect(output).toContain("[intermediate]");
@@ -165,6 +172,8 @@ describe("bounded renderers", () => {
       scope: "all-projects",
       cwd: "/fixture",
       limit: 30,
+      totalSessions: 30,
+      omittedSessions: 0,
       sessions: Array.from({ length: 30 }, (_, index) => ({
         id: `session-${String(index)}`,
         path: `/fixture/${String(index)}.jsonl`,
@@ -181,6 +190,7 @@ describe("bounded renderers", () => {
     const sessions = arrayValue(asRecord(parsed)?.["sessions"]);
     expect(Buffer.byteLength(json)).toBeLessThanOrEqual(TOTAL_OUTPUT_BYTES);
     expect(sessions?.length).toBeLessThan(document.sessions.length);
+    expect(numberValue(asRecord(parsed)?.["omittedSessions"])).toBeGreaterThan(0);
     const text = renderListText({ ...document, sessions: document.sessions.slice(0, 2) });
     expect(text).toContain("Scope: all-projects");
     expect(text).toContain("[unnamed]");
@@ -208,7 +218,11 @@ describe("bounded renderers", () => {
     };
     const json = renderEntryJson(document);
     expect(Buffer.byteLength(json)).toBeLessThanOrEqual(TOTAL_OUTPUT_BYTES);
-    expect(JSON.parse(json)).toMatchObject({ integrity: { status: "issues" } });
+    const parsed: unknown = JSON.parse(json) as unknown;
+    expect(parsed).toMatchObject({ integrity: { status: "issues" } });
+    expect(
+      numberValue(asRecord(asRecord(parsed)?.["integrity"])?.["omittedIssues"]),
+    ).toBeGreaterThan(0);
     expect(renderEntryText(document)).toContain("Entry: entry");
     expect(renderEntryText({ ...document, entry: null })).toContain("Entry: not found");
   });

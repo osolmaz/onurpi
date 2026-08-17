@@ -53,6 +53,7 @@ export function selectRecovery(session: LoadedSession, options: RecoveryOptions)
       totalTurns: builders.length,
       selectedTurns: turns.length,
       omittedTurns,
+      omittedControlEvents: 0,
       outputTruncated: false,
     },
     turns,

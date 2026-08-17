@@ -21,6 +21,10 @@ import {
 const MAX_SCANNED_LINE_BYTES = 64 * 1024;
 const MAX_REPORTED_LINES = 20;
 const MAX_INTEGRITY_ISSUES = 200;
+const MAX_ENTRY_ID_CHARS = 256;
+const MAX_ENTRY_TYPE_CHARS = 128;
+const MAX_TIMESTAMP_CHARS = 64;
+const MAX_CWD_CHARS = 4_096;
 const UUID_PREFIX = /^[0-9a-f-]+$/iu;
 
 export async function resolveSessionPath(
@@ -173,11 +177,11 @@ export async function scanSessionFile(path: string): Promise<ScanResult> {
 
 function validateHeader(header: RawRecord, version: number | null): IntegrityIssue[] {
   const issues: IntegrityIssue[] = [];
-  if (stringValue(header["id"]) === undefined) {
-    issues.push(issue("invalid_session_id", "error", "The session header has no valid id."));
+  if (boundedString(header["id"], MAX_ENTRY_ID_CHARS) === undefined) {
+    issues.push(issue("invalid_session_id", "error", "The session header has no bounded id."));
   }
-  if (stringValue(header["cwd"]) === undefined) {
-    issues.push(issue("invalid_session_cwd", "error", "The session header has no valid cwd."));
+  if (boundedString(header["cwd"], MAX_CWD_CHARS) === undefined) {
+    issues.push(issue("invalid_session_cwd", "error", "The session header has no bounded cwd."));
   }
   if (version === null) {
     issues.push(
@@ -326,11 +330,12 @@ function inspectContentSize(
 ): void {
   const contentBytes = jsonBytes(content);
   if (contentBytes <= MESSAGE_EXCERPT_BYTES) return;
+  const roleLabel = role?.slice(0, MAX_ENTRY_TYPE_CHARS) ?? "unknown";
   issues.push(
     issue(
       role === "toolResult" ? "oversized_tool_result" : "oversized_message",
       "warning",
-      `${role ?? "unknown"} content is ${String(contentBytes)} bytes and will be excerpted.`,
+      `${roleLabel} content is ${String(contentBytes)} bytes and will be excerpted.`,
       entry.id,
     ),
   );
@@ -354,7 +359,7 @@ function inspectAssistantIntegrity(
 }
 
 function addString(value: unknown, target: Set<string>): void {
-  const text = stringValue(value);
+  const text = boundedString(value, MAX_ENTRY_ID_CHARS);
   if (text !== undefined) target.add(text);
 }
 
@@ -417,13 +422,14 @@ function safeBranch(entries: readonly unknown[]): SafeEntry[] {
 function safeEntry(value: unknown): SafeEntry | undefined {
   const raw = asRecord(value);
   if (raw === undefined) return undefined;
-  const id = stringValue(raw["id"]);
-  const timestamp = stringValue(raw["timestamp"]);
-  const type = stringValue(raw["type"]);
+  const id = boundedString(raw["id"], MAX_ENTRY_ID_CHARS);
+  const timestamp = boundedString(raw["timestamp"], MAX_TIMESTAMP_CHARS);
+  const type = boundedString(raw["type"], MAX_ENTRY_TYPE_CHARS);
   const parent = raw["parentId"];
+  const parentId = parent === null ? null : boundedString(parent, MAX_ENTRY_ID_CHARS);
   if (id === undefined || timestamp === undefined || type === undefined) return undefined;
-  if (parent !== null && typeof parent !== "string") return undefined;
-  return { raw, id, parentId: parent, timestamp, type };
+  if (parentId === undefined) return undefined;
+  return { raw, id, parentId, timestamp, type };
 }
 
 function scanIssues(scan: ScanResult): IntegrityIssue[] {
@@ -472,8 +478,8 @@ function invalidLoadedSession(
 ): LoadedSession {
   return {
     path,
-    id: stringValue(header?.["id"]) ?? "unknown",
-    cwd: stringValue(header?.["cwd"]) ?? "",
+    id: boundedString(header?.["id"], MAX_ENTRY_ID_CHARS) ?? "unknown",
+    cwd: boundedString(header?.["cwd"], MAX_CWD_CHARS) ?? "",
     version: numberValue(header?.["version"]),
     entries: [],
     branch: [],
@@ -510,7 +516,7 @@ function limitIssues(issues: readonly IntegrityIssue[]): IntegrityIssue[] {
 }
 
 function report(issues: readonly IntegrityIssue[]): IntegrityReport {
-  return { status: issues.length === 0 ? "ok" : "issues", issues };
+  return { status: issues.length === 0 ? "ok" : "issues", issues, omittedIssues: 0 };
 }
 
 async function requireRegularFile(path: string): Promise<string> {
@@ -549,6 +555,11 @@ export function asRecord(value: unknown): RawRecord | undefined {
 
 export function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function boundedString(value: unknown, maxChars: number): string | undefined {
+  const text = stringValue(value);
+  return text !== undefined && text.length <= maxChars ? text : undefined;
 }
 
 export function numberValue(value: unknown): number | null {

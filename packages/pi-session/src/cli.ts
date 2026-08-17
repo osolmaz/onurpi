@@ -22,17 +22,23 @@ async function executeList(
   command: Extract<ReturnType<typeof parseArgs>, { kind: "list" }>,
   cwd: string,
 ): Promise<string> {
-  const sessions = (await listSessions(cwd, command.allProjects)).slice(0, command.limit);
+  const discovered = await listSessions(cwd, command.allProjects);
+  const sessions = discovered.slice(0, command.limit);
   const document: SessionListDocument = {
     schema: OUTPUT_SCHEMA,
     scope: command.allProjects ? "all-projects" : "cwd",
     cwd,
     limit: command.limit,
+    totalSessions: discovered.length,
+    omittedSessions: discovered.length - sessions.length,
     sessions: sessions.map((session) => ({
       id: session.id,
       path: session.path,
       cwd: session.cwd,
-      name: session.name ?? null,
+      name:
+        session.name === undefined
+          ? null
+          : boundedExcerpt(session.name, MESSAGE_EXCERPT_BYTES).text,
       created: session.created.toISOString(),
       modified: session.modified.toISOString(),
       messageCount: session.messageCount,

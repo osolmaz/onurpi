@@ -11,26 +11,25 @@ export function renderRecoveryJson(document: RecoveryDocument): string {
   let turns = [...document.turns];
   let issues = [...document.integrity.issues];
   let removedTurns = 0;
-  let removedDetails = false;
-  let candidate = recoveryCandidate(document, turns, issues, removedTurns, removedDetails);
+  let removedControls = 0;
+  let candidate = recoveryCandidate(document, turns, issues, removedTurns, removedControls);
 
   while (jsonBytes(candidate) > TOTAL_OUTPUT_BYTES && turns.length > 1) {
     turns = turns.slice(1);
     removedTurns += 1;
-    candidate = recoveryCandidate(document, turns, issues, removedTurns, true);
+    candidate = recoveryCandidate(document, turns, issues, removedTurns, removedControls);
   }
   while (
     jsonBytes(candidate) > TOTAL_OUTPUT_BYTES &&
     turns.some((turn) => turn.control.length > 0)
   ) {
     turns = removeOldestControl(turns);
-    removedDetails = true;
-    candidate = recoveryCandidate(document, turns, issues, removedTurns, removedDetails);
+    removedControls += 1;
+    candidate = recoveryCandidate(document, turns, issues, removedTurns, removedControls);
   }
   while (jsonBytes(candidate) > TOTAL_OUTPUT_BYTES && issues.length > 0) {
     issues = issues.slice(0, -1);
-    removedDetails = true;
-    candidate = recoveryCandidate(document, turns, issues, removedTurns, removedDetails);
+    candidate = recoveryCandidate(document, turns, issues, removedTurns, removedControls);
   }
   return stringify(candidate);
 }
@@ -47,10 +46,10 @@ export function renderEntryJson(document: EntryDocument): string {
 
 export function renderListJson(document: SessionListDocument): string {
   let sessions = [...document.sessions];
-  let candidate: SessionListDocument = { ...document, sessions };
+  let candidate = listCandidate(document, sessions);
   while (jsonBytes(candidate) > TOTAL_OUTPUT_BYTES && sessions.length > 0) {
     sessions = sessions.slice(0, -1);
-    candidate = { ...document, sessions };
+    candidate = listCandidate(document, sessions);
   }
   return stringify(candidate);
 }
@@ -60,17 +59,24 @@ function recoveryCandidate(
   turns: readonly TurnEvidence[],
   issues: readonly IntegrityIssue[],
   removedTurns: number,
-  removedDetails: boolean,
+  removedControls: number,
 ): RecoveryDocument {
   const omittedTurns = source.selection.omittedTurns + removedTurns;
+  const omittedIssues =
+    source.integrity.omittedIssues + source.integrity.issues.length - issues.length;
   return {
     ...source,
-    integrity: { status: source.integrity.status, issues },
+    integrity: { status: source.integrity.status, issues, omittedIssues },
     selection: {
       ...source.selection,
       selectedTurns: turns.length,
       omittedTurns,
-      outputTruncated: source.selection.outputTruncated || removedTurns > 0 || removedDetails,
+      omittedControlEvents: source.selection.omittedControlEvents + removedControls,
+      outputTruncated:
+        source.selection.outputTruncated ||
+        removedTurns > 0 ||
+        removedControls > 0 ||
+        omittedIssues > source.integrity.omittedIssues,
     },
     turns,
     nextOffset: omittedTurns > 0 ? omittedTurns : null,
@@ -80,7 +86,23 @@ function recoveryCandidate(
 function entryCandidate(source: EntryDocument, issues: readonly IntegrityIssue[]): EntryDocument {
   return {
     ...source,
-    integrity: { status: source.integrity.status, issues },
+    integrity: {
+      status: source.integrity.status,
+      issues,
+      omittedIssues:
+        source.integrity.omittedIssues + source.integrity.issues.length - issues.length,
+    },
+  };
+}
+
+function listCandidate(
+  source: SessionListDocument,
+  sessions: SessionListDocument["sessions"],
+): SessionListDocument {
+  return {
+    ...source,
+    omittedSessions: source.omittedSessions + source.sessions.length - sessions.length,
+    sessions,
   };
 }
 
