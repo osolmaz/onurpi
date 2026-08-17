@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { replaceDirectory } from "./atomic-directory.ts";
+import { recoverDirectoryReplacement, replaceDirectory } from "./atomic-directory.ts";
 
 const FRONTMATTER_RE = /^---\n(.*?)\n---(?:\n|$)/su;
 const NAME_RE = /^name:\s*simpledoc\s*$/mu;
@@ -101,7 +101,7 @@ function copySkill(source: string, destination: string): void {
   const staged = join(temporaryDirectory, "simpledoc");
   try {
     cpSync(source, staged, { recursive: true, preserveTimestamps: true });
-    replaceDirectory(staged, destination, temporaryDirectory);
+    replaceDirectory(staged, destination);
   } finally {
     rmSync(temporaryDirectory, { force: true, recursive: true });
   }
@@ -128,6 +128,7 @@ export function syncSimpleDocSkill(options: SimpleDocSyncOptions): SimpleDocSync
   const source = resolve(options.source);
   const destination = resolve(options.destination);
   validateSyncPaths(source, destination);
+  recoverDirectoryReplacement(destination);
   const drift = describeDrift(fileManifest(source), fileManifest(destination));
   if (drift.length === 0) {
     log(`SimpleDoc skill is up to date: ${destination}`);

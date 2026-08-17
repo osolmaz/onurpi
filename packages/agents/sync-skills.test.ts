@@ -57,6 +57,19 @@ function legacyState(sourceRoot: string, ids: string[]): string {
   )}\n`;
 }
 
+function currentState(sourceRoot: string, managed: string[], pending: string[]): string {
+  return `${JSON.stringify(
+    {
+      version: 1,
+      source_root: sourceRoot,
+      managed_skill_ids: managed,
+      pending_skill_ids: pending,
+    },
+    null,
+    2,
+  )}\n`;
+}
+
 function destination(root: string): CopyDestination {
   return {
     name: "Test harness",
@@ -66,7 +79,10 @@ function destination(root: string): CopyDestination {
   };
 }
 
-function readState(path: string): { managed_skill_ids?: unknown } {
+function readState(path: string): {
+  managed_skill_ids?: unknown;
+  pending_skill_ids?: unknown;
+} {
   const value: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (typeof value !== "object" || value === null) throw new Error("Expected state object");
   return value;
@@ -228,7 +244,9 @@ describe("synchronization recovery", () => {
     expect(() => {
       syncSkills(options);
     }).toThrow();
-    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).managed_skill_ids).toEqual([]);
+    const failedState = readState(join(target.skillsRoot, STATE_FILE_NAME));
+    expect(failedState.managed_skill_ids).toEqual([]);
+    expect(failedState.pending_skill_ids).toEqual(["alpha"]);
 
     chmodSync(unreadable, 0o644);
     expect(() => {
@@ -252,6 +270,7 @@ describe("synchronization recovery", () => {
       recursive: true,
       preserveTimestamps: true,
     });
+    write(join(target.skillsRoot, STATE_FILE_NAME), currentState(sourceRoot, [], ["alpha"]));
 
     expect(() => {
       syncSkills({
@@ -274,6 +293,32 @@ describe("synchronization recovery", () => {
 });
 
 describe("synchronization ownership", () => {
+  it("releases a stale pending record without deleting its directory", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    mkdirSync(sourceRoot, { recursive: true });
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const target = destination(join(root, "target"));
+    createSkill(target.skillsRoot, "alpha");
+    write(join(target.skillsRoot, STATE_FILE_NAME), currentState(sourceRoot, [], ["alpha"]));
+
+    syncSkills({
+      sourceRoot,
+      agentsSource,
+      destinations: [target],
+      selectors: [],
+      prune: true,
+      dryRun: false,
+      log: () => undefined,
+    });
+
+    expect(existsSync(join(target.skillsRoot, "alpha", "SKILL.md"))).toBe(true);
+    expect(readState(join(target.skillsRoot, STATE_FILE_NAME)).pending_skill_ids).toEqual([]);
+  });
+});
+
+describe("synchronization ownership", () => {
   it("rejects a collision with a skill it does not manage", () => {
     const root = temporaryDirectory();
     const sourceRoot = join(root, "source", "skills");
@@ -282,7 +327,6 @@ describe("synchronization ownership", () => {
     write(agentsSource, "instructions\n");
     const target = destination(join(root, "target"));
     createSkill(target.skillsRoot, "alpha");
-    write(join(target.skillsRoot, "alpha", "user-owned.txt"), "do not replace\n");
 
     expect(() => {
       syncSkills({
