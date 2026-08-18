@@ -1,14 +1,13 @@
 # OnurPi agents
 
-`@onurpi/agents` contains the public agent instructions, public skills, and the shared installer for
-OnurPi. The installer can combine these public files with the private instructions and skills from
-the sibling `osolmaz/agents-private` repository.
+`@onurpi/agents` contains the public skills and shared installer for OnurPi. Global instructions and
+private skills come from the sibling private agent repository and are never stored in OnurPi.
 
 The package is private to the workspace and is not published to npm.
 
 ## Install
 
-Keep `onurpi` and `agents-private` as sibling checkouts under `~/repos`, install the OnurPi
+Keep the public and private repositories as sibling checkouts under `~/repos`, install the OnurPi
 dependencies, and run:
 
 ```sh
@@ -16,16 +15,10 @@ npm run agents:sync
 npm run agents:check
 ```
 
-The first command validates both sources before it writes anything. It installs one merged
-instruction file for Pi, Codex, Claude Code, and Cursor. It installs the combined public and private
-skill set for Codex, Claude Code, and Cursor. Pi loads public skills from OnurPi and private skills
-from `~/.agents/skills`.
-
-For an intentional public-only installation, run:
-
-```sh
-npm run agents:sync-public
-```
+The first command validates both skill sources and the private instruction file before it writes
+anything. It installs the private instruction file unchanged for Pi, Codex, Claude Code, and Cursor.
+It installs the combined public and private skill set for Codex, Claude Code, and Cursor. Pi loads
+public skills from OnurPi and private skills from `~/.agents/skills`.
 
 Use `--dry-run` to run preflight checks without changing installed files. Use `--skip-codex`,
 `--skip-claude`, `--skip-cursor`, or `--skip-pi` to limit destinations. Skill names can be passed as

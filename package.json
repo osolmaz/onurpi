@@ -46,7 +46,6 @@
   "scripts": {
     "agents:sync": "npm run sync --workspace @onurpi/agents --",
     "agents:check": "npm run check-sync --workspace @onurpi/agents --",
-    "agents:sync-public": "npm run sync-public --workspace @onurpi/agents --",
     "agents:sync-simpledoc": "npm run sync-simpledoc --workspace @onurpi/agents --",
     "settings:sync": "node scripts/sync-settings.ts sync",
     "settings:reset": "node scripts/sync-settings.ts reset",
