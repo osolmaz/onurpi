@@ -83,14 +83,15 @@ model to prioritize actionable findings or finalize early. They are normal Pi us
 therefore remain visible in the native session.
 
 On finalization, the controller first clears queued reminders, leaves only `submit_review` active,
-and queues the finalization prompt with `AgentSession.steer`. It then requests cancellation without
-making prompt delivery depend on `AgentSession.abort` becoming idle. If cancellation reaches idle
-first, the controller removes any stale queued copy and prompts directly. If the queued turn submits
-while cancellation is still pending, that submission completes the same session. A missing tool
-submission receives one corrective prompt if time remains. Transition work consumes the same
-two-minute finalization window rather than moving the deadline. The parent process force-kills the
-complete worker process group only when it has not exited within the separate 30-second shutdown
-allowance.
+and queues the finalization prompt with `AgentSession.steer`. The review guard checks Pi's current
+active-tool set on every `tool_call`, so investigation tools from the active run's older tool
+snapshot are blocked after this transition. The controller then requests cancellation without making
+prompt delivery depend on `AgentSession.abort` becoming idle. If cancellation reaches idle first,
+the controller removes any stale queued copy and prompts directly. If the queued turn submits while
+cancellation is still pending, that submission completes the same session. A missing tool submission
+receives one corrective prompt if time remains. Transition work consumes the same two-minute
+finalization window rather than moving the deadline. The parent process force-kills the complete
+worker process group only when it has not exited within the separate 30-second shutdown allowance.
 
 The submission tool validates the existing public review schema and ends the agent turn with
 `terminate: true`. Pi Reviewer's external text and JSON output stay unchanged.
@@ -134,7 +135,8 @@ The submission tool validates the existing public review schema and ends the age
   pending.
 - The exploration deadline cannot terminate the worker before a finalization attempt.
 - Deadline and request-limit triggers cause one finalization transition, even when simultaneous.
-- Finalization has no investigation tools and can use only `submit_review`.
+- Finalization has no investigation tools and can use only `submit_review`, including when the
+  active run retains an older tool-schema snapshot.
 - A valid submission produces the existing `ReviewOutput` and CLI formats.
 - Text without `submit_review` is rejected and receives one bounded corrective prompt.
 - Finalization-grace expiry stops model execution at the derived absolute deadline and fails
