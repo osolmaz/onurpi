@@ -24,7 +24,7 @@ const MOUSE_DISABLE_SEQUENCE = "\u001b[?1002l\u001b[?1006l";
 const MOUSE_PREFIX = "\u001b[<";
 
 type ExplorerMode = "browse" | "filter" | "help" | "jump" | "search";
-type ExplorerTui = Pick<TUI, "requestRender"> & {
+type ExplorerTui = Pick<TUI, "mode" | "requestRender"> & {
   readonly terminal: Pick<TUI["terminal"], "rows" | "write">;
 };
 
@@ -108,7 +108,7 @@ export class HistoryExplorer implements Component {
   private jumpIndex: HistoryJumpIndex | undefined;
   private mode: ExplorerMode = "browse";
   private helpScroll = 0;
-  private mouseEnabled = false;
+  private ownsMouseTracking = false;
   private readonly search: HistorySearch;
   private searchSelected = false;
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -128,7 +128,7 @@ export class HistoryExplorer implements Component {
     this.closeCallback = close;
     this.viewport = new HistoryViewport(entries, theme);
     this.search = new HistorySearch(this.viewport.entries);
-    this.enableMouse();
+    this.acquireMouseTracking();
   }
 
   handleInput(data: string): void {
@@ -179,19 +179,19 @@ export class HistoryExplorer implements Component {
     this.closed = true;
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = undefined;
-    this.disableMouse();
+    this.releaseMouseTracking();
     this.closeCallback();
   }
 
-  private enableMouse(): void {
-    if (this.mouseEnabled) return;
-    this.mouseEnabled = true;
+  private acquireMouseTracking(): void {
+    if (this.tui.mode !== "regular" || this.ownsMouseTracking) return;
+    this.ownsMouseTracking = true;
     this.tui.terminal.write(MOUSE_ENABLE_SEQUENCE);
   }
 
-  private disableMouse(): void {
-    if (!this.mouseEnabled) return;
-    this.mouseEnabled = false;
+  private releaseMouseTracking(): void {
+    if (!this.ownsMouseTracking) return;
+    this.ownsMouseTracking = false;
     this.tui.terminal.write(MOUSE_DISABLE_SEQUENCE);
   }
 

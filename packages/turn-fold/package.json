@@ -24,8 +24,8 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.82.1 <0.84.0",
-    "@earendil-works/pi-tui": ">=0.82.1 <0.84.0"
+    "@earendil-works/pi-coding-agent": ">=0.84.0 <0.85.0",
+    "@earendil-works/pi-tui": ">=0.84.0 <0.85.0"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.84.1",
