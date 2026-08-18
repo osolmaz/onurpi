@@ -11,6 +11,9 @@
 - Follow `docs/adding-packages.md` for package adoption. Root Pi resources must point into
   `packages/<name>` and must never load extension entry points directly from root `node_modules`.
 - Keep wrapper packages private unless the user separately approves an npm release.
+- For a simple package version update that only adopts an already reviewed and tested upstream
+  release, run the relevant local checks, then commit and push directly to `main`. Do not create a
+  pull request or run Pi Reviewer unless the user asks or repository rules require it.
 - Use strict TypeScript. Do not use explicit `any`, unsafe casts, or unchecked external input.
 - Keep only reviewed global settings in `settings.json`. Never copy Pi authentication, sessions,
   trust decisions, or provider state into this repository.
