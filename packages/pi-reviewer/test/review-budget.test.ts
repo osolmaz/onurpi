@@ -124,12 +124,15 @@ describe("review budget controller", () => {
     let submitted = false;
     let finishInitial: () => void = () => undefined;
     const prompts: string[] = [];
+    const steers: string[] = [];
     const tools: string[][] = [];
+    const transitions: string[] = [];
     let aborts = 0;
     const review = runReviewWithBudget(
       {
         abort: () => {
           aborts += 1;
+          transitions.push("abort");
           finishInitial();
           return Promise.resolve();
         },
@@ -146,8 +149,13 @@ describe("review budget controller", () => {
         },
         setActiveToolsByName: (names) => {
           tools.push(names);
+          transitions.push("restrict-tools");
         },
-        steer: () => Promise.resolve(),
+        steer: (message) => {
+          steers.push(message);
+          transitions.push("steer");
+          return Promise.resolve();
+        },
         subscribe: () => () => undefined,
       },
       "Review",
@@ -160,7 +168,10 @@ describe("review budget controller", () => {
     await expect(review).resolves.toBe("time_budget");
     expect(aborts).toBe(1);
     expect(tools).toEqual([["submit_review"]]);
+    expect(transitions).toEqual(["restrict-tools", "steer", "abort"]);
     expect(prompts[0]).toContain("Review time budget: 1m");
+    expect(steers).toHaveLength(1);
+    expect(steers[0]).toContain("time budget has ended");
     expect(prompts[1]).toContain("time budget has ended");
   });
 });
@@ -211,12 +222,46 @@ describe("review budget finalization failures", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     await expect(review).resolves.toBe("model_request_limit");
     expect(finalPrompts).toBe(2);
-    expect(steers).toBe(0);
+    expect(steers).toBe(1);
   });
 
-  it("keeps the final deadline absolute when exploration abort hangs", async () => {
+  it("accepts a queued submission while exploration abort remains stuck", async () => {
+    vi.useFakeTimers();
+    let submitted = false;
+    let listener: (event: AgentSessionEvent) => void = () => undefined;
+    const never = new Promise<void>(() => undefined);
+    const review = runReviewWithBudget(
+      {
+        abort: () => never,
+        clearQueue: () => ({ steering: [], followUp: [] }),
+        prompt: () => never,
+        setActiveToolsByName: () => undefined,
+        steer: () => {
+          setTimeout(() => {
+            submitted = true;
+            listener(TOOL_EVENT);
+          }, 500);
+          return Promise.resolve();
+        },
+        subscribe: (next) => {
+          listener = next;
+          return () => undefined;
+        },
+      },
+      "Review",
+      { timeBudgetMs: 10_000, warningRemainingMs: [], finalizationGraceMs: 2_000 },
+      null,
+      () => submitted,
+    );
+
+    await vi.advanceTimersByTimeAsync(10_500);
+    await expect(review).resolves.toBe("time_budget");
+  });
+
+  it("queues finalization before a stuck exploration abort reaches the absolute deadline", async () => {
     vi.useFakeTimers();
     let aborts = 0;
+    const steers: string[] = [];
     const never = new Promise<void>(() => undefined);
     const review = runReviewWithBudget(
       {
@@ -227,7 +272,10 @@ describe("review budget finalization failures", () => {
         clearQueue: () => ({ steering: [], followUp: [] }),
         prompt: () => never,
         setActiveToolsByName: () => undefined,
-        steer: () => Promise.resolve(),
+        steer: (message) => {
+          steers.push(message);
+          return Promise.resolve();
+        },
         subscribe: () => () => undefined,
       },
       "Review",
@@ -240,6 +288,8 @@ describe("review budget finalization failures", () => {
     await vi.advanceTimersByTimeAsync(12_000);
     await rejection;
     expect(aborts).toBe(2);
+    expect(steers).toHaveLength(1);
+    expect(steers[0]).toContain("time budget has ended");
   });
 
   it("fails explicitly when finalization grace expires", async () => {

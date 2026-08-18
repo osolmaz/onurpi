@@ -109,7 +109,7 @@ pi-reviewer --base main \
   --finalization-grace 10m
 ```
 
-Explicit warnings replace the defaults. When the exploration budget ends, Pi Reviewer aborts unfinished investigation, clears pending reminders, disables investigation tools, and asks the model to call the typed `submit_review` tool using evidence already gathered. Investigation and finalization share one monotonic timeline, so transition work cannot move the final deadline. At 12 minutes under the defaults, model execution stops and the worker flushes its session and metrics. A worker that has not exited 30 seconds later is force-killed as a complete process group; those 30 seconds are cleanup time, not review time.
+Explicit warnings replace the defaults. When the exploration budget ends, Pi Reviewer clears pending reminders, disables investigation tools, and queues a typed `submit_review` request before asking the active operation to stop. This lets the same Pi session deliver finalization if the provider returns while cancellation is still pending. If cancellation reaches idle first, Pi Reviewer prompts directly. Investigation and finalization share one monotonic timeline, so transition work cannot move the final deadline. At 12 minutes under the defaults, model execution stops and the worker flushes its session and metrics. A worker that has not exited 30 seconds later is force-killed as a complete process group; those 30 seconds are cleanup time, not review time.
 
 `--max-model-requests N` uses the same finalization path after the Nth complete model response. Time and request limits cannot start competing finalization turns. Final review output must come through `submit_review`; raw JSON or prose is not accepted as a second submission protocol.
 
