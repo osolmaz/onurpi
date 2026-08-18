@@ -65,11 +65,12 @@ describe("guarded-launch process groups", () => {
         "--",
         "sh",
         "-c",
-        `(sleep 0.15; touch ${JSON.stringify(marker)}) >/dev/null 2>&1 & exit 0`,
+        `leader=$$; (while kill -0 "$leader" 2>/dev/null; do sleep 0.01; done; touch ${JSON.stringify(marker)}) >/dev/null 2>&1 & exit 0`,
       ],
-      { encoding: "utf8", timeout: 2000 },
+      { encoding: "utf8", timeout: 10_000 },
     );
 
+    expect(result.error).toBeUndefined();
     expect(result.status).toBe(0);
     expect(existsSync(marker)).toBe(true);
   });
