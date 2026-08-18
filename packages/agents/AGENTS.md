@@ -197,12 +197,14 @@
 - Use the `browse-x-posts` skill when asked to browse, search, identify, summarize, or verify
   remembered X/Twitter posts or tweets, or when recent social posts could inform a
   latest-information request.
-- Personal agent skills live in `packages/agents/skills/<skill-name>/SKILL.md` in the OnurPi
-  repository.
+- Personal agent skills usually live in `packages/agents/skills/<skill-name>/SKILL.md` in the OnurPi
+  repository. The `paid-compute-launch` skill is an exception. Its source lives at
+  `.agents/skills/paid-compute-launch/` in the `osolmaz/control-plane` repository.
 - Treat an unqualified request to add, update, or remove a skill as a change to the personal skills
-  in the OnurPi repository. Treat an unqualified request to add or change `AGENTS.md` as a change to
-  `packages/agents/AGENTS.md`. Use another repository only when the user names that repository or
-  clearly requests project-local instructions.
+  in the OnurPi repository, except for a skill with an explicitly recorded source repository. Treat
+  an unqualified request to add or change `AGENTS.md` as a change to `packages/agents/AGENTS.md`.
+  Use another repository when the user names that repository or clearly requests project-local
+  instructions.
 - After changing personal skills or `packages/agents/AGENTS.md`, verify the change and run
   `npm run agents:sync` from the OnurPi repository. Do not edit the tools repository or installed
   harness copies for these requests.
@@ -217,10 +219,13 @@
   extension and Pi core, and requests for elegant, long-term, production-ready, ideal, or holy-grail
   Pi solutions.
 - If a skill is referred to but is not installed in the active skill list, check
-  `packages/agents/skills/` before treating it as missing.
-- Edit personal skill sources under `packages/agents/skills/`. Do not hand-edit copied installations
-  under `$CODEX_HOME/skills`, `~/.codex/skills`, `~/.claude/skills`, `~/.cursor/skills`, or OpenClaw
-  agent runtime mirrors. Pi loads these skills directly from the OnurPi package.
+  `packages/agents/skills/` and the recorded external source repository before treating it as
+  missing.
+- Edit personal skill sources under `packages/agents/skills/`, except for skills with an explicitly
+  recorded source repository. Do not hand-edit copied installations under `$CODEX_HOME/skills`,
+  `~/.agents/skills`, `~/.codex/skills`, `~/.claude/skills`, `~/.cursor/skills`, or OpenClaw agent
+  runtime mirrors. Pi loads OnurPi skills directly from the package. Run `./control sync-skills` in
+  the control-plane repository after changing a control-plane-owned skill.
 - Use the `manage-runtimes` skill before creating, updating, promoting, auditing, or deleting local
   inference runtimes.
 - Do not create ad hoc vLLM, SGLang, llama.cpp, TensorRT-LLM, or similar runtime environments under

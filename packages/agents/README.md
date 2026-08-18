@@ -6,6 +6,10 @@ Claude Code, and Cursor.
 
 The package is private and is not published to npm.
 
+The `paid-compute-launch` skill is maintained in the private `osolmaz/control-plane` repository.
+That repository synchronizes its skill to the supported agent skill directories with
+`./control sync-skills`.
+
 ## Pi
 
 The OnurPi root manifest registers the top-level skills in this package. Local OnurPi settings point
