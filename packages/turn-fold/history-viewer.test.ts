@@ -1,4 +1,5 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
+import type { TuiMode } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryExplorer } from "./history-viewer.ts";
@@ -6,11 +7,15 @@ import { HistoryViewport } from "./history-viewport.ts";
 
 initTheme("dark", false);
 
-function fakeTui(rows: number): {
+function fakeTui(
+  rows: number,
+  mode: TuiMode = "regular",
+): {
+  mode: TuiMode;
   requestRender: ReturnType<typeof vi.fn>;
   terminal: { rows: number; write: ReturnType<typeof vi.fn> };
 } {
-  return { requestRender: vi.fn(), terminal: { rows, write: vi.fn() } };
+  return { mode, requestRender: vi.fn(), terminal: { rows, write: vi.fn() } };
 }
 
 const theme = {
@@ -366,7 +371,7 @@ describe("Turn Fold history viewport display defaults", () => {
 });
 
 describe("Turn Fold history explorer mouse support", () => {
-  it("enables SGR mouse tracking on open and restores it once on close", () => {
+  it("owns SGR mouse tracking only while open in regular mode", () => {
     const tui = fakeTui(20);
     const close = vi.fn();
     const explorer = new HistoryExplorer(tui, theme, history(3), close);
@@ -380,6 +385,20 @@ describe("Turn Fold history explorer mouse support", () => {
     expect(tui.terminal.write).toHaveBeenCalledTimes(2);
     expect(tui.terminal.write).toHaveBeenLastCalledWith("\u001b[?1002l\u001b[?1006l");
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("preserves Pi-owned mouse tracking in fullscreen mode", () => {
+    const tui = fakeTui(20, "fullscreen");
+    const explorer = new HistoryExplorer(tui, theme, history(10), vi.fn());
+    const newest = explorer.render(80).join("\n");
+
+    expect(tui.terminal.write).not.toHaveBeenCalled();
+    explorer.handleInput("\u001b[<64;10;5M");
+    expect(explorer.render(80).join("\n")).not.toBe(newest);
+
+    explorer.close();
+    explorer.close();
+    expect(tui.terminal.write).not.toHaveBeenCalled();
   });
 
   it("scrolls the transcript with wheel input in browse mode", () => {

@@ -75,7 +75,7 @@ Ctrl+Shift+O         close from any explorer screen
 
 User-message hops keep a couple of entries of context and record the position in jump history, so `Shift+Tab` walks back through them. Tool results show their call in a colored header (green-tinted on success, red-tinted on error) with a short output preview by default, and blocks are separated by exactly one blank line before each header so padding is symmetric at the top, bottom, and between entries. Help, filter and jump subviews always fill the screen, so the conversation never shows through.
 
-While the explorer is open, Turn Fold enables terminal mouse reporting (`?1002` with SGR `?1006`) through Pi's public terminal write API so the wheel can reach the overlay. It restores the terminal exactly once when the explorer closes, no matter which close path runs. Nothing is persisted; mouse clicks and motion are ignored.
+In regular TUI mode, Turn Fold enables terminal mouse reporting (`?1002` with SGR `?1006`) through Pi's public terminal write API so the wheel can reach the overlay. It releases only the mouse modes that it acquired, exactly once, when the explorer closes. In fullscreen mode, Pi owns mouse reporting and forwards wheel input to the focused overlay, so Turn Fold does not change terminal mouse modes. Nothing is persisted; mouse clicks and motion are ignored.
 
 Search is a case-insensitive literal scan of the complete active branch. It runs in bounded slices, highlights matching text, shows nearby entries, and admits older compaction windows when needed. Search and jump fields support standard terminal editing keys such as `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Ctrl+K`, `Ctrl+U`, `Ctrl+Y`, word movement, Home, End, Delete and Backspace.
 
@@ -89,7 +89,7 @@ The initial range contains the newest three compaction windows. Moving backward 
 
 Turn Fold applies compact scope changes immediately when every affected component is loaded and patchable. A request that changes the compact main transcript beyond those components is saved and marked `restart required`. This limitation applies only to main transcript window and pre-compaction settings. Opening or scrolling the history explorer never requires a restart.
 
-Turn Fold enables Pi's public clear-on-shrink behavior while loaded and restores the previous value when the extension unloads. A shrink can briefly redraw the full screen. Turn Fold does not persist a global terminal setting. Its only terminal escape write is the explorer's scoped mouse mode described above, which is always restored when the explorer closes.
+Turn Fold enables Pi's public clear-on-shrink behavior while loaded and restores the previous value when the extension unloads. A shrink can briefly redraw the full screen. Turn Fold does not persist a global terminal setting. Its only terminal escape write is the regular-mode explorer's scoped mouse mode described above, which is released when the explorer closes.
 
 ## Transcript windows
 
@@ -107,7 +107,7 @@ Pi does not expose a public whole-turn renderer or transcript projection API. Tu
 
 The history explorer adds no private integration. It uses documented `ctx.ui.custom()` overlays, public Pi TUI components and key matching, Pi's theme, and the active session branch. It renders Turn Fold's own stable message and tool presentation because Pi does not expose a public factory for its native transcript components.
 
-The package targets Pi 0.82.1 through 0.83.x and must be retested when Pi changes the interactive replay path.
+The package targets Pi 0.84.x and must be retested when Pi changes the interactive replay path or TUI mode contract.
 
 ## Quality checks
 
