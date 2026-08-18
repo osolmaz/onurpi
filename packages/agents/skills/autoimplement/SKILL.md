@@ -3,12 +3,17 @@ name: autoimplement
 description: Use when the user asks to implement a plan end-to-end, test it, run Pi Reviewer against the base branch in a loop until no P0/P1 issues remain, and make sure CI/CD is green before finishing.
 ---
 
-Do the following in the order that makes sense. Choose the most efficient order for dependencies, and parallelize independent work.
+Use the built-in `autoimplement` Pi Workflow when it is available. At top level, list workflows, then start `autoimplement` once with the task, existing plan, repository, scope, constraints, base branch, and merge policy from the conversation. Do not manually duplicate stages already owned by the workflow.
+
+When this skill is loaded inside an active workflow step, do not start another workflow. Complete the current step contract with the available tools.
+
+Outside Pi, or when the workflow is unavailable, do the following in the order that makes sense. Choose the most efficient order for dependencies, and parallelize independent work.
 
 0. If the plan does not already exist, use the `autodoc` skill to prepare the plan and documentation.
 
 1. Implement the given plan end-to-end.
    - Implement the most elegant and long-term production-ready solution, but do not take longer than necessary.
+   - When implementation, verification, review, or CI produces evidence that invalidates the plan, use `autodevise` with the previous plan and new evidence, then continue from the revised plan. Keep local implementation bugs in the normal fix loop.
    - Context compaction might happen during implementation or review. If not enough of the plan was preserved after compaction, re-read the written plan to stay on track with the plan.
    - Finish to completion. If there is a PR open for the implementation plan, do it in the same PR. If there is no PR already, open PR.
    - Before finishing, commit and push any new or changed documentation, specification, or plan file in the relevant repo or repos, including the `~/scratch` repo when used, unless the user asked not to.
@@ -23,7 +28,9 @@ Do the following in the order that makes sense. Choose the most efficient order 
    - Run Pi Reviewer with its configured defaults against the base branch: `pi-reviewer --base <branch_name>`. The model and thinking level come from the reviewer's own config, not from this skill.
    - Use a 10 minute timeout on the tool call available to the model, not the shell `timeout` program. If Pi Reviewer takes more than 10 minutes, kill it.
    - Do not silently fall back to `codex review` when Pi Reviewer is unavailable; stop and report the missing command or configuration.
-   - Run Pi Reviewer in a loop and address any P0 or P1 issues until there are none left. If a run reports only P2 or lower issues, move to the next stage.
+   - Record every review round with separate P0, P1, P2, and lower findings.
+   - Run Pi Reviewer in a loop and address any P0 or P1 issues until there are none left.
+   - If a round reports only P2 or lower findings, address valid proportionate P2 findings, verify and push them, then move to the next stage without running Pi Reviewer again solely because of that P2 work.
    - Ignore issues about supporting legacy behavior unless the plan requires compatibility.
    - Look at CI only after Pi Reviewer passes, meaning the last completed run found no issues or only P2 or lower issues.
 
@@ -34,6 +41,8 @@ Do the following in the order that makes sense. Choose the most efficient order 
    - Do not wait a fixed five minutes; wait only when a required review is known to be pending, and keep that wait bounded.
 
 5. In the final step, make sure that CI/CD is green.
+   - Inspect CI once before deciding to wait. If waiting is useful, state and run the exact `gh` tracking command.
+   - Bound one CI watch to five minutes. If CI is still pending, use the next model turn for additional useful local tests or smoke tests instead of waiting. Then inspect CI again.
    - Ignore the fails unrelated to your changes, others break stuff sometimes and don't fix it.
    - Make sure whatever changes you did don't break anything.
    - If CI/CD is not fully green, state explicitly which failures are unrelated and why.
