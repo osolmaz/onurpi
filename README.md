@@ -73,9 +73,9 @@ Run `/reload` in an existing Pi session after installation. After new commits la
 `pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to pick
 them up.
 
-Pi loads public personal skills from [`@onurpi/agents`](packages/agents/). The agent installer can
-combine them with private instructions and skills from a sibling private repository, then refresh
-Pi, Codex, Claude Code, and Cursor:
+Pi loads public personal skills from [`@onurpi/agents`](packages/agents/). The agent installer reads
+global instructions and private skills from a sibling private repository, then refreshes Pi, Codex,
+Claude Code, and Cursor:
 
 ```bash
 npm ci
@@ -83,9 +83,8 @@ npm run agents:sync
 npm run agents:check
 ```
 
-Use `npm run agents:sync-public` only when an explicit public-only installation is required. The
-public repository knows that a private source can exist, but it never stores or generates private
-contents.
+The private repository is required for instruction installation. OnurPi does not contain a global
+`AGENTS.md` source.
 
 ## Global settings
 

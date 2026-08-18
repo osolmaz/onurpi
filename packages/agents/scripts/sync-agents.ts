@@ -8,7 +8,6 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -28,21 +27,20 @@ import {
   type SyncOptions,
 } from "./sync-skills.ts";
 
-const PRIVATE_REPOSITORY_NAME = "agents-private";
+const PRIVATE_REPOSITORY_NAME = "agents";
 const LEGACY_STATE_FILE_NAME = ".tools-agents-skill-sync.json";
 
 type Command = "check" | "sync";
 
-type ComposedCliOptions = {
+type AgentCliOptions = {
   command: Command;
-  privateRoot?: string;
-  publicOnly: boolean;
+  privateRoot: string;
   sharedAgentsDest: string;
   sharedSkillsDest: string;
   coreArgs: string[];
 };
 
-type Composition = {
+type Sources = {
   temporaryRoot: string;
   agentsSource: string;
   skillsRoot: string;
@@ -66,41 +64,26 @@ function extractValue(args: string[], option: string, fallback: string): string 
   return index < 0 ? fallback : replaceHome(takeValue(args, index, option));
 }
 
-function extractOptionalValue(args: string[], option: string): string | undefined {
-  const index = args.indexOf(option);
-  return index < 0 ? undefined : replaceHome(takeValue(args, index, option));
-}
-
-function extractFlag(args: string[], option: string): boolean {
-  const index = args.indexOf(option);
-  if (index < 0) return false;
-  args.splice(index, 1);
-  return true;
-}
-
-function resolvePrivateRoot(
-  publicOnly: boolean,
-  explicitPrivateRoot: string | undefined,
-): string | undefined {
-  if (publicOnly && explicitPrivateRoot !== undefined) {
-    throw new Error("--public-only and --private-root cannot be used together");
-  }
-  if (publicOnly) return undefined;
-  const configured = process.env["AGENTS_PRIVATE_REPO"];
+function resolvePrivateRoot(explicitPrivateRoot: string | undefined): string {
+  const configured = process.env["AGENTS_REPO"];
   return (
     explicitPrivateRoot ??
     replaceHome(configured ?? join(homedir(), "repos", PRIVATE_REPOSITORY_NAME))
   );
 }
 
-export function parseComposedCli(argv: string[]): ComposedCliOptions {
+export function parseAgentCli(argv: string[]): AgentCliOptions {
   const args = [...argv];
   const rawCommand = args.shift();
   if (rawCommand !== "sync" && rawCommand !== "check") {
     throw new Error("The first argument must be sync or check");
   }
-  const publicOnly = extractFlag(args, "--public-only");
-  const privateRoot = resolvePrivateRoot(publicOnly, extractOptionalValue(args, "--private-root"));
+  const privateRootIndex = args.indexOf("--private-root");
+  const privateRoot = resolvePrivateRoot(
+    privateRootIndex < 0
+      ? undefined
+      : replaceHome(takeValue(args, privateRootIndex, "--private-root")),
+  );
   const sharedAgentsDest = extractValue(
     args,
     "--shared-agents-dest",
@@ -113,8 +96,7 @@ export function parseComposedCli(argv: string[]): ComposedCliOptions {
   );
   return {
     command: rawCommand,
-    ...(privateRoot === undefined ? {} : { privateRoot }),
-    publicOnly,
+    privateRoot,
     sharedAgentsDest,
     sharedSkillsDest,
     coreArgs: args,
@@ -129,16 +111,6 @@ function assertInstructionSource(path: string): void {
   }
 }
 
-function withFinalNewline(content: string): string {
-  return `${content.replace(/\n+$/u, "")}\n`;
-}
-
-export function mergeInstructions(publicContent: string, privateContent?: string): string {
-  const publicPart = withFinalNewline(publicContent);
-  if (privateContent === undefined) return publicPart;
-  return `${publicPart.trimEnd()}\n\n${withFinalNewline(privateContent)}`;
-}
-
 function copySkills(skills: Skill[], destination: string): void {
   for (const skill of skills) {
     cpSync(skill.sourcePath, join(destination, skill.skillId), {
@@ -148,23 +120,7 @@ function copySkills(skills: Skill[], destination: string): void {
   }
 }
 
-export function composeSources(
-  publicAgentsSource: string,
-  publicSkillsRoot: string,
-  privateRoot?: string,
-): Composition {
-  assertInstructionSource(publicAgentsSource);
-  const publicSkills = discoverSkills(publicSkillsRoot);
-  let privateContent: string | undefined;
-  let privateSkills: Skill[] = [];
-  if (privateRoot !== undefined) {
-    const privateAgentsSource = join(privateRoot, "AGENTS.md");
-    const privateSkillsRoot = join(privateRoot, "skills");
-    assertInstructionSource(privateAgentsSource);
-    privateSkills = discoverSkills(privateSkillsRoot);
-    privateContent = readFileSync(privateAgentsSource, "utf8");
-  }
-
+function assertUniqueSkillOwners(publicSkills: Skill[], privateSkills: Skill[]): void {
   const owners = new Map<string, string>();
   for (const [owner, skills] of [
     ["public", publicSkills],
@@ -178,16 +134,19 @@ export function composeSources(
       owners.set(skill.skillId, owner);
     }
   }
+}
 
-  const temporaryRoot = mkdtempSync(join(tmpdir(), "onurpi-agents-compose-"));
+export function loadSources(publicSkillsRoot: string, privateRoot: string): Sources {
+  const agentsSource = join(privateRoot, "AGENTS.md");
+  const privateSkillsRoot = join(privateRoot, "skills");
+  assertInstructionSource(agentsSource);
+  const publicSkills = discoverSkills(publicSkillsRoot);
+  const privateSkills = discoverSkills(privateSkillsRoot);
+  assertUniqueSkillOwners(publicSkills, privateSkills);
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "onurpi-agents-sync-"));
   const skillsRoot = join(temporaryRoot, "skills");
-  const agentsSource = join(temporaryRoot, "AGENTS.md");
   mkdirSync(skillsRoot);
-  writeFileSync(
-    agentsSource,
-    mergeInstructions(readFileSync(publicAgentsSource, "utf8"), privateContent),
-    { encoding: "utf8", mode: 0o600 },
-  );
   copySkills(publicSkills, skillsRoot);
   copySkills(privateSkills, skillsRoot);
   return { temporaryRoot, agentsSource, skillsRoot, publicSkills, privateSkills };
@@ -256,14 +215,14 @@ function selectedPrivateSkills(
 }
 
 function regularSyncOptions(
-  composition: Composition,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   destinations: CopyDestination[],
 ): SyncOptions {
   return {
-    sourceRoot: composition.skillsRoot,
+    sourceRoot: sources.skillsRoot,
     stateSourceRoot: parsed.sourceRoot,
-    agentsSource: composition.agentsSource,
+    agentsSource: sources.agentsSource,
     destinations,
     ...(parsed.skipPi
       ? {}
@@ -274,28 +233,28 @@ function regularSyncOptions(
   };
 }
 
-function privateSourceRoot(composition: Composition): string {
-  const firstPrivateSkill = composition.privateSkills[0];
+function privateSourceRoot(sources: Sources): string {
+  const firstPrivateSkill = sources.privateSkills[0];
   if (firstPrivateSkill !== undefined) return dirname(firstPrivateSkill.sourcePath);
-  const emptyRoot = join(composition.temporaryRoot, "private-skills");
+  const emptyRoot = join(sources.temporaryRoot, "private-skills");
   if (!existsSync(emptyRoot)) mkdirSync(emptyRoot);
   return emptyRoot;
 }
 
 function privatePiSyncOptions(
-  composition: Composition,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   sharedSkillsDest: string,
 ): SyncOptions | undefined {
   if (parsed.skipPi) return undefined;
-  const allSkills = [...composition.publicSkills, ...composition.privateSkills];
-  const selected = selectedPrivateSkills(allSkills, composition.privateSkills, parsed.selectors);
+  const allSkills = [...sources.publicSkills, ...sources.privateSkills];
+  const selected = selectedPrivateSkills(allSkills, sources.privateSkills, parsed.selectors);
   if (parsed.selectors.length > 0 && selected.length === 0) return undefined;
-  const privateSkillsRoot = privateSourceRoot(composition);
+  const privateSkillsRoot = privateSourceRoot(sources);
   return {
     sourceRoot: privateSkillsRoot,
     stateSourceRoot: privateSkillsRoot,
-    agentsSource: composition.agentsSource,
+    agentsSource: sources.agentsSource,
     destinations: [
       {
         name: "Pi private skills",
@@ -311,25 +270,21 @@ function privatePiSyncOptions(
 }
 
 function checkPiInstalled(
-  composition: Composition,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   allSkills: Skill[],
   fullCheck: boolean,
   sharedAgentsDest: string,
   sharedSkillsDest: string,
 ): void {
-  assertFileMatches(composition.agentsSource, join(dirname(parsed.piDest), "AGENTS.md"));
-  assertFileMatches(composition.agentsSource, sharedAgentsDest);
-  const selectedPrivate = selectedPrivateSkills(
-    allSkills,
-    composition.privateSkills,
-    parsed.selectors,
-  );
+  assertFileMatches(sources.agentsSource, join(dirname(parsed.piDest), "AGENTS.md"));
+  assertFileMatches(sources.agentsSource, sharedAgentsDest);
+  const selectedPrivate = selectedPrivateSkills(allSkills, sources.privateSkills, parsed.selectors);
   assertSkillCopies(selectedPrivate, sharedSkillsDest);
   if (!fullCheck) return;
   assertManagedState(
     sharedSkillsDest,
-    composition.privateSkills.map((skill) => skill.skillId),
+    sources.privateSkills.map((skill) => skill.skillId),
   );
   for (const fileName of [STATE_FILE_NAME, LEGACY_STATE_FILE_NAME]) {
     const path = join(parsed.piDest, fileName);
@@ -338,18 +293,18 @@ function checkPiInstalled(
 }
 
 function checkInstalled(
-  composition: Composition,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   destinations: CopyDestination[],
   sharedAgentsDest: string,
   sharedSkillsDest: string,
 ): void {
-  const allSkills = discoverSkills(composition.skillsRoot);
+  const allSkills = discoverSkills(sources.skillsRoot);
   const selected = resolveSelection(allSkills, parsed.selectors);
   const fullCheck =
     (parsed.prune ?? parsed.selectors.length === 0) && parsed.selectors.length === 0;
   for (const destination of destinations) {
-    assertFileMatches(composition.agentsSource, destination.agentsDest);
+    assertFileMatches(sources.agentsSource, destination.agentsDest);
     assertSkillCopies(selected, destination.skillsRoot);
     if (fullCheck)
       assertManagedState(
@@ -358,74 +313,62 @@ function checkInstalled(
       );
   }
   if (parsed.skipPi) return;
-  checkPiInstalled(composition, parsed, allSkills, fullCheck, sharedAgentsDest, sharedSkillsDest);
+  checkPiInstalled(sources, parsed, allSkills, fullCheck, sharedAgentsDest, sharedSkillsDest);
 }
 
 function runSynchronization(
-  composition: Composition,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   destinations: CopyDestination[],
   sharedAgentsDest: string,
   sharedSkillsDest: string,
 ): void {
-  const regular = regularSyncOptions(composition, parsed, destinations);
-  const privatePi = privatePiSyncOptions(composition, parsed, sharedSkillsDest);
+  const regular = regularSyncOptions(sources, parsed, destinations);
+  const privatePi = privatePiSyncOptions(sources, parsed, sharedSkillsDest);
   syncSkills({ ...regular, dryRun: true, log: () => undefined });
   if (privatePi !== undefined) syncSkills({ ...privatePi, dryRun: true, log: () => undefined });
   if (parsed.dryRun) {
-    console.log("Public and private agent synchronization preflight passed.");
+    console.log("Agent synchronization preflight passed.");
     return;
   }
-  if (!parsed.skipPi) syncFile(composition.agentsSource, sharedAgentsDest, false);
+  if (!parsed.skipPi) syncFile(sources.agentsSource, sharedAgentsDest, false);
   syncSkills(regular);
   if (privatePi !== undefined) syncSkills(privatePi);
 }
 
 function runCommand(
-  composed: ComposedCliOptions,
-  composition: Composition,
+  cli: AgentCliOptions,
+  sources: Sources,
   parsed: ReturnType<typeof parseCli>,
   destinations: CopyDestination[],
 ): void {
-  if (composed.command === "sync") {
-    runSynchronization(
-      composition,
-      parsed,
-      destinations,
-      composed.sharedAgentsDest,
-      composed.sharedSkillsDest,
-    );
+  if (cli.command === "sync") {
+    runSynchronization(sources, parsed, destinations, cli.sharedAgentsDest, cli.sharedSkillsDest);
     return;
   }
-  checkInstalled(
-    composition,
-    parsed,
-    destinations,
-    composed.sharedAgentsDest,
-    composed.sharedSkillsDest,
-  );
-  console.log("Public and private agent files are synchronized.");
+  checkInstalled(sources, parsed, destinations, cli.sharedAgentsDest, cli.sharedSkillsDest);
+  console.log("Agent files and skills are synchronized.");
 }
 
-export function runComposedCli(
+export function runAgentCli(
   argv: string[],
   packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
 ): void {
-  const composed = parseComposedCli(argv);
-  const parsed = parseCli(composed.coreArgs, packageRoot);
+  const cli = parseAgentCli(argv);
+  const parsed = parseCli(cli.coreArgs, packageRoot);
   if (parsed.skipCodex && parsed.skipClaude && parsed.skipCursor && parsed.skipPi) {
     throw new Error("Nothing to do: every destination was skipped");
   }
   const destinations = buildDestinations(parsed);
-  const composition = composeSources(parsed.agentsSource, parsed.sourceRoot, composed.privateRoot);
+  const sources = loadSources(parsed.sourceRoot, cli.privateRoot);
   try {
-    runCommand(composed, composition, parsed, destinations);
+    runCommand(cli, sources, parsed, destinations);
   } finally {
-    rmSync(composition.temporaryRoot, { force: true, recursive: true });
+    rmSync(sources.temporaryRoot, { force: true, recursive: true });
   }
 }
 
 const entryPath = process.argv[1];
 if (entryPath !== undefined && import.meta.url === pathToFileURL(resolve(entryPath)).href) {
-  runComposedCli(process.argv.slice(2));
+  runAgentCli(process.argv.slice(2));
 }

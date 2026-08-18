@@ -13,9 +13,8 @@
     ]
   },
   "scripts": {
-    "sync": "node scripts/sync-composed-agents.ts sync",
-    "check-sync": "node scripts/sync-composed-agents.ts check",
-    "sync-public": "node scripts/sync-composed-agents.ts sync --public-only",
+    "sync": "node scripts/sync-agents.ts sync",
+    "check-sync": "node scripts/sync-agents.ts check",
     "sync-simpledoc": "node scripts/sync-simpledoc-skill.ts",
     "format": "prettier --check .",
     "lint": "eslint . --config eslint.config.mjs",

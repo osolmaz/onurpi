@@ -58,7 +58,6 @@ describe("@onurpi/agents package", () => {
   });
 
   it("keeps Pi workflow progress model-mediated", () => {
-    const instructions = readFileSync(join(packageRoot, "AGENTS.md"), "utf8");
     const extendingPi = readFileSync(
       join(packageRoot, "skills", "extending-pi", "SKILL.md"),
       "utf8",
@@ -68,23 +67,18 @@ describe("@onurpi/agents package", () => {
       "utf8",
     );
 
-    expect(instructions).toContain("regular Pi model running the check");
-    expect(instructions).toContain("must not import provider clients");
     expect(extendingPi).toContain("## Existing-Capability Gate");
     expect(extendingPi).toContain("workflow update");
     expect(piCodingAgent).toContain("regular Pi model and its documented tools");
   });
 
-  it("keeps private contents out of the public instruction source", () => {
-    const instructions = readFileSync(join(packageRoot, "AGENTS.md"), "utf8");
-    expect(instructions).toContain("## Private agent sources");
-    expect(instructions).not.toContain("## Personal agent resources");
-    expect(instructions).not.toContain("## xTap ecosystem");
+  it("does not keep a public global instruction source", () => {
+    expect(existsSync(join(packageRoot, "AGENTS.md"))).toBe(false);
   });
 
   it("includes the refactored synchronization tools", () => {
     expect(existsSync(join(packageRoot, "scripts", "sync-skills.ts"))).toBe(true);
-    expect(existsSync(join(packageRoot, "scripts", "sync-composed-agents.ts"))).toBe(true);
+    expect(existsSync(join(packageRoot, "scripts", "sync-agents.ts"))).toBe(true);
     expect(existsSync(join(packageRoot, "scripts", "sync-simpledoc-skill.ts"))).toBe(true);
   });
 });
