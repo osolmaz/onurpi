@@ -36,7 +36,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                          |
 | [`@onurpi/demo-mode`](packages/demo-mode/)                               | Opt-in self-driving demo mode                                     |
 | [`@onurpi/regrafter-driver`](packages/regrafter-driver/)                 | Regraft command and optional Regrafter delegation                 |
-| [`@osolmaz/pi-reviewer`](packages/pi-reviewer/)                          | Standalone Pi Factory reviewer with P0–P3 findings                |
 | [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                     |
 
 [`@onurpi/pi-tui-kit`](packages/pi-tui-kit/) is a vendored library package (declarative Pi TUI
@@ -155,17 +154,6 @@ Quality gates:
 npm ci
 npm run check
 npm run slophammer
-```
-
-Pi Reviewer is a standalone binary and is not loaded into normal Pi sessions. Configure its model
-outside the review extension, then review a branch:
-
-```bash
-npm run build --workspace @osolmaz/pi-reviewer
-npm link --workspace @osolmaz/pi-reviewer
-pi-reviewer config set model openai-codex/gpt-5.6-terra
-pi-reviewer config set thinking high
-pi-reviewer --base main
 ```
 
 Mutation testing remains available as an optional manual check:
