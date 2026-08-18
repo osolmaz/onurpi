@@ -24,4 +24,4 @@ The extension executes no processes, installs no shell hooks, accesses no creden
 - Removed upstream examples and the deprecated static renderer because the requested capability is the drop-in animated footer.
 - Preserved the bitmap-only behavior, six original animation frames, smooth movement, Kitty capability check, `/nyan` commands, GPL license, notice, and original artwork licenses while making runway position represent remaining context instead of used context.
 - Replaced the context-used number with the remaining percentage, placed it immediately after the text cat, and added deterministic 25%, 10%, and 5% context-stress moods with theme colors.
-- Added inline rendering for OnurPi's namespaced Codex weekly-remaining status after the subscription marker while leaving other extension statuses on the secondary line.
+- Added inline rendering for OnurPi's current provider usage status after the subscription marker while leaving other extension statuses on the secondary line.

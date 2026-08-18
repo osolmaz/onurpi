@@ -2,8 +2,8 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { remainingContextPercent } from "./progress.ts";
 
-export const CODEX_WEEKLY_STATUS_ID = "onurpi:codex-weekly";
-export const INLINE_EXTENSION_STATUS_IDS: ReadonlySet<string> = new Set([CODEX_WEEKLY_STATUS_ID]);
+export const USAGE_STATUS_ID = "usage";
+export const INLINE_EXTENSION_STATUS_IDS: ReadonlySet<string> = new Set([USAGE_STATUS_ID]);
 const NO_EXCLUDED_STATUS_IDS: ReadonlySet<string> = new Set();
 
 export type FittedRunway = {

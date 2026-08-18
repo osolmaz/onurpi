@@ -42,13 +42,13 @@ describe("Nyan footer context display", () => {
       theme: testTheme,
       thinkingLevel: "high",
       usedPercent: 90,
+      usageStatus: "codex 0% wk",
       usingSubscription: true,
-      weeklyUsage: undefined,
       width: 120,
     });
 
     expect(plain(line)).toMatch(/!\(=¬_¬=\)\s+10%/u);
-    expect(plain(line)).toContain("$0.000 (sub)");
+    expect(plain(line)).toContain("$0.000 (sub) codex 0% wk");
     expect(plain(line)).not.toContain("90%");
     expect(plain(line)).not.toContain("128k");
     expect(visibleWidth(line)).toBe(120);
@@ -72,8 +72,8 @@ describe("Nyan footer identity display", () => {
         theme: testTheme,
         thinkingLevel: "high",
         usedPercent: 90,
+        usageStatus: undefined,
         usingSubscription: true,
-        weeklyUsage: undefined,
         width: 120,
       }),
     );
@@ -98,8 +98,8 @@ describe("Nyan footer identity display", () => {
       theme: testTheme,
       thinkingLevel: "off",
       usedPercent: undefined,
+      usageStatus: undefined,
       usingSubscription: false,
-      weeklyUsage: undefined,
       width: 40,
     });
 
@@ -123,8 +123,8 @@ describe("Nyan footer identity display", () => {
         theme: testTheme,
         thinkingLevel: "off",
         usedPercent: undefined,
+        usageStatus: undefined,
         usingSubscription: false,
-        weeklyUsage: undefined,
         width: 120,
       }),
     );
