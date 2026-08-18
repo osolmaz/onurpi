@@ -22,7 +22,6 @@ import {
   type TextNyanPainter,
 } from "./src/index.ts";
 import {
-  CODEX_WEEKLY_STATUS_ID,
   composeInlineImageLine,
   composeLine,
   extensionStatusText,
@@ -31,6 +30,7 @@ import {
   formatRemainingContext,
   INLINE_EXTENSION_STATUS_IDS,
   joinParts,
+  USAGE_STATUS_ID,
   shortModel,
   type FittedRunway,
 } from "./src/layout.ts";
@@ -161,7 +161,7 @@ function installNyanFooter(
             textPainter: footer.textPainter,
             theme,
             thinkingLevel: pi.getThinkingLevel(),
-            weeklyUsage: extensionStatusText(statuses, CODEX_WEEKLY_STATUS_ID),
+            usageStatus: extensionStatusText(statuses, USAGE_STATUS_ID),
             width,
           }),
         ];
@@ -293,7 +293,7 @@ export type FooterLineOptions = FooterSnapshot & {
   textPainter: TextNyanPainter;
   theme: FooterTheme;
   thinkingLevel: string;
-  weeklyUsage: string | undefined;
+  usageStatus: string | undefined;
   width: number;
 };
 
@@ -334,7 +334,7 @@ export function renderFooterLine(options: FooterLineOptions): string {
     options.theme,
     options.cumulativeCost,
     options.usingSubscription,
-    options.weeklyUsage,
+    options.usageStatus,
   );
   const context = colorRemainingContext(
     options.theme,
@@ -378,11 +378,11 @@ function rightFooter(
   theme: FooterTheme,
   cumulativeCost: number,
   usingSubscription: boolean,
-  weeklyUsage: string | undefined,
+  usageStatus: string | undefined,
 ): string {
   return joinParts([
     mutedLabel(theme, formatApiCost(cumulativeCost, usingSubscription)),
-    mutedLabel(theme, weeklyUsage),
+    mutedLabel(theme, usageStatus),
   ]);
 }
 
