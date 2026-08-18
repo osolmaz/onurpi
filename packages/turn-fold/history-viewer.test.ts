@@ -1,5 +1,5 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
-import type { TuiMode } from "@earendil-works/pi-tui";
+import { type Component, type Terminal, type TuiMode, TuiAltScreen } from "@earendil-works/pi-tui";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryExplorer } from "./history-viewer.ts";
@@ -16,6 +16,66 @@ function fakeTui(
   terminal: { rows: number; write: ReturnType<typeof vi.fn> };
 } {
   return { mode, requestRender: vi.fn(), terminal: { rows, write: vi.fn() } };
+}
+
+class InputTerminal implements Terminal {
+  readonly columns = 100;
+  readonly kittyProtocolActive = false;
+  readonly operations: string[] = [];
+  readonly rows = 30;
+  readonly writes: string[] = [];
+  private onInput: ((data: string) => void) | undefined;
+
+  clearFromCursor(): void {
+    this.operations.push("clearFromCursor");
+  }
+  clearLine(): void {
+    this.operations.push("clearLine");
+  }
+  clearScreen(): void {
+    this.operations.push("clearScreen");
+  }
+  async drainInput(): Promise<void> {
+    await Promise.resolve();
+  }
+  hideCursor(): void {
+    this.operations.push("hideCursor");
+  }
+  moveBy(lines: number): void {
+    this.operations.push(`moveBy:${String(lines)}`);
+  }
+  send(data: string): void {
+    this.onInput?.(data);
+  }
+  setProgress(active: boolean): void {
+    this.operations.push(`setProgress:${String(active)}`);
+  }
+  setTitle(title: string): void {
+    this.operations.push(`setTitle:${title}`);
+  }
+  showCursor(): void {
+    this.operations.push("showCursor");
+  }
+  start(onInput: (data: string) => void): void {
+    this.onInput = onInput;
+  }
+  stop(): void {
+    this.onInput = undefined;
+  }
+  write(data: string): void {
+    this.writes.push(data);
+  }
+}
+
+class LongTranscript implements Component {
+  private invalidations = 0;
+
+  invalidate(): void {
+    this.invalidations += 1;
+  }
+  render(): string[] {
+    return Array.from({ length: 100 }, (_, index) => `transcript row ${String(index)}`);
+  }
 }
 
 const theme = {
@@ -399,6 +459,34 @@ describe("Turn Fold history explorer mouse support", () => {
     explorer.close();
     explorer.close();
     expect(tui.terminal.write).not.toHaveBeenCalled();
+  });
+
+  it("receives wheel input through Pi's focused fullscreen overlay", () => {
+    const terminal = new InputTerminal();
+    const tui = new TuiAltScreen(terminal);
+    const explorer = new HistoryExplorer(tui, theme, history(10), vi.fn());
+    tui.addChild(new LongTranscript());
+    tui.start();
+    const overlay = tui.showOverlay(explorer, {
+      anchor: "center",
+      margin: 0,
+      maxHeight: "100%",
+      width: "100%",
+    });
+
+    try {
+      const newest = explorer.render(80).join("\n");
+      const transcriptTop = tui.viewportTop;
+
+      terminal.send("\u001b[<64;10;5M");
+
+      expect(explorer.render(80).join("\n")).not.toBe(newest);
+      expect(tui.viewportTop).toBe(transcriptTop);
+    } finally {
+      overlay.hide();
+      explorer.close();
+      tui.stop({ preserveScreen: true });
+    }
   });
 
   it("scrolls the transcript with wheel input in browse mode", () => {
