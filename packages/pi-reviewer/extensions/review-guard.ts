@@ -30,12 +30,8 @@ export default function reviewGuard(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    if (!ACTIVE_TOOLS.has(event.toolName)) {
-      return {
-        block: true,
-        reason: `Tool ${event.toolName} is unavailable in read-only review mode`,
-      };
-    }
+    const unavailable = toolUnavailableReason(event.toolName, pi.getActiveTools());
+    if (unavailable !== undefined) return { block: true, reason: unavailable };
     const inputPath = toolPath(event);
     if (inputPath === undefined) return;
     try {
@@ -45,6 +41,19 @@ export default function reviewGuard(pi: ExtensionAPI): void {
       return { block: true, reason: error instanceof Error ? error.message : String(error) };
     }
   });
+}
+
+export function toolUnavailableReason(
+  toolName: string,
+  activeTools: readonly string[],
+): string | undefined {
+  if (!ACTIVE_TOOLS.has(toolName)) {
+    return `Tool ${toolName} is unavailable in read-only review mode`;
+  }
+  if (!activeTools.includes(toolName)) {
+    return `Tool ${toolName} is unavailable during review finalization`;
+  }
+  return undefined;
 }
 
 function toolPath(event: ToolCallEvent): string | undefined {
