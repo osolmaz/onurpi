@@ -35,8 +35,8 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run build && npm run dry"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.84.1",
-    "@earendil-works/pi-coding-agent": "0.84.1",
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2",
     "@osolmaz/pi-factory": "0.5.0",
     "jiti": "^2.7.0",
     "pi-huggingface-oauth": "0.2.0",

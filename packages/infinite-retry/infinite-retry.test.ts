@@ -203,7 +203,7 @@ describe("infinite retry indicator", () => {
 
 describe("installInfiniteRetryPatch", () => {
   it("patches and restores the current development Pi runtime", () => {
-    expect(VERSION).toBe("0.84.1");
+    expect(VERSION).toBe("0.84.2");
     const original = methodValue(AgentSession.prototype, "_prepareRetry");
     const lease = installInfiniteRetryPatch();
     leases.push(lease);
