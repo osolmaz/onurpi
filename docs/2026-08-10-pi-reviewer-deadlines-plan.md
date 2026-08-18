@@ -24,8 +24,8 @@ model to finalize. The sealed DeepSeek study showed this repeatedly.
 - Tell the model about its total budget before investigation starts.
 - Deliver threshold warnings through Pi's public steering API rather than changing tool output.
 - Coalesce stale warnings when several thresholds pass during one long model response.
-- At the exploration deadline, abort unfinished investigation, clear pending warnings, disable
-  investigation tools, and request a final review from existing evidence.
+- At the exploration deadline, clear pending warnings, disable investigation tools, queue the
+  finalization request, and only then abort unfinished investigation.
 - Give finalization its own configurable grace period.
 - Use a typed terminating `submit_review` tool so malformed prose or extra JSON cannot become the
   machine-readable result.
@@ -82,9 +82,12 @@ shutdown time and cannot hang indefinitely. Warning messages say how much time r
 model to prioritize actionable findings or finalize early. They are normal Pi user messages and
 therefore remain visible in the native session.
 
-On finalization, the controller uses public `AgentSession` methods to abort the active turn, clear
-queued reminders, leave only `submit_review` active, and send one finalization prompt. A missing
-tool submission receives one corrective prompt if time remains. Transition work consumes the same
+On finalization, the controller first clears queued reminders, leaves only `submit_review` active,
+and queues the finalization prompt with `AgentSession.steer`. It then requests cancellation without
+making prompt delivery depend on `AgentSession.abort` becoming idle. If cancellation reaches idle
+first, the controller removes any stale queued copy and prompts directly. If the queued turn submits
+while cancellation is still pending, that submission completes the same session. A missing tool
+submission receives one corrective prompt if time remains. Transition work consumes the same
 two-minute finalization window rather than moving the deadline. The parent process force-kills the
 complete worker process group only when it has not exited within the separate 30-second shutdown
 allowance.
@@ -107,6 +110,7 @@ The submission tool validates the existing public review schema and ends the age
 - Do not put countdown text in every tool result.
 - Do not guarantee a model result after a provider, network, or process failure that prevents all
   finalization requests.
+- Do not create a second Pi session or a separate finalizer session.
 - Do not restart or change the AACR-Bench study in this implementation.
 - Do not retain raw-text parsing as a second model-submission protocol.
 
@@ -125,6 +129,9 @@ The submission tool validates the existing public review schema and ends the age
 - A warning fires once at each configured threshold and uses the normalized remaining time.
 - Several thresholds crossed during one model turn produce only the most urgent pending warning.
 - A review submitted before the deadline cancels all timers.
+- The finalization steer is queued before exploration cancellation begins.
+- A queued `submit_review` result can complete finalization while `AgentSession.abort` remains
+  pending.
 - The exploration deadline cannot terminate the worker before a finalization attempt.
 - Deadline and request-limit triggers cause one finalization transition, even when simultaneous.
 - Finalization has no investigation tools and can use only `submit_review`.

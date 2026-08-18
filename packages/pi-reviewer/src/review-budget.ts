@@ -27,6 +27,11 @@ type PromptResult =
 
 type MonotonicNow = () => number;
 
+type SubmissionSignal = {
+  readonly submitted: Promise<void>;
+  readonly detect: () => void;
+};
+
 const monotonicNow: MonotonicNow = () => performance.now();
 
 export function resolveReviewTimePolicy(
@@ -97,8 +102,10 @@ export async function runReviewWithBudget(
     clearTimeout(deadlineTimer);
     for (const timer of warningTimers) clearTimeout(timer);
   };
+  const submission = createSubmissionSignal();
   let requests = 0;
   const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+    if (hasSubmission()) submission.detect();
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
     requests += 1;
     if (
@@ -130,19 +137,32 @@ export async function runReviewWithBudget(
     if (outcome.kind === "failed") throw outcome.error;
     stopExploration();
     const finalizationDeadlineMs = finalDeadline(reviewStartedAtMs, policy, now);
-    await abortExploration(session, initial, finalizationDeadlineMs, policy, now);
-    return await finalizeReview(
+    return await finalizeActiveReview(
       session,
       finalizationDeadlineMs,
       policy.finalizationGraceMs,
       outcome.reason,
       hasSubmission,
+      submission.submitted,
       now,
     );
   } finally {
     stopExploration();
     unsubscribe();
   }
+}
+
+function createSubmissionSignal(): SubmissionSignal {
+  let detect: () => void = () => undefined;
+  const submitted = new Promise<void>((resolve) => {
+    detect = resolve;
+  });
+  return {
+    submitted,
+    detect: () => {
+      detect();
+    },
+  };
 }
 
 function scheduleWarnings(
@@ -169,20 +189,31 @@ function finalDeadline(
   return Math.min(absoluteDeadlineMs, now() + policy.finalizationGraceMs);
 }
 
-async function abortExploration(
+async function finalizeActiveReview(
   session: ControlledSession,
-  initial: Promise<PromptResult>,
   deadlineMs: number,
-  policy: ReviewTimePolicy,
+  graceMs: number,
+  reason: FinalizationReason,
+  hasSubmission: () => boolean,
+  submitted: Promise<void>,
   now: MonotonicNow,
-): Promise<void> {
-  await withFinalizationDeadline(
-    Promise.all([session.abort(), initial]).then(() => undefined),
-    session,
-    deadlineMs,
-    policy.finalizationGraceMs,
-    now,
-  );
+): Promise<FinalizationReason> {
+  session.clearQueue();
+  session.setActiveToolsByName([SUBMIT_REVIEW_TOOL]);
+  const finalization = async (): Promise<void> => {
+    await session.steer(finalizationPrompt(reason));
+    if (hasSubmission()) return;
+    const outcome = await Promise.race([
+      settledPrompt(session.abort()),
+      submitted.then(() => ({ kind: "submitted" as const })),
+    ]);
+    if (outcome.kind === "submitted" || hasSubmission()) return;
+    if (outcome.kind === "failed") throw outcome.error;
+    session.clearQueue();
+    await promptFinalReview(session, reason, hasSubmission);
+  };
+  await withFinalizationDeadline(finalization(), session, deadlineMs, graceMs, now);
+  return reason;
 }
 
 async function finalizeReview(
@@ -195,16 +226,27 @@ async function finalizeReview(
 ): Promise<FinalizationReason> {
   session.clearQueue();
   session.setActiveToolsByName([SUBMIT_REVIEW_TOOL]);
-  const finalization = async (): Promise<void> => {
-    await session.prompt(finalizationPrompt(reason));
-    if (hasSubmission()) return;
-    await session.prompt(
-      "No review was submitted. Call submit_review now with the best result supported by the evidence already gathered. Do not return prose and do not investigate further.",
-    );
-    if (!hasSubmission()) throw new Error("review completed without submit_review");
-  };
-  await withFinalizationDeadline(finalization(), session, deadlineMs, graceMs, now);
+  await withFinalizationDeadline(
+    promptFinalReview(session, reason, hasSubmission),
+    session,
+    deadlineMs,
+    graceMs,
+    now,
+  );
   return reason;
+}
+
+async function promptFinalReview(
+  session: Pick<ControlledSession, "prompt">,
+  reason: FinalizationReason,
+  hasSubmission: () => boolean,
+): Promise<void> {
+  await session.prompt(finalizationPrompt(reason));
+  if (hasSubmission()) return;
+  await session.prompt(
+    "No review was submitted. Call submit_review now with the best result supported by the evidence already gathered. Do not return prose and do not investigate further.",
+  );
+  if (!hasSubmission()) throw new Error("review completed without submit_review");
 }
 
 async function withFinalizationDeadline(
