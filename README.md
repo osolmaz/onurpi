@@ -1,8 +1,8 @@
 # OnurPi
 
 OnurPi is [Onur Solmaz's](https://solmaz.io/) personal setup for the
-[Pi coding agent](https://buildwithpi.ai/). It keeps the extensions, tools, skills, theme, and
-settings I use for daily software work in one installable repository.
+[Pi coding agent](https://pi.dev/). It keeps the extensions, tools, skills, theme, and settings I
+use for daily software work in one installable repository.
 
 I build these packages for my own workflow, but each package is self-contained so others can use or
 adapt the parts they want. More of my work is available at [solmaz.io](https://solmaz.io/) and on
