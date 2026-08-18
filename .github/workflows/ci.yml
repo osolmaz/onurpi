@@ -145,27 +145,6 @@ jobs:
           for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
             npm run slophammer --workspace "@onurpi/$package"
           done
-      - name: Check @osolmaz/pi-reviewer package
-        working-directory: packages/pi-reviewer
-        run: npm run check
-      - name: Check @osolmaz/pi-reviewer package with Slophammer
-        working-directory: packages/pi-reviewer
-        run: npm run slophammer
-  pi-reviewer-platform:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.19.0
-          cache: npm
-      - run: npm ci
-      - name: Typecheck @osolmaz/pi-reviewer
-        working-directory: packages/pi-reviewer
-        run: npm run typecheck
-      - name: Test @osolmaz/pi-reviewer
-        working-directory: packages/pi-reviewer
-        run: npm test
   unified-exec-platform:
     runs-on: ubuntu-latest
     steps:
