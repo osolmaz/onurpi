@@ -1,7 +1,6 @@
 coverage/
 **/coverage/
 **/dist/
-packages/pi-reviewer/prompts/review-system.md
 packages/agents/skills/
 node_modules/
 **/.stryker-tmp/
