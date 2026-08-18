@@ -49,6 +49,7 @@ export type PiDestination = {
 
 export type SyncOptions = {
   sourceRoot: string;
+  stateSourceRoot?: string;
   agentsSource: string;
   destinations: CopyDestination[];
   piDestination?: PiDestination;
@@ -70,7 +71,7 @@ type LoadedSyncState = {
   pending: Set<string>;
 };
 
-type CliOptions = {
+export type CliOptions = {
   sourceRoot: string;
   agentsSource: string;
   codexDest: string;
@@ -238,9 +239,12 @@ function removePath(path: string, dryRun: boolean): void {
   else unlinkSync(path);
 }
 
-function syncFile(sourcePath: string, destPath: string, dryRun: boolean): void {
+export function syncFile(sourcePath: string, destPath: string, dryRun: boolean): void {
   if (lstatSync(sourcePath).isSymbolicLink())
     throw new Error(`Source files must not be symlinks: ${sourcePath}`);
+  if (existsSync(destPath) && lstatSync(destPath).isSymbolicLink()) {
+    throw new Error(`Destination files must not be symlinks: ${destPath}`);
+  }
   if (dryRun) return;
   mkdirSync(dirname(destPath), { recursive: true });
   const temporaryDirectory = mkdtempSync(join(dirname(destPath), `.${basename(destPath)}.tmp-`));
@@ -290,7 +294,7 @@ function treeManifest(root: string, source: boolean): TreeManifest {
   return manifest;
 }
 
-function skillTreesMatch(skill: Skill, destination: string): boolean {
+export function skillTreesMatch(skill: Skill, destination: string): boolean {
   const destinationStats = lstatSync(destination);
   if (!destinationStats.isDirectory() || destinationStats.isSymbolicLink()) return false;
   const sourceManifest = treeManifest(skill.sourcePath, true);
@@ -461,13 +465,23 @@ export function syncSkills(options: SyncOptions): void {
   const log = options.log ?? console.log;
   const sourceRoot = resolve(options.sourceRoot);
   const agentsSource = resolve(options.agentsSource);
+  const stateSourceRoot = resolve(options.stateSourceRoot ?? sourceRoot);
   if (!existsSync(agentsSource)) throw new Error(`Missing AGENTS.md at ${agentsSource}`);
   const skills = discoverSkills(sourceRoot);
   const selected = resolveSelection(skills, options.selectors);
   log(`Source root: ${sourceRoot}`);
   log(`Selected skills: ${selected.map((skill) => skill.skillId).join(", ") || "none"}`);
   for (const destination of options.destinations) {
-    syncCopyDestination(destination, { ...options, sourceRoot, agentsSource }, selected, log);
+    const state = loadSyncState(destination.skillsRoot);
+    assertNoUnownedCollisions(destination.skillsRoot, selected, state);
+  }
+  for (const destination of options.destinations) {
+    syncCopyDestination(
+      destination,
+      { ...options, sourceRoot: stateSourceRoot, agentsSource },
+      selected,
+      log,
+    );
   }
   if (options.piDestination !== undefined) {
     syncPiDestination(options.piDestination, agentsSource, options.dryRun, log);
@@ -551,7 +565,7 @@ export function parseCli(
   };
 }
 
-function buildDestinations(options: CliOptions): CopyDestination[] {
+export function buildDestinations(options: CliOptions): CopyDestination[] {
   const destinations: CopyDestination[] = [];
   if (!options.skipCodex) {
     destinations.push({

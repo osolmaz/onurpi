@@ -75,8 +75,16 @@ describe("@onurpi/agents package", () => {
     expect(piCodingAgent).toContain("regular Pi model and its documented tools");
   });
 
+  it("keeps private contents out of the public instruction source", () => {
+    const instructions = readFileSync(join(packageRoot, "AGENTS.md"), "utf8");
+    expect(instructions).toContain("## Private agent sources");
+    expect(instructions).not.toContain("## Personal agent resources");
+    expect(instructions).not.toContain("## xTap ecosystem");
+  });
+
   it("includes the refactored synchronization tools", () => {
     expect(existsSync(join(packageRoot, "scripts", "sync-skills.ts"))).toBe(true);
+    expect(existsSync(join(packageRoot, "scripts", "sync-composed-agents.ts"))).toBe(true);
     expect(existsSync(join(packageRoot, "scripts", "sync-simpledoc-skill.ts"))).toBe(true);
   });
 });

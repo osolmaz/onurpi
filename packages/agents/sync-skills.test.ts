@@ -349,6 +349,31 @@ describe("synchronization ownership", () => {
     expect(existsSync(target.agentsDest)).toBe(false);
   });
 
+  it("preflights every destination before writing any destination", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    createSkill(sourceRoot, "alpha");
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const first = destination(join(root, "first"));
+    const second = destination(join(root, "second"));
+    createSkill(second.skillsRoot, "alpha");
+
+    expect(() => {
+      syncSkills({
+        sourceRoot,
+        agentsSource,
+        destinations: [first, second],
+        selectors: [],
+        prune: true,
+        dryRun: false,
+        log: () => undefined,
+      });
+    }).toThrow(/Refusing to replace unowned skill/u);
+    expect(existsSync(first.agentsDest)).toBe(false);
+    expect(existsSync(first.skillsRoot)).toBe(false);
+  });
+
   it("does not write during a dry run", () => {
     const root = temporaryDirectory();
     const sourceRoot = join(root, "source", "skills");

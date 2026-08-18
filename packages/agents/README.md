@@ -1,51 +1,47 @@
 # OnurPi agents
 
-`@onurpi/agents` contains Onur Solmaz's personal agent instructions and skills. Pi loads the skills
-directly from this package, while the synchronization script installs the same resources for Codex,
-Claude Code, and Cursor.
+`@onurpi/agents` contains the public agent instructions, public skills, and the shared installer for
+OnurPi. The installer can combine these public files with the private instructions and skills from
+the sibling `osolmaz/agents-private` repository.
 
-The package is private and is not published to npm.
+The package is private to the workspace and is not published to npm.
 
-The `paid-compute-launch` skill is maintained in the private `osolmaz/control-plane` repository.
-That repository synchronizes its skill to the supported agent skill directories with
-`./control sync-skills`.
+## Install
 
-## Pi
-
-The OnurPi root manifest registers the top-level skills in this package. Local OnurPi settings point
-to `packages/agents`, so Pi does not need copied skills under its global configuration directory.
-
-Run these commands from the OnurPi repository after a checkout update:
+Keep `onurpi` and `agents-private` as sibling checkouts under `~/repos`, install the OnurPi
+dependencies, and run:
 
 ```sh
-npm run settings:reset
-npm run settings:sync
 npm run agents:sync
+npm run agents:check
 ```
 
-The final command copies `AGENTS.md` to Pi but removes personal skill copies that were managed by
-the old tools repository. It does not change unrelated global skills.
+The first command validates both sources before it writes anything. It installs one merged
+instruction file for Pi, Codex, Claude Code, and Cursor. It installs the combined public and private
+skill set for Codex, Claude Code, and Cursor. Pi loads public skills from OnurPi and private skills
+from `~/.agents/skills`.
 
-## Other agent harnesses
+For an intentional public-only installation, run:
 
-`npm run agents:sync` copies skills and global instructions to:
+```sh
+npm run agents:sync-public
+```
 
-- Codex
-- Claude Code
-- Cursor
-
-Use `--dry-run` to preview changes. Use `--skip-codex`, `--skip-claude`, `--skip-cursor`, or
-`--skip-pi` to limit destinations. Skill names can be passed as positional arguments for a selective
-update.
+Use `--dry-run` to run preflight checks without changing installed files. Use `--skip-codex`,
+`--skip-claude`, `--skip-cursor`, or `--skip-pi` to limit destinations. Skill names can be passed as
+positional arguments for a selective update.
 
 ```sh
 npm run agents:sync -- --dry-run
 npm run agents:sync -- amk plain-writing
 ```
 
-The script uses state files to remove only copies that it manages. A full synchronization prunes
-removed managed skills by default. A selective synchronization keeps other managed skills unless
-`--prune` is given.
+A full sync prunes only skills recorded as managed by this installer. A selective sync keeps other
+managed skills unless `--prune` is given. Skill directories and instruction files are replaced
+atomically. A repeated sync repairs an interrupted installation.
+
+Private contents are read only during synchronization. They are never copied into this repository,
+its tests, or generated tracked files.
 
 ## SimpleDoc skill
 
