@@ -3,7 +3,7 @@ name: autoimplement
 description: Use when the user asks to implement a plan end-to-end, test it, run Pi Reviewer against the base branch in a loop until no P0/P1 issues remain, and make sure CI/CD is green before finishing.
 ---
 
-Use the built-in `autoimplement` Pi Workflow when it is available. At top level, list workflows, then start `autoimplement` once with the task, existing plan, repository, scope, constraints, base branch, and merge policy from the conversation. Do not manually duplicate stages already owned by the workflow.
+Use the built-in `autoimplement` Pi Workflow when it is available. At top level, list workflows, then start `autoimplement` once with the task, existing plan, repository, scope, constraints, base branch, and merge policy from the conversation. Set `merge: true` only when the user explicitly requested merge or an applicable standing instruction authorizes it. Otherwise set it to false. Do not manually duplicate stages already owned by the workflow.
 
 When this skill is loaded inside an active workflow step, do not start another workflow. Complete the current step contract with the available tools.
 
@@ -48,11 +48,10 @@ Outside Pi, or when the workflow is unavailable, do the following in the order t
    - If CI/CD is not fully green, state explicitly which failures are unrelated and why.
    - For documentation-only changes, including SimpleDoc changes, relevant local checks are enough; do not wait for CI/CD after they pass.
 
-6. Once CI/CD is green, or the relevant local checks have passed for a documentation-only change, and you think that the PR is ready to merge, merge opportunistically unless the user explicitly asked you not to merge.
+6. Once CI/CD is green, or the relevant local checks have passed for a documentation-only change, decide whether merge is authorized.
+   - Merge only when the user explicitly requested it or an applicable standing instruction authorizes it. Otherwise leave the PR ready.
    - Then finish and give a summary with the PR link.
    - Include the exact validation commands you ran and their outcomes.
    - Also comment a final report on the PR.
-
-7. Merge automatically unless the user explicitly asks you not to.
 
 If this skill is queued many times, treat that as a reminder to make sure the work is fully finished. Once the work is fully finished, you can ignore the repeated instructions. If the work is not finished, continue working.
