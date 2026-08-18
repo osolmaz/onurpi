@@ -15,7 +15,7 @@ describe("Pi Workflows wrapper", () => {
   });
 
   it("exposes both skills from the pinned dependency", () => {
-    expect(manifest.pi?.skills).toEqual(["./node_modules/@osolmaz/pi-workflows/skills"]);
+    expect(manifest.pi?.skills).toEqual(["../../node_modules/@osolmaz/pi-workflows/skills"]);
 
     const skillsPath = manifest.pi?.skills?.[0];
     if (skillsPath === undefined) throw new Error("Pi Workflows skill path is missing.");
