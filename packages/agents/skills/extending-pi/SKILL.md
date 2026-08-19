@@ -78,18 +78,17 @@ For OnurPi, keep the implementation independent under `packages/<name>/` with
 a package manifest, entry point, tests, and README, and register its development
 entry point in the root Pi manifest.
 
-## Extension Repository Names
+## Extension Repository Display Names
 
-Name each standalone repository created for a Pi extension or Pi extension
-package `pi-<name>`. Use lowercase words separated by single hyphens, such as
-`pi-demo-mode`; do not concatenate words, use underscores, or put `pi` at the
-end. Apply this rule even when the repository also ships a helper CLI. It does
-not apply to the OnurPi multi-extension workspace or to a general-purpose tool
-that only offers an optional Pi integration.
+When a skill, TUI, list, or other presentation surface shows a cosmetic name
+for a Pi extension repository, format it as `pi-<name>`. Use lowercase words
+separated by single hyphens, such as `pi-demo-mode`.
 
-Before creating or extracting an extension repository, verify that its proposed
-GitHub repository name follows this form. The npm package, executable, command,
-and user-facing product names can remain independent of the repository name.
+For existing repositories, this rule is cosmetic only. Do not rename a GitHub
+repository, local checkout, Git remote, package, executable, URL, dependency
+source, or persistent identifier to enforce it unless the user explicitly asks
+for a real rename. For a new standalone extension repository, propose the
+`pi-<name>` form before repository creation.
 
 Use public event return values instead of mutating Pi-owned state directly. For
 example, customize compaction through `session_before_compact`; do not append or
