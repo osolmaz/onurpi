@@ -119,6 +119,30 @@ describe("OnurPi package loading", () => {
     }
   });
 
+  it("keeps workflow plugin synchronization explicit", () => {
+    const rootManifest = readJson("package.json");
+    const rootScripts = rootManifest["scripts"];
+    if (typeof rootScripts !== "object" || rootScripts === null || Array.isArray(rootScripts)) {
+      throw new Error("Expected root scripts");
+    }
+    const workflowsManifest = readJson("packages/workflows/package.json");
+    const workflowsScripts = workflowsManifest["scripts"];
+    if (
+      typeof workflowsScripts !== "object" ||
+      workflowsScripts === null ||
+      Array.isArray(workflowsScripts)
+    ) {
+      throw new Error("Expected workflow scripts");
+    }
+
+    expect((rootScripts as Record<string, unknown>)["workflows:sync"]).toBe(
+      "npm run sync --workspace @onurpi/workflows",
+    );
+    expect((workflowsScripts as Record<string, unknown>)["sync"]).toBe("node sync.ts");
+    expect((rootScripts as Record<string, unknown>)["postinstall"]).toBeUndefined();
+    expect((workflowsScripts as Record<string, unknown>)["postinstall"]).toBeUndefined();
+  });
+
   it("removes standalone sources replaced by wrappers", () => {
     const settings = readJson("settings.json");
     const packages = settings["packages"];
