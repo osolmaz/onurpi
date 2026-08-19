@@ -100,3 +100,7 @@ export type CodexBackendPayload = {
   credits?: unknown;
   rate_limit_reset_credits?: unknown;
 };
+
+export type XaiBillingPayload = {
+  config?: unknown;
+};

@@ -12,6 +12,7 @@ export { formatProviderStates, formatUsageReport, formatUsageStatusline } from "
 export { normalizeCodexBackendPayload } from "./providers/codex.js";
 export { normalizeGitHubCopilotUsagePayload } from "./providers/github-copilot.js";
 export { normalizeOpenRouterKeyPayload } from "./providers/openrouter.js";
+export { normalizeXaiBillingPayload } from "./providers/xai.js";
 export {
   adapterForProvider,
   isStaleExtensionContextError,

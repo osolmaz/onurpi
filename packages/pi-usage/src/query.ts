@@ -4,6 +4,7 @@ import { errorMessage, fingerprintResolvedAuth, redactUsageError } from "./core.
 import { normalizeCodexBackendPayload } from "./providers/codex.js";
 import { normalizeGitHubCopilotUsagePayload } from "./providers/github-copilot.js";
 import { normalizeOpenRouterKeyPayload } from "./providers/openrouter.js";
+import { normalizeXaiBillingPayload } from "./providers/xai.js";
 import type {
   CodexBackendPayload,
   GitHubCopilotUsagePayload,
@@ -12,11 +13,13 @@ import type {
   ResolvedUsageAuth,
   UsageProviderAdapter,
   UsageReport,
+  XaiBillingPayload,
 } from "./types.js";
 
 const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const GITHUB_COPILOT_USAGE_URL = "https://api.github.com/copilot_internal/user";
 const OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key";
+const XAI_BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
 const MAX_SUCCESS_BODY_BYTES = 64 * 1024;
 const MAX_ERROR_BODY_BYTES = 4 * 1024;
 
@@ -74,6 +77,24 @@ export const SUPPORTED_ADAPTERS: readonly UsageProviderAdapter[] = [
       return normalizeOpenRouterKeyPayload(payload as OpenRouterKeyPayload, Date.now());
     },
   },
+  {
+    id: "xai",
+    displayName: "xAI",
+    semantics: {
+      kind: "consumer-subscription",
+      label: "Grok/X subscription limits",
+    },
+    async query(auth, signal, timeoutMs) {
+      const payload = await fetchProviderJson(
+        XAI_BILLING_URL,
+        auth,
+        signal,
+        timeoutMs,
+        "xAI billing endpoint",
+      );
+      return normalizeXaiBillingPayload(payload as XaiBillingPayload, Date.now());
+    },
+  },
 ];
 
 export function adapterForProvider(
@@ -129,6 +150,9 @@ export async function resolveUsageAuth(
   if (!auth) return undefined;
   if (adapter.id === "github-copilot") {
     return resolveGitHubCopilotUsageAuth(auth, model, salt, credentialReader);
+  }
+  if (adapter.id === "xai") {
+    return resolveXaiUsageAuth(auth, model, salt, credentialReader);
   }
   const authorization = authorizationFrom(auth);
   if (!authorization) return undefined;
@@ -350,6 +374,39 @@ function resolveGitHubCopilotUsageAuth(
   };
 }
 
+function resolveXaiUsageAuth(
+  auth: RequestAuth,
+  model: PiModel,
+  salt: Uint8Array,
+  credentialReader: StoredCredentialReader,
+): ResolvedUsageAuth {
+  const credential = asObject(credentialReader("xai"));
+  if (credential?.["type"] !== "oauth") {
+    throw new Error(
+      "xAI usage requires the SuperGrok or X Premium subscription configured through Pi /login.",
+    );
+  }
+
+  const authorization = authorizationFrom(auth);
+  const token = bearerToken(authorization) ?? auth.apiKey;
+  if (!token) {
+    throw new Error("xAI usage requires a resolved SuperGrok or X Premium access token.");
+  }
+  if (token.startsWith("xai-")) {
+    throw new Error("xAI usage does not support API-key credentials.");
+  }
+
+  const header = `Bearer ${token}`;
+  const headers = { Authorization: header };
+  return {
+    apiKey: token,
+    headers,
+    fingerprint: fingerprintResolvedAuth({ headers }, salt),
+    secrets: [token, authorization, header].filter((value): value is string => Boolean(value)),
+    model,
+  };
+}
+
 function authorizationFrom(auth: RequestAuth): string | undefined {
   return (
     headerValue(auth.headers, "Authorization") ??
@@ -389,6 +446,9 @@ function hasOfficialUrlOrigin(value: string, providerId: string): boolean {
       return (
         url.protocol === "https:" && /^api\.[a-z0-9-]+\.githubcopilot\.com$/u.test(url.hostname)
       );
+    }
+    if (providerId === "xai") {
+      return url.origin === "https://api.x.ai" || url.origin === "https://cli-chat-proxy.grok.com";
     }
     return false;
   } catch {

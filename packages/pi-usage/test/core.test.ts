@@ -276,6 +276,76 @@ test("GitHub Copilot usage uses the matching Pi OAuth refresh token", async () =
   );
 });
 
+test("xAI usage requires SuperGrok or X Premium OAuth and rejects API keys", async () => {
+  const adapter = SUPPORTED_ADAPTERS.find((candidate) => candidate.id === "xai");
+  assert.ok(adapter);
+  const model = {
+    id: "grok-4.6",
+    name: "Grok 4.6",
+    provider: "xai",
+    baseUrl: "https://api.x.ai/v1",
+  };
+  const { ctx } = createMockContext({
+    model,
+    modelRegistry: {
+      getProviderAuth: async () => ({
+        auth: { apiKey: "oauth-access-token", baseUrl: model.baseUrl },
+      }),
+      getAvailable: () => [model],
+      getAll: () => [model],
+    },
+  });
+
+  const auth = await resolveUsageAuth(ctx, adapter, new Uint8Array(32), () => ({
+    type: "oauth",
+    access: "oauth-access-token",
+  }));
+  assert.deepEqual(auth?.headers, { Authorization: "Bearer oauth-access-token" });
+
+  await assert.rejects(
+    () => resolveUsageAuth(ctx, adapter, new Uint8Array(32), () => ({ type: "api_key" })),
+    /SuperGrok or X Premium/iu,
+  );
+
+  const { ctx: apiKeyContext } = createMockContext({
+    model,
+    modelRegistry: {
+      getProviderAuth: async () => ({
+        auth: { apiKey: "xai-secret-key", baseUrl: model.baseUrl },
+      }),
+      getAvailable: () => [model],
+      getAll: () => [model],
+    },
+  });
+  await assert.rejects(
+    () =>
+      resolveUsageAuth(apiKeyContext, adapter, new Uint8Array(32), () => ({
+        type: "oauth",
+        access: "xai-secret-key",
+      })),
+    /API-key/iu,
+  );
+
+  const proxyModel = { ...model, baseUrl: "https://proxy.example/v1" };
+  const { ctx: proxyContext } = createMockContext({
+    model: proxyModel,
+    modelRegistry: {
+      getProviderAuth: async () => ({
+        auth: { apiKey: "oauth-access-token", baseUrl: proxyModel.baseUrl },
+      }),
+      getAvailable: () => [proxyModel],
+      getAll: () => [proxyModel],
+    },
+  });
+  await assert.rejects(
+    () =>
+      resolveUsageAuth(proxyContext, adapter, new Uint8Array(32), () => ({
+        type: "oauth",
+      })),
+    /custom.*base URL|official/iu,
+  );
+});
+
 test("provider cancellation preserves AbortError identity", async () => {
   const abort = Object.assign(new Error("cancelled"), { name: "AbortError" });
   const adapter = {

@@ -6,6 +6,7 @@ import {
   normalizeCodexBackendPayload,
   normalizeGitHubCopilotUsagePayload,
   normalizeOpenRouterKeyPayload,
+  normalizeXaiBillingPayload,
 } from "../src/index.js";
 
 test("GitHub Copilot adapter normalizes legacy premium request quota", () => {
@@ -365,4 +366,86 @@ test("Codex adapter preserves windows, credits, and model-specific statusline bu
     }),
     "codex spark 90% 5h",
   );
+});
+
+test("xAI adapter normalizes weekly credit percent and product buckets", () => {
+  const report = normalizeXaiBillingPayload(
+    {
+      config: {
+        creditUsagePercent: 39,
+        isUnifiedBillingUser: true,
+        currentPeriod: {
+          type: "USAGE_PERIOD_TYPE_WEEKLY",
+          start: "2026-08-19T09:58:44.594438+00:00",
+          end: "2026-08-26T09:58:44.594438+00:00",
+        },
+        productUsage: [{ product: "GrokBuild", usagePercent: 12 }, { product: "broken" }],
+        onDemandUsed: { val: 150 },
+        onDemandCap: { val: 2500 },
+        prepaidBalance: { val: 400 },
+      },
+    },
+    1_000,
+  );
+
+  assert.equal(report.providerId, "xai");
+  assert.deepEqual(report.semantics, {
+    kind: "consumer-subscription",
+    label: "Grok/X subscription limits",
+  });
+  assert.equal(report.buckets[0]?.id, "weekly-credits");
+  assert.equal(report.buckets[0]?.remaining, 61);
+  assert.equal(report.buckets[0]?.period, "weekly");
+  assert.equal(report.buckets[0]?.resetsAt, 1_787_738_324);
+  assert.equal(report.buckets[1]?.label, "Grok Build");
+  assert.equal(report.buckets[1]?.remaining, 88);
+  assert.deepEqual(
+    report.metrics.map((metric) => [metric.id, metric.value]),
+    [
+      ["on-demand-used", 1.5],
+      ["on-demand-cap", 25],
+      ["prepaid-balance", 4],
+    ],
+  );
+  assert.equal(report.notes, undefined);
+  assert.match(formatUsageReport(report, "current"), /Weekly credits:/);
+  assert.match(formatUsageReport(report, "current"), /61% left/);
+  assert.equal(formatUsageStatusline(report), "xai 61% wk");
+});
+
+test("xAI adapter keeps unified-billing accounts without a remaining percent", () => {
+  const report = normalizeXaiBillingPayload(
+    {
+      config: {
+        currentPeriod: {
+          type: "USAGE_PERIOD_TYPE_WEEKLY",
+          start: "2026-08-19T09:58:44.594438+00:00",
+          end: "2026-08-26T09:58:44.594438+00:00",
+        },
+        onDemandCap: { val: 0 },
+        onDemandUsed: { val: 0 },
+        isUnifiedBillingUser: true,
+        prepaidBalance: { val: 0 },
+      },
+    },
+    2_000,
+  );
+
+  assert.equal(report.buckets[0]?.remaining, undefined);
+  assert.deepEqual(
+    report.metrics.map((metric) => [metric.id, metric.value]),
+    [
+      ["on-demand-used", 0],
+      ["on-demand-cap", 0],
+      ["prepaid-balance", 0],
+    ],
+  );
+  assert.deepEqual(report.notes, ["Weekly remaining percent was not returned for this account."]);
+  assert.match(formatUsageReport(report, "current"), /not returned/);
+  assert.equal(formatUsageStatusline(report), "xai weekly");
+});
+
+test("xAI adapter rejects empty billing payloads", () => {
+  assert.throws(() => normalizeXaiBillingPayload({}, 0), /config was not an object/);
+  assert.throws(() => normalizeXaiBillingPayload({ config: {} }, 0), /no displayable usage data/);
 });

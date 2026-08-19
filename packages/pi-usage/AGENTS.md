@@ -8,8 +8,10 @@
 - Keep `/usage` argument-free; cross-provider queries stay explicit interactive menu choices.
 - Resolve credentials only through Pi's public model registry and credential APIs, and never send
   custom-base-URL or proxy credentials to the providers' official usage endpoints.
-- Keep network access restricted to the fixed Codex, GitHub Copilot, and OpenRouter usage endpoints
-  with bounded response reads, bounded timeouts, and redacted error text.
+- Keep network access restricted to the fixed Codex, GitHub Copilot, OpenRouter, and xAI usage
+  endpoints with bounded response reads, bounded timeouts, and redacted error text. The xAI path may
+  call only `https://cli-chat-proxy.grok.com/v1/billing?format=credits` and only with SuperGrok or X
+  Premium OAuth. Do not send API keys or impersonate the Grok CLI with extra client headers.
 - Do not write session entries, messages, settings, files, credentials, or other persistent state.
 - Treat all provider payloads as untrusted input.
 - The interactive menu runs on the vendored `@onurpi/pi-tui-kit` workspace library; do not replace

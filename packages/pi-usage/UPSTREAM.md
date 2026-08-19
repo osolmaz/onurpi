@@ -15,13 +15,14 @@ file under `src/` (including `src/providers/`), and every test file under `test/
 
 The extension executes no shell commands and installs no shell hooks. It reads no files. It sends
 GET requests only to the fixed `https://chatgpt.com/backend-api/wham/usage`,
-`https://api.github.com/copilot_internal/user`, and `https://openrouter.ai/api/v1/key` endpoints
-with bounded response reads (64 KiB success, 4 KiB error) and 15-second timeouts. Credentials are
-resolved through Pi's public model registry and credential APIs; custom-base-URL, proxy, GitHub
-Enterprise, and account-mismatched credentials fail closed and are never forwarded. Error text is
-redacted of bearer tokens and credential material. The extension sends no telemetry, overrides no
-tools, and handles no project trust decisions. Its five-minute cache and failure backoff live in
-process memory and are keyed by a process-salted credential HMAC.
+`https://api.github.com/copilot_internal/user`, `https://openrouter.ai/api/v1/key`, and
+`https://cli-chat-proxy.grok.com/v1/billing?format=credits` endpoints with bounded response reads
+(64 KiB success, 4 KiB error) and 15-second timeouts. Credentials are resolved through Pi's public
+model registry and credential APIs; custom-base-URL, proxy, GitHub Enterprise, and
+account-mismatched credentials fail closed and are never forwarded. Error text is redacted of bearer
+tokens and credential material. The extension sends no telemetry, overrides no tools, and handles no
+project trust decisions. Its five-minute cache and failure backoff live in process memory and are
+keyed by a process-salted credential HMAC.
 
 The interactive `/usage` menu runs on `@narumitw/pi-tui-kit`, vendored separately as
 `@onurpi/pi-tui-kit` (see `packages/pi-tui-kit/UPSTREAM.md`).
@@ -53,3 +54,6 @@ The interactive `/usage` menu runs on `@narumitw/pi-tui-kit`, vendored separatel
   `t.after`) and ported the shared monorepo mock harness to `test/support.ts`.
 - Added `test/local-coverage.test.ts` covering generic report rendering, statusline variants for all
   three providers, Codex model-bucket selection, and Codex payload normalization edge cases.
+- Added an xAI SuperGrok / X Premium adapter that queries the Grok CLI billing endpoint with Pi's
+  subscription OAuth token. API-key credentials and custom xAI base URLs fail closed. Remaining
+  percent is shown only when the billing payload includes it.

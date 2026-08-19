@@ -5,8 +5,8 @@ Vendored from [`@narumitw/pi-usage`](https://www.npmjs.com/package/@narumitw/pi-
 
 `@onurpi/pi-usage` is a native [Pi coding agent](https://pi.dev) extension that adds one interactive
 `/usage` command for reading usage from the account Pi is actually using. It supports OpenAI Codex
-ChatGPT subscription windows, GitHub Copilot allowances, and OpenRouter API-key spend limits without
-pretending those limits have the same semantics.
+ChatGPT subscription windows, GitHub Copilot allowances, OpenRouter API-key spend limits, and xAI
+Grok/X subscription billing without pretending those limits have the same semantics.
 
 ## ✨ Features
 
@@ -16,14 +16,17 @@ pretending those limits have the same semantics.
 - Supports GitHub Copilot AI Credits, legacy premium requests, Free chat quota, additional usage,
   percentage, and reset time.
 - Supports OpenRouter per-key credit limits plus daily, weekly, monthly, and all-time spend.
+- Supports xAI SuperGrok or X Premium subscription windows, weekly remaining percent when returned,
+  product buckets, and prepaid or on-demand balances.
 - Provides explicit refresh, another-provider, and all-configured-provider actions.
 - Runs manually requested all-provider queries with concurrency limited to two and preserves partial
   results.
 - Labels only the selected model provider as `Current`; other results are `Configured`.
 - Keeps the compact statusline scoped to the current provider and runtime account.
 - Isolates its five-minute in-memory cache by provider and a process-salted credential fingerprint.
-- Resolves runtime credentials through Pi; for Copilot only, reads Pi's stored OAuth credential
-  through Pi's public credential API and verifies that it matches the active runtime account.
+- Resolves runtime credentials through Pi; for Copilot and xAI, reads Pi's stored OAuth credential
+  through Pi's public credential API. Copilot also verifies that the stored account matches the
+  active runtime account.
 
 ## 📦 Requirements
 
@@ -107,6 +110,20 @@ The extension does not call OpenRouter's account-level `/credits` endpoint becau
 requires a separate management key. OpenRouter documents the distinction between credit and rate
 limits in its [API limits guide](https://openrouter.ai/docs/api_reference/limits).
 
+### xAI
+
+- Provider ID: `xai`
+- Semantics: SuperGrok or X Premium subscription limits, not API-key prepaid spend
+- Source: the Grok CLI billing endpoint
+  `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits` using Pi's `/login xai`
+  subscription access token
+- Displayed data: weekly remaining percent when the account returns one, product buckets, prepaid
+  and on-demand balances, and the current weekly reset time
+- Statusline examples: `xai 61% wk` or `xai weekly`
+
+API-key credentials and custom xAI base URLs fail closed. Some X Premium+ accounts return a weekly
+window without a remaining-percent field; `/usage` reports that gap instead of inventing a quota.
+
 ## 🧭 Current and configured accounts
 
 `Current` means the provider and credential used by Pi's selected model. `Configured` means Pi
@@ -140,6 +157,8 @@ This package replaces the retired `@onurpi/codex-usage` package. Behavior change
 
 - Only providers with a meaningful usage source and verifiable Pi runtime auth are supported.
 - GitHub Copilot quota uses an undocumented GitHub endpoint that may change without notice.
+- xAI subscription remaining uses the Grok CLI billing endpoint, which is not in the public REST API
+  reference and may omit remaining percent for some X Premium+ accounts.
 - Credentials resolved for custom provider base URLs are never forwarded to the providers' official
   usage endpoints; effective auth origin validation requires Pi 0.81.0 or newer.
 - Provider reports are snapshots and may themselves be delayed by the provider.
@@ -160,7 +179,7 @@ packages/pi-usage/
 │   ├── query.ts       # Runtime auth resolution and provider queries
 │   ├── format.ts      # Provider-aware notifications and statusline text
 │   ├── core.ts        # Cache, concurrency, fingerprint, and redaction helpers
-│   ├── providers/     # Codex, GitHub Copilot, and OpenRouter normalization adapters
+│   ├── providers/     # Codex, GitHub Copilot, OpenRouter, and xAI normalization adapters
 │   └── types.ts       # Common presentation and adapter contracts
 ├── test/
 ├── README.md
@@ -175,8 +194,8 @@ package's named helper exports; other source modules are internal.
 ## 🔎 Keywords
 
 Pi extension, Pi coding agent, usage, quota, OpenAI Codex usage, ChatGPT subscription limits, GitHub
-Copilot AI credits, GitHub Copilot premium requests, OpenRouter credits, API-key spend limits,
-TypeScript Pi package, npm Pi extension.
+Copilot AI credits, GitHub Copilot premium requests, OpenRouter credits, xAI Grok subscription
+limits, API-key spend limits, TypeScript Pi package, npm Pi extension.
 
 ## 📄 License
 

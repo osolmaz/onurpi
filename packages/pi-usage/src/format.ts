@@ -15,10 +15,14 @@ export function formatUsageReport(report: UsageReport, displayState: UsageDispla
   if (report.accountLabel) lines.push(`Account: ${report.accountLabel}`);
   lines.push(`Semantics: ${report.semantics.label}`, "");
 
-  if (report.providerId === "openai-codex") formatCodexReport(lines, report);
-  else if (report.providerId === "github-copilot") formatGitHubCopilotReport(lines, report);
-  else if (report.providerId === "openrouter") formatOpenRouterReport(lines, report);
-  else formatGenericReport(lines, report);
+  const formatReport =
+    {
+      "openai-codex": formatCodexReport,
+      "github-copilot": formatGitHubCopilotReport,
+      openrouter: formatOpenRouterReport,
+      xai: formatXaiReport,
+    }[report.providerId] ?? formatGenericReport;
+  formatReport(lines, report);
 
   if (report.notes) {
     for (const note of report.notes) lines.push(note);
@@ -29,12 +33,8 @@ export function formatUsageReport(report: UsageReport, displayState: UsageDispla
 export function formatUsageStatusline(report: UsageReport, model?: UsageModel): string | undefined {
   if (report.providerId === "openai-codex") return formatCodexStatusline(report, model);
   if (report.providerId === "github-copilot") return formatGitHubCopilotStatusline(report);
-  if (report.providerId === "openrouter") {
-    const limit = report.buckets.find((bucket) => bucket.id === "key-limit");
-    if (limit?.remaining !== undefined) return `openrouter ${formatUsd(limit.remaining)} left`;
-    const total = report.metrics.find((metric) => metric.id === "usage-total");
-    if (typeof total?.value === "number") return `openrouter ${formatUsd(total.value)} used`;
-  }
+  if (report.providerId === "openrouter") return formatOpenRouterStatusline(report);
+  if (report.providerId === "xai") return formatXaiStatusline(report);
   return undefined;
 }
 
@@ -140,6 +140,38 @@ function formatOpenRouterReport(lines: string[], report: UsageReport): void {
       `${`${metric.label}:`.padEnd(VALUE_COLUMN)}${formatMetricValue(metric.value, metric.unit)}`,
     );
   }
+}
+
+function formatXaiReport(lines: string[], report: UsageReport): void {
+  for (const bucket of report.buckets) {
+    const reset = bucket.resetsAt ? ` (resets ${formatReset(bucket.resetsAt)})` : "";
+    if (bucket.remaining !== undefined) {
+      lines.push(`${`${bucket.label}:`.padEnd(VALUE_COLUMN)}${formatPercentBucket(bucket)}`);
+      continue;
+    }
+    lines.push(`${`${bucket.label}:`.padEnd(VALUE_COLUMN)}not returned${reset}`);
+  }
+  for (const metric of report.metrics) {
+    lines.push(
+      `${`${metric.label}:`.padEnd(VALUE_COLUMN)}${formatMetricValue(metric.value, metric.unit)}`,
+    );
+  }
+}
+
+function formatOpenRouterStatusline(report: UsageReport): string | undefined {
+  const limit = report.buckets.find((bucket) => bucket.id === "key-limit");
+  if (limit?.remaining !== undefined) return `openrouter ${formatUsd(limit.remaining)} left`;
+  const total = report.metrics.find((metric) => metric.id === "usage-total");
+  if (typeof total?.value === "number") return `openrouter ${formatUsd(total.value)} used`;
+  return undefined;
+}
+
+function formatXaiStatusline(report: UsageReport): string {
+  const weekly = report.buckets.find((bucket) => bucket.id === "weekly-credits");
+  if (weekly?.remaining !== undefined) {
+    return `xai ${clampPercent(weekly.remaining).toFixed(0)}% wk`;
+  }
+  return "xai weekly";
 }
 
 function formatGenericReport(lines: string[], report: UsageReport): void {
