@@ -52,6 +52,8 @@ describe("guarded-launch process groups", () => {
     const root = temporaryDirectory();
     const marker = join(root, "background-finished");
 
+    // The delayed group member proves the guard waits after the leader exits.
+    // Do not poll the leader PID: an exited leader can stay visible as a zombie.
     const result = spawnSync(
       script,
       [
@@ -65,7 +67,9 @@ describe("guarded-launch process groups", () => {
         "--",
         "sh",
         "-c",
-        `leader=$$; (while kill -0 "$leader" 2>/dev/null; do sleep 0.01; done; touch ${JSON.stringify(marker)}) >/dev/null 2>&1 & exit 0`,
+        '(sleep 0.2; touch "$1") >/dev/null 2>&1 & exit 0',
+        "guarded-launch-test",
+        marker,
       ],
       { encoding: "utf8", timeout: 10_000 },
     );
