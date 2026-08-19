@@ -49,6 +49,7 @@
     "agents:sync-simpledoc": "npm run sync-simpledoc --workspace @onurpi/agents --",
     "settings:sync": "node scripts/sync-settings.ts sync",
     "settings:reset": "node scripts/sync-settings.ts reset",
+    "workflows:sync": "npm run sync --workspace @onurpi/workflows",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint .",

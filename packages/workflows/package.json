@@ -21,6 +21,7 @@
     "typebox": "*"
   },
   "scripts": {
+    "sync": "node sync.ts",
     "format": "prettier --check .",
     "lint": "eslint . --config eslint.config.mjs",
     "typecheck": "tsc --noEmit",
