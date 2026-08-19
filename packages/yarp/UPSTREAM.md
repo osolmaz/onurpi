@@ -2,7 +2,7 @@
 
 | Item          | Reviewed value                                                  |
 | ------------- | --------------------------------------------------------------- |
-| Repository    | https://github.com/osolmaz/yarp                                 |
+| Repository    | https://github.com/osolmaz/pi-yarp                              |
 | Commit        | `303e390695e2edd994057e2345496a7d72c34310`                      |
 | Retrieved     | 2026-08-06                                                      |
 | License       | MIT                                                             |
