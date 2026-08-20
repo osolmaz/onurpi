@@ -268,8 +268,8 @@ Run:
 - account-manager tests with fake OAuth and UI interactions;
 - integration tests for one provider identity and normal compaction/context handling;
 - startup-adapter tests for matching vault readiness, missing and invalid state, canonical auth
-  delegation, unrelated providers, duplicate installation, reload, cleanup, and unsupported Pi
-  versions;
+  delegation, unrelated providers, duplicate installation, reload, cleanup, unsupported Pi versions,
+  and queued-provider rollback after startup rejection;
 - synthetic fresh-session and resumed-session tests that check the selected model and warning
   without reading real sessions or credentials;
 - `npm run check` and `npm run slophammer` in the switcher package;
@@ -294,7 +294,9 @@ The startup adapter wraps the host Pi `ModelRuntime` only while Pi resolves the 
 model. A synchronous vault check returns only whether valid configuration has a matching stored
 account. Synthetic SDK and real temporary Pi resume tests verify that Pi restores the saved Codex
 model without the false warning. Startup cleanup restores the original method before model requests
-begin.
+begin. If the startup adapter rejects the Pi version or lifecycle setup, the extension unregisters
+its queued provider before it reports the error. Pi therefore keeps the built-in provider instead of
+binding a rejected override.
 
 ## Related work
 
