@@ -13,7 +13,7 @@ function object(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function isCodexProvider(value: unknown): value is CodexProvider {
+export function isOpenAICodexProvider(value: unknown): value is CodexProvider {
   const provider = object(value);
   return (
     provider?.["id"] === "openai-codex" &&
@@ -50,7 +50,7 @@ export async function loadOpenAICodexProvider(): Promise<CodexProvider> {
     throw new Error("The installed pi-ai package does not export the OpenAI Codex provider.");
   }
   const provider: unknown = (factory as () => unknown)();
-  if (!isCodexProvider(provider)) {
+  if (!isOpenAICodexProvider(provider)) {
     throw new Error("The installed pi-ai OpenAI Codex provider has an incompatible shape.");
   }
   return provider;

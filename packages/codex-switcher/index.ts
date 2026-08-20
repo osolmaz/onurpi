@@ -1,157 +1,80 @@
-import { createProvider, type Model, type Provider } from "@earendil-works/pi-ai";
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { runAccountManager, type ConfigController } from "./account-manager.ts";
+import { runAccountManager } from "./account-manager.ts";
 import {
   codexSwitcherConfigPath,
   loadCodexSwitcherConfig,
-  type CodexSwitcherConfig,
   type ConfigLoadResult,
-  writeCodexSwitcherConfig,
 } from "./config.ts";
 import { loadOpenAICodexProvider } from "./native-provider.ts";
 import {
-  createCodexSwitcherStream,
-  type CodexTransport,
-  type SwitcherRuntime,
-  type SwitcherState,
-} from "./router.ts";
-import { createCodexUsageClient } from "./usage-client.ts";
-import { codexSwitcherVaultPath, createAccountVault, type AccountVault } from "./vault.ts";
+  createCodexSwitcherProvider,
+  type CodexProvider,
+  type CodexSwitcherProvider,
+} from "./provider.ts";
+import type { AccountVault } from "./vault.ts";
 
-const DEFAULT_REFRESH_MS = 5 * 60_000;
-const DEFAULT_TIMEOUT_MS = 10_000;
-type CodexModel = Model<"openai-codex-responses">;
-type CodexProvider = Provider<"openai-codex-responses">;
+export type InstallOptions = {
+  readonly configPath?: string;
+  readonly configResult?: ConfigLoadResult;
+  readonly nativeProvider?: CodexProvider;
+  readonly vault?: AccountVault;
+  readonly vaultPath?: string;
+};
 
-function emptyConfig(): CodexSwitcherConfig {
-  return { accounts: [], refreshMs: DEFAULT_REFRESH_MS, timeoutMs: DEFAULT_TIMEOUT_MS };
-}
-
-function createConfigController(path: string, initial: CodexSwitcherConfig): ConfigController {
-  let current = initial;
-  return {
-    get: () => current,
-    replace: (config) => {
-      writeCodexSwitcherConfig(path, config);
-      current = config;
-    },
-  };
-}
-
-async function hasConfiguredAccount(
-  config: CodexSwitcherConfig,
-  vault: AccountVault,
-): Promise<boolean> {
-  const stored = new Set(await vault.list());
-  return config.accounts.some((account) => stored.has(account.id));
-}
-
-async function resolveProviderAuth(
-  config: CodexSwitcherConfig,
-  vault: AccountVault,
-  state: SwitcherState,
-  signal: AbortSignal,
-) {
-  const preferred = [state.leaseAccountId, state.activeAccountId].filter(
-    (id): id is string => id !== undefined,
-  );
-  const candidates = [...new Set([...preferred, ...config.accounts.map((account) => account.id)])];
-  for (const id of candidates) {
-    const auth = await vault.resolve(id, signal);
-    if (auth) return { auth, source: "Codex switcher account vault" };
+export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions): void {
+  const agentDir = getAgentDir();
+  const configResult =
+    options.configResult ??
+    loadCodexSwitcherConfig(options.configPath ?? codexSwitcherConfigPath(agentDir));
+  if (configResult.status === "invalid") {
+    registerInvalidConfigCommand(pi, configResult);
+    return;
   }
-  return undefined;
-}
-
-function createSwitcherProvider(
-  native: CodexProvider,
-  config: ConfigController,
-  vault: AccountVault,
-  state: SwitcherState,
-  stream: CodexTransport,
-  streamSimple: CodexTransport,
-): CodexProvider {
-  return createProvider({
-    id: native.id,
-    name: native.name,
-    ...(native.baseUrl ? { baseUrl: native.baseUrl } : {}),
-    ...(native.headers ? { headers: native.headers } : {}),
-    auth: {
-      apiKey: {
-        name: "Codex switcher account vault",
-        check: async () =>
-          (await hasConfiguredAccount(config.get(), vault))
-            ? { type: "oauth", source: "Codex switcher account vault" }
-            : undefined,
-        resolve: ({ signal }) => resolveProviderAuth(config.get(), vault, state, signal),
-      },
-    },
-    models: native.getModels(),
-    api: {
-      stream: (model, context, options) => stream(model as CodexModel, context, options),
-      streamSimple: (model, context, options) =>
-        streamSimple(model as CodexModel, context, options),
-    },
+  const nativeProvider = options.nativeProvider;
+  if (!nativeProvider) {
+    throw new Error("Codex switcher requires the built-in OpenAI Codex OAuth provider.");
+  }
+  const runtime = createCodexSwitcherProvider({
+    agentDir,
+    nativeProvider,
+    configResult,
+    ...(options.configPath === undefined ? {} : { configPath: options.configPath }),
+    ...(options.vault === undefined ? {} : { vault: options.vault }),
+    ...(options.vaultPath === undefined ? {} : { vaultPath: options.vaultPath }),
   });
+  pi.registerProvider(runtime.provider);
+  pi.registerCommand("codex-switcher", {
+    description: "Manage OpenAI Codex accounts, billing, order, and usage",
+    handler: (args, context) =>
+      runAccountManager(args, context, {
+        config: runtime.config,
+        oauth: runtime.oauth,
+        pi,
+        state: runtime.state,
+        vault: runtime.vault,
+      }),
+  });
+  registerLifecycle(pi, runtime);
 }
 
-function registerLifecycle(pi: ExtensionAPI, state: SwitcherState): void {
-  const startAgentRun = (): void => {
-    if (!state.agentRunActive) {
-      state.agentRunActive = true;
-      state.leaseAccountId = undefined;
-      state.activeAccountId = undefined;
-    }
-  };
-
+function registerLifecycle(pi: ExtensionAPI, runtime: CodexSwitcherProvider): void {
   pi.on("session_start", (_event, context) => {
     context.ui.setStatus("codex-switcher", undefined);
   });
   pi.on("before_agent_start", () => {
-    startAgentRun();
+    runtime.startRun();
   });
   pi.on("agent_start", () => {
-    startAgentRun();
+    runtime.startRun();
   });
   pi.on("agent_settled", () => {
-    state.agentRunActive = false;
-    state.leaseAccountId = undefined;
+    runtime.finishRun();
   });
   pi.on("session_shutdown", (_event, context) => {
     context.ui.setStatus("codex-switcher", undefined);
-    state.agentRunActive = false;
-    state.leaseAccountId = undefined;
-    state.activeAccountId = undefined;
+    runtime.close();
   });
-}
-
-export type InstallOptions = {
-  configPath?: string;
-  configResult?: ConfigLoadResult;
-  nativeProvider?: CodexProvider;
-  vault?: AccountVault;
-  vaultPath?: string;
-};
-
-function requiredNativeProvider(options: InstallOptions): {
-  native: CodexProvider;
-  oauth: NonNullable<CodexProvider["auth"]["oauth"]>;
-} {
-  const native = options.nativeProvider;
-  const oauth = native?.auth.oauth;
-  if (!native || !oauth) {
-    throw new Error("Codex switcher requires the built-in OpenAI Codex OAuth provider.");
-  }
-  return { native, oauth };
-}
-
-function configuredVault(
-  options: InstallOptions,
-  oauth: NonNullable<CodexProvider["auth"]["oauth"]>,
-): AccountVault {
-  if (options.vault) return options.vault;
-  return createAccountVault(options.vaultPath ?? codexSwitcherVaultPath(getAgentDir()), oauth);
 }
 
 function registerInvalidConfigCommand(
@@ -165,67 +88,6 @@ function registerInvalidConfigCommand(
       return Promise.resolve();
     },
   });
-}
-
-export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions): void {
-  const configPath = options.configPath ?? codexSwitcherConfigPath(getAgentDir());
-  const result = options.configResult ?? loadCodexSwitcherConfig(configPath);
-  if (result.status === "invalid") {
-    registerInvalidConfigCommand(pi, result);
-    return;
-  }
-
-  const { native, oauth } = requiredNativeProvider(options);
-  const config = createConfigController(
-    configPath,
-    result.status === "ready" ? result.config : emptyConfig(),
-  );
-  const vault = configuredVault(options, oauth);
-  const state: SwitcherState = {
-    activeAccountId: undefined,
-    agentRunActive: false,
-    leaseAccountId: undefined,
-    usageByAccount: new Map(),
-  };
-  const usage = createCodexUsageClient(config.get().refreshMs, config.get().timeoutMs);
-  const runtime: SwitcherRuntime = {
-    getAuth: (accountId, signal) => vault.resolve(accountId, signal),
-    queryUsage: (account, auth, model, signal) => usage.query(account, auth, model, signal),
-    clearUsage: (account) => {
-      usage.clear(account);
-    },
-    activateAccount: (account) => {
-      state.activeAccountId = account.id;
-    },
-  };
-  const routerOptions = {
-    getAccounts: () => config.get().accounts,
-    runtime,
-    state,
-  };
-  const stream = createCodexSwitcherStream({
-    ...routerOptions,
-    transport: (model, context, streamOptions) => native.stream(model, context, streamOptions),
-  });
-  const streamSimple = createCodexSwitcherStream({
-    ...routerOptions,
-    transport: (model, context, streamOptions) =>
-      native.streamSimple(model, context, streamOptions),
-  });
-
-  pi.registerProvider(createSwitcherProvider(native, config, vault, state, stream, streamSimple));
-  pi.registerCommand("codex-switcher", {
-    description: "Manage OpenAI Codex accounts, billing, order, and usage",
-    handler: (args, context) =>
-      runAccountManager(args, context, {
-        config,
-        oauth,
-        pi,
-        state,
-        vault,
-      }),
-  });
-  registerLifecycle(pi, state);
 }
 
 export default async function codexSwitcherExtension(pi: ExtensionAPI): Promise<void> {

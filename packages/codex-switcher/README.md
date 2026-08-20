@@ -104,6 +104,20 @@ Before updating, run `/logout` and select each old alias provider to remove its 
 updating, replace the old configuration with the ordered `accounts` format and authenticate each
 account through `/codex-switcher`. Fresh login avoids copying credentials between stores.
 
+## Pi Factory
+
+The package declares `openai-codex` under `piFactory.providers`. Pi Factory can load
+`provider-module.ts` without loading the account-management command or other OnurPi extensions.
+Normal Pi and Pi Factory use the same provider construction, vault, usage policy, routing, OAuth
+refresh, and account lease rules.
+
+A Pi Factory app selects its own model. The provider module does not read or write normal Pi's
+selected model. It reads the existing policy and vault under the main Pi agent directory and does
+not copy credentials into the app profile.
+
+The provider module keeps one account selected for the complete Pi Factory run. Its start, finish,
+and close functions cover tools, retries, compaction, finalization, cancellation, and cleanup.
+
 ## Security and state
 
 The extension accepts only the official `openai-codex` provider and official ChatGPT Codex endpoint.
