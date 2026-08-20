@@ -28,6 +28,7 @@ export type CodexSwitcherProvider = {
   readonly oauth: NonNullable<CodexProvider["auth"]["oauth"]>;
   readonly state: SwitcherState;
   readonly vault: AccountVault;
+  readonly isAuthenticationReady: () => boolean;
   readonly startRun: (runId?: string) => void;
   readonly finishRun: (runId?: string) => void;
   readonly close: () => void;
@@ -111,6 +112,8 @@ export function createCodexSwitcherProvider(
     oauth,
     state,
     vault,
+    isAuthenticationReady: () =>
+      vault.hasAnySync(config.get().accounts.map((account) => account.id)),
     startRun,
     finishRun,
     close,

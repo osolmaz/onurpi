@@ -12,6 +12,11 @@ import {
   type CodexProvider,
   type CodexSwitcherProvider,
 } from "./provider.ts";
+import {
+  installStartupAuthAdapter,
+  type RestoreStartupAuthAdapter,
+  type StartupAuthAdapterOptions,
+} from "./startup-auth-adapter.ts";
 import type { AccountVault } from "./vault.ts";
 
 export type InstallOptions = {
@@ -22,7 +27,10 @@ export type InstallOptions = {
   readonly vaultPath?: string;
 };
 
-export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions): void {
+export function installCodexSwitcher(
+  pi: ExtensionAPI,
+  options: InstallOptions,
+): CodexSwitcherProvider | undefined {
   const agentDir = getAgentDir();
   const configResult =
     options.configResult ??
@@ -56,6 +64,26 @@ export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions):
       }),
   });
   registerLifecycle(pi, runtime);
+  return runtime;
+}
+
+export function installCodexSwitcherStartup(
+  pi: ExtensionAPI,
+  runtime: CodexSwitcherProvider,
+  options: Omit<StartupAuthAdapterOptions, "isReady"> = {},
+): RestoreStartupAuthAdapter {
+  const restore = installStartupAuthAdapter({
+    ...options,
+    isReady: runtime.isAuthenticationReady,
+  });
+  try {
+    pi.on("session_start", restore);
+    pi.on("session_shutdown", restore);
+    return restore;
+  } catch (error) {
+    restore();
+    throw error;
+  }
 }
 
 function registerLifecycle(pi: ExtensionAPI, runtime: CodexSwitcherProvider): void {
@@ -91,6 +119,14 @@ function registerInvalidConfigCommand(
 }
 
 export default async function codexSwitcherExtension(pi: ExtensionAPI): Promise<void> {
-  const nativeProvider = await loadOpenAICodexProvider();
-  installCodexSwitcher(pi, { nativeProvider });
+  let runtime: CodexSwitcherProvider | undefined;
+  try {
+    const nativeProvider = await loadOpenAICodexProvider();
+    runtime = installCodexSwitcher(pi, { nativeProvider });
+    if (!runtime) return;
+    installCodexSwitcherStartup(pi, runtime);
+  } catch (error) {
+    runtime?.close();
+    throw error;
+  }
 }

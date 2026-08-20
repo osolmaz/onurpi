@@ -9,7 +9,8 @@ tags: [pi, codex, oauth, usage]
 
 ## Status
 
-The one-provider switcher is implemented. Selective Pi Factory integration is planned in the
+The one-provider switcher, selective Pi Factory integration, and version-locked startup adapter for
+resumed normal Pi sessions are implemented. The cross-repository design lives in the
 [selective Pi profile inheritance plan](https://github.com/osolmaz/pi-factory/blob/main/docs/2026-08-21-selective-profile-inheritance-plan.md).
 
 ## Purpose
@@ -92,6 +93,39 @@ stream. It must not forward a placeholder credential.
 
 Use the official public OpenAI Codex OAuth implementation for login and refresh. Do not implement a
 second OAuth protocol and do not read Codex CLI credentials.
+
+## Resumed-session startup
+
+Pi 0.84.x restores an existing session model before it applies provider registrations queued during
+extension loading. Its early authentication check therefore sees only the built-in `openai-codex`
+provider and canonical `auth.json`. A session saved with an account from the switcher vault can be
+rejected and replaced by an unrelated authenticated model before the switcher provider is bound.
+
+Add one version-locked startup adapter for Pi 0.84.x. During the asynchronous extension factory,
+after configuration and vault setup but before resource loading returns, temporarily wrap the public
+exported `ModelRuntime.prototype.hasConfiguredAuth` method. The wrapper changes only the
+`openai-codex` result during this startup window. It reports configured authentication when valid
+switcher configuration selects at least one account that exists in the protected vault. It delegates
+every other provider and every nonmatching Codex state to Pi's original method.
+
+The vault exposes a synchronous boolean readiness check for this adapter. The check parses the
+existing private vault with its normal validation and file-safety rules. It does not return, copy,
+log, refresh, or rewrite a credential. Missing configuration, invalid configuration, an unsafe or
+invalid vault, and no matching configured account do not produce a positive result.
+
+Guard the wrapper against duplicate installation and reload. Keep its state under a versioned global
+symbol, compose safely with an existing compatible installation, and restore the exact original
+method after `session_start`. Also restore it on `session_shutdown`, initialization failure, and
+explicit cleanup. Installation must reject unsupported Pi versions rather than patch an unknown
+runtime shape.
+
+The adapter does not choose or change a model. It does not read session entries, append a model
+change, or suppress a warning after the fact. It only makes the existing pre-session authentication
+check recognize provider-owned authentication. After `AgentSession` binds queued providers, the
+normal switcher provider owns authentication, refresh, routing, and the account lease.
+
+Remove this adapter by hard cutover when Pi exposes and releases provider registration before model
+restoration. Do not keep the adapter beside a native startup contract.
 
 ## Pi Factory provider module
 
@@ -176,15 +210,19 @@ Keep the existing usage parser and billing decision rules where they still apply
 ## Boundaries
 
 - **Session state:** The extension adds no custom session entries. All assistant messages use
-  `openai-codex`.
-- **Other persistent data:** One local policy file and one protected credential vault.
-- **Pi internals:** None.
-- **Public API:** `registerProvider`, `registerCommand`, documented lifecycle events, `ctx.ui`, and
-  public `pi-ai` OpenAI Codex provider and OAuth exports.
+  `openai-codex`. The startup adapter does not read or change saved model history.
+- **Other persistent data:** One local policy file and one protected credential vault. The startup
+  adapter adds no file or stored value.
+- **Pi internals:** One narrow, reversible wrapper around the public exported
+  `ModelRuntime.prototype.hasConfiguredAuth` method for the Pi 0.84.x startup window. It follows the
+  same reviewed, version-locked adaptation policy as Turn Fold.
+- **Public API:** `ModelRuntime`, `registerProvider`, `registerCommand`, documented lifecycle
+  events, `ctx.ui`, and public `pi-ai` OpenAI Codex provider and OAuth exports.
 
 ## Non-goals
 
-- Changing Pi's credential schema or source code.
+- Changing Pi's credential schema, source code, or installed package files.
+- Patching model choice, session history, or providers other than `openai-codex`.
 - Supporting arbitrary Codex-compatible endpoints.
 - Reading or importing Codex CLI credentials.
 - Copying existing Pi credentials without explicit source-and-destination approval.
@@ -210,6 +248,14 @@ Keep the existing usage parser and billing decision rules where they still apply
 - Pi Factory loads only the provider module and does not expose `/codex-switcher` in the app.
 - A Pi Factory app can select its own model without changing normal Pi settings.
 - The provider module uses the existing vault in place and creates no fallback credential.
+- Resuming a session saved with an available `openai-codex` model and a matching switcher vault
+  account restores that model without a false warning or unrelated provider fallback.
+- Missing or invalid switcher state delegates to Pi's original authentication result and fallback.
+- The startup adapter restores the exact original runtime method after provider binding and on every
+  cleanup path.
+- Fresh sessions, explicit model selection, model cycling, built-in providers, and unrelated custom
+  providers keep their existing behavior.
+- Unsupported Pi versions fail before the adapter changes runtime behavior.
 
 ## Verification
 
@@ -221,6 +267,11 @@ Run:
   continuations, reset recovery, aborts, and unrelated errors;
 - account-manager tests with fake OAuth and UI interactions;
 - integration tests for one provider identity and normal compaction/context handling;
+- startup-adapter tests for matching vault readiness, missing and invalid state, canonical auth
+  delegation, unrelated providers, duplicate installation, reload, cleanup, and unsupported Pi
+  versions;
+- synthetic fresh-session and resumed-session tests that check the selected model and warning
+  without reading real sessions or credentials;
 - `npm run check` and `npm run slophammer` in the switcher package;
 - checks for every directly changed integration package;
 - repository checks, SimpleDoc, `git diff --check`, and a temporary Pi extension startup test;
@@ -238,6 +289,12 @@ the router through Pi's normal provider-auth path. This lets native Codex compac
 account without a direct dependency on the switcher package. The lifecycle handler covers direct and
 extension-triggered agent runs, and the account manager blocks changes to the leased account until
 the run settles.
+
+The startup adapter wraps the host Pi `ModelRuntime` only while Pi resolves the initial or saved
+model. A synchronous vault check returns only whether valid configuration has a matching stored
+account. Synthetic SDK and real temporary Pi resume tests verify that Pi restores the saved Codex
+model without the false warning. Startup cleanup restores the original method before model requests
+begin.
 
 ## Related work
 
