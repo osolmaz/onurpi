@@ -204,6 +204,60 @@ describe("codex switcher startup", () => {
     expect(Reflect.get(runtime.provider, "getModels")).toBe(originalGetModels);
   });
 
+  it("keeps startup authentication through model selection when the provider binds first", () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    const original = vi.fn((providerId: string) => {
+      void providerId;
+      return false;
+    });
+    const runtimePrototype = { hasConfiguredAuth: original };
+
+    installCodexSwitcherStartup(test.api, runtime, {
+      piVersion: "0.84.2",
+      runtimePrototype,
+    });
+    runtime.provider.getModels();
+    expect(runtimePrototype.hasConfiguredAuth).not.toBe(original);
+
+    expect(runtimePrototype.hasConfiguredAuth("openai-codex")).toBe(true);
+    expect(runtimePrototype.hasConfiguredAuth).toBe(original);
+  });
+
+  it("restores after provider binding when an explicit model skips the auth check", async () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    const original = vi.fn((providerId: string) => {
+      void providerId;
+      return false;
+    });
+    const runtimePrototype = { hasConfiguredAuth: original };
+
+    installCodexSwitcherStartup(test.api, runtime, {
+      piVersion: "0.84.2",
+      runtimePrototype,
+    });
+    runtime.provider.getModels();
+    expect(runtimePrototype.hasConfiguredAuth).not.toBe(original);
+
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+    expect(runtimePrototype.hasConfiguredAuth).toBe(original);
+  });
+
   it("restores startup authentication behavior after the session starts", async () => {
     const test = harness();
     const runtime = installCodexSwitcher(test.api, {

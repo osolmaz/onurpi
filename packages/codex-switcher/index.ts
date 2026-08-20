@@ -27,7 +27,7 @@ export type InstallOptions = {
   readonly vaultPath?: string;
 };
 
-type StartupOptions = Omit<StartupAuthAdapterOptions, "isReady">;
+type StartupOptions = Omit<StartupAuthAdapterOptions, "isReady" | "onCheck">;
 
 export function installCodexSwitcher(
   pi: ExtensionAPI,
@@ -106,20 +106,39 @@ export function installCodexSwitcherStartup(
   runtime: CodexSwitcherProvider,
   options: StartupOptions = {},
 ): RestoreStartupAuthAdapter {
-  const restoreAuth = installStartupAuthAdapter({
-    ...options,
-    isReady: runtime.isAuthenticationReady,
-  });
-  let restoreProvider: RestoreStartupAuthAdapter | undefined;
   let active = true;
+  let authChecked = false;
+  let providerBound = false;
+  let restoreAuth: RestoreStartupAuthAdapter | undefined;
+  let restoreProvider: RestoreStartupAuthAdapter | undefined;
+  let restoreAfterBind: ReturnType<typeof setImmediate> | undefined;
   const restore = (): void => {
     if (!active) return;
     active = false;
+    if (restoreAfterBind) clearImmediate(restoreAfterBind);
     restoreProvider?.();
-    restoreAuth();
+    restoreAuth?.();
+  };
+  const restoreWhenComplete = (): void => {
+    if (authChecked && providerBound) restore();
   };
   try {
-    restoreProvider = restoreWhenProviderBinds(runtime.provider, restore);
+    restoreAuth = installStartupAuthAdapter({
+      ...options,
+      isReady: runtime.isAuthenticationReady,
+      onCheck: () => {
+        authChecked = true;
+        restoreWhenComplete();
+      },
+    });
+    restoreProvider = restoreWhenProviderBinds(runtime.provider, () => {
+      providerBound = true;
+      restoreWhenComplete();
+      if (active && !authChecked) {
+        restoreAfterBind = setImmediate(restore);
+        restoreAfterBind.unref();
+      }
+    });
     pi.on("session_start", restore);
     pi.on("session_shutdown", restore);
     return restore;
@@ -131,13 +150,13 @@ export function installCodexSwitcherStartup(
 
 function restoreWhenProviderBinds(
   provider: CodexProvider,
-  restore: RestoreStartupAuthAdapter,
+  onBind: () => void,
 ): RestoreStartupAuthAdapter {
   const original = Reflect.get(provider, "getModels");
   let active = true;
   const wrapped: CodexProvider["getModels"] = function (this: CodexProvider) {
     cleanup();
-    restore();
+    onBind();
     return Reflect.apply(original, this, []);
   };
   if (!Reflect.set(provider, "getModels", wrapped)) {

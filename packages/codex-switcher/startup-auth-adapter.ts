@@ -10,14 +10,20 @@ type AuthRuntimePrototype = {
   hasConfiguredAuth: AuthCheck;
 };
 
+type ReadinessCheck = {
+  readonly isReady: () => boolean;
+  readonly onCheck?: () => void;
+};
+
 type AdapterState = {
-  readonly checks: Map<symbol, () => boolean>;
+  readonly checks: Map<symbol, ReadinessCheck>;
   readonly original: AuthCheck;
   readonly patched: AuthCheck;
 };
 
 export type StartupAuthAdapterOptions = {
   readonly isReady: () => boolean;
+  readonly onCheck?: () => void;
   readonly piVersion?: string;
   readonly runtimePrototype?: AuthRuntimePrototype;
 };
@@ -58,16 +64,20 @@ function stateFor(prototype: AuthRuntimePrototype): AdapterState {
   if (typeof original !== "function") {
     throw new Error("Pi ModelRuntime.hasConfiguredAuth is unavailable.");
   }
-  const checks = new Map<symbol, () => boolean>();
+  const checks = new Map<symbol, ReadinessCheck>();
   const patched: AuthCheck = function (providerId) {
     if (providerId === PROVIDER_ID) {
+      let ready = false;
       for (const check of checks.values()) {
         try {
-          if (check()) return true;
+          if (check.isReady()) ready = true;
         } catch {
           // Invalid provider-owned state delegates to Pi's original readiness result.
+        } finally {
+          check.onCheck?.();
         }
       }
+      if (ready) return true;
     }
     return Reflect.apply(original, this, [providerId]);
   };
@@ -98,7 +108,10 @@ export function installStartupAuthAdapter(
   const prototype = options.runtimePrototype ?? (ModelRuntime.prototype as AuthRuntimePrototype);
   const state = stateFor(prototype);
   const token = Symbol("codex-switcher-startup-auth");
-  state.checks.set(token, options.isReady);
+  state.checks.set(token, {
+    isReady: options.isReady,
+    ...(options.onCheck === undefined ? {} : { onCheck: options.onCheck }),
+  });
   let active = true;
 
   return () => {
