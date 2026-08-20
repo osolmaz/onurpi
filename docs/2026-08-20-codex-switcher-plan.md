@@ -9,7 +9,8 @@ tags: [pi, codex, oauth, usage]
 
 ## Status
 
-Implemented.
+The one-provider switcher is implemented. Selective Pi Factory integration is planned in the
+[selective Pi profile inheritance plan](https://github.com/osolmaz/pi-factory/blob/main/docs/2026-08-21-selective-profile-inheritance-plan.md).
 
 ## Purpose
 
@@ -37,6 +38,9 @@ billing policy is `allow-credits`.
 - Never use paid credits unless local policy permits them.
 - Never repeat text, thinking, or tool calls while changing accounts.
 - Provide a clear interactive command for account setup and maintenance.
+- Use the same provider implementation in normal Pi and selected Pi Factory runtimes.
+- Let a Pi Factory app choose its own model without changing normal Pi's selected model.
+- Keep the existing policy and vault paths and do not copy credentials into an app profile.
 
 ## Local data
 
@@ -88,6 +92,34 @@ stream. It must not forward a placeholder credential.
 
 Use the official public OpenAI Codex OAuth implementation for login and refresh. Do not implement a
 second OAuth protocol and do not read Codex CLI credentials.
+
+## Pi Factory provider module
+
+Move provider construction, vault access, usage checks, routing state, auth resolution, and run
+lifetime into shared code. Each call creates independent in-memory provider state and continues to
+use the existing locked vault.
+
+Keep two thin adapters:
+
+- The normal Pi extension registers the provider, maps documented Pi lifecycle events, and keeps the
+  `/codex-switcher` account manager.
+- The Pi Factory provider module exports contract version 1, `createProvider`, and a default
+  provider-only Pi extension. It does not add the account manager or another package resource.
+
+Declare the provider module under `piFactory.providers` with provider ID `openai-codex`, its module
+path, and this package's normal extension as the activation extension. Pi Factory can then find and
+load this provider without executing every OnurPi extension.
+
+The provider module receives the main agent directory and may use the current built-in provider. It
+does not receive app prompts, tools, commands, sessions, policy, or credential values. It returns
+the complete provider and start, finish, and close functions for one high-level run.
+
+The same account stays selected across all model calls in that run, including tools, retries, and
+compaction. Pi Reviewer chooses its model in its own runtime. The module does not read or write
+normal Pi's selected model.
+
+This work does not change, migrate, or copy the policy file or vault. A selected provider-module
+failure is final and must not fall back to the built-in provider.
 
 ## Account manager
 
@@ -174,6 +206,10 @@ Keep the existing usage parser and billing decision rules where they still apply
 - No credential or private account value enters tracked files, session entries, logs, or test
   output.
 - The old alias implementation and its direct integration dependencies are gone.
+- Normal Pi and Pi Factory use the same provider construction and routing code.
+- Pi Factory loads only the provider module and does not expose `/codex-switcher` in the app.
+- A Pi Factory app can select its own model without changing normal Pi settings.
+- The provider module uses the existing vault in place and creates no fallback credential.
 
 ## Verification
 
@@ -189,7 +225,11 @@ Run:
 - checks for every directly changed integration package;
 - repository checks, SimpleDoc, `git diff --check`, and a temporary Pi extension startup test;
 - code review against `main` until no P0 or P1 findings remain;
-- pull-request CI before merge.
+- pull-request CI before merge;
+- provider-module discovery and loading through Pi Factory;
+- equivalent provider, auth, routing, compaction, and lifecycle behavior through both adapters;
+- concurrent Pi Factory runtimes with independent run state and the existing locked vault;
+- a check that normal Pi model settings and credential files remain unchanged.
 
 ## Implementation result
 
@@ -203,3 +243,7 @@ the run settles.
 
 This plan replaces the earlier alias design in this document and the
 [Codex auth reload plan](2026-08-09-codex-auth-reload-plan.md).
+
+The cross-repository provider-module, Pi Factory runtime, Pi Reviewer integration, release order,
+and failure rules live in the
+[selective Pi profile inheritance plan](https://github.com/osolmaz/pi-factory/blob/main/docs/2026-08-21-selective-profile-inheritance-plan.md).

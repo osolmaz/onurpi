@@ -1,6 +1,6 @@
 {
   "name": "@onurpi/codex-switcher",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Usage-aware multi-account routing for Pi's OpenAI Codex provider",
   "type": "module",
@@ -8,11 +8,22 @@
     "node": ">=22.19.0"
   },
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./provider": "./provider-module.ts"
   },
   "pi": {
     "extensions": [
       "./index.ts"
+    ]
+  },
+  "piFactory": {
+    "providers": [
+      {
+        "version": 1,
+        "id": "openai-codex",
+        "module": "./provider-module.ts",
+        "extension": "./index.ts"
+      }
     ]
   },
   "scripts": {
