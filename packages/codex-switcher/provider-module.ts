@@ -1,7 +1,7 @@
 import type { Provider } from "@earendil-works/pi-ai";
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { isOpenAICodexProvider, loadOpenAICodexProvider } from "./native-provider.ts";
+import { loadOpenAICodexProvider } from "./native-provider.ts";
 import { createCodexSwitcherProvider } from "./provider.ts";
 
 export const version = 1 as const;
@@ -18,9 +18,7 @@ export async function createProvider(input: CreateProviderInput) {
   if (input.providerId !== "openai-codex") {
     throw new Error(`Codex switcher cannot provide ${input.providerId}.`);
   }
-  const nativeProvider = isOpenAICodexProvider(input.nativeProvider)
-    ? input.nativeProvider
-    : await loadOpenAICodexProvider();
+  const nativeProvider = await loadOpenAICodexProvider();
   const runtime = createCodexSwitcherProvider({
     agentDir: input.agentDir,
     nativeProvider,

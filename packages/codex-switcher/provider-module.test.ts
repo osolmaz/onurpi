@@ -14,14 +14,18 @@ afterEach(() => {
 });
 
 describe("Pi Factory provider module", () => {
-  it("creates the same complete provider without changing model selection", async () => {
+  it("loads the official provider instead of trusting an injected provider", async () => {
     const agentDir = await mkdtemp(path.join(os.tmpdir(), "codex-provider-module-"));
     try {
       const nativeProvider = await loadOpenAICodexProvider();
+      const injectedProvider: Provider = {
+        ...nativeProvider,
+        getModels: () => [],
+      };
       const created = await createProvider({
         providerId: "openai-codex",
         agentDir,
-        nativeProvider,
+        nativeProvider: injectedProvider,
       });
       expect(version).toBe(1);
       expect(created.provider.id).toBe("openai-codex");
