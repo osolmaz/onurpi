@@ -1,17 +1,18 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.11.1`
-- Source commit: `6a95b970a9a7ed240b5f92c857d22dcdbc38101b`
-- Package source: exact npm release `0.11.1`
+- Latest release at review: `v0.11.2`
+- Source commit: `05fed72887f6f49b6d2933f98a6ec09159f10ac2`
+- Package source: exact npm release `0.11.2`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
 
 The reviewed source provides workflow and controller commands, model-managed workflow controls,
 durable controller state, child workflow scheduling, and the standalone workflow host. Release
-`0.11.1` includes the `0.11.0` planning and human-decision changes. It also adds verified Herdr
-plugin synchronization and makes autoimplement challenge fixable blocker claims before stopping.
+`0.11.2` makes deferred workflow launches durable before acknowledgement, returns stable queued run
+IDs, recovers interrupted activation, and reports activation failures to the model so it can correct
+and restart the workflow.
 
 The release bundles the `pi-workflows`, `monitor`, `autoplan`, `autodoc`, and `autoimplement` skills
 with the extension. It also ships the native Herdr plugin and workflow-to-piw actions. Pi package
