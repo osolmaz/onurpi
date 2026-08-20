@@ -1,0 +1,49 @@
+---
+name: autoimplement-legacy
+description: Use when the user asks to implement a plan end-to-end, test it, run Pi Reviewer against the base branch in a loop until no P0/P1 issues remain, and make sure CI/CD is green before finishing.
+---
+
+Do the following in the order that makes sense. Choose the most efficient order for dependencies, and parallelize independent work.
+
+0. If the plan does not already exist, use the `autodoc-legacy` skill to prepare the plan and documentation.
+
+1. Implement the given plan end-to-end.
+   - Implement the most elegant and long-term production-ready solution, but do not take longer than necessary.
+   - Context compaction might happen during implementation or review. If not enough of the plan was preserved after compaction, re-read the written plan to stay on track with the plan.
+   - Finish to completion. If there is a PR open for the implementation plan, do it in the same PR. If there is no PR already, open PR.
+   - Before finishing, commit and push any new or changed documentation, specification, or plan file in the relevant repo or repos, including the `~/scratch` repo when used, unless the user asked not to.
+
+2. Once you finish implementing, make sure to test it.
+   - This will depend on the nature of the problem. If needed, run local smoke tests, spin up dev servers, make requests and such.
+   - Try to test as much as possible, without merging.
+   - State explicitly what could not be tested locally and what still needs staging or production verification.
+   - Do not put mutation testing on the critical path unless repository policy explicitly requires it; keep the mutation test scripts available.
+
+3. Push your latest commits before running review so the review is always against the current PR head.
+   - Run Pi Reviewer with its configured defaults against the base branch: `pi-reviewer --base <branch_name>`. The model and thinking level come from the reviewer's own config, not from this skill.
+   - Use a 10 minute timeout on the tool call available to the model, not the shell `timeout` program. If Pi Reviewer takes more than 10 minutes, kill it.
+   - Do not silently fall back to `codex review` when Pi Reviewer is unavailable; stop and report the missing command or configuration.
+   - Run Pi Reviewer in a loop and address any P0 or P1 issues until there are none left. If a run reports only P2 or lower issues, move to the next stage.
+   - Ignore issues about supporting legacy behavior unless the plan requires compatibility.
+   - Look at CI only after Pi Reviewer passes, meaning the last completed run found no issues or only P2 or lower issues.
+
+4. Pi Reviewer reports findings locally and does not post them to the pull request.
+   - Separately check existing inline review comments and PR issue comments, and address valid comments.
+   - Ignore irrelevant comments and stale comments from before the latest commit unless they still apply.
+   - Reply to and resolve each comment either way.
+   - Do not wait a fixed five minutes; wait only when a required review is known to be pending, and keep that wait bounded.
+
+5. In the final step, make sure that CI/CD is green.
+   - Ignore the fails unrelated to your changes, others break stuff sometimes and don't fix it.
+   - Make sure whatever changes you did don't break anything.
+   - If CI/CD is not fully green, state explicitly which failures are unrelated and why.
+   - For documentation-only changes, including SimpleDoc changes, relevant local checks are enough; do not wait for CI/CD after they pass.
+
+6. Once CI/CD is green, or the relevant local checks have passed for a documentation-only change, and you think that the PR is ready to merge, merge opportunistically unless the user explicitly asked you not to merge.
+   - Then finish and give a summary with the PR link.
+   - Include the exact validation commands you ran and their outcomes.
+   - Also comment a final report on the PR.
+
+7. Merge automatically unless the user explicitly asks you not to.
+
+If this skill is queued many times, treat that as a reminder to make sure the work is fully finished. Once the work is fully finished, you can ignore the repeated instructions. If the work is not finished, continue working.
