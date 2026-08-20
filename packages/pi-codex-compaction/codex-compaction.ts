@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { reloadCodexRequestOptions } from "@onurpi/codex-auth-reload";
 import type {
   BeforeProviderHeadersEvent,
   BeforeProviderRequestEvent,
@@ -136,8 +135,7 @@ async function resolveCodexAuth(
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
   if (!auth.ok) throw new Error(auth.error);
   if (!auth.apiKey) throw new Error("OpenAI Codex authentication is unavailable.");
-  const requestAuth = { apiKey: auth.apiKey, headers: auth.headers ?? {} };
-  return (await reloadCodexRequestOptions(model, requestAuth)) ?? requestAuth;
+  return { apiKey: auth.apiKey, headers: auth.headers ?? {} };
 }
 
 async function createNativeCheckpoint(params: CheckpointParams): Promise<CheckpointResult> {

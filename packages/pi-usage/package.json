@@ -4,6 +4,9 @@
   "private": true,
   "description": "Provider usage reports and a model-gated status for Pi",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "engines": {
     "node": ">=22.19.0"
   },

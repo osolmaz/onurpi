@@ -339,6 +339,19 @@ describe("Codex native compaction ownership", () => {
     ).toBe("unavailable");
     expect(requests).toHaveLength(0);
 
+    expect(
+      controller.evaluate(
+        context({
+          contextWindow: 272_000,
+          tokens: 272_000,
+          provider: "openai-codex-primary",
+          api: "openai-codex-responses",
+          compact: (value) => requests.push(value),
+        }),
+      ),
+    ).toBe("unavailable");
+    expect(requests).toHaveLength(0);
+
     // A custom provider using the same API is still text-compacted by this policy.
     expect(
       controller.evaluate(
@@ -354,11 +367,18 @@ describe("Codex native compaction ownership", () => {
     expect(requests).toHaveLength(1);
   });
 
-  it("identifies only the built-in Codex provider and API pair", () => {
+  it("identifies the built-in provider and switcher profiles with the Codex API", () => {
     expect(
       isCodexNativeModel({
         contextWindow: 272_000,
         provider: "openai-codex",
+        api: "openai-codex-responses",
+      }),
+    ).toBe(true);
+    expect(
+      isCodexNativeModel({
+        contextWindow: 272_000,
+        provider: "openai-codex-backup",
         api: "openai-codex-responses",
       }),
     ).toBe(true);
