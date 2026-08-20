@@ -133,8 +133,10 @@ The readiness check returns only a boolean. It does not return, copy, refresh, l
 credential. The adapter does not choose a model, read session entries, or append a model change.
 Missing or invalid switcher state keeps Pi's normal fallback behavior.
 
-This adapter supports Pi 0.84.x only. It will be removed when Pi releases provider registration
-before saved-model restoration.
+This adapter supports Pi 0.84.x only. If startup rejects the Pi version or cannot register its
+lifecycle cleanup, the extension removes its queued provider override before it reports the error.
+Pi then keeps the built-in provider unchanged. The adapter will be removed when Pi releases provider
+registration before saved-model restoration.
 
 ## Security and state
 
