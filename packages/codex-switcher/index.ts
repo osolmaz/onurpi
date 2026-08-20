@@ -1,9 +1,5 @@
 import { createProvider, type Model, type Provider } from "@earendil-works/pi-ai";
-import {
-  getAgentDir,
-  type ExtensionAPI,
-  type ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { runAccountManager, type ConfigController } from "./account-manager.ts";
 import {
@@ -21,14 +17,12 @@ import {
   type SwitcherState,
 } from "./router.ts";
 import { createCodexUsageClient } from "./usage-client.ts";
-import { minimumRemaining } from "./usage-policy.ts";
 import { codexSwitcherVaultPath, createAccountVault, type AccountVault } from "./vault.ts";
 
 const DEFAULT_REFRESH_MS = 5 * 60_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
 type CodexModel = Model<"openai-codex-responses">;
 type CodexProvider = Provider<"openai-codex-responses">;
-type LiveContext = Pick<ExtensionContext, "model" | "ui">;
 
 function emptyConfig(): CodexSwitcherConfig {
   return { accounts: [], refreshMs: DEFAULT_REFRESH_MS, timeoutMs: DEFAULT_TIMEOUT_MS };
@@ -70,21 +64,6 @@ async function resolveProviderAuth(
   return undefined;
 }
 
-function statusText(state: SwitcherState): string | undefined {
-  const id = state.activeAccountId;
-  if (!id) return undefined;
-  const usage = state.usageByAccount.get(id);
-  if (usage?.status === "ready") {
-    const remaining = minimumRemaining(usage.report);
-    if (remaining !== undefined) return `${id} ${Math.max(0, remaining).toFixed(0)}%`;
-  }
-  return id;
-}
-
-function setStatus(context: LiveContext | undefined, state: SwitcherState): void {
-  context?.ui.setStatus("codex-switcher", statusText(state));
-}
-
 function createSwitcherProvider(
   native: CodexProvider,
   config: ConfigController,
@@ -117,51 +96,33 @@ function createSwitcherProvider(
   });
 }
 
-function registerLifecycle(
-  pi: ExtensionAPI,
-  state: SwitcherState,
-  live: { context: LiveContext | undefined },
-): void {
-  const startAgentRun = (context: LiveContext): void => {
-    live.context = context;
+function registerLifecycle(pi: ExtensionAPI, state: SwitcherState): void {
+  const startAgentRun = (): void => {
     if (!state.agentRunActive) {
       state.agentRunActive = true;
       state.leaseAccountId = undefined;
       state.activeAccountId = undefined;
     }
-    setStatus(context, state);
   };
 
   pi.on("session_start", (_event, context) => {
-    live.context = context;
-    setStatus(live.context, state);
+    context.ui.setStatus("codex-switcher", undefined);
   });
-  pi.on("model_select", (event, context) => {
-    live.context = context;
-    if (event.model.provider !== "openai-codex") {
-      context.ui.setStatus("codex-switcher", undefined);
-    } else {
-      setStatus(context, state);
-    }
+  pi.on("before_agent_start", () => {
+    startAgentRun();
   });
-  pi.on("before_agent_start", (_event, context) => {
-    startAgentRun(context);
+  pi.on("agent_start", () => {
+    startAgentRun();
   });
-  pi.on("agent_start", (_event, context) => {
-    startAgentRun(context);
-  });
-  pi.on("agent_settled", (_event, context) => {
-    live.context = context;
+  pi.on("agent_settled", () => {
     state.agentRunActive = false;
     state.leaseAccountId = undefined;
-    setStatus(context, state);
   });
   pi.on("session_shutdown", (_event, context) => {
     context.ui.setStatus("codex-switcher", undefined);
     state.agentRunActive = false;
     state.leaseAccountId = undefined;
     state.activeAccountId = undefined;
-    live.context = undefined;
   });
 }
 
@@ -226,7 +187,6 @@ export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions):
     leaseAccountId: undefined,
     usageByAccount: new Map(),
   };
-  const live: { context: LiveContext | undefined } = { context: undefined };
   const usage = createCodexUsageClient(config.get().refreshMs, config.get().timeoutMs);
   const runtime: SwitcherRuntime = {
     getAuth: (accountId, signal) => vault.resolve(accountId, signal),
@@ -236,7 +196,6 @@ export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions):
     },
     activateAccount: (account) => {
       state.activeAccountId = account.id;
-      setStatus(live.context, state);
     },
   };
   const routerOptions = {
@@ -266,7 +225,7 @@ export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions):
         vault,
       }),
   });
-  registerLifecycle(pi, state, live);
+  registerLifecycle(pi, state);
 }
 
 export default async function codexSwitcherExtension(pi: ExtensionAPI): Promise<void> {
