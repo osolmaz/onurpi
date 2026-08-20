@@ -99,15 +99,16 @@ function nativeEntry(id: string, details: unknown): CompactionEntry {
 }
 
 describe("isOpenAICodexModel / modelKey", () => {
-  it("matches the built-in provider and switcher profiles with the Codex API", () => {
+  it("matches only the built-in provider with the Codex API", () => {
     expect(isOpenAICodexModel(model())).toBe(true);
-    expect(isOpenAICodexModel(model({ provider: "openai-codex-primary" }))).toBe(true);
     expect(isOpenAICodexModel(model({ provider: "custom-codex" }))).toBe(false);
     expect(isOpenAICodexModel(model({ api: "openai-responses" }))).toBe(false);
     expect(isOpenAICodexModel(undefined)).toBe(false);
     expect(isOpenAICodexModel({})).toBe(false);
     expect(modelKey(model())).toBe(MODEL_KEY);
-    expect(modelKey(model({ provider: "openai-codex-primary" }))).toBe(MODEL_KEY);
+    expect(modelKey(model({ provider: "custom-codex" }))).toBe(
+      "custom-codex:openai-codex-responses:gpt-test",
+    );
   });
 });
 

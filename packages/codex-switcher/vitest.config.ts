@@ -7,12 +7,15 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       include: [
-        "codex-family.ts",
+        "account-manager.ts",
         "config.ts",
+        "index.ts",
         "native-provider.ts",
+        "private-file.ts",
         "router.ts",
         "usage-client.ts",
         "usage-policy.ts",
+        "vault.ts",
       ],
       thresholds: {
         statements: 85,

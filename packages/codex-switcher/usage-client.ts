@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { AuthResult, Model } from "@earendil-works/pi-ai";
+import type { Model, ModelAuth } from "@earendil-works/pi-ai";
 import {
   adapterForProvider,
   fingerprintResolvedAuth,
@@ -10,12 +10,12 @@ import {
   type UsageReport,
 } from "@onurpi/pi-usage";
 
-import { CODEX_PROVIDER_ID, toBuiltInCodexModel } from "./codex-family.ts";
-import type { CodexProfile } from "./config.ts";
+import type { CodexAccount } from "./config.ts";
 
+const CODEX_PROVIDER_ID = "openai-codex";
 type CodexModel = Model<"openai-codex-responses">;
 
-function headerValue(headers: AuthResult["auth"]["headers"], name: string): string | undefined {
+function headerValue(headers: ModelAuth["headers"], name: string): string | undefined {
   const match = Object.entries(headers ?? {}).find(
     ([key]) => key.toLowerCase() === name.toLowerCase(),
   );
@@ -33,7 +33,7 @@ function officialBaseUrl(baseUrl: string | undefined): boolean {
 }
 
 function resolvedUsageAuth(
-  auth: AuthResult["auth"],
+  auth: ModelAuth,
   model: CodexModel,
   salt: Uint8Array,
 ): ResolvedUsageAuth | undefined {
@@ -52,18 +52,18 @@ function resolvedUsageAuth(
     headers,
     fingerprint: fingerprintResolvedAuth({ headers }, salt),
     secrets: [auth.apiKey, authorization].filter((value): value is string => Boolean(value)),
-    model: toBuiltInCodexModel(model),
+    model,
   };
 }
 
 export type CodexUsageClient = {
   query(
-    profile: CodexProfile,
-    auth: AuthResult["auth"],
+    account: CodexAccount,
+    auth: ModelAuth,
     model: CodexModel,
     signal: AbortSignal,
   ): Promise<UsageReport | undefined>;
-  clear(profile: CodexProfile): void;
+  clear(account: CodexAccount): void;
 };
 
 function exhaustedWindowReset(report: UsageReport, now: number): boolean {
@@ -85,18 +85,18 @@ export function createCodexUsageClient(
   if (!adapter) throw new Error("OpenAI Codex usage support is unavailable.");
   const cache = new UsageCache(refreshMs, 16);
   return {
-    query: async (profile, auth, model, signal) => {
+    query: async (account, auth, model, signal) => {
       const resolved = resolvedUsageAuth(auth, model, salt);
       if (!resolved) return undefined;
-      const cached = cache.get(profile.providerId, resolved.fingerprint);
+      const cached = cache.get(account.id, resolved.fingerprint);
       if (cached && !exhaustedWindowReset(cached, Date.now())) return cached;
-      if (cached) cache.clearProvider(profile.providerId);
+      if (cached) cache.clearProvider(account.id);
       const report = await queryProviderUsage(adapter, resolved, signal, timeoutMs);
-      cache.set(profile.providerId, resolved.fingerprint, report);
+      cache.set(account.id, resolved.fingerprint, report);
       return report;
     },
-    clear: (profile) => {
-      cache.clearProvider(profile.providerId);
+    clear: (account) => {
+      cache.clearProvider(account.id);
     },
   };
 }

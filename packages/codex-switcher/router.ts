@@ -3,47 +3,41 @@ import {
   type AssistantMessage,
   type AssistantMessageEvent,
   type AssistantMessageEventStream,
-  type AuthResult,
   type Context,
   type Model,
+  type ModelAuth,
   type ProviderHeaders,
   type StreamOptions,
 } from "@earendil-works/pi-ai";
 import type { UsageReport } from "@onurpi/pi-usage";
 
-import {
-  assertOfficialCodexEndpoint,
-  mapCodexEventProvider,
-  toBuiltInCodexContext,
-  toBuiltInCodexModel,
-} from "./codex-family.ts";
-import type { CodexProfile } from "./config.ts";
+import type { CodexAccount } from "./config.ts";
 import { usageDecision } from "./usage-policy.ts";
 
 type CodexModel = Model<"openai-codex-responses">;
 
-export type ProfileUsageState =
+export type AccountUsageState =
   | { status: "unknown" }
   | { status: "ready"; report: UsageReport }
   | { status: "failed"; message: string };
 
 export type SwitcherState = {
-  activeProfileId?: string;
+  activeAccountId: string | undefined;
   agentRunActive: boolean;
-  runProfileId: string | undefined;
-  usageByProfile: Map<string, ProfileUsageState>;
+  leaseAccountId: string | undefined;
+  usageByAccount: Map<string, AccountUsageState>;
 };
 
 export type SwitcherRuntime = {
-  getAuth(providerId: string): Promise<AuthResult | undefined>;
+  activateAccount(account: CodexAccount): void;
+  clearUsage(account: CodexAccount): void;
+  getAuth(accountId: string, signal: AbortSignal): Promise<ModelAuth | undefined>;
   queryUsage(
-    profile: CodexProfile,
-    auth: AuthResult["auth"],
+    account: CodexAccount,
+    auth: ModelAuth,
     model: CodexModel,
     signal: AbortSignal,
   ): Promise<UsageReport | undefined>;
-  clearUsage(profile: CodexProfile): void;
-  activateProfile(profile: CodexProfile, model: CodexModel): Promise<void>;
 };
 
 export type CodexTransport = (
@@ -53,17 +47,15 @@ export type CodexTransport = (
 ) => AssistantMessageEventStream;
 
 export type RouterOptions = {
-  profiles: readonly CodexProfile[];
-  fallbackChain: readonly string[];
+  getAccounts(): readonly CodexAccount[];
   runtime: SwitcherRuntime;
   state: SwitcherState;
   transport: CodexTransport;
 };
 
 type Candidate = {
-  profile: CodexProfile;
-  model: CodexModel;
-  auth: AuthResult["auth"];
+  account: CodexAccount;
+  auth: ModelAuth;
 };
 
 type AttemptResult =
@@ -79,29 +71,25 @@ type PrecommitAction =
 const USAGE_LIMIT_ERROR =
   /GoUsageLimitError|FreeUsageLimitError|Monthly usage limit reached|\busage limit(?: reached| exceeded)?\b|\binsufficient_quota\b|\bquota exceeded\b|\bout of budget\b|\binsufficient (?:credit|balance)\b|\bno available balance\b|\bavailable balance is (?:too low|exhausted|zero)\b|\bcredit balance (?:is )?(?:exhausted|insufficient|zero)\b|\bbilling_hard_limit_reached\b/iu;
 
-function profileMap(profiles: readonly CodexProfile[]): Map<string, CodexProfile> {
-  return new Map(profiles.map((profile) => [profile.id, profile]));
+function officialCodexUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.origin === "https://chatgpt.com" &&
+      url.pathname.replace(/\/+$/u, "") === "/backend-api" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === ""
+    );
+  } catch {
+    return false;
+  }
 }
 
-function candidatesFrom(
-  selectedProvider: string,
-  profiles: readonly CodexProfile[],
-  fallbackChain: readonly string[],
-  runProfileId: string | undefined,
-): CodexProfile[] {
-  const byId = profileMap(profiles);
-  const selected =
-    runProfileId ?? profiles.find((profile) => profile.providerId === selectedProvider)?.id;
-  const start = selected ? fallbackChain.indexOf(selected) : -1;
-  if (start < 0) return [];
-  return fallbackChain.slice(start).flatMap((id) => {
-    const profile = byId.get(id);
-    return profile ? [profile] : [];
-  });
-}
-
-function activeRunProfile(state: SwitcherState): string | undefined {
-  return state.agentRunActive ? state.runProfileId : undefined;
+function assertOfficialCodexModel(model: CodexModel): void {
+  if (model.provider === "openai-codex" && officialCodexUrl(model.baseUrl)) return;
+  throw new Error("Codex account authentication is restricted to the official endpoint.");
 }
 
 function withoutCredentialHeaders(headers: ProviderHeaders | undefined): ProviderHeaders {
@@ -112,14 +100,13 @@ function withoutCredentialHeaders(headers: ProviderHeaders | undefined): Provide
   );
 }
 
-function requestOptions(
-  options: StreamOptions | undefined,
-  auth: AuthResult["auth"],
-): StreamOptions {
+function requestOptions(options: StreamOptions | undefined, auth: ModelAuth): StreamOptions {
+  const { apiKey: discardedApiKey, headers: originalHeaders, ...rest } = options ?? {};
+  void discardedApiKey;
   return {
-    ...options,
+    ...rest,
     ...(auth.apiKey ? { apiKey: auth.apiKey } : {}),
-    headers: { ...withoutCredentialHeaders(options?.headers), ...auth.headers },
+    headers: { ...withoutCredentialHeaders(originalHeaders), ...auth.headers },
   };
 }
 
@@ -160,34 +147,64 @@ function routingError(model: CodexModel, message: string): AssistantMessageEvent
   };
 }
 
+function accountCandidates(options: RouterOptions): readonly CodexAccount[] {
+  const lease = options.state.agentRunActive ? options.state.leaseAccountId : undefined;
+  if (!lease) return options.getAccounts();
+  const account = options.getAccounts().find((candidate) => candidate.id === lease);
+  return account ? [account] : [];
+}
+
+async function resolveAccountAuth(
+  account: CodexAccount,
+  options: RouterOptions,
+  signal: AbortSignal,
+): Promise<ModelAuth | undefined> {
+  try {
+    return await options.runtime.getAuth(account.id, signal);
+  } catch {
+    throw new Error("Codex account authentication failed.");
+  }
+}
+
+async function hasPermittedUsage(
+  account: CodexAccount,
+  auth: ModelAuth,
+  model: CodexModel,
+  options: RouterOptions,
+  signal: AbortSignal,
+): Promise<boolean> {
+  try {
+    const report = await options.runtime.queryUsage(account, auth, model, signal);
+    if (!report) return true;
+    options.state.usageByAccount.set(account.id, { status: "ready", report });
+    return usageDecision(report, model.id, account.billing) !== "exhausted";
+  } catch {
+    options.state.usageByAccount.set(account.id, {
+      status: "failed",
+      message: "usage check unavailable",
+    });
+    return true;
+  }
+}
+
 async function eligibleCandidate(
-  profile: CodexProfile,
-  selectedModel: CodexModel,
+  account: CodexAccount,
+  model: CodexModel,
   options: RouterOptions,
   signal: AbortSignal,
 ): Promise<Candidate | undefined> {
-  assertOfficialCodexEndpoint(selectedModel);
-  const auth = await options.runtime.getAuth(profile.providerId);
-  if (!auth?.auth.apiKey) return undefined;
-  const model = { ...selectedModel, provider: profile.providerId };
-  try {
-    const report = await options.runtime.queryUsage(profile, auth.auth, model, signal);
-    if (report) {
-      options.state.usageByProfile.set(profile.id, { status: "ready", report });
-      if (usageDecision(report, model.id, profile.billing) === "exhausted") return undefined;
-    }
-  } catch (error) {
-    options.state.usageByProfile.set(profile.id, {
-      status: "failed",
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
-  return { profile, model, auth: auth.auth };
+  assertOfficialCodexModel(model);
+  const auth = await resolveAccountAuth(account, options, signal);
+  if (!auth?.apiKey && !auth?.headers) return undefined;
+  return (await hasPermittedUsage(account, auth, model, options, signal))
+    ? { account, auth }
+    : undefined;
 }
 
 function commitCandidate(candidate: Candidate, options: RouterOptions): void {
-  options.state.activeProfileId = candidate.profile.id;
-  if (options.state.agentRunActive) options.state.runProfileId = candidate.profile.id;
+  options.state.activeAccountId = candidate.account.id;
+  if (options.state.agentRunActive) options.state.leaseAccountId = candidate.account.id;
+  options.runtime.activateAccount(candidate.account);
 }
 
 function flushBuffered(
@@ -205,37 +222,25 @@ function precommitAction(event: AssistantMessageEvent): PrecommitAction {
   return { status: "commit" };
 }
 
-async function forwardTerminal(
-  event: AssistantMessageEvent,
-  candidate: Candidate,
-  output: AssistantMessageEventStream,
-  options: RouterOptions,
-): Promise<AttemptResult | undefined> {
-  if (event.type === "done") {
-    await options.runtime.activateProfile(candidate.profile, candidate.model);
-    output.push(event);
-    return { status: "success" };
-  }
-  output.push(event);
-  return event.type === "error" ? { status: "terminal" } : undefined;
-}
-
 async function attemptCandidate(
   candidate: Candidate,
+  model: CodexModel,
   context: Context,
   streamOptions: StreamOptions | undefined,
   output: AssistantMessageEventStream,
   options: RouterOptions,
 ): Promise<AttemptResult> {
+  const requestModel = candidate.auth.baseUrl
+    ? { ...model, baseUrl: candidate.auth.baseUrl }
+    : model;
   const stream = options.transport(
-    toBuiltInCodexModel(candidate.model),
-    toBuiltInCodexContext(context),
+    requestModel,
+    context,
     requestOptions(streamOptions, candidate.auth),
   );
   const buffered: AssistantMessageEvent[] = [];
   let committed = false;
-  for await (const raw of stream) {
-    const event = mapCodexEventProvider(raw, candidate.profile.providerId);
+  for await (const event of stream) {
     if (!committed) {
       const action = precommitAction(event);
       if (action.status === "buffer") {
@@ -247,26 +252,49 @@ async function attemptCandidate(
       commitCandidate(candidate, options);
       flushBuffered(buffered, output);
     }
-    const terminal = await forwardTerminal(event, candidate, output, options);
-    if (terminal) return terminal;
+    output.push(event);
+    if (event.type === "done") return { status: "success" };
+    if (event.type === "error") return { status: "terminal" };
   }
   flushBuffered(buffered, output);
-  output.push(
-    routingError(candidate.model, "Codex provider stream ended without a terminal event."),
-  );
+  output.push(routingError(model, "Codex provider stream ended without a terminal event."));
   return { status: "terminal" };
 }
 
 function routeFailureMessage(signal: AbortSignal): string {
   return signal.aborted
-    ? "Codex profile routing was aborted."
-    : "No authenticated Codex profile with available usage remains in the fallback chain.";
+    ? "Codex account routing was aborted."
+    : "No authenticated Codex account with available usage remains.";
 }
 
-function isUsageLimitResult(
-  result: AttemptResult,
-): result is Extract<AttemptResult, { status: "usage-limit" }> {
-  return result.status === "usage-limit";
+type RouteAccountResult =
+  | { status: "done" }
+  | { status: "continue"; limit?: Extract<AssistantMessageEvent, { type: "error" }> };
+
+async function routeAccount(
+  account: CodexAccount,
+  model: CodexModel,
+  context: Context,
+  streamOptions: StreamOptions | undefined,
+  output: AssistantMessageEventStream,
+  options: RouterOptions,
+  signal: AbortSignal,
+): Promise<RouteAccountResult> {
+  const candidate = await eligibleCandidate(account, model, options, signal);
+  if (!candidate) return { status: "continue" };
+  const result = await attemptCandidate(candidate, model, context, streamOptions, output, options);
+  if (result.status !== "usage-limit") return { status: "done" };
+  options.runtime.clearUsage(account);
+  options.state.usageByAccount.set(account.id, { status: "unknown" });
+  return { status: "continue", limit: result.event };
+}
+
+function requestSignal(streamOptions: StreamOptions | undefined): AbortSignal {
+  return streamOptions?.signal ?? new AbortController().signal;
+}
+
+function hasCommittedLease(state: SwitcherState): boolean {
+  return state.agentRunActive && state.leaseAccountId !== undefined;
 }
 
 async function route(
@@ -276,23 +304,23 @@ async function route(
   output: AssistantMessageEventStream,
   options: RouterOptions,
 ): Promise<void> {
-  const profiles = candidatesFrom(
-    model.provider,
-    options.profiles,
-    options.fallbackChain,
-    activeRunProfile(options.state),
-  );
-  const signal = streamOptions?.signal ?? new AbortController().signal;
+  const signal = requestSignal(streamOptions);
+  const leased = hasCommittedLease(options.state);
   let lastLimit: Extract<AssistantMessageEvent, { type: "error" }> | undefined;
-  for (const profile of profiles) {
+  for (const account of accountCandidates(options)) {
     if (signal.aborted) break;
-    const candidate = await eligibleCandidate(profile, model, options, signal);
-    if (!candidate) continue;
-    const result = await attemptCandidate(candidate, context, streamOptions, output, options);
-    if (!isUsageLimitResult(result)) return;
-    options.runtime.clearUsage(profile);
-    options.state.usageByProfile.set(profile.id, { status: "unknown" });
-    lastLimit = result.event;
+    const result = await routeAccount(
+      account,
+      model,
+      context,
+      streamOptions,
+      output,
+      options,
+      signal,
+    );
+    if (result.status === "done") return;
+    if (result.limit) lastLimit = result.limit;
+    if (leased) break;
   }
   output.push(lastLimit ?? routingError(model, routeFailureMessage(signal)));
 }
@@ -300,8 +328,8 @@ async function route(
 export function createCodexSwitcherStream(options: RouterOptions): CodexTransport {
   return (model, context, streamOptions) => {
     const output = createAssistantMessageEventStream();
-    void route(model, context, streamOptions, output, options).catch((error: unknown) => {
-      output.push(routingError(model, error instanceof Error ? error.message : String(error)));
+    void route(model, context, streamOptions, output, options).catch(() => {
+      output.push(routingError(model, "Codex account routing failed."));
     });
     return output;
   };

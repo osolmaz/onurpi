@@ -56,8 +56,9 @@ repositories.
 | [`demo-mode`](packages/demo-mode/)                 | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
-provider and Codex switcher profile providers natively. `context-window-policy` and
-`reliable-compaction` pass those providers through and keep covering every other model. See the
+provider natively. The Codex switcher keeps that provider identity while changing its account
+credential. `context-window-policy` and `reliable-compaction` pass `openai-codex` through and keep
+covering every other model. See the
 [package README](packages/pi-codex-compaction/README.md#compaction-ownership-in-onurpi).
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts

@@ -5,139 +5,110 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
+import { runAccountManager, type ConfigController } from "./account-manager.ts";
 import {
   codexSwitcherConfigPath,
   loadCodexSwitcherConfig,
-  type CodexProfile,
   type CodexSwitcherConfig,
   type ConfigLoadResult,
+  writeCodexSwitcherConfig,
 } from "./config.ts";
 import { loadOpenAICodexProvider } from "./native-provider.ts";
 import {
   createCodexSwitcherStream,
   type CodexTransport,
-  type ProfileUsageState,
   type SwitcherRuntime,
   type SwitcherState,
 } from "./router.ts";
 import { createCodexUsageClient } from "./usage-client.ts";
 import { minimumRemaining } from "./usage-policy.ts";
+import { codexSwitcherVaultPath, createAccountVault, type AccountVault } from "./vault.ts";
 
+const DEFAULT_REFRESH_MS = 5 * 60_000;
+const DEFAULT_TIMEOUT_MS = 10_000;
 type CodexModel = Model<"openai-codex-responses">;
+type CodexProvider = Provider<"openai-codex-responses">;
+type LiveContext = Pick<ExtensionContext, "model" | "ui">;
 
-type LiveContext = Pick<ExtensionContext, "model" | "modelRegistry" | "ui">;
-
-function profileForProvider(
-  config: CodexSwitcherConfig,
-  provider: string | undefined,
-): CodexProfile | undefined {
-  return config.profiles.find((profile) => profile.providerId === provider);
+function emptyConfig(): CodexSwitcherConfig {
+  return { accounts: [], refreshMs: DEFAULT_REFRESH_MS, timeoutMs: DEFAULT_TIMEOUT_MS };
 }
 
-function statusText(profile: CodexProfile, usage: ProfileUsageState | undefined): string {
-  if (usage?.status === "ready") {
-    const remaining = minimumRemaining(usage.report);
-    if (remaining !== undefined) return `${profile.label} ${Math.max(0, remaining).toFixed(0)}%`;
-  }
-  return profile.label;
-}
-
-function setProfileStatus(
-  context: LiveContext | undefined,
-  state: SwitcherState,
-  profile: CodexProfile | undefined,
-): void {
-  if (!context) return;
-  if (!profile) {
-    context.ui.setStatus("codex-switcher", undefined);
-    return;
-  }
-  state.activeProfileId = profile.id;
-  context.ui.setStatus("codex-switcher", statusText(profile, state.usageByProfile.get(profile.id)));
-}
-
-function authStatus(profile: CodexProfile, context: LiveContext | undefined): string {
-  const configured = context?.modelRegistry.getProviderAuthStatus(profile.providerId).configured;
-  if (configured === undefined) return "unknown auth";
-  return configured ? "authenticated" : "not authenticated";
-}
-
-function usageStatus(profile: CodexProfile, state: SwitcherState): string {
-  const usage = state.usageByProfile.get(profile.id);
-  if (usage?.status === "failed") return `usage check failed: ${usage.message}`;
-  if (usage?.status === "ready") {
-    const remaining = minimumRemaining(usage.report);
-    return remaining === undefined
-      ? "usage available"
-      : `${Math.max(0, remaining).toFixed(0)}% remaining`;
-  }
-  return "usage unknown";
-}
-
-function diagnosticLine(
-  profile: CodexProfile,
-  context: LiveContext | undefined,
-  state: SwitcherState,
-): string {
-  const auth = authStatus(profile, context);
-  const usageText = usageStatus(profile, state);
-  const active = state.activeProfileId === profile.id ? ", active" : "";
-  return `${profile.label} (${profile.providerId}): ${auth}, ${profile.billing}, ${usageText}${active}`;
-}
-
-function registerDiagnosticCommand(
-  pi: ExtensionAPI,
-  path: string,
-  result: ConfigLoadResult,
-  context: () => LiveContext | undefined,
-  state: SwitcherState,
-): void {
-  pi.registerCommand("codex-switcher", {
-    description: "Show Codex profile, authentication, and usage state",
-    handler: (_args, commandContext) => {
-      if (result.status === "missing") {
-        commandContext.ui.notify(`Codex switcher configuration is missing: ${path}`, "warning");
-        return Promise.resolve();
-      }
-      if (result.status === "invalid") {
-        commandContext.ui.notify(
-          `Codex switcher configuration is invalid: ${result.message}`,
-          "error",
-        );
-        return Promise.resolve();
-      }
-      const lines = result.config.fallbackChain.map((id) => {
-        const profile = result.config.profiles.find((candidate) => candidate.id === id);
-        return profile ? diagnosticLine(profile, context(), state) : id;
-      });
-      commandContext.ui.notify(`Codex fallback chain:\n${lines.join("\n")}`, "info");
-      return Promise.resolve();
+function createConfigController(path: string, initial: CodexSwitcherConfig): ConfigController {
+  let current = initial;
+  return {
+    get: () => current,
+    replace: (config) => {
+      writeCodexSwitcherConfig(path, config);
+      current = config;
     },
-  });
+  };
 }
 
-function aliasModels(
-  native: Provider<"openai-codex-responses">,
-  profile: CodexProfile,
-): CodexModel[] {
-  return native.getModels().map((model) => ({
-    ...model,
-    provider: profile.providerId,
-  }));
+async function hasConfiguredAccount(
+  config: CodexSwitcherConfig,
+  vault: AccountVault,
+): Promise<boolean> {
+  const stored = new Set(await vault.list());
+  return config.accounts.some((account) => stored.has(account.id));
 }
 
-function createProfileProvider(
-  native: Provider<"openai-codex-responses">,
-  profile: CodexProfile,
+async function resolveProviderAuth(
+  config: CodexSwitcherConfig,
+  vault: AccountVault,
+  state: SwitcherState,
+  signal: AbortSignal,
+) {
+  const preferred = [state.leaseAccountId, state.activeAccountId].filter(
+    (id): id is string => id !== undefined,
+  );
+  const candidates = [...new Set([...preferred, ...config.accounts.map((account) => account.id)])];
+  for (const id of candidates) {
+    const auth = await vault.resolve(id, signal);
+    if (auth) return { auth, source: "Codex switcher account vault" };
+  }
+  return undefined;
+}
+
+function statusText(state: SwitcherState): string | undefined {
+  const id = state.activeAccountId;
+  if (!id) return undefined;
+  const usage = state.usageByAccount.get(id);
+  if (usage?.status === "ready") {
+    const remaining = minimumRemaining(usage.report);
+    if (remaining !== undefined) return `${id} ${Math.max(0, remaining).toFixed(0)}%`;
+  }
+  return id;
+}
+
+function setStatus(context: LiveContext | undefined, state: SwitcherState): void {
+  context?.ui.setStatus("codex-switcher", statusText(state));
+}
+
+function createSwitcherProvider(
+  native: CodexProvider,
+  config: ConfigController,
+  vault: AccountVault,
+  state: SwitcherState,
   stream: CodexTransport,
   streamSimple: CodexTransport,
-): Provider<"openai-codex-responses"> {
+): CodexProvider {
   return createProvider({
-    id: profile.providerId,
-    name: `OpenAI Codex (${profile.label})`,
+    id: native.id,
+    name: native.name,
     ...(native.baseUrl ? { baseUrl: native.baseUrl } : {}),
-    auth: native.auth,
-    models: aliasModels(native, profile),
+    ...(native.headers ? { headers: native.headers } : {}),
+    auth: {
+      apiKey: {
+        name: "Codex switcher account vault",
+        check: async () =>
+          (await hasConfiguredAccount(config.get(), vault))
+            ? { type: "oauth", source: "Codex switcher account vault" }
+            : undefined,
+        resolve: ({ signal }) => resolveProviderAuth(config.get(), vault, state, signal),
+      },
+    },
+    models: native.getModels(),
     api: {
       stream: (model, context, options) => stream(model as CodexModel, context, options),
       streamSimple: (model, context, options) =>
@@ -146,69 +117,41 @@ function createProfileProvider(
   });
 }
 
-function sameModel(left: CodexModel | undefined, right: CodexModel): boolean {
-  return left?.provider === right.provider && left.id === right.id;
-}
-
-type LiveState = {
-  context: LiveContext | undefined;
-  preferredModel: CodexModel | undefined;
-  internalModelChange: boolean;
-};
-
-async function selectInternalModel(
-  pi: ExtensionAPI,
-  live: LiveState,
-  model: CodexModel,
-): Promise<boolean> {
-  live.internalModelChange = true;
-  try {
-    return await pi.setModel(model);
-  } finally {
-    live.internalModelChange = false;
-  }
-}
-
 function registerLifecycle(
   pi: ExtensionAPI,
-  config: CodexSwitcherConfig,
   state: SwitcherState,
-  live: LiveState,
+  live: { context: LiveContext | undefined },
 ): void {
-  pi.on("session_start", (_event, next) => {
-    live.context = next;
-    const profile = profileForProvider(config, next.model?.provider);
-    live.preferredModel = profile ? (next.model as CodexModel) : undefined;
-    setProfileStatus(live.context, state, profile);
+  pi.on("session_start", (_event, context) => {
+    live.context = context;
+    setStatus(live.context, state);
   });
-  pi.on("model_select", (event, next) => {
-    live.context = next;
-    const profile = profileForProvider(config, event.model.provider);
-    if (!live.internalModelChange) {
-      live.preferredModel = profile ? (event.model as CodexModel) : undefined;
-      state.runProfileId = undefined;
+  pi.on("model_select", (event, context) => {
+    live.context = context;
+    if (event.model.provider !== "openai-codex") {
+      context.ui.setStatus("codex-switcher", undefined);
+    } else {
+      setStatus(context, state);
     }
-    setProfileStatus(live.context, state, profile);
   });
-  pi.on("agent_start", () => {
-    if (state.agentRunActive) return;
+  pi.on("before_agent_start", (_event, context) => {
+    live.context = context;
     state.agentRunActive = true;
-    state.runProfileId = undefined;
+    state.leaseAccountId = undefined;
+    state.activeAccountId = undefined;
+    setStatus(context, state);
   });
-  pi.on("agent_settled", async (_event, next) => {
+  pi.on("agent_settled", (_event, context) => {
+    live.context = context;
     state.agentRunActive = false;
-    state.runProfileId = undefined;
-    const preferred = live.preferredModel;
-    if (!preferred || sameModel(next.model as CodexModel | undefined, preferred)) return;
-    if (!(await selectInternalModel(pi, live, preferred))) {
-      next.ui.notify("Codex switcher could not restore the preferred profile.", "warning");
-    }
+    state.leaseAccountId = undefined;
+    setStatus(context, state);
   });
-  pi.on("session_shutdown", (_event, next) => {
-    next.ui.setStatus("codex-switcher", undefined);
+  pi.on("session_shutdown", (_event, context) => {
+    context.ui.setStatus("codex-switcher", undefined);
     state.agentRunActive = false;
-    state.runProfileId = undefined;
-    live.preferredModel = undefined;
+    state.leaseAccountId = undefined;
+    state.activeAccountId = undefined;
     live.context = undefined;
   });
 }
@@ -216,87 +159,108 @@ function registerLifecycle(
 export type InstallOptions = {
   configPath?: string;
   configResult?: ConfigLoadResult;
-  nativeProvider?: Provider<"openai-codex-responses">;
+  nativeProvider?: CodexProvider;
+  vault?: AccountVault;
+  vaultPath?: string;
 };
 
-export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions = {}): void {
-  const path = options.configPath ?? codexSwitcherConfigPath(getAgentDir());
-  const result = options.configResult ?? loadCodexSwitcherConfig(path);
-  const state: SwitcherState = {
-    agentRunActive: false,
-    runProfileId: undefined,
-    usageByProfile: new Map(),
-  };
-  const live: LiveState = {
-    context: undefined,
-    preferredModel: undefined,
-    internalModelChange: false,
-  };
-  registerDiagnosticCommand(pi, path, result, () => live.context, state);
-  if (result.status !== "ready") return;
-
-  const config = result.config;
+function requiredNativeProvider(options: InstallOptions): {
+  native: CodexProvider;
+  oauth: NonNullable<CodexProvider["auth"]["oauth"]>;
+} {
   const native = options.nativeProvider;
-  if (!native) throw new Error("Codex switcher requires the built-in OpenAI Codex provider.");
-  const usage = createCodexUsageClient(config.refreshMs, config.timeoutMs);
+  const oauth = native?.auth.oauth;
+  if (!native || !oauth) {
+    throw new Error("Codex switcher requires the built-in OpenAI Codex OAuth provider.");
+  }
+  return { native, oauth };
+}
+
+function configuredVault(
+  options: InstallOptions,
+  oauth: NonNullable<CodexProvider["auth"]["oauth"]>,
+): AccountVault {
+  if (options.vault) return options.vault;
+  return createAccountVault(options.vaultPath ?? codexSwitcherVaultPath(getAgentDir()), oauth);
+}
+
+function registerInvalidConfigCommand(
+  pi: ExtensionAPI,
+  result: Extract<ConfigLoadResult, { status: "invalid" }>,
+): void {
+  pi.registerCommand("codex-switcher", {
+    description: "Manage OpenAI Codex accounts",
+    handler: (_args, context) => {
+      context.ui.notify(`Codex switcher configuration is invalid: ${result.message}`, "error");
+      return Promise.resolve();
+    },
+  });
+}
+
+export function installCodexSwitcher(pi: ExtensionAPI, options: InstallOptions): void {
+  const configPath = options.configPath ?? codexSwitcherConfigPath(getAgentDir());
+  const result = options.configResult ?? loadCodexSwitcherConfig(configPath);
+  if (result.status === "invalid") {
+    registerInvalidConfigCommand(pi, result);
+    return;
+  }
+
+  const { native, oauth } = requiredNativeProvider(options);
+  const config = createConfigController(
+    configPath,
+    result.status === "ready" ? result.config : emptyConfig(),
+  );
+  const vault = configuredVault(options, oauth);
+  const state: SwitcherState = {
+    activeAccountId: undefined,
+    agentRunActive: false,
+    leaseAccountId: undefined,
+    usageByAccount: new Map(),
+  };
+  const live: { context: LiveContext | undefined } = { context: undefined };
+  const usage = createCodexUsageClient(config.get().refreshMs, config.get().timeoutMs);
   const runtime: SwitcherRuntime = {
-    getAuth: async (providerId) => {
-      if (!live.context) throw new Error("Codex switcher runtime is not ready.");
-      return live.context.modelRegistry.getProviderAuth(providerId);
+    getAuth: (accountId, signal) => vault.resolve(accountId, signal),
+    queryUsage: (account, auth, model, signal) => usage.query(account, auth, model, signal),
+    clearUsage: (account) => {
+      usage.clear(account);
     },
-    queryUsage: (profile, auth, model, signal) => usage.query(profile, auth, model, signal),
-    clearUsage: (profile) => {
-      usage.clear(profile);
-    },
-    activateProfile: async (profile, model) => {
-      setProfileStatus(live.context, state, profile);
-      if (
-        !state.agentRunActive ||
-        sameModel(live.context?.model as CodexModel | undefined, model)
-      ) {
-        return;
-      }
-      if (!(await selectInternalModel(pi, live, model))) {
-        live.context?.ui.notify("Codex switcher could not select the fallback profile.", "warning");
-      }
+    activateAccount: (account) => {
+      state.activeAccountId = account.id;
+      setStatus(live.context, state);
     },
   };
   const routerOptions = {
-    profiles: config.profiles,
-    fallbackChain: config.fallbackChain,
+    getAccounts: () => config.get().accounts,
     runtime,
     state,
   };
   const stream = createCodexSwitcherStream({
     ...routerOptions,
-    transport: (model, streamContext, streamOptions) =>
-      native.stream(model, streamContext, streamOptions),
+    transport: (model, context, streamOptions) => native.stream(model, context, streamOptions),
   });
   const streamSimple = createCodexSwitcherStream({
     ...routerOptions,
-    transport: (model, streamContext, streamOptions) =>
-      native.streamSimple(model, streamContext, streamOptions),
+    transport: (model, context, streamOptions) =>
+      native.streamSimple(model, context, streamOptions),
   });
-  for (const profile of config.profiles) {
-    pi.registerProvider(createProfileProvider(native, profile, stream, streamSimple));
-  }
-  registerLifecycle(pi, config, state, live);
+
+  pi.registerProvider(createSwitcherProvider(native, config, vault, state, stream, streamSimple));
+  pi.registerCommand("codex-switcher", {
+    description: "Manage OpenAI Codex accounts, billing, order, and usage",
+    handler: (args, context) =>
+      runAccountManager(args, context, {
+        config,
+        oauth,
+        pi,
+        state,
+        vault,
+      }),
+  });
+  registerLifecycle(pi, state, live);
 }
 
 export default async function codexSwitcherExtension(pi: ExtensionAPI): Promise<void> {
-  const path = codexSwitcherConfigPath(getAgentDir());
-  const result = loadCodexSwitcherConfig(path);
-  const nativeProvider = result.status === "ready" ? await loadOpenAICodexProvider() : undefined;
-  installCodexSwitcher(pi, {
-    configPath: path,
-    configResult: result,
-    ...(nativeProvider ? { nativeProvider } : {}),
-  });
+  const nativeProvider = await loadOpenAICodexProvider();
+  installCodexSwitcher(pi, { nativeProvider });
 }
-
-export {
-  isCodexFamilyModel,
-  isCodexFamilyProvider,
-  isCodexProfileProvider,
-} from "./codex-family.ts";
-export { providerIdForProfile } from "./config.ts";

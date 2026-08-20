@@ -59,15 +59,16 @@ upstream config module; see the local adaptations below.
   narrow context and API surfaces.
 - **Endpoint allowlist for credentials** (see above) — new behavior, deliberately stricter than
   upstream.
-- Resolves the selected built-in or Codex switcher profile credential through Pi's normal request
-  auth path after the endpoint guard.
+- Resolves the built-in `openai-codex` credential through Pi's normal request auth path after the
+  endpoint guard. The Codex switcher overrides that provider in place and exposes its leased account
+  through the same auth path.
 - Bounded HTTP error bodies in error messages (300 characters).
 - Added test coverage for credential/base-URL safety, model-mismatched checkpoints, auth resolution
   failure, and non-Codex pass-through of every hook.
 - Resolved the interaction with OnurPi's compaction packages (hard cutover, documented in
   [README.md](README.md#compaction-ownership-in-onurpi)): `context-window-policy` passes Codex
   models through to this extension, and `reliable-compaction` no longer arms its SSE retry override
-  for the built-in `openai-codex` provider and Codex switcher profiles.
+  for the built-in `openai-codex` provider.
 - Removed the upstream proactive controller as a hard cutover. The package no longer reads
   `autoCompact` or `thresholdRatio`, listens to `turn_end`, calls `ctx.abort()` to schedule
   compaction, listens to `agent_settled`, or sends a continuation user message. Pi owns manual,

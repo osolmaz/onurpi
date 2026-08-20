@@ -7,9 +7,9 @@
 - Keep compaction fail-closed: no fallback to text summarization, no replay of malformed or
   model-mismatched checkpoints, no credentials to custom base URLs.
 - Keep the local checkpoint marker out of provider context and out of OpenAI requests.
-- This package owns compaction for the built-in `openai-codex` provider and `openai-codex-*`
-  switcher profiles. `context-window-policy` and `reliable-compaction` must pass that family
-  through; preserve their non-Codex behavior.
+- This package owns compaction for the built-in `openai-codex` provider. The Codex switcher
+  overrides that provider in place and exposes its leased account through normal provider auth.
+  `context-window-policy` and `reliable-compaction` must pass `openai-codex` through.
 - Add or update tests for every behavior change.
 - Before finishing, run `npm run check` and `npm run slophammer`. Then run `git diff --check` and an
   installed Pi smoke test.

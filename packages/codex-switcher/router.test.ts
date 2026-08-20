@@ -4,11 +4,12 @@ import {
   type AssistantMessageEvent,
   type Context,
   type Model,
+  type StreamOptions,
 } from "@earendil-works/pi-ai";
 import type { UsageReport } from "@onurpi/pi-usage";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CodexProfile } from "./config.ts";
+import type { CodexAccount } from "./config.ts";
 import {
   createCodexSwitcherStream,
   isTerminalUsageLimit,
@@ -16,27 +17,16 @@ import {
   type SwitcherState,
 } from "./router.ts";
 
+const primary: CodexAccount = { id: "primary", billing: "subscription-only" };
+const backup: CodexAccount = { id: "backup", billing: "allow-credits" };
 type CodexModel = Model<"openai-codex-responses">;
 
-const primary: CodexProfile = {
-  id: "primary",
-  label: "Primary",
-  billing: "subscription-only",
-  providerId: "openai-codex-primary",
-};
-const backup: CodexProfile = {
-  id: "backup",
-  label: "Backup",
-  billing: "allow-credits",
-  providerId: "openai-codex-backup",
-};
-
-function model(provider = primary.providerId): CodexModel {
+function model(): CodexModel {
   return {
     id: "gpt-test",
     name: "GPT test",
     api: "openai-codex-responses",
-    provider,
+    provider: "openai-codex",
     baseUrl: "https://chatgpt.com/backend-api",
     reasoning: true,
     input: ["text"],
@@ -47,7 +37,6 @@ function model(provider = primary.providerId): CodexModel {
 }
 
 function assistant(
-  provider: string,
   stopReason: AssistantMessage["stopReason"] = "stop",
   errorMessage?: string,
 ): AssistantMessage {
@@ -55,7 +44,7 @@ function assistant(
     role: "assistant",
     content: [],
     api: "openai-codex-responses",
-    provider,
+    provider: "openai-codex",
     model: "gpt-test",
     usage: {
       input: 0,
@@ -71,7 +60,11 @@ function assistant(
   };
 }
 
-function usage(remaining: number, credits: number | string = "none"): UsageReport {
+function usage(
+  remaining: number,
+  credits: number | string = "none",
+  resetsAt?: number,
+): UsageReport {
   return {
     providerId: "openai-codex",
     providerName: "OpenAI Codex",
@@ -79,7 +72,14 @@ function usage(remaining: number, credits: number | string = "none"): UsageRepor
     source: "test",
     semantics: { kind: "consumer-subscription", label: "Subscription" },
     buckets: [
-      { id: "codex:primary", groupId: "codex", label: "Primary", remaining, unit: "percent" },
+      {
+        id: "codex:primary",
+        groupId: "codex",
+        label: "Primary",
+        remaining,
+        unit: "percent",
+        ...(resetsAt === undefined ? {} : { resetsAt }),
+      },
     ],
     metrics: [{ id: "credits", label: "Credits", value: credits }],
   };
@@ -89,9 +89,7 @@ function stream(events: readonly AssistantMessageEvent[]) {
   if (events.length === 0) {
     return {
       [Symbol.asyncIterator]() {
-        return {
-          next: () => Promise.resolve({ done: true, value: undefined }),
-        };
+        return { next: () => Promise.resolve({ done: true, value: undefined }) };
       },
     } as unknown as ReturnType<typeof createAssistantMessageEventStream>;
   }
@@ -101,24 +99,22 @@ function stream(events: readonly AssistantMessageEvent[]) {
 }
 
 function successEvents(): AssistantMessageEvent[] {
-  const partial = assistant("openai-codex", "pending");
-  const done = assistant("openai-codex");
+  const partial = assistant("pending");
   return [
     { type: "start", partial },
     { type: "text_start", contentIndex: 0, partial },
     { type: "text_delta", contentIndex: 0, delta: "ok", partial },
     { type: "text_end", contentIndex: 0, content: "ok", partial },
-    { type: "done", reason: "stop", message: done },
+    { type: "done", reason: "stop", message: assistant() },
   ];
 }
 
 function errorEvents(message: string, afterText = false): AssistantMessageEvent[] {
-  const partial = assistant("openai-codex", "pending");
-  const error = assistant("openai-codex", "error", message);
+  const partial = assistant("pending");
   return [
     { type: "start", partial },
     ...(afterText ? [{ type: "text_start" as const, contentIndex: 0, partial }] : []),
-    { type: "error", reason: "error", error },
+    { type: "error", reason: "error", error: assistant("error", message) },
   ];
 }
 
@@ -134,199 +130,161 @@ function setup(
   const activated: string[] = [];
   const cleared: string[] = [];
   const state: SwitcherState = {
+    activeAccountId: undefined,
     agentRunActive: false,
-    runProfileId: undefined,
-    usageByProfile: new Map(),
+    leaseAccountId: undefined,
+    usageByAccount: new Map(),
   };
   const authenticated = new Set(options.authenticated ?? [primary.id, backup.id]);
   const runtime: SwitcherRuntime = {
-    getAuth: (providerId) => {
-      authCalls.push(providerId);
+    getAuth: (accountId) => {
+      authCalls.push(accountId);
       return Promise.resolve(
-        [...authenticated].some((id) => providerId.endsWith(id))
-          ? { auth: { apiKey: `token-${providerId}` } }
-          : undefined,
+        authenticated.has(accountId) ? { apiKey: `token-${accountId}` } : undefined,
       );
     },
-    queryUsage: (profile) => {
-      const value = options.reports?.[profile.id] ?? usage(50);
+    queryUsage: (account) => {
+      const value = options.reports?.[account.id] ?? usage(50);
       return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
     },
-    clearUsage: (profile) => {
-      cleared.push(profile.id);
+    clearUsage: (account) => {
+      cleared.push(account.id);
     },
-    activateProfile: (profile) => {
-      activated.push(profile.id);
-      return Promise.resolve();
+    activateAccount: (account) => {
+      activated.push(account.id);
     },
   };
-  const transport = vi.fn((requestModel: CodexModel, context: Context) => {
-    const token = context.systemPrompt ?? "";
-    const profile = token.includes("backup")
-      ? backup.id
-      : token.includes("primary")
-        ? primary.id
-        : calls.length === 0
-          ? primary.id
-          : backup.id;
-    calls.push(profile);
-    expect(requestModel.provider).toBe("openai-codex");
-    return stream(options.streams?.[profile] ?? successEvents());
-  });
+  const transport = vi.fn(
+    (_requestModel: CodexModel, _context: Context, streamOptions?: StreamOptions) => {
+      const account = streamOptions?.apiKey?.replace("token-", "") ?? "missing";
+      calls.push(account);
+      return stream(options.streams?.[account] ?? successEvents());
+    },
+  );
   const route = createCodexSwitcherStream({
-    profiles: [primary, backup],
-    fallbackChain: [primary.id, backup.id],
+    getAccounts: () => [primary, backup],
     runtime,
     state,
-    transport: (requestModel, context, streamOptions) => {
-      const apiKey = streamOptions?.apiKey ?? "";
-      const profileContext = {
-        ...context,
-        systemPrompt: apiKey.includes("backup") ? "backup" : "primary",
-      };
-      return transport(requestModel, profileContext);
-    },
+    transport,
   });
-  return { route, calls, authCalls, activated, cleared, state, transport };
+  return { activated, authCalls, calls, cleared, route, state, transport };
 }
 
-describe("createCodexSwitcherStream", () => {
-  it("skips an exhausted subscription profile without changing the preferred model", async () => {
-    const test = setup({ reports: { primary: usage(0), backup: usage(0, 20) } });
+describe("Codex account routing", () => {
+  it("starts each unleased request with the preferred account", async () => {
+    const test = setup();
     const result = await test.route(model(), { messages: [] }).result();
-    expect(result.provider).toBe(backup.providerId);
-    expect(test.calls).toEqual([backup.id]);
-    expect(test.activated).toEqual([backup.id]);
-    expect(test.state.activeProfileId).toBe(backup.id);
+    expect(result.provider).toBe("openai-codex");
+    expect(test.calls).toEqual(["primary"]);
+    expect(test.state.activeAccountId).toBe("primary");
   });
 
-  it("keeps a fallback for one agent run and climbs back on the next run", async () => {
-    let primaryRemaining = 0;
-    const reports = { backup: usage(50) } as Partial<Record<string, UsageReport>>;
-    Object.defineProperty(reports, "primary", {
-      enumerable: true,
-      get: () => usage(primaryRemaining),
+  it("skips unauthenticated and exhausted subscription-only accounts", async () => {
+    const unauthenticated = setup({ authenticated: [backup.id] });
+    await unauthenticated.route(model(), { messages: [] }).result();
+    expect(unauthenticated.calls).toEqual(["backup"]);
+
+    const exhausted = setup({ reports: { primary: usage(0), backup: usage(50) } });
+    await exhausted.route(model(), { messages: [] }).result();
+    expect(exhausted.calls).toEqual(["backup"]);
+  });
+
+  it("permits credits only for an account with explicit policy and confirmed credits", async () => {
+    const allowed = setup({ reports: { primary: usage(0, 100), backup: usage(0, 100) } });
+    await allowed.route(model(), { messages: [] }).result();
+    expect(allowed.calls).toEqual(["backup"]);
+
+    const denied = setup({ reports: { primary: usage(0), backup: usage(0) } });
+    const result = await denied.route(model(), { messages: [] }).result();
+    expect(result.errorMessage).toContain("No authenticated Codex account");
+  });
+
+  it("falls back for a confirmed limit error before semantic output", async () => {
+    const test = setup({
+      streams: {
+        primary: errorEvents("usage limit reached"),
+        backup: successEvents(),
+      },
     });
-    const test = setup({ reports });
-
-    test.state.agentRunActive = true;
-    await test.route(model(), { messages: [] }).result();
-    expect(test.state.runProfileId).toBe(backup.id);
-
-    primaryRemaining = 50;
-    await test.route(model(), { messages: [] }).result();
-    expect(test.calls).toEqual([backup.id, backup.id]);
-
-    test.state.agentRunActive = false;
-    test.state.runProfileId = undefined;
-    test.state.agentRunActive = true;
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.provider).toBe(primary.providerId);
-    expect(test.calls).toEqual([backup.id, backup.id, primary.id]);
-    expect(test.state.runProfileId).toBe(primary.id);
-  });
-
-  it("tries a profile when its usage check fails", async () => {
-    const test = setup({ reports: { primary: new Error("usage offline") } });
     const result = await test.route(model(), { messages: [] }).result();
     expect(result.stopReason).toBe("stop");
-    expect(test.calls).toEqual([primary.id]);
-    expect(test.state.usageByProfile.get(primary.id)).toMatchObject({ status: "failed" });
+    expect(test.calls).toEqual(["primary", "backup"]);
+    expect(test.cleared).toEqual(["primary"]);
   });
 
-  it("falls back for a terminal usage error before output", async () => {
+  it("does not fall back after semantic output or for unrelated errors", async () => {
+    const afterText = setup({
+      streams: { primary: errorEvents("usage limit reached", true), backup: successEvents() },
+    });
+    await afterText.route(model(), { messages: [] }).result();
+    expect(afterText.calls).toEqual(["primary"]);
+
+    const network = setup({
+      streams: { primary: errorEvents("network error"), backup: successEvents() },
+    });
+    await network.route(model(), { messages: [] }).result();
+    expect(network.calls).toEqual(["primary"]);
+  });
+
+  it("leases the first semantic account for later calls in the same agent run", async () => {
     const test = setup({
-      streams: { primary: errorEvents("FreeUsageLimitError: usage limit reached") },
+      reports: { primary: usage(0), backup: usage(50) },
+      streams: { backup: successEvents() },
     });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.provider).toBe(backup.providerId);
-    expect(test.calls).toEqual([primary.id, backup.id]);
-    expect(test.cleared).toEqual([primary.id]);
+    test.state.agentRunActive = true;
+    await test.route(model(), { messages: [] }).result();
+    expect(test.state.leaseAccountId).toBe("backup");
+
+    await test.route(model(), { messages: [] }).result();
+    expect(test.calls).toEqual(["backup", "backup"]);
+    expect(test.authCalls).toEqual(["primary", "backup", "backup"]);
   });
 
-  it("does not fall back after semantic output starts", async () => {
-    const test = setup({
-      streams: { primary: errorEvents("usage limit reached", true) },
-    });
+  it("does not leave a leased account after a later limit response", async () => {
+    const test = setup({ streams: { primary: successEvents() } });
+    test.state.agentRunActive = true;
+    await test.route(model(), { messages: [] }).result();
+    test.transport.mockImplementationOnce(() => stream(errorEvents("usage limit reached")));
     const result = await test.route(model(), { messages: [] }).result();
     expect(result.stopReason).toBe("error");
-    expect(result.provider).toBe(primary.providerId);
-    expect(test.calls).toEqual([primary.id]);
+    expect(test.authCalls.at(-1)).toBe("primary");
+    expect(test.authCalls).not.toContain("backup");
   });
 
-  it("does not fall back for ordinary provider errors", async () => {
-    const test = setup({ streams: { primary: errorEvents("network connection failed") } });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.errorMessage).toBe("network connection failed");
-    expect(test.calls).toEqual([primary.id]);
-  });
-
-  it("does not fall back for an unrelated billing error", async () => {
-    const test = setup({ streams: { primary: errorEvents("billing service unavailable") } });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.errorMessage).toBe("billing service unavailable");
-    expect(test.calls).toEqual([primary.id]);
-  });
-
-  it("rejects a custom endpoint before resolving profile auth", async () => {
-    const test = setup();
-    const result = await test
-      .route({ ...model(), baseUrl: "https://example.com/backend-api" }, { messages: [] })
-      .result();
-    expect(result.errorMessage).toContain("restricted to https://chatgpt.com/backend-api");
-    expect(test.calls).toEqual([]);
-    expect(test.authCalls).toEqual([]);
-  });
-
-  it("returns an error when the provider stream ends without a terminal event", async () => {
-    const test = setup({ streams: { primary: [] } });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.stopReason).toBe("error");
-    expect(result.errorMessage).toBe("Codex provider stream ended without a terminal event.");
-    expect(test.calls).toEqual([primary.id]);
-  });
-
-  it("starts from the explicitly selected profile", async () => {
-    const test = setup();
-    const result = await test.route(model(backup.providerId), { messages: [] }).result();
-    expect(result.provider).toBe(backup.providerId);
-    expect(test.calls).toEqual([backup.id]);
-  });
-
-  it("skips profiles without auth", async () => {
-    const test = setup({ authenticated: [backup.id] });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.provider).toBe(backup.providerId);
-    expect(test.calls).toEqual([backup.id]);
-  });
-
-  it("returns a clear error when no eligible profile remains", async () => {
-    const test = setup({ authenticated: [] });
-    const result = await test.route(model(), { messages: [] }).result();
-    expect(result.stopReason).toBe("error");
-    expect(result.errorMessage).toContain("No authenticated Codex profile");
-  });
-
-  it("maps profile assistant history to the built-in provider", async () => {
-    const test = setup();
-    const history = assistant(primary.providerId);
-    test.transport.mockImplementationOnce((requestModel, context) => {
-      expect(requestModel.provider).toBe("openai-codex");
-      expect(context.messages[0]).toMatchObject({ provider: "openai-codex" });
-      return stream(successEvents());
+  it("tries requests when usage checks are unavailable", async () => {
+    const test = setup({ reports: { primary: new Error("private provider payload") } });
+    await test.route(model(), { messages: [] }).result();
+    expect(test.calls).toEqual(["primary"]);
+    expect(test.state.usageByAccount.get("primary")).toEqual({
+      status: "failed",
+      message: "usage check unavailable",
     });
-    await test.route(model(), { messages: [history] }).result();
+  });
+
+  it("rejects non-official provider identity and endpoint", async () => {
+    const wrongProvider = { ...model(), provider: "openai-codex-primary" };
+    const result = await setup().route(wrongProvider, { messages: [] }).result();
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toBe("Codex account routing failed.");
+  });
+
+  it("returns an error when no account remains or the stream ends early", async () => {
+    const none = setup({ authenticated: [] });
+    expect((await none.route(model(), { messages: [] }).result()).errorMessage).toContain(
+      "No authenticated Codex account",
+    );
+
+    const ended = setup({ streams: { primary: [] } });
+    expect((await ended.route(model(), { messages: [] }).result()).errorMessage).toBe(
+      "Codex provider stream ended without a terminal event.",
+    );
   });
 });
 
 it("classifies only terminal quota and billing errors", () => {
-  expect(isTerminalUsageLimit(assistant("openai-codex", "error", "insufficient_quota"))).toBe(true);
-  expect(
-    isTerminalUsageLimit(assistant("openai-codex", "error", "Your available balance is too low")),
-  ).toBe(true);
-  expect(
-    isTerminalUsageLimit(assistant("openai-codex", "error", "billing service unavailable")),
-  ).toBe(false);
-  expect(isTerminalUsageLimit(assistant("openai-codex", "error", "network error"))).toBe(false);
-  expect(isTerminalUsageLimit(assistant("openai-codex", "stop"))).toBe(false);
+  expect(isTerminalUsageLimit(assistant("error", "insufficient_quota"))).toBe(true);
+  expect(isTerminalUsageLimit(assistant("error", "Your available balance is too low"))).toBe(true);
+  expect(isTerminalUsageLimit(assistant("error", "billing service unavailable"))).toBe(false);
+  expect(isTerminalUsageLimit(assistant("error", "network error"))).toBe(false);
+  expect(isTerminalUsageLimit(assistant("stop"))).toBe(false);
 });

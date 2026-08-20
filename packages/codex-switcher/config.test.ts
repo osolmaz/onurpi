@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,20 +8,25 @@ import {
   codexSwitcherConfigPath,
   loadCodexSwitcherConfig,
   parseCodexSwitcherConfig,
-  providerIdForProfile,
+  writeCodexSwitcherConfig,
 } from "./config.ts";
 
 const directories: string[] = [];
 
 function validConfig(): unknown {
   return {
-    profiles: {
-      primary: { label: "Primary", billing: "subscription-only" },
-      backup: { label: "Backup", billing: "allow-credits" },
-    },
-    fallbackChain: ["primary", "backup"],
+    accounts: [
+      { id: "primary", billing: "subscription-only" },
+      { id: "backup", billing: "allow-credits" },
+    ],
     usage: { refreshMinutes: 3, timeoutSeconds: 7 },
   };
+}
+
+function temporaryDirectory(): string {
+  const directory = mkdtempSync(join(tmpdir(), "codex-switcher-"));
+  directories.push(directory);
+  return directory;
 }
 
 afterEach(() => {
@@ -29,61 +34,41 @@ afterEach(() => {
 });
 
 describe("parseCodexSwitcherConfig", () => {
-  it("parses profiles, provider IDs, chain, and usage timing", () => {
+  it("uses array order as preference and fallback order", () => {
     expect(parseCodexSwitcherConfig(validConfig())).toEqual({
-      profiles: [
-        {
-          id: "primary",
-          label: "Primary",
-          billing: "subscription-only",
-          providerId: "openai-codex-primary",
-        },
-        {
-          id: "backup",
-          label: "Backup",
-          billing: "allow-credits",
-          providerId: "openai-codex-backup",
-        },
+      accounts: [
+        { id: "primary", billing: "subscription-only" },
+        { id: "backup", billing: "allow-credits" },
       ],
-      fallbackChain: ["primary", "backup"],
       refreshMs: 180_000,
       timeoutMs: 7_000,
     });
   });
 
-  it("applies bounded timing defaults", () => {
-    const raw = validConfig() as { usage?: unknown };
-    delete raw.usage;
-    const parsed = parseCodexSwitcherConfig(raw);
-    expect(parsed.refreshMs).toBe(300_000);
-    expect(parsed.timeoutMs).toBe(10_000);
+  it("applies bounded timing defaults and permits an empty account list", () => {
+    expect(parseCodexSwitcherConfig({ accounts: [] })).toEqual({
+      accounts: [],
+      refreshMs: 300_000,
+      timeoutMs: 10_000,
+    });
   });
 
   it.each([
-    ["empty profiles", { profiles: {}, fallbackChain: [] }],
+    ["missing accounts", {}],
+    ["unsafe ID", { accounts: [{ id: "Primary Account", billing: "subscription-only" }] }],
+    ["unknown billing", { accounts: [{ id: "primary", billing: "automatic" }] }],
     [
-      "unsafe ID",
+      "duplicate account",
       {
-        profiles: { "Primary Account": { label: "P", billing: "subscription-only" } },
-        fallbackChain: ["Primary Account"],
+        accounts: [
+          { id: "primary", billing: "subscription-only" },
+          { id: "primary", billing: "allow-credits" },
+        ],
       },
     ],
-    [
-      "unknown billing",
-      { profiles: { primary: { label: "P", billing: "automatic" } }, fallbackChain: ["primary"] },
-    ],
-    [
-      "duplicate chain",
-      {
-        profiles: { primary: { label: "P", billing: "subscription-only" } },
-        fallbackChain: ["primary", "primary"],
-      },
-    ],
-    ["incomplete chain", validConfig() as object],
+    ["old profile schema", { profiles: {}, fallbackChain: [] }],
     ["unknown field", { ...(validConfig() as object), secret: "value" }],
   ])("rejects %s", (_name, raw) => {
-    if (_name === "incomplete chain")
-      (raw as { fallbackChain: string[] }).fallbackChain = ["primary"];
     expect(() => parseCodexSwitcherConfig(raw)).toThrow();
   });
 
@@ -94,35 +79,42 @@ describe("parseCodexSwitcherConfig", () => {
   });
 });
 
-describe("loadCodexSwitcherConfig", () => {
+describe("configuration files", () => {
   it("reports missing files without throwing", () => {
     expect(loadCodexSwitcherConfig("/path/that/does/not/exist")).toEqual({ status: "missing" });
   });
 
-  it("loads a bounded JSON file", () => {
-    const directory = mkdtempSync(join(tmpdir(), "codex-switcher-"));
-    directories.push(directory);
-    const path = join(directory, "config.json");
-    writeFileSync(path, JSON.stringify(validConfig()));
-    expect(loadCodexSwitcherConfig(path).status).toBe("ready");
+  it("writes and loads a private bounded file", () => {
+    const path = join(temporaryDirectory(), "config.json");
+    const config = parseCodexSwitcherConfig(validConfig());
+    writeCodexSwitcherConfig(path, config);
+    expect(loadCodexSwitcherConfig(path)).toEqual({ status: "ready", config });
   });
 
-  it("reports malformed and oversized files without their contents", () => {
-    const directory = mkdtempSync(join(tmpdir(), "codex-switcher-"));
-    directories.push(directory);
+  it("rejects malformed, oversized, permissive, and symbolic-link files", () => {
+    const directory = temporaryDirectory();
     const malformed = join(directory, "malformed.json");
-    writeFileSync(malformed, "{secret-token");
+    writeFileSync(malformed, "{secret-token", { mode: 0o600 });
     expect(loadCodexSwitcherConfig(malformed)).toEqual({
       status: "invalid",
       message: "Configuration contains invalid JSON.",
     });
+
     const oversized = join(directory, "oversized.json");
-    writeFileSync(oversized, "x".repeat(64 * 1024 + 1));
+    writeFileSync(oversized, "x".repeat(64 * 1024 + 1), { mode: 0o600 });
     expect(loadCodexSwitcherConfig(oversized)).toMatchObject({ status: "invalid" });
+
+    const permissive = join(directory, "permissive.json");
+    writeFileSync(permissive, JSON.stringify(validConfig()), { mode: 0o600 });
+    chmodSync(permissive, 0o644);
+    expect(loadCodexSwitcherConfig(permissive)).toMatchObject({ status: "invalid" });
+
+    const link = join(directory, "link.json");
+    symlinkSync(malformed, link);
+    expect(loadCodexSwitcherConfig(link)).toMatchObject({ status: "invalid" });
   });
 });
 
-it("builds the canonical path and provider ID", () => {
+it("builds the canonical configuration path", () => {
   expect(codexSwitcherConfigPath("/agent")).toBe(join("/agent", "codex-switcher.json"));
-  expect(providerIdForProfile("work-two")).toBe("openai-codex-work-two");
 });
