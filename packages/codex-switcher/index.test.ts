@@ -11,7 +11,11 @@ import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigLoadResult } from "./config.ts";
-import { installCodexSwitcher, installCodexSwitcherStartup } from "./index.ts";
+import {
+  installCodexSwitcher,
+  installCodexSwitcherExtension,
+  installCodexSwitcherStartup,
+} from "./index.ts";
 import type { AccountVault } from "./vault.ts";
 
 type CodexModel = Model<"openai-codex-responses">;
@@ -223,52 +227,51 @@ describe("codex switcher startup", () => {
     restore();
   });
 
-  it("removes the queued provider when the Pi version is unsupported", () => {
+  it("preserves another queued provider when the Pi version is unsupported", () => {
     const test = harness();
-    const runtime = installCodexSwitcher(test.api, {
-      configResult: readyConfig(),
-      nativeProvider: fakeNative([]),
-      vault: fakeVault(),
-    });
-    expect(runtime).toBeDefined();
-    if (!runtime) return;
-    expect(test.providers).toHaveLength(1);
+    const existing = fakeNative([]);
+    test.api.registerProvider(existing);
 
     expect(() =>
-      installCodexSwitcherStartup(test.api, runtime, {
-        piVersion: "0.85.0",
-      }),
+      installCodexSwitcherExtension(
+        test.api,
+        {
+          configResult: readyConfig(),
+          nativeProvider: fakeNative([]),
+          vault: fakeVault(),
+        },
+        { piVersion: "0.85.0" },
+      ),
     ).toThrow("supports Pi >=0.84.2 <0.85.0");
-    expect(test.providers).toHaveLength(0);
+    expect(test.providers).toEqual([existing]);
   });
 
-  it("restores startup authentication when lifecycle registration fails", () => {
+  it("does not queue its provider when lifecycle registration fails", () => {
     const test = harness();
-    const runtime = installCodexSwitcher(test.api, {
-      configResult: readyConfig(),
-      nativeProvider: fakeNative([]),
-      vault: fakeVault(),
-    });
-    expect(runtime).toBeDefined();
-    if (!runtime) return;
+    const existing = fakeNative([]);
+    test.api.registerProvider(existing);
     const original = vi.fn((providerId: string) => providerId === "canonical-ready");
     const runtimePrototype = { hasConfiguredAuth: original };
-    const unregisterProvider = vi.fn();
     const failingApi = {
+      ...test.api,
       on: vi.fn(() => {
         throw new Error("registration failed");
       }),
-      unregisterProvider,
-    } as unknown as ExtensionAPI;
+    } as ExtensionAPI;
 
     expect(() =>
-      installCodexSwitcherStartup(failingApi, runtime, {
-        piVersion: "0.84.2",
-        runtimePrototype,
-      }),
+      installCodexSwitcherExtension(
+        failingApi,
+        {
+          configResult: readyConfig(),
+          nativeProvider: fakeNative([]),
+          vault: fakeVault(),
+        },
+        { piVersion: "0.84.2", runtimePrototype },
+      ),
     ).toThrow("registration failed");
     expect(runtimePrototype.hasConfiguredAuth).toBe(original);
-    expect(unregisterProvider).toHaveBeenCalledExactlyOnceWith("openai-codex");
+    expect(test.providers).toEqual([existing]);
   });
 });
 

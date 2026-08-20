@@ -27,7 +27,39 @@ export type InstallOptions = {
   readonly vaultPath?: string;
 };
 
+type StartupOptions = Omit<StartupAuthAdapterOptions, "isReady">;
+
 export function installCodexSwitcher(
+  pi: ExtensionAPI,
+  options: InstallOptions,
+): CodexSwitcherProvider | undefined {
+  const runtime = createCodexSwitcher(pi, options);
+  if (!runtime) return;
+  registerCodexSwitcher(pi, runtime);
+  return runtime;
+}
+
+export function installCodexSwitcherExtension(
+  pi: ExtensionAPI,
+  options: InstallOptions,
+  startupOptions: StartupOptions = {},
+): CodexSwitcherProvider | undefined {
+  let runtime: CodexSwitcherProvider | undefined;
+  let restoreStartup: RestoreStartupAuthAdapter | undefined;
+  try {
+    runtime = createCodexSwitcher(pi, options);
+    if (!runtime) return;
+    restoreStartup = installCodexSwitcherStartup(pi, runtime, startupOptions);
+    registerCodexSwitcher(pi, runtime);
+    return runtime;
+  } catch (error) {
+    restoreStartup?.();
+    runtime?.close();
+    throw error;
+  }
+}
+
+function createCodexSwitcher(
   pi: ExtensionAPI,
   options: InstallOptions,
 ): CodexSwitcherProvider | undefined {
@@ -43,7 +75,7 @@ export function installCodexSwitcher(
   if (!nativeProvider) {
     throw new Error("Codex switcher requires the built-in OpenAI Codex OAuth provider.");
   }
-  const runtime = createCodexSwitcherProvider({
+  return createCodexSwitcherProvider({
     agentDir,
     nativeProvider,
     configResult,
@@ -51,7 +83,9 @@ export function installCodexSwitcher(
     ...(options.vault === undefined ? {} : { vault: options.vault }),
     ...(options.vaultPath === undefined ? {} : { vaultPath: options.vaultPath }),
   });
-  pi.registerProvider(runtime.provider);
+}
+
+function registerCodexSwitcher(pi: ExtensionAPI, runtime: CodexSwitcherProvider): void {
   pi.registerCommand("codex-switcher", {
     description: "Manage OpenAI Codex accounts, billing, order, and usage",
     handler: (args, context) =>
@@ -64,24 +98,18 @@ export function installCodexSwitcher(
       }),
   });
   registerLifecycle(pi, runtime);
-  return runtime;
+  pi.registerProvider(runtime.provider);
 }
 
 export function installCodexSwitcherStartup(
   pi: ExtensionAPI,
   runtime: CodexSwitcherProvider,
-  options: Omit<StartupAuthAdapterOptions, "isReady"> = {},
+  options: StartupOptions = {},
 ): RestoreStartupAuthAdapter {
-  let restoreAuth: RestoreStartupAuthAdapter;
-  try {
-    restoreAuth = installStartupAuthAdapter({
-      ...options,
-      isReady: runtime.isAuthenticationReady,
-    });
-  } catch (error) {
-    pi.unregisterProvider(runtime.provider.id);
-    throw error;
-  }
+  const restoreAuth = installStartupAuthAdapter({
+    ...options,
+    isReady: runtime.isAuthenticationReady,
+  });
   let restoreProvider: RestoreStartupAuthAdapter | undefined;
   let active = true;
   const restore = (): void => {
@@ -97,7 +125,6 @@ export function installCodexSwitcherStartup(
     return restore;
   } catch (error) {
     restore();
-    pi.unregisterProvider(runtime.provider.id);
     throw error;
   }
 }
@@ -160,14 +187,6 @@ function registerInvalidConfigCommand(
 }
 
 export default async function codexSwitcherExtension(pi: ExtensionAPI): Promise<void> {
-  let runtime: CodexSwitcherProvider | undefined;
-  try {
-    const nativeProvider = await loadOpenAICodexProvider();
-    runtime = installCodexSwitcher(pi, { nativeProvider });
-    if (!runtime) return;
-    installCodexSwitcherStartup(pi, runtime);
-  } catch (error) {
-    runtime?.close();
-    throw error;
-  }
+  const nativeProvider = await loadOpenAICodexProvider();
+  installCodexSwitcherExtension(pi, { nativeProvider });
 }
