@@ -101,6 +101,10 @@ function harness() {
     registerProvider(provider: Provider) {
       providers.push(provider);
     },
+    unregisterProvider(providerId: string) {
+      const retained = providers.filter((provider) => provider.id !== providerId);
+      providers.splice(0, providers.length, ...retained);
+    },
     registerCommand(name: string, command: Omit<RegisteredCommand, "name" | "sourceInfo">) {
       commands.set(name, command);
     },
@@ -219,6 +223,25 @@ describe("codex switcher startup", () => {
     restore();
   });
 
+  it("removes the queued provider when the Pi version is unsupported", () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    expect(test.providers).toHaveLength(1);
+
+    expect(() =>
+      installCodexSwitcherStartup(test.api, runtime, {
+        piVersion: "0.85.0",
+      }),
+    ).toThrow("supports Pi >=0.84.2 <0.85.0");
+    expect(test.providers).toHaveLength(0);
+  });
+
   it("restores startup authentication when lifecycle registration fails", () => {
     const test = harness();
     const runtime = installCodexSwitcher(test.api, {
@@ -230,10 +253,12 @@ describe("codex switcher startup", () => {
     if (!runtime) return;
     const original = vi.fn((providerId: string) => providerId === "canonical-ready");
     const runtimePrototype = { hasConfiguredAuth: original };
+    const unregisterProvider = vi.fn();
     const failingApi = {
       on: vi.fn(() => {
         throw new Error("registration failed");
       }),
+      unregisterProvider,
     } as unknown as ExtensionAPI;
 
     expect(() =>
@@ -243,6 +268,7 @@ describe("codex switcher startup", () => {
       }),
     ).toThrow("registration failed");
     expect(runtimePrototype.hasConfiguredAuth).toBe(original);
+    expect(unregisterProvider).toHaveBeenCalledExactlyOnceWith("openai-codex");
   });
 });
 
