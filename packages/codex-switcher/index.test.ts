@@ -171,7 +171,32 @@ describe("installCodexSwitcher", () => {
 });
 
 describe("codex switcher startup", () => {
-  it("restores startup authentication behavior after provider binding", async () => {
+  it("restores startup authentication when the provider binds without lifecycle events", () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    const originalAuth = vi.fn((providerId: string) => providerId === "canonical-ready");
+    const runtimePrototype = { hasConfiguredAuth: originalAuth };
+    const originalGetModels = Reflect.get(runtime.provider, "getModels");
+
+    installCodexSwitcherStartup(test.api, runtime, {
+      piVersion: "0.84.2",
+      runtimePrototype,
+    });
+    expect(runtimePrototype.hasConfiguredAuth("openai-codex")).toBe(true);
+
+    runtime.provider.getModels();
+
+    expect(runtimePrototype.hasConfiguredAuth).toBe(originalAuth);
+    expect(Reflect.get(runtime.provider, "getModels")).toBe(originalGetModels);
+  });
+
+  it("restores startup authentication behavior after the session starts", async () => {
     const test = harness();
     const runtime = installCodexSwitcher(test.api, {
       configResult: readyConfig(),
