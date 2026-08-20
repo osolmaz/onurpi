@@ -167,6 +167,8 @@ Keep the existing usage parser and billing decision rules where they still apply
 - Billing policy prevents unapproved credit use.
 - Confirmed pre-output exhaustion can move to the next account.
 - Semantic output commits one account for the complete agent run.
+- All agent-start paths establish the run boundary, and account management cannot change the leased
+  account before the run settles.
 - A later run returns to a higher-priority account after factual reset evidence.
 - Compaction and context policy use normal built-in `openai-codex` behavior.
 - No credential or private account value enters tracked files, session entries, logs, or test
@@ -186,14 +188,16 @@ Run:
 - `npm run check` and `npm run slophammer` in the switcher package;
 - checks for every directly changed integration package;
 - repository checks, SimpleDoc, `git diff --check`, and a temporary Pi extension startup test;
-- Pi Reviewer against `main` until no P0 or P1 findings remain;
+- code review against `main` until no P0 or P1 findings remain;
 - pull-request CI before merge.
 
 ## Implementation result
 
 The implementation follows this plan. The provider auth resolver also exposes the account leased by
 the router through Pi's normal provider-auth path. This lets native Codex compaction use the same
-account without a direct dependency on the switcher package.
+account without a direct dependency on the switcher package. The lifecycle handler covers direct and
+extension-triggered agent runs, and the account manager blocks changes to the leased account until
+the run settles.
 
 ## Related work
 

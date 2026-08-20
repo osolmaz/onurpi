@@ -87,7 +87,7 @@ prevents duplicate answers and duplicate tool calls.
 
 The first semantic event locks the account for the complete agent run. Tool continuations, retries,
 and compaction use that same account. A later limit error ends the run instead of changing accounts
-mid-run.
+mid-run. The account manager does not change the locked account until the run finishes.
 
 An exhausted cached window expires at its reported reset time. The next agent run then starts at the
 top of the list and can return to the preferred account.

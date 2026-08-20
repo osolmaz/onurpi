@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readPrivateFile, withPrivateFileLock, writePrivateFile } from "./private-file.ts";
 
@@ -15,6 +15,7 @@ function temporaryDirectory(): string {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true });
 });
 
@@ -24,6 +25,13 @@ describe("private files", () => {
     writePrivateFile(path, "one", 10);
     writePrivateFile(path, "two", 10);
     expect(readPrivateFile(path, 10)).toBe("two");
+  });
+
+  it("writes safely without directory fsync on Windows", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const path = join(temporaryDirectory(), "state.json");
+    writePrivateFile(path, "value", 10);
+    expect(readPrivateFile(path, 10)).toBe("value");
   });
 
   it("rejects oversized writes and reads", () => {

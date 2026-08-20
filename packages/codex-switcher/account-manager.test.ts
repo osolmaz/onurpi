@@ -135,6 +135,34 @@ describe("Codex account manager", () => {
     expect(test.state.usageByAccount.has("primary")).toBe(false);
   });
 
+  it("blocks changes to the leased account until the run settles", async () => {
+    const test = setup([
+      { id: "primary", billing: "subscription-only" },
+      { id: "backup", billing: "subscription-only" },
+    ]);
+    await test.options.vault.set("primary", credential());
+    test.state.agentRunActive = true;
+    test.state.leaseAccountId = "primary";
+
+    await runAccountManager("login primary", test.context, test.options);
+    await runAccountManager("remove primary", test.context, test.options);
+    await runAccountManager("billing primary allow-credits", test.context, test.options);
+    await runAccountManager("move primary down", test.context, test.options);
+
+    expect(test.login).not.toHaveBeenCalled();
+    expect(test.confirm).not.toHaveBeenCalled();
+    expect(test.credentials.has("primary")).toBe(true);
+    expect(test.config.get().accounts).toEqual([
+      { id: "primary", billing: "subscription-only" },
+      { id: "backup", billing: "subscription-only" },
+    ]);
+    expect(test.notify).toHaveBeenCalledTimes(4);
+    expect(test.notify).toHaveBeenLastCalledWith(
+      "Wait for the current Codex run to finish before changing account: primary",
+      "error",
+    );
+  });
+
   it("shows policy and status without credential values", async () => {
     const test = setup([{ id: "primary", billing: "subscription-only" }]);
     await test.options.vault.set("primary", credential());
