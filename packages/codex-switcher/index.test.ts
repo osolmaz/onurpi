@@ -156,10 +156,14 @@ describe("installCodexSwitcher", () => {
     ).toMatchObject({ type: "oauth" });
 
     const model = provider.getModels()[0] as CodexModel;
-    const context = { model, ui: { notify: vi.fn(), setStatus: vi.fn() } };
+    const setStatus = vi.fn();
+    const context = { model, ui: { notify: vi.fn(), setStatus } };
+    await test.emit("session_start", {}, context);
     await test.emit("before_agent_start", {}, context);
     expect((await provider.stream(model, { messages: [] }).result()).provider).toBe("openai-codex");
     expect(requests).toEqual(["token-primary"]);
+    expect(setStatus).toHaveBeenCalledOnce();
+    expect(setStatus).toHaveBeenCalledWith("codex-switcher", undefined);
     await test.emit("agent_settled", {}, context);
   });
 

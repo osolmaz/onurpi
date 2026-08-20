@@ -92,6 +92,10 @@ mid-run. The account manager does not change the locked account until the run fi
 An exhausted cached window expires at its reported reset time. The next agent run then starts at the
 top of the list and can return to the preferred account.
 
+The switcher does not add account or usage text to Pi's bottom status area. Use
+`/codex-switcher status` for account details. The separate Pi Usage package owns the shared usage
+display.
+
 ## Migration from profile providers
 
 The replacement does not copy old credentials or keep compatibility providers.
