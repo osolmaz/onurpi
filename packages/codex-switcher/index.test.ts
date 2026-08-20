@@ -163,6 +163,38 @@ describe("installCodexSwitcher", () => {
     await test.emit("agent_settled", {}, context);
   });
 
+  it("starts a lease for extension-triggered agent runs", async () => {
+    const requests: string[] = [];
+    const test = harness();
+    const vault = fakeVault();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(usageResponse(50)));
+    installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative(requests),
+      vault,
+    });
+    const provider = test.providers[0] as CodexProvider;
+    const model = provider.getModels()[0] as CodexModel;
+    const context = { model, ui: { notify: vi.fn(), setStatus: vi.fn() } };
+
+    await test.emit("agent_start", {}, context);
+    await provider.stream(model, { messages: [] }).result();
+    const confirm = vi.fn(() => Promise.resolve(true));
+    const notify = vi.fn();
+    await test.commands.get("codex-switcher")?.handler("remove primary", {
+      ui: { confirm, notify },
+    } as never);
+
+    expect(requests).toEqual(["token-primary"]);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(
+      "Wait for the current Codex run to finish before changing account: primary",
+      "error",
+    );
+    await expect(vault.has("primary")).resolves.toBe(true);
+    await test.emit("agent_settled", {}, context);
+  });
+
   it("routes to the next account without registering a provider alias", async () => {
     const requests: string[] = [];
     const test = harness();

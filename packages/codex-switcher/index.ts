@@ -122,6 +122,16 @@ function registerLifecycle(
   state: SwitcherState,
   live: { context: LiveContext | undefined },
 ): void {
+  const startAgentRun = (context: LiveContext): void => {
+    live.context = context;
+    if (!state.agentRunActive) {
+      state.agentRunActive = true;
+      state.leaseAccountId = undefined;
+      state.activeAccountId = undefined;
+    }
+    setStatus(context, state);
+  };
+
   pi.on("session_start", (_event, context) => {
     live.context = context;
     setStatus(live.context, state);
@@ -135,11 +145,10 @@ function registerLifecycle(
     }
   });
   pi.on("before_agent_start", (_event, context) => {
-    live.context = context;
-    state.agentRunActive = true;
-    state.leaseAccountId = undefined;
-    state.activeAccountId = undefined;
-    setStatus(context, state);
+    startAgentRun(context);
+  });
+  pi.on("agent_start", (_event, context) => {
+    startAgentRun(context);
   });
   pi.on("agent_settled", (_event, context) => {
     live.context = context;

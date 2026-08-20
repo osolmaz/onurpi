@@ -81,11 +81,13 @@ export function writePrivateFile(path: string, contents: string, maxBytes: numbe
     descriptor = undefined;
     renameSync(temporary, path);
     chmodSync(path, PRIVATE_MODE);
-    const directoryDescriptor = openSync(directory, constants.O_RDONLY);
-    try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
+    if (process.platform !== "win32") {
+      const directoryDescriptor = openSync(directory, constants.O_RDONLY);
+      try {
+        fsyncSync(directoryDescriptor);
+      } finally {
+        closeSync(directoryDescriptor);
+      }
     }
   } catch (error) {
     if (descriptor !== undefined) closeSync(descriptor);

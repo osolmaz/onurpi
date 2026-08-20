@@ -35,6 +35,12 @@ function configuredAccount(config: CodexSwitcherConfig, id: string): CodexAccoun
   return account;
 }
 
+function assertAccountMutable(id: string, state: SwitcherState): void {
+  if (state.agentRunActive && state.leaseAccountId === id) {
+    throw new Error(`Wait for the current Codex run to finish before changing account: ${id}`);
+  }
+}
+
 function usageText(usage: AccountUsageState | undefined): string {
   if (usage?.status === "failed") return usage.message;
   if (usage?.status !== "ready") return "usage unknown";
@@ -131,6 +137,7 @@ async function login(
   options: AccountManagerOptions,
 ): Promise<void> {
   configuredAccount(options.config.get(), accountId);
+  assertAccountMutable(accountId, options.state);
   const controller = new AbortController();
   try {
     const credential = await options.oauth.login(interaction(ctx, options.pi, controller.signal));
@@ -185,6 +192,7 @@ async function remove(
 ): Promise<void> {
   if (!id) throw new Error("Usage: /codex-switcher remove <account>");
   configuredAccount(options.config.get(), id);
+  assertAccountMutable(id, options.state);
   if (!(await ctx.ui.confirm("Remove Codex account?", `Remove ${id} and its saved credential?`)))
     return;
   await options.vault.remove(id);
@@ -205,6 +213,7 @@ function setBilling(
 ): void {
   if (!id) throw new Error("Usage: /codex-switcher billing <account> <billing-policy>");
   configuredAccount(options.config.get(), id);
+  assertAccountMutable(id, options.state);
   const billing = parseBilling(value);
   replaceAccounts(
     options,
@@ -225,6 +234,7 @@ function move(
   const accounts = [...options.config.get().accounts];
   const index = accounts.findIndex((account) => account.id === id);
   if (index < 0) throw new Error(`Unknown Codex account: ${id}`);
+  assertAccountMutable(id, options.state);
   const target = direction === "up" ? index - 1 : index + 1;
   const current = accounts[index];
   const replacement = accounts[target];
