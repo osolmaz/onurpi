@@ -46,6 +46,23 @@ describe("startup auth adapter", () => {
     expect(test.prototype.hasConfiguredAuth("openai-codex")).toBe(false);
   });
 
+  it("reports Codex readiness checks after evaluating provider-owned state", () => {
+    const test = prototypeWith(false);
+    const onCheck = vi.fn();
+    const restore = installStartupAuthAdapter({
+      isReady: () => true,
+      onCheck,
+      piVersion: "0.84.2",
+      runtimePrototype: test.prototype,
+    });
+
+    expect(test.prototype.hasConfiguredAuth("other-provider")).toBe(false);
+    expect(onCheck).not.toHaveBeenCalled();
+    expect(test.prototype.hasConfiguredAuth("openai-codex")).toBe(true);
+    expect(onCheck).toHaveBeenCalledOnce();
+    restore();
+  });
+
   it("delegates missing and invalid provider-owned state", () => {
     const missing = prototypeWith(false);
     const restoreMissing = installStartupAuthAdapter({
