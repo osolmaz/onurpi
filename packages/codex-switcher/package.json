@@ -1,15 +1,14 @@
 {
-  "name": "@onurpi/codex-auth-reload",
+  "name": "@onurpi/codex-switcher",
   "version": "0.1.0",
   "private": true,
-  "description": "Reload same-account Codex CLI credentials for running Pi sessions",
+  "description": "Usage-aware OpenAI Codex account profiles and fallback routing for Pi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
   "exports": {
-    ".": "./index.ts",
-    "./credential-source": "./credential-source.ts"
+    ".": "./index.ts"
   },
   "pi": {
     "extensions": [
@@ -27,9 +26,12 @@
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
+  "dependencies": {
+    "@onurpi/pi-usage": "0.1.0"
+  },
   "peerDependencies": {
-    "@earendil-works/pi-ai": ">=0.84.1",
-    "@earendil-works/pi-coding-agent": ">=0.84.1"
+    "@earendil-works/pi-ai": ">=0.84.2",
+    "@earendil-works/pi-coding-agent": ">=0.84.2"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.84.2",

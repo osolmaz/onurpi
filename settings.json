@@ -8,7 +8,7 @@
     "../../repos/onurpi/packages/goal",
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
-    "../../repos/onurpi/packages/codex-auth-reload",
+    "../../repos/onurpi/packages/codex-switcher",
     "../../repos/onurpi/packages/pi-codex-compaction",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/context-window-policy",
@@ -27,7 +27,7 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.84.1",
+  "lastChangelogVersion": "0.84.2",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "high",

@@ -8,6 +8,7 @@ import type {
   Transport,
 } from "@earendil-works/pi-ai";
 import type { ProviderConfig, SessionBeforeCompactEvent } from "@earendil-works/pi-coding-agent";
+import { isCodexFamilyModel } from "@onurpi/codex-switcher";
 
 const MAX_ATTEMPTS = 2;
 
@@ -65,9 +66,9 @@ function isOwnedOverride(value: unknown, expected: ProviderConfig): boolean {
 
 export function policyForModel(model: Model<Api>): CompactionPolicy | undefined {
   if (model.api !== "openai-codex-responses") return undefined;
-  // The built-in Codex provider compacts natively through @onurpi/pi-codex-compaction; Pi never
-  // makes a text-summary call for it, so there is no transport left to stabilize.
-  if (model.provider === "openai-codex") return undefined;
+  // The Codex family compacts natively through @onurpi/pi-codex-compaction; Pi never makes a
+  // text-summary call for it, so there is no transport left to stabilize.
+  if (isCodexFamilyModel(model)) return undefined;
   return { maxAttempts: MAX_ATTEMPTS, transport: "sse" };
 }
 

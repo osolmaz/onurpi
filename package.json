@@ -17,7 +17,7 @@
       "./packages/goal/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
-      "./packages/codex-auth-reload/index.ts",
+      "./packages/codex-switcher/index.ts",
       "./packages/pi-codex-compaction/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/context-window-policy/index.ts",
