@@ -1,21 +1,19 @@
-import { closeSync, fstatSync, openSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { isMissingFileError, readPrivateFile, writePrivateFile } from "./private-file.ts";
+
 const MAX_CONFIG_BYTES = 64 * 1024;
-const PROFILE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const ACCOUNT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 export type BillingPolicy = "subscription-only" | "allow-credits";
 
-export type CodexProfile = {
+export type CodexAccount = {
   id: string;
-  label: string;
   billing: BillingPolicy;
-  providerId: string;
 };
 
 export type CodexSwitcherConfig = {
-  profiles: readonly CodexProfile[];
-  fallbackChain: readonly string[];
+  accounts: readonly CodexAccount[];
   refreshMs: number;
   timeoutMs: number;
 };
@@ -39,8 +37,9 @@ function object(value: unknown, field: string): JsonObject {
 }
 
 function exactKeys(value: JsonObject, allowed: readonly string[], field: string): void {
-  const unexpected = Object.keys(value).filter((key) => !allowed.includes(key));
-  if (unexpected.length > 0) throw new Error(`${field} has an unknown field.`);
+  if (Object.keys(value).some((key) => !allowed.includes(key))) {
+    throw new Error(`${field} has an unknown field.`);
+  }
 }
 
 function positiveNumber(value: unknown, fallback: number, field: string, max: number): number {
@@ -51,113 +50,72 @@ function positiveNumber(value: unknown, fallback: number, field: string, max: nu
   return value;
 }
 
-function hasControlCharacter(value: string): boolean {
-  for (const character of value) {
-    const codePoint = character.codePointAt(0) ?? 0;
-    if (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)) return true;
+function parseAccount(raw: unknown, index: number): CodexAccount {
+  const field = `accounts[${String(index)}]`;
+  const value = object(raw, field);
+  exactKeys(value, ["id", "billing"], field);
+  const id = value["id"];
+  if (typeof id !== "string" || id.length > 48 || !ACCOUNT_ID.test(id)) {
+    throw new Error("Each account ID must use lowercase letters, digits, and single hyphens.");
   }
-  return false;
-}
-
-function validLabel(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    Boolean(value.trim()) &&
-    value.length <= 80 &&
-    !hasControlCharacter(value)
-  );
-}
-
-function parseProfile(id: string, raw: unknown): CodexProfile {
-  if (!PROFILE_ID.test(id) || id.length > 48) {
-    throw new Error("Each profile ID must use lowercase letters, digits, and single hyphens.");
-  }
-  const value = object(raw, `profiles.${id}`);
-  exactKeys(value, ["label", "billing"], `profiles.${id}`);
-  const label = value["label"];
   const billing = value["billing"];
-  if (!validLabel(label)) {
-    throw new Error(`profiles.${id}.label must be a nonempty string of at most 80 characters.`);
-  }
   if (billing !== "subscription-only" && billing !== "allow-credits") {
-    throw new Error(`profiles.${id}.billing must be "subscription-only" or "allow-credits".`);
+    throw new Error(`${field}.billing must be subscription-only or allow-credits.`);
   }
-  return { id, label: label.trim(), billing, providerId: providerIdForProfile(id) };
+  return { id, billing };
 }
 
-function parseProfiles(raw: unknown): CodexProfile[] {
-  const value = object(raw, "profiles");
-  const profiles = Object.entries(value).map(([id, profile]) => parseProfile(id, profile));
-  if (profiles.length === 0) throw new Error("profiles must contain at least one profile.");
-  if (profiles.length > 16) throw new Error("profiles must contain at most 16 profiles.");
-  return profiles;
-}
-
-function parseChain(raw: unknown, profiles: readonly CodexProfile[]): string[] {
-  if (!Array.isArray(raw) || raw.some((item) => typeof item !== "string")) {
-    throw new Error("fallbackChain must be an array of profile IDs.");
+function parseAccounts(raw: unknown): CodexAccount[] {
+  if (!Array.isArray(raw) || raw.length > 16) {
+    throw new Error("accounts must contain at most 16 accounts.");
   }
-  const chain = raw as string[];
-  if (new Set(chain).size !== chain.length) {
-    throw new Error("fallbackChain must not contain duplicate profile IDs.");
+  const accounts = raw.map(parseAccount);
+  if (new Set(accounts.map((account) => account.id)).size !== accounts.length) {
+    throw new Error("accounts must not contain duplicate account IDs.");
   }
-  const configured = new Set(profiles.map((profile) => profile.id));
-  if (chain.length !== configured.size || chain.some((id) => !configured.has(id))) {
-    throw new Error("fallbackChain must contain every configured profile exactly once.");
-  }
-  return [...chain];
+  return accounts;
 }
 
 export function parseCodexSwitcherConfig(raw: unknown): CodexSwitcherConfig {
   const value = object(raw, "configuration");
-  exactKeys(value, ["profiles", "fallbackChain", "usage"], "configuration");
-  const profiles = parseProfiles(value["profiles"]);
-  const fallbackChain = parseChain(value["fallbackChain"], profiles);
+  exactKeys(value, ["accounts", "usage"], "configuration");
   const usage = value["usage"] === undefined ? {} : object(value["usage"], "usage");
   exactKeys(usage, ["refreshMinutes", "timeoutSeconds"], "usage");
-  const refreshMinutes = positiveNumber(usage["refreshMinutes"], 5, "usage.refreshMinutes", 60);
-  const timeoutSeconds = positiveNumber(usage["timeoutSeconds"], 10, "usage.timeoutSeconds", 30);
   return {
-    profiles,
-    fallbackChain,
-    refreshMs: refreshMinutes * 60_000,
-    timeoutMs: timeoutSeconds * 1_000,
+    accounts: parseAccounts(value["accounts"]),
+    refreshMs: positiveNumber(usage["refreshMinutes"], 5, "usage.refreshMinutes", 60) * 60_000,
+    timeoutMs: positiveNumber(usage["timeoutSeconds"], 10, "usage.timeoutSeconds", 30) * 1_000,
   };
 }
 
-export function providerIdForProfile(profileId: string): string {
-  return `openai-codex-${profileId}`;
+function serializableConfig(config: CodexSwitcherConfig): JsonObject {
+  return {
+    accounts: config.accounts.map(({ id, billing }) => ({ id, billing })),
+    usage: {
+      refreshMinutes: config.refreshMs / 60_000,
+      timeoutSeconds: config.timeoutMs / 1_000,
+    },
+  };
 }
 
-function readBoundedConfig(path: string): string {
-  const descriptor = openSync(path, "r");
-  try {
-    const stats = fstatSync(descriptor);
-    if (!stats.isFile() || stats.size > MAX_CONFIG_BYTES) {
-      throw new Error(
-        `Configuration must be a regular file no larger than ${String(MAX_CONFIG_BYTES)} bytes.`,
-      );
-    }
-    return readFileSync(descriptor, "utf8");
-  } finally {
-    closeSync(descriptor);
-  }
-}
-
-function errorCode(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" ? code : undefined;
+export function writeCodexSwitcherConfig(path: string, config: CodexSwitcherConfig): void {
+  writePrivateFile(
+    path,
+    `${JSON.stringify(serializableConfig(config), undefined, 2)}\n`,
+    MAX_CONFIG_BYTES,
+  );
 }
 
 export function loadCodexSwitcherConfig(path: string): ConfigLoadResult {
   try {
     return {
       status: "ready",
-      config: parseCodexSwitcherConfig(JSON.parse(readBoundedConfig(path)) as unknown),
+      config: parseCodexSwitcherConfig(
+        JSON.parse(readPrivateFile(path, MAX_CONFIG_BYTES)) as unknown,
+      ),
     };
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return { status: "missing" };
+    if (isMissingFileError(error)) return { status: "missing" };
     const message =
       error instanceof SyntaxError
         ? "Configuration contains invalid JSON."

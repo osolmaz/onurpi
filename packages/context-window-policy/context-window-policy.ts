@@ -3,7 +3,6 @@ import type {
   ContextUsage,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { isCodexFamilyModel } from "@onurpi/codex-switcher";
 
 const AUTO_COMPACT_NUMERATOR = 9;
 const AUTO_COMPACT_DENOMINATOR = 10;
@@ -11,13 +10,9 @@ const AUTO_COMPACT_DENOMINATOR = 10;
 type SelectedModel = Pick<NonNullable<ExtensionContext["model"]>, "contextWindow"> &
   Partial<Pick<NonNullable<ExtensionContext["model"]>, "provider" | "api">>;
 
-/**
- * True when `@onurpi/pi-codex-compaction` owns compaction for this model. Built-in Codex and
- * switcher profiles compact natively through that extension (90% turn-boundary trigger plus
- * fail-closed remote checkpoints), so this policy must not request a racing text compaction.
- */
+/** True when `@onurpi/pi-codex-compaction` owns compaction for this model. */
 export function isCodexNativeModel(model: SelectedModel | undefined): boolean {
-  return isCodexFamilyModel(model);
+  return model?.provider === "openai-codex" && model.api === "openai-codex-responses";
 }
 
 export type ContextWindowPolicyContext = {

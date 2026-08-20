@@ -1,26 +1,27 @@
 # @onurpi/codex-switcher
 
-`@onurpi/codex-switcher` lets Pi keep separate OpenAI Codex OAuth credentials and move through a
-usage-aware fallback chain. Each account is a normal Pi provider alias, so Pi owns login, token
-refresh, and credential storage.
+`@onurpi/codex-switcher` lets one normal Pi `openai-codex` provider use several ChatGPT accounts. It
+checks account usage and can move to the next account before a response starts.
+
+The extension does not add providers such as `openai-codex-primary`. Pi keeps one provider, one
+model list, and one session identity.
 
 ## Configuration
 
-Create `~/.pi/agent/codex-switcher.json`:
+Create `~/.pi/agent/codex-switcher.json` with mode `0600`:
 
 ```json
 {
-  "profiles": {
-    "primary": {
-      "label": "Primary",
+  "accounts": [
+    {
+      "id": "primary",
       "billing": "subscription-only"
     },
-    "backup": {
-      "label": "Backup",
+    {
+      "id": "backup",
       "billing": "allow-credits"
     }
-  },
-  "fallbackChain": ["primary", "backup"],
+  ],
   "usage": {
     "refreshMinutes": 5,
     "timeoutSeconds": 10
@@ -28,55 +29,94 @@ Create `~/.pi/agent/codex-switcher.json`:
 }
 ```
 
-Profile IDs use lowercase letters, digits, and single hyphens. The extension converts each profile
-to a provider named `openai-codex-<profile-id>`.
-
-`subscription-only` stops that profile when a subscription window reaches zero. `allow-credits`
-permits billable credit use when the subscription is exhausted and the Codex usage response confirms
-that credits remain.
-
-Reload Pi after a configuration change. Then sign in to each provider:
-
-```text
-/login openai-codex-primary
-/login openai-codex-backup
+```bash
+chmod 600 ~/.pi/agent/codex-switcher.json
 ```
 
-Select the first provider with `/model`, or set it as Pi's default provider. Run `/codex-switcher`
-to see the fallback order, authentication state, billing policy, and last known usage state.
+Array order defines preference and fallback order. Account IDs use lowercase letters, digits, and
+single hyphens.
 
-## Routing rules
+`subscription-only` stops an account when a subscription window reaches zero. `allow-credits`
+permits paid credits only when the Codex usage response confirms that credits remain.
 
-The selected profile defines the preferred start of the chain. A run selected on `primary` can move
-to `backup`; a run selected on `backup` does not move back to `primary`.
+The account manager can create and update this file. A missing file is the same as an empty account
+list. The old `profiles` and `fallbackChain` format is not supported.
 
-The extension checks the official Codex usage endpoint before each request, with a short in-memory
-cache. An exhausted cached window expires as soon as its reported reset time passes. If the usage
-endpoint is unavailable, the extension tries the request and lets the provider response decide.
+## Account manager
 
-A confirmed usage-limit error can cause fallback only before the provider emits text, thinking, or a
-tool call. Errors after output starts remain on the account that started the response. This avoids
-duplicate partial answers and duplicate tool calls.
+Reload Pi, then run:
 
-After a fallback starts output, the extension keeps that profile for later model calls in the same
-agent run. It temporarily selects the serving profile so tool continuations, automatic retries, and
-native compaction use the same account. When the run fully settles, it restores the preferred
-profile. The next run can then return to a higher-priority account when its cached limit expires or
-on the first request after its reported reset time passes.
+```text
+/codex-switcher
+```
+
+The interactive manager can:
+
+- show account order, authentication, billing policy, usage, and reset time;
+- add and authenticate an account;
+- reauthenticate or remove an account;
+- change billing policy;
+- move an account up or down.
+
+Command forms are also available:
+
+```text
+/codex-switcher status
+/codex-switcher add primary subscription-only
+/codex-switcher login primary
+/codex-switcher billing primary allow-credits
+/codex-switcher move primary up
+/codex-switcher remove primary
+```
+
+Login uses Pi AI's official OpenAI Codex OAuth implementation. Credentials are stored in
+`~/.pi/agent/codex-switcher-auth.json` with mode `0600`. The extension writes this file atomically
+and serializes changes across Pi processes. It never puts credentials in the policy file.
+
+Do not use `/login openai-codex` for switcher accounts. The switcher account manager owns these
+credentials.
+
+## Routing
+
+Each new agent run starts at the first configured account. The extension skips unauthenticated
+accounts and accounts that confirmed they have no permitted usage.
+
+If the usage endpoint is unavailable, the extension tries the account. A confirmed usage-limit error
+can move to the next account only before the provider emits text, thinking, or a tool call. This
+prevents duplicate answers and duplicate tool calls.
+
+The first semantic event locks the account for the complete agent run. Tool continuations, retries,
+and compaction use that same account. A later limit error ends the run instead of changing accounts
+mid-run.
+
+An exhausted cached window expires at its reported reset time. The next agent run then starts at the
+top of the list and can return to the preferred account.
+
+## Migration from profile providers
+
+The replacement does not copy old credentials or keep compatibility providers.
+
+Before updating, run `/logout` and select each old alias provider to remove its credential. After
+updating, replace the old configuration with the ordered `accounts` format and authenticate each
+account through `/codex-switcher`. Fresh login avoids copying credentials between stores.
 
 ## Security and state
 
-The configuration contains labels and policy only. It must not contain credentials. Pi stores one
-OAuth credential for each generated provider ID in its normal auth store.
+The extension accepts only the official `openai-codex` provider and official ChatGPT Codex endpoint.
+It sends account credentials only to the official OpenAI OAuth, Codex API, and Codex usage
+endpoints.
 
-The extension sends profile credentials only to the official ChatGPT Codex API and official Codex
-usage endpoint. It keeps usage reports and salted credential fingerprints in memory and clears them
-when the process ends. It adds no custom session entries.
+Policy and vault files must be regular files with mode `0600`. The vault is bounded, validated,
+locked, and replaced atomically. OAuth refresh happens under the vault lock so concurrent Pi
+processes do not overwrite a rotated token.
+
+Usage reports and salted credential fingerprints stay in memory. Status and errors never include
+credential values. The extension adds no custom session entries.
 
 ## Limits
 
 - The extension needs Pi 0.84.2 or newer.
-- Configuration changes require `/reload` because provider aliases are registered at extension load
-  time.
-- Native remote compaction uses the profile leased to the current agent run.
-- The built-in `openai-codex` provider remains available, but it is outside the switcher chain.
+- Pi currently stores one credential for each provider ID. The switcher therefore owns its account
+  vault until Pi exposes public named credential profiles.
+- A configuration syntax error leaves the built-in provider unchanged and exposes only a diagnostic
+  `/codex-switcher` command.

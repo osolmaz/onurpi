@@ -7,12 +7,12 @@ the security review, and the local adaptations.
 
 ## Behavior
 
-When the active model uses the built-in Codex provider or an `openai-codex-*` switcher profile with
-the `openai-codex-responses` API, the extension intercepts Pi's manual, threshold, and overflow
-compaction events. It sends the finalized Responses history to the official Codex endpoint with a
-trailing `compaction_trigger`, stores the returned opaque `compaction` item in Pi's real
-`CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary. Direct
-compaction requests use the selected provider's current Pi OAuth credential.
+When the active model uses the built-in `openai-codex` provider with the `openai-codex-responses`
+API, the extension intercepts Pi's manual, threshold, and overflow compaction events. It sends the
+finalized Responses history to the official Codex endpoint with a trailing `compaction_trigger`,
+stores the returned opaque `compaction` item in Pi's real `CompactionEntry.details`, and lets Pi
+rebuild the active transcript from that boundary. The Codex switcher overrides that same provider in
+place, so direct compaction requests use the account leased to the current agent run.
 
 Pi owns compaction scheduling and continuation. The extension does not abort an active run or add a
 synthetic user message. Manual compaction, Pi's configured threshold compaction, and overflow retry
@@ -23,9 +23,9 @@ marker. The marker is filtered from provider context and is never sent to OpenAI
 mode, each native compaction adds durable `OpenAI compaction running…` / complete / failed status
 entries to the chat transcript; these custom entries are never included in model context.
 
-Native compaction activates for the built-in `openai-codex` provider and Codex switcher profiles.
-Other providers pass through every hook unchanged and never receive the opaque checkpoint or the
-local marker. The extension performs no text-summary model call.
+Native compaction activates only for the built-in `openai-codex` provider. Other providers pass
+through every hook unchanged and never receive the opaque checkpoint or the local marker. The
+extension performs no text-summary model call.
 
 ## Fail-closed policy
 
@@ -39,15 +39,14 @@ local marker. The extension performs no text-summary model call.
 
 ## Compaction ownership in OnurPi
 
-- **`@onurpi/pi-codex-compaction`** owns all compaction for the built-in `openai-codex` provider and
-  Codex switcher profiles: the 90% mid-run threshold, the remote native checkpoint, and the
-  compaction entry.
+- **`@onurpi/pi-codex-compaction`** owns all compaction for the built-in `openai-codex` provider:
+  the 90% mid-run threshold, the remote native checkpoint, and the compaction entry.
 - **`@onurpi/context-window-policy`** keeps its model-relative 90% settlement compaction for every
-  non-Codex model and passes Codex family models through untouched, so the two extensions never
-  request duplicate or racing compactions.
-- **`@onurpi/reliable-compaction`** still stabilizes ordinary Pi text compaction (SSE transport with
-  one retry) for other custom providers that use the `openai-codex-responses` API, but passes the
-  Codex family through because native compaction replaces its text-summary path.
+  other model and passes `openai-codex` through untouched, so the two extensions never request
+  duplicate or racing compactions.
+- **`@onurpi/reliable-compaction`** still stabilizes ordinary Pi text compaction for other custom
+  providers that use the `openai-codex-responses` API, but passes `openai-codex` through because
+  native compaction replaces its text-summary path.
 
 The root manifest registers `pi-codex-compaction` before both policy packages, and the repository
 tests assert that ordering.
@@ -67,8 +66,8 @@ compaction derive state from the newest checkpoint on the active branch. No othe
 ## Limitations
 
 Native checkpoints are model-specific. Switch back to the model that created the checkpoint before
-continuing; with any other model selected, requests fail closed. Provider switching is not a
-portability path because no textual summary is generated.
+continuing; with any other model selected, requests fail closed. Account switching keeps the same
+provider and model identity, so it does not change checkpoint compatibility.
 
 Pi does not expose a finalized provider payload during `session_before_compact`. The extension
 mirrors Pi's Codex message conversion and combines it with the latest observed request shape to

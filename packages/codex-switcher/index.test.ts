@@ -1,92 +1,29 @@
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
+  type AssistantMessageEvent,
   type Model,
   type Provider,
+  type StreamOptions,
 } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
+import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigLoadResult } from "./config.ts";
 import { installCodexSwitcher } from "./index.ts";
+import type { AccountVault } from "./vault.ts";
 
 type CodexModel = Model<"openai-codex-responses">;
-type EventHandler = (event: unknown, context: unknown) => unknown;
+type CodexProvider = Provider<"openai-codex-responses">;
+type EventHandler = (event: never, context: never) => unknown;
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-function readyConfig(): Extract<ConfigLoadResult, { status: "ready" }> {
-  return {
-    status: "ready",
-    config: {
-      profiles: [
-        {
-          id: "primary",
-          label: "Primary",
-          billing: "subscription-only",
-          providerId: "openai-codex-primary",
-        },
-        {
-          id: "backup",
-          label: "Backup",
-          billing: "allow-credits",
-          providerId: "openai-codex-backup",
-        },
-      ],
-      fallbackChain: ["primary", "backup"],
-      refreshMs: 300_000,
-      timeoutMs: 10_000,
-    },
-  };
-}
-
-function harness() {
-  const providers: Provider[] = [];
-  const commands = new Map<string, Omit<RegisteredCommand, "name" | "sourceInfo">>();
-  const events: string[] = [];
-  const handlers = new Map<string, EventHandler[]>();
-  let currentContext: { model?: CodexModel } | undefined;
-  const selected: CodexModel[] = [];
-  const api = {
-    registerProvider(provider: Provider) {
-      providers.push(provider);
-    },
-    registerCommand(name: string, command: Omit<RegisteredCommand, "name" | "sourceInfo">) {
-      commands.set(name, command);
-    },
-    on(event: string, handler: EventHandler) {
-      events.push(event);
-      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
-    },
-    setModel(model: CodexModel) {
-      selected.push(model);
-      if (currentContext) currentContext.model = model;
-      return Promise.resolve(true);
-    },
-  };
-  const emit = async (event: string, value: unknown, context: { model?: CodexModel }) => {
-    currentContext = context;
-    for (const handler of handlers.get(event) ?? []) await handler(value, context);
-  };
-  return {
-    api: api as unknown as ExtensionAPI,
-    providers,
-    commands,
-    events,
-    emit,
-    selected,
-  };
-}
-
-function assistant(provider: string): AssistantMessage {
+function assistant(stopReason: AssistantMessage["stopReason"] = "stop"): AssistantMessage {
   return {
     role: "assistant",
     content: [],
     api: "openai-codex-responses",
-    provider,
+    provider: "openai-codex",
     model: "gpt-test",
     usage: {
       input: 0,
@@ -96,143 +33,190 @@ function assistant(provider: string): AssistantMessage {
       totalTokens: 0,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
-    stopReason: "stop",
+    stopReason,
     timestamp: 1,
   };
 }
 
-function successfulStream() {
+function successfulStream(): ReturnType<typeof createAssistantMessageEventStream> {
   const output = createAssistantMessageEventStream();
-  output.push({ type: "done", reason: "stop", message: assistant("openai-codex") });
+  const partial = assistant("pending");
+  const events: AssistantMessageEvent[] = [
+    { type: "start", partial },
+    { type: "text_start", contentIndex: 0, partial },
+    { type: "done", reason: "stop", message: assistant() },
+  ];
+  for (const event of events) output.push(event);
   return output;
 }
 
-function testNativeProvider(): Provider<"openai-codex-responses"> {
+function readyConfig(): Extract<ConfigLoadResult, { status: "ready" }> {
+  return {
+    status: "ready",
+    config: {
+      accounts: [
+        { id: "primary", billing: "subscription-only" },
+        { id: "backup", billing: "allow-credits" },
+      ],
+      refreshMs: 300_000,
+      timeoutMs: 10_000,
+    },
+  };
+}
+
+function fakeVault(authenticated = ["primary", "backup"]): AccountVault {
+  const accounts = new Set(authenticated);
+  return {
+    has: (id) => Promise.resolve(accounts.has(id)),
+    list: () => Promise.resolve([...accounts]),
+    remove: (id) => Promise.resolve(accounts.delete(id)),
+    resolve: (id) => Promise.resolve(accounts.has(id) ? { apiKey: `token-${id}` } : undefined),
+    set: (id) => {
+      accounts.add(id);
+      return Promise.resolve();
+    },
+  };
+}
+
+function fakeNative(requests: string[]): CodexProvider {
   const native = openaiCodexProvider();
+  const transport = (_model: CodexModel, _context: unknown, options?: StreamOptions) => {
+    requests.push(options?.apiKey ?? "missing");
+    return successfulStream();
+  };
   return {
     ...native,
-    stream: () => successfulStream(),
-    streamSimple: () => successfulStream(),
+    stream: transport as CodexProvider["stream"],
+    streamSimple: transport as CodexProvider["streamSimple"],
   };
+}
+
+function harness() {
+  const providers: Provider[] = [];
+  const commands = new Map<string, Omit<RegisteredCommand, "name" | "sourceInfo">>();
+  const handlers = new Map<string, EventHandler[]>();
+  const api = {
+    exec: vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "", killed: false })),
+    registerProvider(provider: Provider) {
+      providers.push(provider);
+    },
+    registerCommand(name: string, command: Omit<RegisteredCommand, "name" | "sourceInfo">) {
+      commands.set(name, command);
+    },
+    on(event: string, handler: EventHandler) {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+    },
+  };
+  const emit = async (event: string, value: unknown, context: unknown) => {
+    for (const handler of handlers.get(event) ?? []) {
+      await handler(value as never, context as never);
+    }
+  };
+  return { api: api as unknown as ExtensionAPI, commands, emit, handlers, providers };
 }
 
 function usageResponse(usedPercent: number): Response {
   return new Response(
     JSON.stringify({
-      rate_limit: { primary_window: { used_percent: usedPercent } },
-      credits: { has_credits: false },
+      rate_limit: {
+        primary_window: { used_percent: usedPercent, limit_window_seconds: 18_000 },
+      },
+      credits: { has_credits: true, unlimited: false, balance: "10" },
     }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("installCodexSwitcher", () => {
-  it("registers one complete OAuth provider per configured profile", () => {
+  it("overrides one built-in provider and keeps normal model identity", async () => {
+    const requests: string[] = [];
     const test = harness();
-    const native = openaiCodexProvider();
-    installCodexSwitcher(test.api, { configResult: readyConfig(), nativeProvider: native });
-
-    expect(test.providers.map((provider) => provider.id)).toEqual([
-      "openai-codex-primary",
-      "openai-codex-backup",
-    ]);
-    for (const provider of test.providers) {
-      expect(provider.auth.oauth).toBe(native.auth.oauth);
-      expect(provider.getModels()).not.toHaveLength(0);
-      expect(provider.getModels().every((model) => model.provider === provider.id)).toBe(true);
-    }
-    expect(test.commands.has("codex-switcher")).toBe(true);
-    expect(test.events).toEqual([
-      "session_start",
-      "model_select",
-      "agent_start",
-      "agent_settled",
-      "session_shutdown",
-    ]);
-  });
-
-  it("routes and rejects custom endpoints on the full stream API", async () => {
-    const test = harness();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(usageResponse(50)));
     installCodexSwitcher(test.api, {
       configResult: readyConfig(),
-      nativeProvider: openaiCodexProvider(),
+      nativeProvider: fakeNative(requests),
+      vault: fakeVault(),
     });
-    const provider = test.providers[0];
-    const registeredModel = provider?.getModels()[0];
-    if (!provider || !registeredModel) throw new Error("Expected a registered profile model");
-    const result = await provider
-      .stream({ ...registeredModel, baseUrl: "https://example.com/backend-api" }, { messages: [] })
-      .result();
-    expect(result.errorMessage).toContain("Codex profile authentication is restricted");
+
+    expect(test.providers).toHaveLength(1);
+    const provider = test.providers[0] as CodexProvider;
+    expect(provider.id).toBe("openai-codex");
+    expect(new Set(provider.getModels().map((value) => value.provider))).toEqual(
+      new Set(["openai-codex"]),
+    );
+    expect(
+      await provider.auth.apiKey?.check?.({
+        ctx: { env: () => Promise.resolve(undefined), fileExists: () => Promise.resolve(false) },
+        signal: new AbortController().signal,
+      }),
+    ).toMatchObject({ type: "oauth" });
+
+    const model = provider.getModels()[0] as CodexModel;
+    const context = { model, ui: { notify: vi.fn(), setStatus: vi.fn() } };
+    await test.emit("before_agent_start", {}, context);
+    expect((await provider.stream(model, { messages: [] }).result()).provider).toBe("openai-codex");
+    expect(requests).toEqual(["token-primary"]);
+    await test.emit("agent_settled", {}, context);
   });
 
-  it("selects a fallback during a run and restores the preferred profile when settled", async () => {
+  it("routes to the next account without registering a provider alias", async () => {
+    const requests: string[] = [];
+    const test = harness();
     vi.stubGlobal(
       "fetch",
-      vi.fn((_input: string | URL | Request, init?: RequestInit) => {
-        const authorization = new Headers(init?.headers).get("authorization") ?? "";
-        return Promise.resolve(usageResponse(authorization.includes("primary") ? 100 : 50));
+      vi.fn((_input: unknown, init?: RequestInit) => {
+        const auth = new Headers(init?.headers).get("Authorization");
+        return Promise.resolve(usageResponse(auth?.includes("primary") ? 100 : 50));
       }),
     );
-    const test = harness();
     installCodexSwitcher(test.api, {
       configResult: readyConfig(),
-      nativeProvider: testNativeProvider(),
+      nativeProvider: fakeNative(requests),
+      vault: fakeVault(),
     });
-    const primaryProvider = test.providers[0];
-    const primaryModel = primaryProvider?.getModels()[0] as CodexModel | undefined;
-    if (!primaryProvider || !primaryModel) throw new Error("Expected the primary profile model");
-    const context = {
-      model: primaryModel,
-      modelRegistry: {
-        getProviderAuth: (providerId: string) =>
-          Promise.resolve({ auth: { apiKey: `token-${providerId}` } }),
-        getProviderAuthStatus: () => ({ configured: true }),
-      },
-      ui: { notify: vi.fn(), setStatus: vi.fn() },
-    };
-
-    await test.emit("session_start", { type: "session_start", reason: "startup" }, context);
-    await test.emit("agent_start", { type: "agent_start" }, context);
-    const result = await primaryProvider.stream(primaryModel, { messages: [] }).result();
-
-    expect(result.provider).toBe("openai-codex-backup");
-    expect(test.selected[0]?.provider).toBe("openai-codex-backup");
-    await test.emit("agent_settled", { type: "agent_settled" }, context);
-    expect(test.selected[1]?.provider).toBe("openai-codex-primary");
-    expect(context.model.provider).toBe("openai-codex-primary");
+    const provider = test.providers[0] as CodexProvider;
+    const model = provider.getModels()[0] as CodexModel;
+    await provider.stream(model, { messages: [] }).result();
+    expect(requests).toEqual(["token-backup"]);
+    expect(test.providers.map((value) => value.id)).toEqual(["openai-codex"]);
+    await expect(
+      provider.auth.apiKey?.resolve({
+        ctx: { env: () => Promise.resolve(undefined), fileExists: () => Promise.resolve(false) },
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toMatchObject({ auth: { apiKey: "token-backup" } });
   });
 
-  it("registers only diagnostics when configuration is missing", async () => {
+  it("keeps the account manager available with a missing configuration", async () => {
     const test = harness();
     installCodexSwitcher(test.api, {
       configPath: "/agent/codex-switcher.json",
       configResult: { status: "missing" },
+      nativeProvider: fakeNative([]),
+      vault: fakeVault([]),
     });
-    expect(test.providers).toHaveLength(0);
-    expect(test.events).toHaveLength(0);
-
+    expect(test.providers.map((provider) => provider.id)).toEqual(["openai-codex"]);
     const notify = vi.fn();
-    const command = test.commands.get("codex-switcher");
-    if (!command) throw new Error("Expected diagnostic command");
-    await command.handler("", { ui: { notify } } as never);
-    expect(notify).toHaveBeenCalledWith(
-      "Codex switcher configuration is missing: /agent/codex-switcher.json",
-      "warning",
-    );
+    await test.commands.get("codex-switcher")?.handler("status", {
+      ui: { notify },
+    } as never);
+    expect(notify).toHaveBeenCalledWith("No Codex accounts are configured.", "info");
   });
 
-  it("reports invalid configuration without registering profile providers", async () => {
+  it("does not override the provider when configuration is invalid", async () => {
     const test = harness();
     installCodexSwitcher(test.api, {
-      configResult: { status: "invalid", message: "profiles must contain at least one profile." },
+      configResult: { status: "invalid", message: "accounts has an unknown field." },
     });
+    expect(test.providers).toHaveLength(0);
     const notify = vi.fn();
-    const command = test.commands.get("codex-switcher");
-    if (!command) throw new Error("Expected diagnostic command");
-    await command.handler("", { ui: { notify } } as never);
+    await test.commands.get("codex-switcher")?.handler("", { ui: { notify } } as never);
     expect(notify).toHaveBeenCalledWith(
-      "Codex switcher configuration is invalid: profiles must contain at least one profile.",
+      "Codex switcher configuration is invalid: accounts has an unknown field.",
       "error",
     );
   });

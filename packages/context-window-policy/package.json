@@ -23,9 +23,6 @@
     "slophammer": "sh scripts/run-slophammer.sh",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
-  "dependencies": {
-    "@onurpi/codex-switcher": "0.1.0"
-  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

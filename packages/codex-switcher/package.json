@@ -2,7 +2,7 @@
   "name": "@onurpi/codex-switcher",
   "version": "0.1.0",
   "private": true,
-  "description": "Usage-aware OpenAI Codex account profiles and fallback routing for Pi",
+  "description": "Usage-aware multi-account routing for Pi's OpenAI Codex provider",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

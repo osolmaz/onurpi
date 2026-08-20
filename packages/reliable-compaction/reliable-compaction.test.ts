@@ -143,9 +143,8 @@ describe("reliable compaction policy", () => {
     expect(policyForModel(model("anthropic-messages"))).toBeUndefined();
   });
 
-  it("passes through the Codex family owned by native compaction", () => {
+  it("passes through the built-in Codex provider owned by native compaction", () => {
     expect(policyForModel(model("openai-codex-responses", "openai-codex"))).toBeUndefined();
-    expect(policyForModel(model("openai-codex-responses", "openai-codex-primary"))).toBeUndefined();
   });
 
   it("counts one or two summary calls from Pi's public preparation", () => {

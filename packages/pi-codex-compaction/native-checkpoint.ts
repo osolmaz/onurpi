@@ -1,6 +1,5 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { isCodexFamilyModel } from "@onurpi/codex-switcher";
 
 export const NATIVE_COMPACTION_KIND = "openai-codex-native-compaction";
 export const NATIVE_COMPACTION_VERSION = 1;
@@ -8,7 +7,7 @@ export const NATIVE_COMPACTION_VERSION = 1;
 export type JsonObject = Record<string, unknown>;
 export type ResponseItem = JsonObject & { type?: string };
 
-/** The only model family this extension serves: built-in Codex and switcher profile providers. */
+/** The only model this extension serves: the built-in OpenAI Codex provider. */
 export type CodexModel = Model<"openai-codex-responses">;
 
 export type NativeCompactionDetails = {
@@ -37,14 +36,11 @@ export function isOpenAICodexModel(model: unknown): model is CodexModel {
   if (!isJsonObject(model)) return false;
   const provider = model["provider"];
   const api = model["api"];
-  return (
-    typeof provider === "string" && typeof api === "string" && isCodexFamilyModel({ provider, api })
-  );
+  return provider === "openai-codex" && api === "openai-codex-responses";
 }
 
 export function modelKey(model: { provider: string; api: string; id: string }): string {
-  const provider = isCodexFamilyModel(model) ? "openai-codex" : model.provider;
-  return `${provider}:${model.api}:${model.id}`;
+  return `${model.provider}:${model.api}:${model.id}`;
 }
 
 function isResponseItem(value: unknown): value is ResponseItem {

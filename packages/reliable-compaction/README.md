@@ -9,11 +9,10 @@ configured provider pipeline, so base URL and authentication overrides, request 
 settings, split-turn handling, custom instructions, file tracking, thinking level, and automatic
 overflow recovery are preserved.
 
-The built-in `openai-codex` provider and `openai-codex-*` switcher profiles are not covered.
-`@onurpi/pi-codex-compaction` owns native remote compaction for them, so Pi never makes a
-text-summary call whose transport this extension could stabilize. The policy passes the Codex
-family through instead of arming an override that would be left dangling when native compaction
-cancels Pi's compaction.
+The built-in `openai-codex` provider is not covered. `@onurpi/pi-codex-compaction` owns its native
+remote compaction, so Pi never makes a text-summary call whose transport this extension could
+stabilize. The policy passes that provider through instead of arming an override that would be left
+dangling when native compaction cancels Pi's compaction.
 
 A failed summary request is retried once because Pi does not append the compaction entry until a
 complete result exists. Cancellation is never retried. Both attempts stay on SSE, so failure does
