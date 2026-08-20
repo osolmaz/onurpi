@@ -72,10 +72,16 @@ export function installCodexSwitcherStartup(
   runtime: CodexSwitcherProvider,
   options: Omit<StartupAuthAdapterOptions, "isReady"> = {},
 ): RestoreStartupAuthAdapter {
-  const restoreAuth = installStartupAuthAdapter({
-    ...options,
-    isReady: runtime.isAuthenticationReady,
-  });
+  let restoreAuth: RestoreStartupAuthAdapter;
+  try {
+    restoreAuth = installStartupAuthAdapter({
+      ...options,
+      isReady: runtime.isAuthenticationReady,
+    });
+  } catch (error) {
+    pi.unregisterProvider(runtime.provider.id);
+    throw error;
+  }
   let restoreProvider: RestoreStartupAuthAdapter | undefined;
   let active = true;
   const restore = (): void => {
@@ -91,6 +97,7 @@ export function installCodexSwitcherStartup(
     return restore;
   } catch (error) {
     restore();
+    pi.unregisterProvider(runtime.provider.id);
     throw error;
   }
 }
