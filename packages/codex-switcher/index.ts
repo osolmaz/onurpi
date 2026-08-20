@@ -72,11 +72,20 @@ export function installCodexSwitcherStartup(
   runtime: CodexSwitcherProvider,
   options: Omit<StartupAuthAdapterOptions, "isReady"> = {},
 ): RestoreStartupAuthAdapter {
-  const restore = installStartupAuthAdapter({
+  const restoreAuth = installStartupAuthAdapter({
     ...options,
     isReady: runtime.isAuthenticationReady,
   });
+  let restoreProvider: RestoreStartupAuthAdapter | undefined;
+  let active = true;
+  const restore = (): void => {
+    if (!active) return;
+    active = false;
+    restoreProvider?.();
+    restoreAuth();
+  };
   try {
+    restoreProvider = restoreWhenProviderBinds(runtime.provider, restore);
     pi.on("session_start", restore);
     pi.on("session_shutdown", restore);
     return restore;
@@ -84,6 +93,31 @@ export function installCodexSwitcherStartup(
     restore();
     throw error;
   }
+}
+
+function restoreWhenProviderBinds(
+  provider: CodexProvider,
+  restore: RestoreStartupAuthAdapter,
+): RestoreStartupAuthAdapter {
+  const original = Reflect.get(provider, "getModels");
+  let active = true;
+  const wrapped: CodexProvider["getModels"] = function (this: CodexProvider) {
+    cleanup();
+    restore();
+    return Reflect.apply(original, this, []);
+  };
+  if (!Reflect.set(provider, "getModels", wrapped)) {
+    throw new Error("Unable to observe Codex provider registration during session startup.");
+  }
+
+  function cleanup(): void {
+    if (!active) return;
+    active = false;
+    if (Reflect.get(provider, "getModels") === wrapped) {
+      Reflect.set(provider, "getModels", original);
+    }
+  }
+  return cleanup;
 }
 
 function registerLifecycle(pi: ExtensionAPI, runtime: CodexSwitcherProvider): void {
