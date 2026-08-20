@@ -11,7 +11,7 @@ import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigLoadResult } from "./config.ts";
-import { installCodexSwitcher } from "./index.ts";
+import { installCodexSwitcher, installCodexSwitcherStartup } from "./index.ts";
 import type { AccountVault } from "./vault.ts";
 
 type CodexModel = Model<"openai-codex-responses">;
@@ -68,6 +68,7 @@ function fakeVault(authenticated = ["primary", "backup"]): AccountVault {
   const accounts = new Set(authenticated);
   return {
     has: (id) => Promise.resolve(accounts.has(id)),
+    hasAnySync: (ids) => ids.some((id) => accounts.has(id)),
     list: () => Promise.resolve([...accounts]),
     remove: (id) => Promise.resolve(accounts.delete(id)),
     resolve: (id) => Promise.resolve(accounts.has(id) ? { apiKey: `token-${id}` } : undefined),
@@ -136,12 +137,13 @@ describe("installCodexSwitcher", () => {
     const requests: string[] = [];
     const test = harness();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(usageResponse(50)));
-    installCodexSwitcher(test.api, {
+    const runtime = installCodexSwitcher(test.api, {
       configResult: readyConfig(),
       nativeProvider: fakeNative(requests),
       vault: fakeVault(),
     });
 
+    expect(runtime?.isAuthenticationReady()).toBe(true);
     expect(test.providers).toHaveLength(1);
     const provider = test.providers[0] as CodexProvider;
     expect(provider.id).toBe("openai-codex");
@@ -166,7 +168,60 @@ describe("installCodexSwitcher", () => {
     expect(setStatus).toHaveBeenCalledWith("codex-switcher", undefined);
     await test.emit("agent_settled", {}, context);
   });
+});
 
+describe("codex switcher startup", () => {
+  it("restores startup authentication behavior after provider binding", async () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    const original = vi.fn((providerId: string) => providerId === "canonical-ready");
+    const runtimePrototype = { hasConfiguredAuth: original };
+    const restore = installCodexSwitcherStartup(test.api, runtime, {
+      piVersion: "0.84.2",
+      runtimePrototype,
+    });
+
+    expect(runtimePrototype.hasConfiguredAuth("openai-codex")).toBe(true);
+    expect(runtimePrototype.hasConfiguredAuth("other-provider")).toBe(false);
+    await test.emit("session_start", {}, { ui: { setStatus: vi.fn() } });
+    expect(runtimePrototype.hasConfiguredAuth).toBe(original);
+    restore();
+  });
+
+  it("restores startup authentication when lifecycle registration fails", () => {
+    const test = harness();
+    const runtime = installCodexSwitcher(test.api, {
+      configResult: readyConfig(),
+      nativeProvider: fakeNative([]),
+      vault: fakeVault(),
+    });
+    expect(runtime).toBeDefined();
+    if (!runtime) return;
+    const original = vi.fn((providerId: string) => providerId === "canonical-ready");
+    const runtimePrototype = { hasConfiguredAuth: original };
+    const failingApi = {
+      on: vi.fn(() => {
+        throw new Error("registration failed");
+      }),
+    } as unknown as ExtensionAPI;
+
+    expect(() =>
+      installCodexSwitcherStartup(failingApi, runtime, {
+        piVersion: "0.84.2",
+        runtimePrototype,
+      }),
+    ).toThrow("registration failed");
+    expect(runtimePrototype.hasConfiguredAuth).toBe(original);
+  });
+});
+
+describe("installCodexSwitcher", () => {
   it("starts a lease for extension-triggered agent runs", async () => {
     const requests: string[] = [];
     const test = harness();
@@ -229,12 +284,13 @@ describe("installCodexSwitcher", () => {
 
   it("keeps the account manager available with a missing configuration", async () => {
     const test = harness();
-    installCodexSwitcher(test.api, {
+    const runtime = installCodexSwitcher(test.api, {
       configPath: "/agent/codex-switcher.json",
       configResult: { status: "missing" },
       nativeProvider: fakeNative([]),
       vault: fakeVault([]),
     });
+    expect(runtime?.isAuthenticationReady()).toBe(false);
     expect(test.providers.map((provider) => provider.id)).toEqual(["openai-codex"]);
     const notify = vi.fn();
     await test.commands.get("codex-switcher")?.handler("status", {

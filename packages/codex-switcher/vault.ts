@@ -16,6 +16,7 @@ const ACCOUNT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 export type AccountVault = {
   has(accountId: string): Promise<boolean>;
+  hasAnySync(accountIds: readonly string[]): boolean;
   list(): Promise<readonly string[]>;
   remove(accountId: string, signal?: AbortSignal): Promise<boolean>;
   resolve(accountId: string, signal: AbortSignal): Promise<ModelAuth | undefined>;
@@ -139,6 +140,10 @@ export function createAccountVault(path: string, oauth: OAuthAuth): AccountVault
   return {
     has: (accountId) =>
       Promise.resolve().then(() => Object.hasOwn(readDocument(path).accounts, accountId)),
+    hasAnySync: (accountIds) => {
+      const accounts = readDocument(path).accounts;
+      return accountIds.some((accountId) => Object.hasOwn(accounts, accountId));
+    },
     list: () => Promise.resolve().then(() => Object.keys(readDocument(path).accounts)),
     remove: (accountId, signal = new AbortController().signal) =>
       mutate(signal, (document) => {

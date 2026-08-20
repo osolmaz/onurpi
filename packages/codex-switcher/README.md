@@ -118,6 +118,24 @@ not copy credentials into the app profile.
 The provider module keeps one account selected for the complete Pi Factory run. Its start, finish,
 and close functions cover tools, retries, compaction, finalization, cancellation, and cleanup.
 
+## Session restore
+
+Pi 0.84.x checks saved-session authentication before it applies provider registrations from
+extensions. The switcher installs a short-lived, version-locked startup adapter so this early check
+can recognize a configured account in the existing switcher vault.
+
+The adapter changes only the `openai-codex` readiness result while Pi restores the session. It
+reports readiness only when valid switcher configuration names an account that exists in the vault.
+It delegates all other providers and states to Pi. After Pi binds the switcher provider, the adapter
+restores the original runtime method and normal provider authentication takes over.
+
+The readiness check returns only a boolean. It does not return, copy, refresh, log, or rewrite a
+credential. The adapter does not choose a model, read session entries, or append a model change.
+Missing or invalid switcher state keeps Pi's normal fallback behavior.
+
+This adapter supports Pi 0.84.x only. It will be removed when Pi releases provider registration
+before saved-model restoration.
+
 ## Security and state
 
 The extension accepts only the official `openai-codex` provider and official ChatGPT Codex endpoint.
@@ -133,7 +151,8 @@ credential values. The extension adds no custom session entries.
 
 ## Limits
 
-- The extension needs Pi 0.84.2 or newer.
+- The extension supports Pi versions from 0.84.2 through 0.84.x. The startup adapter rejects an
+  unsupported runtime version.
 - Pi currently stores one credential for each provider ID. The switcher therefore owns its account
   vault until Pi exposes public named credential profiles.
 - A configuration syntax error leaves the built-in provider unchanged and exposes only a diagnostic

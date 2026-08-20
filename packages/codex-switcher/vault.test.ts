@@ -54,6 +54,8 @@ describe("account vault", () => {
 
     expect(await vault.list()).toEqual(["primary", "backup"]);
     expect(await vault.has("primary")).toBe(true);
+    expect(vault.hasAnySync(["missing", "backup"])).toBe(true);
+    expect(vault.hasAnySync(["missing"])).toBe(false);
     expect((await vault.resolve("backup", new AbortController().signal))?.apiKey).toBe(
       "backup-secret",
     );

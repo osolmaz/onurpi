@@ -13,6 +13,7 @@ export default defineConfig({
         "native-provider.ts",
         "private-file.ts",
         "router.ts",
+        "startup-auth-adapter.ts",
         "usage-client.ts",
         "usage-policy.ts",
         "vault.ts",

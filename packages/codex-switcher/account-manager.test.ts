@@ -36,6 +36,7 @@ function setup(initialAccounts: CodexSwitcherConfig["accounts"] = []) {
   const credentials = new Set<string>();
   const vault: AccountVault = {
     has: (id) => Promise.resolve(credentials.has(id)),
+    hasAnySync: (ids) => ids.some((id) => credentials.has(id)),
     list: () => Promise.resolve([...credentials]),
     remove: (id) => Promise.resolve(credentials.delete(id)),
     resolve: (id) =>
