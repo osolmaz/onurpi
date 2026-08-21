@@ -138,6 +138,7 @@ function usageResponse(usedPercent: number): Response {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("installCodexSwitcher", () => {
@@ -230,7 +231,8 @@ describe("codex switcher startup", () => {
     expect(runtimePrototype.hasConfiguredAuth).toBe(original);
   });
 
-  it("restores after provider binding when an explicit model skips the auth check", async () => {
+  it("restores after provider binding when an explicit model skips the auth check", () => {
+    vi.useFakeTimers();
     const test = harness();
     const runtime = installCodexSwitcher(test.api, {
       configResult: readyConfig(),
@@ -252,9 +254,7 @@ describe("codex switcher startup", () => {
     runtime.provider.getModels();
     expect(runtimePrototype.hasConfiguredAuth).not.toBe(original);
 
-    await new Promise<void>((resolve) => {
-      setImmediate(resolve);
-    });
+    vi.runAllTimers();
     expect(runtimePrototype.hasConfiguredAuth).toBe(original);
   });
 
