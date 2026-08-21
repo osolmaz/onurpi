@@ -19,6 +19,8 @@ import {
 } from "./startup-auth-adapter.ts";
 import type { AccountVault } from "./vault.ts";
 
+const STARTUP_BIND_CLEANUP_DELAY_MS = 30_000;
+
 export type InstallOptions = {
   readonly configPath?: string;
   readonly configResult?: ConfigLoadResult;
@@ -111,11 +113,11 @@ export function installCodexSwitcherStartup(
   let providerBound = false;
   let restoreAuth: RestoreStartupAuthAdapter | undefined;
   let restoreProvider: RestoreStartupAuthAdapter | undefined;
-  let restoreAfterBind: ReturnType<typeof setImmediate> | undefined;
+  let restoreAfterBind: ReturnType<typeof setTimeout> | undefined;
   const restore = (): void => {
     if (!active) return;
     active = false;
-    if (restoreAfterBind) clearImmediate(restoreAfterBind);
+    if (restoreAfterBind) clearTimeout(restoreAfterBind);
     restoreProvider?.();
     restoreAuth?.();
   };
@@ -135,7 +137,7 @@ export function installCodexSwitcherStartup(
       providerBound = true;
       restoreWhenComplete();
       if (active && !authChecked) {
-        restoreAfterBind = setImmediate(restore);
+        restoreAfterBind = setTimeout(restore, STARTUP_BIND_CLEANUP_DELAY_MS);
         restoreAfterBind.unref();
       }
     });

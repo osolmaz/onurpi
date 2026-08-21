@@ -128,8 +128,8 @@ The adapter changes only the `openai-codex` readiness result while Pi restores t
 reports readiness only when valid switcher configuration names an account that exists in the vault.
 It delegates all other providers and states to Pi. The adapter restores the original runtime method
 after Pi has both bound the switcher provider and completed the initial authentication check. If an
-explicit model skips that check, it restores on the next event-loop turn. Normal provider
-authentication then takes over.
+explicit model skips that check and no session event is available, a 30-second fallback restores it.
+Normal provider authentication then takes over.
 
 The readiness check returns only a boolean. It does not return, copy, refresh, log, or rewrite a
 credential. The adapter does not choose a model, read session entries, or append a model change.

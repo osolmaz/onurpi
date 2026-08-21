@@ -294,11 +294,11 @@ The startup adapter wraps the host Pi `ModelRuntime` only while Pi resolves the 
 model. A synchronous vault check returns only whether valid configuration has a matching stored
 account. Synthetic SDK and real temporary Pi resume tests verify that Pi restores the saved Codex
 model without the false warning. Startup cleanup restores the original method after provider binding
-and the initial authentication check have both completed. If an explicit model skips that check, it
-restores on the next event-loop turn. The extension validates the startup adapter and its lifecycle
-cleanup before it queues its provider. If startup rejects the Pi version or lifecycle setup, no
-switcher provider is queued. Pi therefore keeps the built-in provider or another extension's queued
-provider unchanged.
+and the initial authentication check have both completed. If an explicit model skips that check and
+no session event is available, a 30-second fallback restores it. The extension validates the startup
+adapter and its lifecycle cleanup before it queues its provider. If startup rejects the Pi version
+or lifecycle setup, no switcher provider is queued. Pi therefore keeps the built-in provider or
+another extension's queued provider unchanged.
 
 ## Related work
 
