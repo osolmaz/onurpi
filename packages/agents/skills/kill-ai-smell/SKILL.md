@@ -189,12 +189,23 @@ step is not an "escalation". Say what happened in plain verbs.
 - Good: "Two metrics stopped separating the groups once the READMEs went
   in."
 
-**No aphorism closers.** Do not end a paragraph by promoting its
-specific point into a universal principle. If the story implies the
-principle, the closing slogan adds nothing; delete it.
+**No totalizing aphorisms.** Delete short sentences that turn a local
+model into a universal law, dismiss unmodeled details, or restate the
+paragraph as a slogan. These sentences can occur anywhere, although they
+often appear at the end of a paragraph, caption, or callout. Common forms
+include "everything else is bookkeeping," "all work flows through X,"
+"the world accepts X," and "X is the work." Their confidence comes from
+compression rather than evidence.
 
-- Bad: "That is the argument for keeping the baselines adversarial."
-- Good: (nothing; the previous sentence already made the point)
+Remove the sentence when the surrounding text already contains its
+meaning. Do not move it to a callout or replace it with a softer slogan.
+Rewrite it only when it contains a concrete fact that appears nowhere
+else.
+
+- Bad: "Everything else is bookkeeping."
+- Bad: "All work flows through the straw."
+- Bad: "Work closes this gap."
+- Good: (delete each sentence and let the specific explanation stand)
 
 **Disconnected sentence parades.** A paragraph shaped "X does Y. Z does
 W. A does B.", where every sentence introduces a new subject doing a new
@@ -404,8 +415,8 @@ Before finishing any writing task, check the draft against this list:
 - Sentences in each paragraph connect; no parade of unrelated subjects.
 - Every paragraph contains at least one named thing (a file, a person,
   a number), and no drama verbs narrate the methodology.
-- No aphorism closing a paragraph; no list wedged between a subject and
-  its verb; one register throughout.
+- No totalizing aphorism or dismissive slogan anywhere; no list wedged
+  between a subject and its verb; one register throughout.
 - The document says what its subject is before what it does.
 - Sections open with orienting sentences, never context-dump fragments.
 - Headings are sentence-case noun-phrase labels; no slogans, comma
