@@ -1,7 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   WorkflowEngine,
   validateWorkflowDefinition,
@@ -65,10 +65,6 @@ class MaintainerExecutor implements AgentStepExecutor {
   }
 }
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
 describe("OpenClaw maintainer workflow", () => {
   it("is a valid bounded graph", () => {
     expect(() => {
@@ -88,10 +84,12 @@ describe("OpenClaw maintainer workflow", () => {
     const issue = parseIssueReference("111886");
     if (!issue) throw new Error("test issue did not parse");
     const input = buildWorkflowInput(issue);
-    const outputRoot = await mkdtemp(join(tmpdir(), "openclaw-maintainer-runs-"));
-    vi.stubEnv("PI_WORKFLOWS_RUNS_DIR", outputRoot);
+    const stateRoot = await mkdtemp(join(tmpdir(), "openclaw-maintainer-state-"));
     const executor = new MaintainerExecutor();
-    const result = await new WorkflowEngine({ executor, outputRoot }).run(workflow, input);
+    const result = await new WorkflowEngine({
+      executor,
+      databasePath: join(stateRoot, "state.sqlite"),
+    }).run(workflow, input);
 
     expect(result.state.status).toBe("completed");
     expect(result.state.finalOutput).toEqual({
