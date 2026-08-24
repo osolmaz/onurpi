@@ -19,20 +19,45 @@ afterEach(() => {
 });
 
 describe("Pi process adapter", () => {
-  it("resolves the first executable Pi symlink without a shell", () => {
+  it("prefers the co-installed Pi CLI over PATH", () => {
+    const packageRoot = temporaryRoot();
+    const pathRoot = temporaryRoot();
+    const packageEntrypoint = join(packageRoot, "index.js");
+    const cliEntrypoint = join(packageRoot, "cli.js");
+    const pathEntrypoint = join(pathRoot, "global-pi.js");
+    writeFileSync(packageEntrypoint, "");
+    writeFileSync(cliEntrypoint, "#!/usr/bin/env node\n");
+    writeFileSync(pathEntrypoint, "#!/usr/bin/env node\n");
+    chmodSync(cliEntrypoint, 0o755);
+    chmodSync(pathEntrypoint, 0o755);
+    symlinkSync(pathEntrypoint, join(pathRoot, "pi"));
+
+    expect(resolvePiEntrypoint(pathRoot, "linux", () => packageEntrypoint)).toBe(cliEntrypoint);
+  });
+
+  it("falls back to the first executable Pi symlink in PATH without a shell", () => {
     const first = temporaryRoot();
     const second = temporaryRoot();
     const entrypoint = join(second, "cli.js");
     writeFileSync(entrypoint, "#!/usr/bin/env node\n");
     chmodSync(entrypoint, 0o755);
     symlinkSync(entrypoint, join(second, "pi"));
-    expect(resolvePiEntrypoint(`${first}${delimiter}${second}`, "linux")).toBe(entrypoint);
+    expect(
+      resolvePiEntrypoint(`${first}${delimiter}${second}`, "linux", () => {
+        throw new Error("Package unavailable");
+      }),
+    ).toBe(entrypoint);
   });
 
   it("rejects missing executables and unsupported platforms", () => {
-    expect(() => resolvePiEntrypoint(temporaryRoot(), "linux")).toThrow(/Could not find/u);
-    expect(() => resolvePiEntrypoint("", "darwin")).toThrow(/tested Linux/u);
-    expect(() => resolvePiEntrypoint("", "win32")).toThrow(/tested Linux/u);
+    const missingPackage = (): string => {
+      throw new Error("Package unavailable");
+    };
+    expect(() => resolvePiEntrypoint(temporaryRoot(), "linux", missingPackage)).toThrow(
+      /Could not find/u,
+    );
+    expect(() => resolvePiEntrypoint("", "darwin", missingPackage)).toThrow(/tested Linux/u);
+    expect(() => resolvePiEntrypoint("", "win32", missingPackage)).toThrow(/tested Linux/u);
   });
 
   it("forks a Node entrypoint with working IPC", async () => {
