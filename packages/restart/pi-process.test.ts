@@ -56,15 +56,28 @@ describe("Pi process adapter", () => {
     expect(() => resolvePiEntrypoint("", "win32", wrapperEntrypoint)).toThrow(/tested Linux/u);
   });
 
-  it("forks a Node entrypoint with working IPC", async () => {
+  it.each(["direct", "shell-shim"])("starts a %s Pi command with working IPC", async (kind) => {
     const root = temporaryRoot();
-    const entrypoint = join(root, "worker.mjs");
+    const workerScript = join(root, "worker.mjs");
     writeFileSync(
-      entrypoint,
-      ["process.send?.({ kind: 'ready' });", "process.on('message', () => process.exit(0));"].join(
-        "\n",
-      ),
+      workerScript,
+      [
+        "#!/usr/bin/env node",
+        "process.send?.({ kind: 'ready' });",
+        "process.on('message', () => process.exit(0));",
+      ].join("\n"),
     );
+    chmodSync(workerScript, 0o755);
+
+    const entrypoint = kind === "direct" ? workerScript : join(root, "pi");
+    if (kind === "shell-shim") {
+      writeFileSync(
+        entrypoint,
+        `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(workerScript)} "$@"\n`,
+      );
+      chmodSync(entrypoint, 0o755);
+    }
+
     const worker = startPiWorker({ entrypoint, args: [], cwd: root, env: process.env });
     const message = new Promise<unknown>((resolve) => {
       worker.onMessage(resolve);
