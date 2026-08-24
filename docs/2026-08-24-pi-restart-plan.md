@@ -18,19 +18,21 @@ the session, rewrite the session file, or run two Pi workers against the same se
 
 ## Selected design
 
-Create a private `@onurpi/restart` package under `packages/restart`. The package owns two parts:
+Create a private `@onurpi/restart` package under `packages/restart`. The package owns three parts:
 
-- a `pi-restart` launcher that stays alive and runs Pi as its child process;
+- a restart-aware `pi` launcher that stays alive and runs the upstream Pi runtime as its child;
 - a Pi extension that registers `/restart`;
 - a private in-memory IPC connection between the launcher and the extension.
 
-Users start Pi with `pi-restart`. The launcher remains the foreground terminal process while Pi runs
-as its child. This keeps one process in control of the terminal before, during, and after a restart.
-It avoids a race in which a shell or Herdr takes the terminal after the old Pi process exits.
+Users continue to start Pi with `pi`. OnurPi installs its launcher at `~/.local/bin/pi`, which is
+before the upstream Pi command in `PATH`. The launcher skips itself, finds the next `pi` executable,
+and runs that upstream runtime as its child. This keeps one process in control of the terminal
+before, during, and after a restart. It avoids a race in which a shell or Herdr takes the terminal
+after the old Pi process exits.
 
-A Pi process started directly with `pi` does not have the launcher connection. In that case,
-`/restart` must keep Pi running and show the exact manual command that opens the current session.
-The package must not replace the global `pi` command or change shell configuration.
+The stable user-level command survives an upstream Pi reinstall. OnurPi's install step creates or
+repairs the link without changing shell configuration. If an unmanaged command already exists at
+that path, installation must stop instead of replacing it.
 
 ## Restart flow
 
@@ -76,7 +78,7 @@ until it receives acceptance for that exact request.
 
 ## Launcher requirements
 
-The `pi-restart` launcher must:
+The restart-aware `pi` launcher must:
 
 - stay in the foreground and keep ownership of the terminal;
 - run Pi as a child with inherited standard input, output, and error streams;
@@ -116,7 +118,7 @@ It must not use `pi -c` or any latest-session lookup.
 `/restart` is a TUI-only command. It must:
 
 - require a persisted session;
-- require a compatible `pi-restart` launcher connection;
+- require a compatible restart-aware launcher connection;
 - read session identity through documented Pi APIs;
 - wait for launcher acceptance;
 - call `ctx.shutdown()` exactly once after acceptance;
@@ -144,24 +146,27 @@ working directory.
 Register `packages/restart/index.ts` through the root Pi manifest. Generate the canonical package
 entry in tracked settings with the repository settings scripts. Do not edit `settings.json` by hand.
 
-Expose `pi-restart` as the package binary. Do not replace the global `pi` executable, add a shell
-alias, change shell startup files, or change Herdr configuration.
+Keep the launcher entry point in the restart package. The package postinstall step must create or
+repair the stable `~/.local/bin/pi` link to that entry point. Do not add a shell alias, change shell
+startup files, or change Herdr configuration.
 
 ## Implementation plan
 
 1. Create the private `@onurpi/restart` package with strict TypeScript, tests, this package's
-   README, and a `pi-restart` binary.
-2. Define and test the validated `onurpi-restart-v1` IPC protocol.
-3. Implement the foreground launcher with structured process arguments and inherited terminal
+   README, and a restart-aware `pi` entry point.
+2. Add an idempotent package postinstall step that manages `~/.local/bin/pi` and refuses to replace
+   an unmanaged command.
+3. Define and test the validated `onurpi-restart-v1` IPC protocol.
+4. Implement the foreground launcher with structured process arguments and inherited terminal
    streams.
-4. Implement and test the conservative startup argument policy.
-5. Implement `/restart` as a TUI-only command that shuts Pi down only after launcher acceptance.
-6. Enforce one Pi worker per session and old-child exit before replacement startup.
-7. Add replacement confirmation for the expected session and working directory.
-8. Add preflight, startup, timeout, recovery, signal, and orphan-process handling.
-9. Register the extension in the root package manifest and generated settings.
-10. Add unit, process, real-Pi PTY, and isolated Herdr tests.
-11. Run package checks, repository checks, Pi Reviewer against `main`, pull-request CI, package
+5. Implement and test the conservative startup argument policy.
+6. Implement `/restart` as a TUI-only command that shuts Pi down only after launcher acceptance.
+7. Enforce one Pi worker per session and old-child exit before replacement startup.
+8. Add replacement confirmation for the expected session and working directory.
+9. Add preflight, startup, timeout, recovery, signal, and orphan-process handling.
+10. Register the extension in the root package manifest and generated settings.
+11. Add unit, installer, process, real-Pi PTY, and isolated Herdr tests.
+12. Run package checks, repository checks, Pi Reviewer against `main`, pull-request CI, package
     discovery, and a fresh-process smoke test.
 
 ## Tests
@@ -170,7 +175,7 @@ Unit and process tests must cover:
 
 - valid and malformed IPC messages;
 - stale generations and duplicate requests;
-- direct `pi` startup without launcher support;
+- startup without the restart-aware launcher connection;
 - persisted and ephemeral sessions;
 - unsupported modes and startup arguments;
 - exact session file, session ID, and working directory values;
@@ -225,8 +230,9 @@ request and verify that its CI checks pass.
 
 ## Rollout and compatibility
 
-The first release is private and opt-in. Users must start Pi with `pi-restart` to enable automatic
-restart. Direct `pi` startup continues to work as before and receives manual restart instructions.
+The private OnurPi install provides the restart-aware launcher as the normal `pi` command. Users do
+not need a second command. The stable `~/.local/bin/pi` link remains in place when upstream Pi is
+reinstalled and discovers the updated upstream executable on the next start.
 
 Initial support is limited to persisted interactive sessions on POSIX terminals that pass the real
 PTY tests. Ephemeral sessions, startup prompts, forks, RPC mode, print mode, unknown flags,
@@ -238,7 +244,8 @@ socket, state file, or persistent coordination data.
 ## Pi contract impact
 
 - **Session state:** No restart entry is appended and no existing entry is changed.
-- **Other persistent data:** None.
+- **Other persistent data:** Installation manages the `~/.local/bin/pi` symlink. It adds no state
+  file or settings schema.
 - **Pi internals:** None.
 - **Public API:** The extension uses `registerCommand`, documented session getters, lifecycle hooks,
   UI notifications, and `ctx.shutdown()`.
@@ -253,6 +260,5 @@ This work does not include:
 - Pi core or private API changes;
 - services, daemons, sockets, or persistent restart stores;
 - Herdr internals or Herdr production changes;
-- shell aliases or global `pi` replacement;
-- automatic restart from a direct `pi` launch;
+- shell aliases or shell startup-file changes;
 - releases or deployment.

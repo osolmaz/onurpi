@@ -91,7 +91,7 @@ describe("real Pi restart", () => {
       );
 
       const terminal = spawn(
-        join(repoRoot, "node_modules/.bin/pi-restart"),
+        join(repoRoot, "packages/restart/bin/pi.ts"),
         ["--session-dir", sessionsDir, "--session", sessionFile, "--no-tools", "--offline"],
         {
           cwd: root,

@@ -7,14 +7,19 @@ package adds `/restart` for cases where Pi itself must start again.
 
 ## Start Pi
 
-Run the launcher instead of `pi`:
+Start Pi as usual:
 
 ```sh
-./node_modules/.bin/pi-restart
+pi
 ```
 
-The launcher stays in the foreground and runs Pi as its child. It keeps control of the terminal
-while Pi restarts.
+The installed `pi` command is the restart-aware launcher. OnurPi puts it at `~/.local/bin/pi`, ahead
+of the upstream Pi command in `PATH`. The launcher skips itself and runs the next `pi` executable as
+its child. It keeps control of the terminal while Pi restarts.
+
+The user-level link survives an upstream Pi reinstall and automatically finds the updated runtime.
+OnurPi creates or repairs this link during installation. It refuses to replace an unrelated file at
+that path.
 
 ## Restart
 
@@ -35,11 +40,6 @@ A successful restart keeps:
 - the terminal and Herdr pane.
 
 The Pi worker PID changes because the launcher starts a new worker.
-
-## Direct Pi launches
-
-If Pi was started with `pi`, `/restart` keeps Pi running and shows the exact manual resume command.
-Automatic restart requires the `pi-restart` launcher.
 
 ## Supported startup arguments
 
@@ -71,8 +71,9 @@ The private `onurpi-restart-v1` IPC protocol carries only:
 - session ID;
 - working directory.
 
-It carries no credentials, prompts, provider data, or session content. The package creates no state
-file, service, daemon, or socket and does not write to the session file.
+It carries no credentials, prompts, provider data, or session content. The only persistent install
+change is the `~/.local/bin/pi` symlink. The package creates no state file, service, daemon, or
+socket and does not write to the session file.
 
 ## Development
 
