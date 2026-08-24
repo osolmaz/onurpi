@@ -1,6 +1,7 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
-import { delimiter, isAbsolute, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { LauncherOutboundMessage } from "./protocol.ts";
 
@@ -44,18 +45,39 @@ function resolvedExecutable(command: string, directory: string): string | undefi
   }
 }
 
-export function resolvePiEntrypoint(
-  pathValue = process.env["PATH"] ?? "",
-  platform = process.platform,
-): string {
-  if (platform !== "linux") {
-    throw new Error("pi-restart currently supports tested Linux terminals only.");
+function resolveInstalledPiPackage(): string {
+  return fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+}
+
+function resolvedInstalledPiEntrypoint(resolvePackage: () => string): string | undefined {
+  try {
+    return resolvedExecutable("cli.js", dirname(resolvePackage()));
+  } catch {
+    return undefined;
   }
+}
+
+function resolvedPathPiEntrypoint(pathValue: string): string | undefined {
   for (const directory of pathValue.split(delimiter).filter(Boolean)) {
     const resolved = resolvedExecutable("pi", directory);
     if (resolved) return resolved;
   }
-  throw new Error("Could not find an executable pi command in PATH.");
+  return undefined;
+}
+
+export function resolvePiEntrypoint(
+  pathValue = process.env["PATH"] ?? "",
+  platform = process.platform,
+  resolvePackage = resolveInstalledPiPackage,
+): string {
+  if (platform !== "linux") {
+    throw new Error("pi-restart currently supports tested Linux terminals only.");
+  }
+  const installed = resolvedInstalledPiEntrypoint(resolvePackage);
+  if (installed) return installed;
+  const fromPath = resolvedPathPiEntrypoint(pathValue);
+  if (fromPath) return fromPath;
+  throw new Error("Could not find the installed Pi CLI or an executable pi command in PATH.");
 }
 
 function childWorker(child: ChildProcess): PiWorker {
