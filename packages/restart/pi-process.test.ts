@@ -31,7 +31,8 @@ describe("Pi process adapter", () => {
 
   it("rejects missing executables and unsupported platforms", () => {
     expect(() => resolvePiEntrypoint(temporaryRoot(), "linux")).toThrow(/Could not find/u);
-    expect(() => resolvePiEntrypoint("", "win32")).toThrow(/Linux and macOS/u);
+    expect(() => resolvePiEntrypoint("", "darwin")).toThrow(/tested Linux/u);
+    expect(() => resolvePiEntrypoint("", "win32")).toThrow(/tested Linux/u);
   });
 
   it("forks a Node entrypoint with working IPC", async () => {

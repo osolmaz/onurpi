@@ -50,7 +50,8 @@ unknown flags, combined `--flag=value` forms, and ambiguous arguments.
 Unsupported arguments do not stop the first Pi process from starting. They only make automatic
 restart unavailable. `/restart` then keeps Pi running and explains the reason.
 
-Initial support is limited to persisted interactive sessions on tested Linux and macOS terminals.
+Initial support is limited to persisted interactive sessions on tested Linux terminals. macOS and
+Windows fail closed until equivalent real-terminal tests exist.
 
 ## Failure behavior
 

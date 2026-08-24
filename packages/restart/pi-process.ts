@@ -48,8 +48,8 @@ export function resolvePiEntrypoint(
   pathValue = process.env["PATH"] ?? "",
   platform = process.platform,
 ): string {
-  if (platform !== "linux" && platform !== "darwin") {
-    throw new Error("pi-restart currently supports Linux and macOS only.");
+  if (platform !== "linux") {
+    throw new Error("pi-restart currently supports tested Linux terminals only.");
   }
   for (const directory of pathValue.split(delimiter).filter(Boolean)) {
     const resolved = resolvedExecutable("pi", directory);
@@ -59,6 +59,15 @@ export function resolvePiEntrypoint(
 }
 
 function childWorker(child: ChildProcess): PiWorker {
+  let spawnError: Error | undefined;
+  const exit = new Promise<WorkerExit>((resolve) => {
+    child.once("error", (error) => {
+      spawnError = error;
+    });
+    child.once("close", (code, signal) => {
+      resolve({ code, signal, ...(spawnError ? { error: spawnError } : {}) });
+    });
+  });
   return {
     pid: child.pid,
     send: (message) => {
@@ -66,16 +75,7 @@ function childWorker(child: ChildProcess): PiWorker {
       child.send(message);
     },
     onMessage: (listener) => child.on("message", listener),
-    wait: () =>
-      new Promise<WorkerExit>((resolve) => {
-        let spawnError: Error | undefined;
-        child.once("error", (error) => {
-          spawnError = error;
-        });
-        child.once("close", (code, signal) => {
-          resolve({ code, signal, ...(spawnError ? { error: spawnError } : {}) });
-        });
-      }),
+    wait: () => exit,
     kill: (signal) => {
       child.kill(signal);
     },
