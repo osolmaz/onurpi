@@ -33,7 +33,7 @@
         "ref": "main",
         "subdir": "packages/pi-codex-compaction"
       },
-      "commit": "15026bb69070aa2bf844867e338590ba0dafcc93",
+      "commit": "207ecb4aef9aa6725b8459e44b5580151229cd8e",
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/pi-codex-compaction/UPSTREAM.md."
       ]

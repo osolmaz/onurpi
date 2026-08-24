@@ -4,10 +4,10 @@
 | ------------------------ | --------------------------------------------------------------------------------- |
 | Repository               | https://github.com/ogulcancelik/pi-extensions                                     |
 | Subdirectory             | `packages/pi-codex-compaction`                                                    |
-| Commit                   | `15026bb69070aa2bf844867e338590ba0dafcc93` (reviewed `main` HEAD)                 |
-| Latest package commit    | `ca37adb6c8000f6a83c447b4a119657c7714bc94`                                        |
-| Retrieved                | 2026-08-08                                                                        |
-| Upstream package version | `0.1.3`                                                                           |
+| Commit                   | `207ecb4aef9aa6725b8459e44b5580151229cd8e` (reviewed `main` HEAD)                 |
+| Latest package commit    | `c4d6ca8fb484ba51684296ba8b4715f8c7b3ac91`                                        |
+| Retrieved                | 2026-08-24                                                                        |
+| Upstream package version | `0.1.4`                                                                           |
 | License                  | MIT (© Can Celik), preserved in [LICENSE](LICENSE)                                |
 | Regraft                  | `pi-codex-compaction` in `regraft.json`, tracked from `main` at the pinned commit |
 
@@ -76,3 +76,9 @@ upstream config module; see the local adaptations below.
   results through `session_before_compact`.
 - Other upstream behavior for checkpoint creation, fail-closed cancellation, and duplicate
   prevention is preserved.
+- Adopted upstream `c4d6ca8` ("fix(codex-compaction): sanitize cross-provider history", 0.1.4):
+  reasoning items, text-signature item ids, and tool-call item ids replay only when the stored
+  message's provider and API match the active Codex model, foreign reasoning state is dropped from
+  the Responses replay, and the response-only `status` field is stripped from replayed reasoning and
+  assistant message items. Ported into `responses-input.ts` with regression tests in
+  `conversion.test.ts`.

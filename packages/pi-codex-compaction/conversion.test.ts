@@ -30,6 +30,7 @@ function assistantEntry(
   id: string,
   content: AssistantMessage["content"],
   stopReason: AssistantMessage["stopReason"] = "stop",
+  overrides: Partial<AssistantMessage> = {},
 ): SessionMessageEntry {
   return {
     type: "message",
@@ -43,6 +44,7 @@ function assistantEntry(
       provider: "openai-codex",
       model: "gpt-test",
       stopReason,
+      ...overrides,
       usage: {
         input: 1,
         output: 1,
@@ -145,7 +147,6 @@ describe("Responses conversion", () => {
       type: "message",
       role: "assistant",
       id: "msg_a",
-      status: "completed",
       content: [{ type: "output_text", text: "first", annotations: [] }],
       phase: "commentary",
     });
@@ -250,6 +251,76 @@ describe("Responses conversion", () => {
       call_id: "call_1",
       output: "(no tool output)",
     });
+  });
+});
+
+describe("cross-provider sanitization", () => {
+  it("drops foreign reasoning state and response item ids", () => {
+    const foreign = assistantEntry(
+      "a1",
+      [
+        {
+          type: "thinking",
+          thinking: "checking",
+          thinkingSignature: JSON.stringify({
+            type: "reasoning",
+            id: "rs_grok_1",
+            status: "completed",
+            summary: [{ type: "summary_text", text: "checking" }],
+            encrypted_content: "opaque-grok-state",
+          }),
+        },
+        {
+          type: "text",
+          text: "Looks good.",
+          textSignature: JSON.stringify({ v: 1, id: "msg_grok_1" }),
+        },
+        {
+          type: "toolCall",
+          id: "call_grok_1|fc_grok_1",
+          name: "bash",
+          arguments: { command: "git status" },
+        },
+      ],
+      "toolUse",
+      { provider: "xai", api: "openai-responses", model: "grok-4.6" },
+    );
+    const branch = branchOf(userEntry("u1", "review this change"), foreign);
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+
+    expect(input.find((item) => item.type === "reasoning")).toBeUndefined();
+    expect(JSON.stringify(input)).not.toContain("opaque-grok-state");
+    const assistantMessage = input.find(
+      (item) => item.type === "message" && item["role"] === "assistant",
+    );
+    expect(assistantMessage?.["id"]).toBe("msg_pi_1");
+    expect(assistantMessage?.["status"]).toBeUndefined();
+    const functionCall = input.find((item) => item.type === "function_call");
+    expect(functionCall?.["call_id"]).toBe("call_grok_1");
+    expect(functionCall?.["id"]).toBeUndefined();
+  });
+
+  it("removes response-only status from replayed Codex reasoning", () => {
+    const branch = branchOf(
+      userEntry("u1", "continue"),
+      assistantEntry("a1", [
+        {
+          type: "thinking",
+          thinking: "checking",
+          thinkingSignature: JSON.stringify({
+            type: "reasoning",
+            id: "rs_codex_1",
+            status: "completed",
+            summary: [],
+            encrypted_content: "opaque-codex-state",
+          }),
+        },
+      ]),
+    );
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+    const reasoning = input.find((item) => item.type === "reasoning");
+    expect(reasoning?.["status"]).toBeUndefined();
+    expect(reasoning?.["encrypted_content"]).toBe("opaque-codex-state");
   });
 });
 

@@ -137,7 +137,9 @@ function reasoningItem(block: ThinkingContent): ResponseItem | undefined {
       !Array.isArray(parsed) &&
       (parsed as Record<string, unknown>)["type"] === "reasoning"
     ) {
-      return structuredClone(parsed) as ResponseItem;
+      const cloned = structuredClone(parsed) as ResponseItem;
+      // `status` is a response-only field; replaying it in a request is rejected by the API.
+      return omitKeys(cloned, ["status"]) as ResponseItem;
     }
   } catch {
     // Undecodable thinking signatures are dropped from the Responses replay.
@@ -147,8 +149,13 @@ function reasoningItem(block: ThinkingContent): ResponseItem | undefined {
 
 type TextIndex = { message: number; textIndex: number };
 
-function assistantTextItem(block: TextContent, index: TextIndex): ResponseItem {
-  const parsed = textSignature(block.textSignature);
+function assistantTextItem(
+  block: TextContent,
+  index: TextIndex,
+  sameProvider: boolean,
+): ResponseItem {
+  // Only the provider that minted a text signature may replay its response item id.
+  const parsed = sameProvider ? textSignature(block.textSignature) : {};
   const fallbackId =
     index.textIndex === 0
       ? `msg_pi_${String(index.message)}`
@@ -160,15 +167,15 @@ function assistantTextItem(block: TextContent, index: TextIndex): ResponseItem {
     type: "message",
     role: "assistant",
     id,
-    status: "completed",
     content: [{ type: "output_text", text: block.text, annotations: [] }],
     ...(parsed.phase ? { phase: parsed.phase } : {}),
   };
 }
 
-function appendToolCall(state: ConversionState, block: ToolCall): void {
+function appendToolCall(state: ConversionState, block: ToolCall, sameProvider: boolean): void {
   const [callId, rawItemId] = block.id.split("|");
-  const itemId = normalizedItemId(rawItemId);
+  // Only the provider that minted a tool call id may replay its response item id.
+  const itemId = sameProvider ? normalizedItemId(rawItemId) : undefined;
   state.pendingToolCalls.set(block.id, callId ?? block.id);
   state.items.push({
     type: "function_call",
@@ -179,19 +186,36 @@ function appendToolCall(state: ConversionState, block: ToolCall): void {
   });
 }
 
-function appendAssistantMessage(state: ConversionState, message: AssistantMessage): void {
+function appendReasoning(
+  state: ConversionState,
+  block: ThinkingContent,
+  sameProvider: boolean,
+): void {
+  if (!sameProvider) return;
+  const reasoning = reasoningItem(block);
+  if (reasoning) state.items.push(reasoning);
+}
+
+function appendAssistantMessage(
+  state: ConversionState,
+  message: AssistantMessage,
+  model: AnyModel,
+): void {
   flushOrphanedToolCalls(state);
   if (message.stopReason === "error" || message.stopReason === "aborted") return;
+
+  // Reasoning state and response item ids are only valid for the provider and API that minted
+  // them. Cross-provider history is replayed as plain text and bare tool calls instead.
+  const sameProvider = message.provider === model.provider && message.api === model.api;
 
   const index: TextIndex = { message: state.messageIndex, textIndex: 0 };
   for (const block of message.content) {
     if (block.type === "thinking") {
-      const reasoning = reasoningItem(block);
-      if (reasoning) state.items.push(reasoning);
+      appendReasoning(state, block, sameProvider);
     } else if (block.type === "text") {
-      state.items.push(assistantTextItem(block, index));
+      state.items.push(assistantTextItem(block, index, sameProvider));
     } else {
-      appendToolCall(state, block);
+      appendToolCall(state, block, sameProvider);
     }
   }
 }
@@ -246,7 +270,7 @@ function convertMessage(state: ConversionState, message: Message, model: AnyMode
   if (message.role === "user") {
     appendUserMessage(state, message);
   } else if (message.role === "assistant") {
-    appendAssistantMessage(state, message);
+    appendAssistantMessage(state, message, model);
   } else {
     appendToolResultMessage(state, message, model);
   }
