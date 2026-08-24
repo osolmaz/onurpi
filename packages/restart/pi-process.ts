@@ -1,4 +1,4 @@
-import { fork, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,7 +99,7 @@ function childWorker(child: ChildProcess): PiWorker {
 }
 
 export function startPiWorker(spec: WorkerSpec): PiWorker {
-  const child = fork(spec.entrypoint, spec.args, {
+  const child = spawn(spec.entrypoint, spec.args, {
     cwd: spec.cwd,
     env: spec.env,
     stdio: ["inherit", "inherit", "inherit", "ipc"],
