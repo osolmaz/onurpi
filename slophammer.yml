@@ -102,6 +102,9 @@ typescript:
     - from: packages/prompt-queue
       allow:
         - packages/prompt-queue
+    - from: packages/restart
+      allow:
+        - packages/restart
     - from: packages/context-window-policy
       allow:
         - packages/context-window-policy

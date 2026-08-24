@@ -1,0 +1,28 @@
+typescript:
+  coverage:
+    threshold: 85
+  complexity:
+    max: 8
+  dry:
+    max_findings: 0
+    paths:
+      - .
+    exclude:
+      - "**/*.test.ts"
+      - pattern: "eslint.config.mjs"
+        reason: Package-local lint configuration.
+      - pattern: "vitest.config.ts"
+        reason: Package-local test configuration.
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  mutation:
+    targets:
+      - arguments.ts
+      - command.ts
+      - ipc-client.ts
+      - launcher.ts
+      - protocol.ts
+  dependency_boundaries:
+    - from: .
+      allow: []
