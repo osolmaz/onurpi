@@ -107,7 +107,7 @@ describe("restart IPC client", () => {
     direct.connected = () => false;
     await expect(requestRestart(identity, direct)).resolves.toEqual({
       accepted: false,
-      reason: "Pi was not started by pi-restart.",
+      reason: "Pi was not started by the restart-aware launcher.",
     });
     expect(direct.sent).toEqual([]);
   });

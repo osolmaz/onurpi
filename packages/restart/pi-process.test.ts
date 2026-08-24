@@ -19,45 +19,41 @@ afterEach(() => {
 });
 
 describe("Pi process adapter", () => {
-  it("prefers the co-installed Pi CLI over PATH", () => {
-    const packageRoot = temporaryRoot();
-    const pathRoot = temporaryRoot();
-    const packageEntrypoint = join(packageRoot, "index.js");
-    const cliEntrypoint = join(packageRoot, "cli.js");
-    const pathEntrypoint = join(pathRoot, "global-pi.js");
-    writeFileSync(packageEntrypoint, "");
-    writeFileSync(cliEntrypoint, "#!/usr/bin/env node\n");
-    writeFileSync(pathEntrypoint, "#!/usr/bin/env node\n");
-    chmodSync(cliEntrypoint, 0o755);
-    chmodSync(pathEntrypoint, 0o755);
-    symlinkSync(pathEntrypoint, join(pathRoot, "pi"));
+  it("skips the restart-aware pi command and resolves the next Pi in PATH", () => {
+    const wrapperRoot = temporaryRoot();
+    const upstreamRoot = temporaryRoot();
+    const wrapperEntrypoint = join(wrapperRoot, "pi.ts");
+    const upstreamEntrypoint = join(upstreamRoot, "cli.js");
+    writeFileSync(wrapperEntrypoint, "#!/usr/bin/env node\n");
+    writeFileSync(upstreamEntrypoint, "#!/usr/bin/env node\n");
+    chmodSync(wrapperEntrypoint, 0o755);
+    chmodSync(upstreamEntrypoint, 0o755);
+    symlinkSync(wrapperEntrypoint, join(wrapperRoot, "pi"));
+    symlinkSync(upstreamEntrypoint, join(upstreamRoot, "pi"));
 
-    expect(resolvePiEntrypoint(pathRoot, "linux", () => packageEntrypoint)).toBe(cliEntrypoint);
+    const pathValue = `${wrapperRoot}${delimiter}${upstreamRoot}`;
+    expect(resolvePiEntrypoint(pathValue, "linux", wrapperEntrypoint)).toBe(upstreamEntrypoint);
+
+    const updatedEntrypoint = join(upstreamRoot, "cli-updated.js");
+    writeFileSync(updatedEntrypoint, "#!/usr/bin/env node\n");
+    chmodSync(updatedEntrypoint, 0o755);
+    rmSync(join(upstreamRoot, "pi"));
+    symlinkSync(updatedEntrypoint, join(upstreamRoot, "pi"));
+    expect(resolvePiEntrypoint(pathValue, "linux", wrapperEntrypoint)).toBe(updatedEntrypoint);
   });
 
-  it("falls back to the first executable Pi symlink in PATH without a shell", () => {
-    const first = temporaryRoot();
-    const second = temporaryRoot();
-    const entrypoint = join(second, "cli.js");
-    writeFileSync(entrypoint, "#!/usr/bin/env node\n");
-    chmodSync(entrypoint, 0o755);
-    symlinkSync(entrypoint, join(second, "pi"));
-    expect(
-      resolvePiEntrypoint(`${first}${delimiter}${second}`, "linux", () => {
-        throw new Error("Package unavailable");
-      }),
-    ).toBe(entrypoint);
-  });
+  it("rejects a PATH that contains only the wrapper and unsupported platforms", () => {
+    const wrapperRoot = temporaryRoot();
+    const wrapperEntrypoint = join(wrapperRoot, "pi.ts");
+    writeFileSync(wrapperEntrypoint, "#!/usr/bin/env node\n");
+    chmodSync(wrapperEntrypoint, 0o755);
+    symlinkSync(wrapperEntrypoint, join(wrapperRoot, "pi"));
 
-  it("rejects missing executables and unsupported platforms", () => {
-    const missingPackage = (): string => {
-      throw new Error("Package unavailable");
-    };
-    expect(() => resolvePiEntrypoint(temporaryRoot(), "linux", missingPackage)).toThrow(
-      /Could not find/u,
+    expect(() => resolvePiEntrypoint(wrapperRoot, "linux", wrapperEntrypoint)).toThrow(
+      /upstream pi command/u,
     );
-    expect(() => resolvePiEntrypoint("", "darwin", missingPackage)).toThrow(/tested Linux/u);
-    expect(() => resolvePiEntrypoint("", "win32", missingPackage)).toThrow(/tested Linux/u);
+    expect(() => resolvePiEntrypoint("", "darwin", wrapperEntrypoint)).toThrow(/tested Linux/u);
+    expect(() => resolvePiEntrypoint("", "win32", wrapperEntrypoint)).toThrow(/tested Linux/u);
   });
 
   it("forks a Node entrypoint with working IPC", async () => {

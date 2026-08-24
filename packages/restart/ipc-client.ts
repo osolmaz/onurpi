@@ -39,7 +39,7 @@ export function nodeIpcTransport(): IpcTransport {
     send: (message) =>
       new Promise<void>((resolve, reject) => {
         if (!process.connected || typeof process.send !== "function") {
-          reject(new Error("Pi was not started by pi-restart."));
+          reject(new Error("Pi was not started by the restart-aware launcher."));
           return;
         }
         process.send(message, (error) => {
@@ -73,7 +73,7 @@ export async function requestRestart(
 ): Promise<RestartResponse> {
   const generation = launcherGeneration(transport);
   if (!generation || !transport.connected()) {
-    return { accepted: false, reason: "Pi was not started by pi-restart." };
+    return { accepted: false, reason: "Pi was not started by the restart-aware launcher." };
   }
 
   const request: RestartRequest = {
@@ -100,13 +100,14 @@ export async function requestRestart(
       else finish({ accepted: false, reason: parsed.reason });
     };
     const timer = setTimeout(() => {
-      finish({ accepted: false, reason: "The pi-restart launcher did not respond." });
+      finish({ accepted: false, reason: "The restart-aware launcher did not respond." });
     }, timeoutMs);
     transport.addMessageListener(onMessage);
     void transport.send(request).catch((error: unknown) => {
       finish({
         accepted: false,
-        reason: error instanceof Error ? error.message : "Failed to contact pi-restart.",
+        reason:
+          error instanceof Error ? error.message : "Failed to contact the restart-aware launcher.",
       });
     });
   });

@@ -97,7 +97,7 @@ const identity: Identity = {
   cwd: "/repo",
 };
 
-function harness(plans: WorkerPlan[]) {
+function harness(plans: WorkerPlan[], launchCwd = identity.cwd) {
   const specs: WorkerSpec[] = [];
   const workers: FakeWorker[] = [];
   const errors: string[] = [];
@@ -123,16 +123,17 @@ function harness(plans: WorkerPlan[]) {
     onWorker: vi.fn(),
     shouldStop: () => false,
     env: {},
-    cwd: identity.cwd,
+    cwd: launchCwd,
   };
   return { deps, specs, workers, errors };
 }
 
 describe("restart launcher", () => {
-  it("starts a replacement only after accepted worker exit", async () => {
-    const test = harness([{ request: identity }, { ready: identity }]);
+  it("starts a replacement in the session cwd after the accepted worker exits", async () => {
+    const test = harness([{ request: identity }, { ready: identity }], "/invocation");
     await expect(runLauncher([], test.deps)).resolves.toBe(0);
     expect(test.specs).toHaveLength(2);
+    expect(test.specs[0]?.cwd).toBe("/invocation");
     expect(test.workers[0]?.sent).toContainEqual(
       expect.objectContaining({ type: "restartAccepted", requestId: "request-1" }),
     );

@@ -63,7 +63,7 @@ export async function runRestartCommand(
   const manual = manualRestartCommand(identity.sessionFile);
   if (!hasRestartLauncher(transport)) {
     ctx.ui.notify(
-      `Automatic restart requires pi-restart.\nRestart manually with:\n${manual}`,
+      `Automatic restart requires the restart-aware pi command.\nRestart manually with:\n${manual}`,
       "warning",
     );
     return;

@@ -53,7 +53,6 @@ type GenerationContext = {
   generation: string;
   entrypoint: string;
   policy: RestartArgumentPolicy;
-  launchCwd: string;
   expected?: RestartRequest;
 };
 
@@ -83,7 +82,6 @@ function requestShapeError(
   if (!isAbsolute(request.sessionFile) || !isAbsolute(request.cwd)) {
     return "Session file and working directory must be absolute paths.";
   }
-  if (request.cwd !== context.launchCwd) return "Working directory does not match the Pi launch.";
   return undefined;
 }
 
@@ -197,7 +195,7 @@ function startGeneration(
       worker: deps.startWorker({
         entrypoint,
         args: state.args,
-        cwd: deps.cwd,
+        cwd: state.expected?.cwd ?? deps.cwd,
         env: workerEnvironment(deps, state.generation, state.expected),
       }),
     };
@@ -267,7 +265,6 @@ export async function runLauncher(
         generation: state.generation,
         entrypoint,
         policy,
-        launchCwd: deps.cwd,
         ...(state.expected ? { expected: state.expected } : {}),
       },
       deps,

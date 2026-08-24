@@ -1,6 +1,6 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { LauncherOutboundMessage } from "./protocol.ts";
@@ -45,22 +45,16 @@ function resolvedExecutable(command: string, directory: string): string | undefi
   }
 }
 
-function resolveInstalledPiPackage(): string {
-  return fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-}
+const DEFAULT_LAUNCHER_ENTRYPOINT = fileURLToPath(new URL("./bin/pi.ts", import.meta.url));
 
-function resolvedInstalledPiEntrypoint(resolvePackage: () => string): string | undefined {
-  try {
-    return resolvedExecutable("cli.js", dirname(resolvePackage()));
-  } catch {
-    return undefined;
-  }
-}
-
-function resolvedPathPiEntrypoint(pathValue: string): string | undefined {
+function resolvedPathPiEntrypoint(
+  pathValue: string,
+  launcherEntrypoint: string,
+): string | undefined {
+  const launcher = realpathSync(launcherEntrypoint);
   for (const directory of pathValue.split(delimiter).filter(Boolean)) {
     const resolved = resolvedExecutable("pi", directory);
-    if (resolved) return resolved;
+    if (resolved && resolved !== launcher) return resolved;
   }
   return undefined;
 }
@@ -68,16 +62,16 @@ function resolvedPathPiEntrypoint(pathValue: string): string | undefined {
 export function resolvePiEntrypoint(
   pathValue = process.env["PATH"] ?? "",
   platform = process.platform,
-  resolvePackage = resolveInstalledPiPackage,
+  launcherEntrypoint = DEFAULT_LAUNCHER_ENTRYPOINT,
 ): string {
   if (platform !== "linux") {
-    throw new Error("pi-restart currently supports tested Linux terminals only.");
+    throw new Error("The restart-aware pi command currently supports tested Linux terminals only.");
   }
-  const installed = resolvedInstalledPiEntrypoint(resolvePackage);
-  if (installed) return installed;
-  const fromPath = resolvedPathPiEntrypoint(pathValue);
+  const fromPath = resolvedPathPiEntrypoint(pathValue, launcherEntrypoint);
   if (fromPath) return fromPath;
-  throw new Error("Could not find the installed Pi CLI or an executable pi command in PATH.");
+  throw new Error(
+    "Could not find the upstream pi command after the restart-aware launcher in PATH.",
+  );
 }
 
 function childWorker(child: ChildProcess): PiWorker {

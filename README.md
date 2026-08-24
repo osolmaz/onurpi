@@ -75,6 +75,11 @@ package entry covers the whole workspace:
 pi install git:github.com/osolmaz/onurpi
 ```
 
+Installation also creates `~/.local/bin/pi`, which starts the restart-aware launcher and then the
+upstream Pi runtime. Keep `~/.local/bin` before the upstream Pi directory in `PATH`. The launcher
+link survives upstream Pi reinstalls, finds the updated upstream `pi` command, and keeps the normal
+`pi` command seamless.
+
 Run `/reload` in an existing Pi session after installation. After new commits land on `main`, run
 `pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to pick
 them up.

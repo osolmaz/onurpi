@@ -10,6 +10,7 @@ export default defineConfig({
         "arguments.ts",
         "command.ts",
         "index.ts",
+        "install-command.ts",
         "ipc-client.ts",
         "launcher.ts",
         "pi-process.ts",
