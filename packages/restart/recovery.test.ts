@@ -8,9 +8,12 @@ describe("restart recovery", () => {
     expect(manualRestartCommand("/tmp/a b.jsonl")).toBe("pi --session '/tmp/a b.jsonl'");
   });
 
-  it("bounds recovery diagnostics", () => {
-    const message = recoveryMessage(`/tmp/${"s".repeat(800)}.jsonl`, "x".repeat(800));
-    expect(message.length).toBeLessThanOrEqual(1000);
-    expect(message).toContain("Pi restart failed");
+  it("bounds the reason and preserves the complete recovery command", () => {
+    const sessionFile = `/tmp/${"s".repeat(2000)}'long.jsonl`;
+    const message = recoveryMessage(sessionFile, "x".repeat(2000));
+    expect(message).toContain(`Pi restart failed: ${"x".repeat(1000)}\n`);
+    expect(message).not.toContain(`Pi restart failed: ${"x".repeat(1001)}`);
+    expect(message).toContain(`Session: ${sessionFile}\n`);
+    expect(message).toContain(`Resume with: ${manualRestartCommand(sessionFile)}`);
   });
 });
