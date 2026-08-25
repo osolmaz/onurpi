@@ -49,5 +49,6 @@ authorized maintainer session after reviewing the result.
 ## Data and APIs
 
 The selected issue and normal workflow prompts become ordinary Pi session messages. `pi-workflows`
-stores its normal run bundle under `~/.pi/agent/workflows/runs/` and may append its hidden
-result-presentation message. This package writes no sidecar state and uses no Pi internals.
+stores normalized run state under `~/.pi/agent/workflows/state.sqlite` and may append its hidden
+result-presentation message. This package writes no sidecar state and uses no Pi internals. It uses
+Pi's documented command dispatch to call the public `/workflow` command.

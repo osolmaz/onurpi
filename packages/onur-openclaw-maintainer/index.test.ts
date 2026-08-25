@@ -1,12 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import onurOpenClawMaintainer from "./index.ts";
-import {
-  WORKFLOW_START_CHANNEL,
-  WORKFLOW_START_RESULT_CHANNEL,
-  type SharedEventBus,
-  type WorkflowStartRequest,
-} from "./maintainer.ts";
 
 type FakeContext = {
   hasUI: boolean;
@@ -23,29 +17,9 @@ type ToolHandler = (event: {
   input: unknown;
 }) => { block: true; reason: string } | undefined;
 
-class TestBus implements SharedEventBus {
-  private readonly handlers = new Map<string, ((data: unknown) => void)[]>();
-
-  emit(channel: string, data: unknown): void {
-    for (const handler of this.handlers.get(channel) ?? []) handler(data);
-  }
-
-  on(channel: string, handler: (data: unknown) => void): () => void {
-    const handlers = this.handlers.get(channel) ?? [];
-    handlers.push(handler);
-    this.handlers.set(channel, handlers);
-    return () => {
-      this.handlers.set(
-        channel,
-        (this.handlers.get(channel) ?? []).filter((candidate) => candidate !== handler),
-      );
-    };
-  }
-}
-
-function makeHarness() {
-  const bus = new TestBus();
+function makeHarness(options: { workflowLoaded?: boolean } = {}) {
   const notifications: string[] = [];
+  const sentMessages: { content: string; expandPromptTemplates?: boolean }[] = [];
   const statuses: (string | undefined)[] = [];
   const names: string[] = [];
   let command: Command | undefined;
@@ -60,12 +34,17 @@ function makeHarness() {
     },
   };
   const pi = {
-    events: bus,
+    getCommands: () =>
+      options.workflowLoaded === false
+        ? []
+        : [{ name: "workflow", source: "extension", sourceInfo: {} }],
     getFlag: () => undefined,
     registerCommand: (_name: string, value: Command) => {
       command = value;
     },
     registerFlag: () => undefined,
+    sendUserMessage: (content: string, sendOptions?: { expandPromptTemplates?: boolean }) =>
+      sentMessages.push({ content, expandPromptTemplates: sendOptions?.expandPromptTemplates }),
     setSessionName: (name: string) => names.push(name),
     on: (event: string, handler: (...args: never[]) => unknown) => {
       lifecycle.set(event, handler);
@@ -74,39 +53,27 @@ function makeHarness() {
   };
   onurOpenClawMaintainer(pi as never);
   if (!command || !toolHandler) throw new Error("extension did not register expected handlers");
-  return { bus, command, ctx, names, notifications, statuses, toolHandler };
+  return { command, ctx, names, notifications, sentMessages, statuses, toolHandler };
 }
 
 describe("onur-openclaw-maintainer extension", () => {
   it("starts the bundled workflow for an exact issue", async () => {
     const harness = makeHarness();
-    harness.bus.on(WORKFLOW_START_CHANNEL, (value) => {
-      const request = value as WorkflowStartRequest;
-      expect(request.input).toMatchObject({ issueNumber: 111886, allowMerge: false });
-      harness.bus.emit(WORKFLOW_START_RESULT_CHANNEL, {
-        requestId: request.requestId,
-        ok: true,
-        workflowName: "onur-openclaw-maintainer",
-      });
-    });
 
     await harness.command.handler("111886", harness.ctx);
 
     expect(harness.names).toEqual(["OpenClaw #111886 workflow test"]);
     expect(harness.notifications.at(-1)).toContain("This is a workflow test");
     expect(harness.statuses.at(-1)).toBe("OC #111886 workflow test");
+    expect(harness.sentMessages).toHaveLength(1);
+    expect(harness.sentMessages[0]?.content).toContain(
+      '/openclaw-maintainer.workflow.ts --input-json {"allowCommits":false',
+    );
+    expect(harness.sentMessages[0]?.expandPromptTemplates).toBe(true);
   });
 
   it("blocks tracked writes and merge commands once the run starts", async () => {
     const harness = makeHarness();
-    harness.bus.on(WORKFLOW_START_CHANNEL, (value) => {
-      const request = value as WorkflowStartRequest;
-      harness.bus.emit(WORKFLOW_START_RESULT_CHANNEL, {
-        requestId: request.requestId,
-        ok: true,
-        workflowName: "onur-openclaw-maintainer",
-      });
-    });
     await harness.command.handler("111886", harness.ctx);
 
     expect(harness.toolHandler({ toolName: "edit", input: {} })?.block).toBe(true);
@@ -118,17 +85,11 @@ describe("onur-openclaw-maintainer extension", () => {
     ).toBeUndefined();
   });
 
-  it("reports a missing pi-workflows listener", async () => {
-    vi.useFakeTimers();
-    try {
-      const harness = makeHarness();
-      const pending = harness.command.handler("111886", harness.ctx);
-      await vi.advanceTimersByTimeAsync(10_001);
-      await pending;
-      expect(harness.notifications.at(-1)).toContain("Timed out waiting for pi-workflows");
-      expect(harness.statuses.at(-1)).toBeUndefined();
-    } finally {
-      vi.useRealTimers();
-    }
+  it("reports a missing pi-workflows command", async () => {
+    const harness = makeHarness({ workflowLoaded: false });
+    await harness.command.handler("111886", harness.ctx);
+    expect(harness.notifications.at(-1)).toContain("Pi Workflows is not loaded");
+    expect(harness.sentMessages).toHaveLength(0);
+    expect(harness.statuses).toHaveLength(0);
   });
 });
