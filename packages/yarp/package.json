@@ -1,13 +1,13 @@
 {
   "name": "@onurpi/yarp",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "yarp-cli": "https://codeload.github.com/osolmaz/yarp/tar.gz/303e390695e2edd994057e2345496a7d72c34310"
+    "yarp-cli": "https://codeload.github.com/osolmaz/yarp/tar.gz/73adf7d434cf41ee34834a3f13f1167dd43b1491"
   },
   "pi": {
     "extensions": [

@@ -19,7 +19,7 @@ cap marker to proven recovery output.
 The extension requires the matching `yarp` binary on `PATH`:
 
 ```sh
-cargo install yarp-cli --version 0.2.1 --locked --force
+cargo install yarp-cli --version 0.3.0 --locked --force
 ```
 
 ## Configuration
@@ -45,9 +45,15 @@ command removes old calls without printing stored payloads.
 ## Pi contract
 
 YARP uses Pi's documented tool and session lifecycle hooks together with `message_end` and
-`pi.exec`. It does not modify Pi session state, Pi's persistent schema, or Pi internals. A
-session-scoped `yarp archive ingest` child process owns archive writes and stops when the Pi session
-shuts down.
+`pi.exec`. It does not modify Pi session state, Pi's persistent schema, or Pi internals. Each Pi
+session starts a thin `yarp archive ingest` bridge. All bridges use private local IPC to share one
+on-demand YARP broker for the configured archive. The broker is the only normal SQLite writer and
+exits after a bounded idle period.
+
+The broker admits bounded requests fairly, preserves source order, and commits short fixed
+micro-batches. Capture requests are acknowledged only after commit and can replay safely from the
+existing archive rows. Prune is sent once; if its acknowledgement is lost, YARP reports that its
+outcome is unknown instead of pruning again.
 
 The configuration file and archive are YARP's only persistent data. The archive can contain
 commands, source code, file contents, and secrets printed by tools. It remains local and has no
