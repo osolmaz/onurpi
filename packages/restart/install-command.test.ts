@@ -90,6 +90,19 @@ describe("restart-aware pi command installer", () => {
     expect(installActivePiBridge(source, upstream, target, "linux").status).toBe("current");
   });
 
+  it("updates an active bridge from an older managed checkout", () => {
+    const root = temporaryRoot();
+    const source = launcher(root, "new");
+    const oldSource = launcher(root, "old");
+    const upstream = launcher(root, "upstream");
+    const target = join(root, "node", "bin", "pi");
+    mkdirSync(dirname(target), { recursive: true });
+    symlinkSync(oldSource, target);
+
+    expect(installActivePiBridge(source, upstream, target, "linux").status).toBe("installed");
+    expect(readlinkSync(target)).toBe(source);
+  });
+
   it("does not replace an unrelated active Pi command", () => {
     const root = temporaryRoot();
     const source = launcher(root, "checkout");
@@ -108,7 +121,9 @@ describe("restart-aware pi command installer", () => {
     });
     expect(readlinkSync(target)).toBe(unrelated);
   });
+});
 
+describe("restart-aware Zsh override", () => {
   it("installs an idempotent Zsh function that bypasses cached command paths", () => {
     const home = temporaryRoot();
     const zshrc = join(home, ".zshrc");
@@ -148,6 +163,17 @@ describe("restart-aware pi command installer", () => {
     expect(readFileSync(source, "utf8")).toContain("# >>> onurpi restart-aware pi >>>");
   });
 
+  it("refuses a dangling Zsh configuration symlink without replacing it", () => {
+    const home = temporaryRoot();
+    const zshrc = join(home, ".zshrc");
+    const missing = join(home, "missing", "zshrc");
+    symlinkSync(missing, zshrc);
+
+    expect(() => installZshOverride(home, "zsh", "linux")).toThrow(/dangling/u);
+    expect(lstatSync(zshrc).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(zshrc)).toBe(missing);
+  });
+
   it("repairs its managed Zsh block without changing surrounding configuration", () => {
     const home = temporaryRoot();
     const zshrc = join(home, ".zshrc");
@@ -170,15 +196,29 @@ describe("restart-aware pi command installer", () => {
     expect(result).toContain('"$HOME/.local/bin/pi" "$@"');
   });
 
-  it("refuses malformed blocks and skips unsupported shells and platforms", () => {
+  it("refuses malformed or duplicate blocks and skips unsupported environments", () => {
     const home = temporaryRoot();
     const zshrc = join(home, ".zshrc");
     writeFileSync(zshrc, "# >>> onurpi restart-aware pi >>>\n");
     expect(() => installZshOverride(home, "zsh", "linux")).toThrow(/malformed/u);
+
+    writeFileSync(
+      zshrc,
+      [
+        "# >>> onurpi restart-aware pi >>>",
+        "# <<< onurpi restart-aware pi <<<",
+        "# >>> onurpi restart-aware pi >>>",
+        "# <<< onurpi restart-aware pi <<<",
+        "",
+      ].join("\n"),
+    );
+    expect(() => installZshOverride(home, "zsh", "linux")).toThrow(/duplicate/u);
     expect(installZshOverride(home, "/bin/bash", "linux").status).toBe("unsupported");
     expect(installZshOverride(home, "/bin/zsh", "darwin").status).toBe("unsupported");
   });
+});
 
+describe("restart installer platform boundary", () => {
   it("does not install the command on an untested platform", () => {
     const home = temporaryRoot();
     expect(installPiCommand(home, "/checkout/packages/restart/bin/pi.ts", "darwin")).toEqual({

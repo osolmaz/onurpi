@@ -112,7 +112,11 @@ function installActivePiBridgeAt(
   validateSource(upstream);
   const existing = targetState(target);
   if (existing.kind !== "link") return { status: "unsupported", target };
-  if (isManagedLink(existing.source, source)) return { status: "current", target };
+  if (existing.source === source) return { status: "current", target };
+  if (isManagedLink(existing.source, source)) {
+    writeLink(target, source);
+    return { status: "installed", target };
+  }
   if (!resolvesToSameFile(existing.source, upstream)) return { status: "unsupported", target };
   writeLink(target, source);
   return { status: "installed", target };
@@ -138,11 +142,20 @@ function readTextOrEmpty(path: string): string {
 
 type ManagedBlockRange = { start: number; end: number };
 
+function onlyMarkerIndex(current: string, marker: string): number | undefined {
+  const first = current.indexOf(marker);
+  if (first === -1) return undefined;
+  if (current.includes(marker, first + marker.length)) {
+    throw new Error("Refusing to replace duplicate restart-aware pi blocks in .zshrc.");
+  }
+  return first;
+}
+
 function managedBlockRange(current: string): ManagedBlockRange | undefined {
-  const start = current.indexOf(ZSH_BLOCK_START);
-  const endMarker = current.indexOf(ZSH_BLOCK_END);
-  if (start === -1 && endMarker === -1) return undefined;
-  if (start === -1 || endMarker < start) {
+  const start = onlyMarkerIndex(current, ZSH_BLOCK_START);
+  const endMarker = onlyMarkerIndex(current, ZSH_BLOCK_END);
+  if (start === undefined && endMarker === undefined) return undefined;
+  if (start === undefined || endMarker === undefined || endMarker < start) {
     throw new Error("Refusing to replace a malformed restart-aware pi block in .zshrc.");
   }
   const afterMarker = endMarker + ZSH_BLOCK_END.length;
@@ -163,16 +176,31 @@ function updatedZshConfig(current: string): string | undefined {
   return `${current.slice(0, range.start)}${ZSH_BLOCK}${current.slice(range.end)}`;
 }
 
-function configWritePath(target: string): string {
+function existingConfigStatus(target: string): ReturnType<typeof lstatSync> | undefined {
   try {
-    const status = lstatSync(target);
-    if (status.isSymbolicLink()) return realpathSync(target);
-    if (status.isFile()) return target;
-    throw new Error(`Zsh configuration is not a file: ${target}.`);
+    return lstatSync(target);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return target;
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
     throw error;
   }
+}
+
+function resolvedConfigLink(target: string): string {
+  try {
+    return realpathSync(target);
+  } catch (error) {
+    throw new Error(`Refusing to replace a dangling Zsh configuration link: ${target}.`, {
+      cause: error,
+    });
+  }
+}
+
+function configWritePath(target: string): string {
+  const status = existingConfigStatus(target);
+  if (!status) return target;
+  if (status.isSymbolicLink()) return resolvedConfigLink(target);
+  if (status.isFile()) return target;
+  throw new Error(`Zsh configuration is not a file: ${target}.`);
 }
 
 function writeTextAtomically(target: string, content: string): void {
