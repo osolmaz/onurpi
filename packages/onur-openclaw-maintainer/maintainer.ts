@@ -1,10 +1,6 @@
-export const WORKFLOW_START_CHANNEL = "pi-workflows:start";
-export const WORKFLOW_START_RESULT_CHANNEL = "pi-workflows:start-result";
 export const OPENCLAW_REPOSITORY = "openclaw/openclaw";
 export const INVENTORY_URL =
   "https://raw.githubusercontent.com/osolmaz/onurclaw/main/OPENCLAW_ONUR_INVENTORY.json";
-export const WORKFLOW_START_TIMEOUT_MS = 10_000;
-
 const MAX_INVENTORY_BYTES = 2_000_000;
 const MAX_PICKER_ISSUES = 100;
 
@@ -26,21 +22,6 @@ export type MaintainerWorkflowInput = {
   operatorNote: string;
   repository: typeof OPENCLAW_REPOSITORY;
   workflowTest: true;
-};
-
-export type WorkflowStartRequest = {
-  requestId: string;
-  ref: string;
-  input: unknown;
-};
-
-export type WorkflowStartResult =
-  | { requestId: string; ok: true; workflowName: string }
-  | { requestId: string; ok: false; error: string };
-
-export type SharedEventBus = {
-  emit(channel: string, data: unknown): void;
-  on(channel: string, handler: (data: unknown) => void): () => void;
 };
 
 export function parseIssueReference(value: string): MaintainerIssue | undefined {
@@ -110,40 +91,11 @@ export function formatIssueChoice(issue: MaintainerIssue): string {
   return `#${String(issue.number)} · ${issue.area} · ${issue.title}`;
 }
 
-export async function requestWorkflowStart(options: {
-  bus: SharedEventBus;
-  input: MaintainerWorkflowInput;
-  ref: string;
-  requestId: string;
-  timeoutMs?: number;
-}): Promise<WorkflowStartResult> {
-  const { bus, input, ref, requestId } = options;
-  return await new Promise<WorkflowStartResult>((resolve) => {
-    let settled = false;
-    const finish = (result: WorkflowStartResult): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      stop();
-      resolve(result);
-    };
-    const stop = bus.on(WORKFLOW_START_RESULT_CHANNEL, (value) => {
-      const result = parseWorkflowStartResult(value);
-      if (result?.requestId !== requestId) return;
-      finish(result);
-    });
-    const timer = setTimeout(() => {
-      finish({
-        requestId,
-        ok: false,
-        error:
-          "Timed out waiting for pi-workflows. Confirm that pi-workflows is installed and loaded.",
-      });
-    }, options.timeoutMs ?? WORKFLOW_START_TIMEOUT_MS);
-    timer.unref();
-    const request: WorkflowStartRequest = { requestId, ref, input };
-    bus.emit(WORKFLOW_START_CHANNEL, request);
-  });
+export function buildWorkflowStartCommand(ref: string, input: MaintainerWorkflowInput): string {
+  if (ref.length === 0 || ref.trim() !== ref || /\s/u.test(ref)) {
+    throw new Error("The workflow path must be one non-empty command argument");
+  }
+  return `/workflow ${ref} --input-json ${JSON.stringify(input)}`;
 }
 
 export function isForbiddenMaintainerCommand(command: string): boolean {
@@ -188,23 +140,6 @@ function parseIssueNumber(value: unknown): number | undefined {
 
 function issueUrl(number: number): string {
   return `https://github.com/${OPENCLAW_REPOSITORY}/issues/${String(number)}`;
-}
-
-function parseWorkflowStartResult(value: unknown): WorkflowStartResult | undefined {
-  if (
-    !isRecord(value) ||
-    typeof value["requestId"] !== "string" ||
-    typeof value["ok"] !== "boolean"
-  ) {
-    return undefined;
-  }
-  if (value["ok"] && typeof value["workflowName"] === "string") {
-    return { requestId: value["requestId"], ok: true, workflowName: value["workflowName"] };
-  }
-  if (!value["ok"] && typeof value["error"] === "string") {
-    return { requestId: value["requestId"], ok: false, error: value["error"] };
-  }
-  return undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

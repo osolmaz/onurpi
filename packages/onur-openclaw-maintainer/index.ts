@@ -1,15 +1,14 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   buildWorkflowInput,
+  buildWorkflowStartCommand,
   fetchInventory,
   formatIssueChoice,
   isForbiddenMaintainerCommand,
   parseIssueReference,
-  requestWorkflowStart,
   type MaintainerIssue,
 } from "./maintainer.ts";
 
@@ -39,23 +38,17 @@ export default function onurOpenClawMaintainer(pi: ExtensionAPI): void {
         ? requireIssueReference(rawReference)
         : await selectIssue(ctx);
       if (!issue) return;
+      if (!hasWorkflowCommand(pi)) {
+        throw new Error("Pi Workflows is not loaded in this session");
+      }
       readOnlyRun = true;
       pi.setSessionName(`OpenClaw #${String(issue.number)} workflow test`);
       ctx.ui.setStatus("onur-openclaw-maintainer", `OC #${String(issue.number)} workflow test`);
-      const result = await requestWorkflowStart({
-        bus: pi.events,
-        input: buildWorkflowInput(issue),
-        ref: WORKFLOW_PATH,
-        requestId: randomUUID(),
+      pi.sendUserMessage(buildWorkflowStartCommand(WORKFLOW_PATH, buildWorkflowInput(issue)), {
+        expandPromptTemplates: true,
       });
-      if (!result.ok) {
-        readOnlyRun = false;
-        ctx.ui.setStatus("onur-openclaw-maintainer", undefined);
-        ctx.ui.notify(`Could not start the maintainer workflow: ${result.error}`, "error");
-        return;
-      }
       ctx.ui.notify(
-        `Started ${result.workflowName} for #${String(issue.number)}. This is a workflow test; GitHub writes, commits, and merges are blocked.`,
+        `Sent the maintainer workflow for #${String(issue.number)} to Pi Workflows. This is a workflow test; GitHub writes, commits, and merges are blocked.`,
         "info",
       );
     } finally {
@@ -92,6 +85,12 @@ export default function onurOpenClawMaintainer(pi: ExtensionAPI): void {
     readOnlyRun = false;
     if (ctx.hasUI) ctx.ui.setStatus("onur-openclaw-maintainer", undefined);
   });
+}
+
+function hasWorkflowCommand(pi: ExtensionAPI): boolean {
+  return pi
+    .getCommands()
+    .some((command) => command.name === "workflow" && command.source === "extension");
 }
 
 function guardMaintainerToolCall(

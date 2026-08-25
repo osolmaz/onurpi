@@ -5,7 +5,7 @@
 - Every run must state that it is a workflow test and that automatic merging is forbidden.
 - Treat `osolmaz/onurclaw` as the curated picker source, then re-check the selected issue live.
 - Keep account-specific credentials and filesystem paths out of the package.
-- Use only documented Pi extension APIs and the public `pi-workflows` event contract.
+- Use only documented Pi extension APIs and the public `pi-workflows` command contract.
 - Validate issue references, inventory responses, event payloads, and model step outputs strictly.
 - Keep network requests bounded, cancellable, and free of redirects.
 - Add or update tests for every behavior change.

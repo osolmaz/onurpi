@@ -1,40 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  WORKFLOW_START_CHANNEL,
-  WORKFLOW_START_RESULT_CHANNEL,
   buildWorkflowInput,
+  buildWorkflowStartCommand,
   fetchInventory,
   formatIssueChoice,
   isForbiddenMaintainerCommand,
   parseInventory,
   parseIssueReference,
-  requestWorkflowStart,
-  type SharedEventBus,
-  type WorkflowStartRequest,
 } from "./maintainer.ts";
-
-class TestBus implements SharedEventBus {
-  readonly emitted: { channel: string; data: unknown }[] = [];
-  private readonly handlers = new Map<string, ((data: unknown) => void)[]>();
-
-  emit(channel: string, data: unknown): void {
-    this.emitted.push({ channel, data });
-    for (const handler of this.handlers.get(channel) ?? []) handler(data);
-  }
-
-  on(channel: string, handler: (data: unknown) => void): () => void {
-    const handlers = this.handlers.get(channel) ?? [];
-    handlers.push(handler);
-    this.handlers.set(channel, handlers);
-    return () => {
-      this.handlers.set(
-        channel,
-        (this.handlers.get(channel) ?? []).filter((candidate) => candidate !== handler),
-      );
-    };
-  }
-}
 
 function requireIssue(reference: string) {
   const issue = parseIssueReference(reference);
@@ -158,45 +132,25 @@ describe("curated issue inventory", () => {
   });
 });
 
-describe("workflow start bridge", () => {
-  it("correlates the start result", async () => {
-    const bus = new TestBus();
-    bus.on(WORKFLOW_START_CHANNEL, (value) => {
-      const request = value as WorkflowStartRequest;
-      bus.emit(WORKFLOW_START_RESULT_CHANNEL, {
-        requestId: request.requestId,
-        ok: true,
-        workflowName: "onur-openclaw-maintainer",
-      });
-    });
-    await expect(
-      requestWorkflowStart({
-        bus,
-        input: buildWorkflowInput(requireIssue("111886")),
-        ref: "/tmp/workflow.ts",
-        requestId: "request-1",
-      }),
-    ).resolves.toEqual({
-      requestId: "request-1",
-      ok: true,
-      workflowName: "onur-openclaw-maintainer",
-    });
-    expect(bus.emitted[0]?.channel).toBe(WORKFLOW_START_CHANNEL);
+describe("workflow start command", () => {
+  it("uses the public workflow command with exact JSON input", () => {
+    const command = buildWorkflowStartCommand(
+      "/tmp/workflow.ts",
+      buildWorkflowInput(requireIssue("111886")),
+    );
+    expect(command).toBe(
+      '/workflow /tmp/workflow.ts --input-json {"allowCommits":false,"allowGitHubWrites":false,"allowMerge":false,"allowTrackedChanges":false,"issueNumber":111886,"issueUrl":"https://github.com/openclaw/openclaw/issues/111886","operatorNote":"This is a workflow test. Do not merge automatically.","repository":"openclaw/openclaw","workflowTest":true}',
+    );
   });
 
-  it("times out when pi-workflows is unavailable", async () => {
-    const bus = new TestBus();
-    const result = await requestWorkflowStart({
-      bus,
-      input: buildWorkflowInput(requireIssue("111886")),
-      ref: "/tmp/workflow.ts",
-      requestId: "request-2",
-      timeoutMs: 1,
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("expected start failure");
-    expect(result.error).toContain("pi-workflows");
-  });
+  it.each(["", " /tmp/workflow.ts", "/tmp/workflow file.ts", "/tmp/workflow.ts\nnext"])(
+    "rejects an unsafe workflow path %j",
+    (ref) => {
+      expect(() =>
+        buildWorkflowStartCommand(ref, buildWorkflowInput(requireIssue("111886"))),
+      ).toThrow(/one non-empty command argument/);
+    },
+  );
 });
 
 describe("read-only command policy", () => {
