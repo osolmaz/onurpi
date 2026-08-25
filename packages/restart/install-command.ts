@@ -81,13 +81,13 @@ export function installPiCommand(
 }
 
 function main(): void {
-  restoreLegacyPiBridge();
-  removeLegacyZshOverride(homedir());
   const result = installPiCommand();
   if (result.status === "unsupported") {
     process.stdout.write("Skipped the restart-aware pi command on an untested platform.\n");
     return;
   }
+  restoreLegacyPiBridge();
+  removeLegacyZshOverride(homedir());
   process.stdout.write(
     result.status === "current"
       ? `Restart-aware pi command is current at ${result.target}.\n`
