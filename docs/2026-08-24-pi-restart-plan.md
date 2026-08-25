@@ -242,8 +242,10 @@ Initial support is limited to persisted interactive sessions on POSIX terminals 
 PTY tests. Ephemeral sessions, startup prompts, forks, RPC mode, print mode, unknown flags,
 ambiguous arguments, and untested platforms fail closed.
 
-No migration is required. The package adds no session schema, compatibility reader, service, daemon,
-socket, state file, or persistent coordination data.
+Installation removes the short-lived managed NVM bridge and exact managed Zsh block from the prior
+launcher cutover. This cleanup must leave unrelated commands and shell content unchanged. The
+package adds no session schema, compatibility reader, service, daemon, socket, state file, or
+persistent coordination data.
 
 ## Pi contract impact
 

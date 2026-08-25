@@ -24,6 +24,10 @@ The user-level link survives an upstream Pi reinstall and automatically finds th
 OnurPi creates or repairs this link during installation. It refuses to replace an unrelated file at
 that path.
 
+When upgrading from the short-lived bridge design, installation restores only its old managed
+upstream link and removes only its exact old Zsh block. It leaves unrelated commands and shell
+content unchanged.
+
 ## Restart
 
 Inside Pi, run:
