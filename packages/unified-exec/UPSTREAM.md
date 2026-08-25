@@ -112,6 +112,8 @@ native module cannot load.
   instead collects unboundedly and splices an in-band omission marker at the drop point; OnurPi
   keeps its bounded collection and feeds the exact totals into the v0.9.0 result envelope, whose
   `omitted_bytes` / `output_bytes_total` fields and truncation marker report the loss.
+- Keep the bounded output only in `details.output`. Truncation metadata excludes the duplicate
+  `content` field, so a maximum-size result does not store the same 50 KiB tail twice.
 - Upstream v0.9.0 bounds `kill_session` output through the canonical result envelope and pauses
   neither pipe nor PTY output for the complete-log writer; OnurPi additionally pauses child output
   while the log writer is backpressured.

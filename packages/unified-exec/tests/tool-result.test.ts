@@ -67,6 +67,8 @@ describe("bounded tool results", () => {
     assert.ok(Buffer.byteLength(details.output, "utf8") <= DEFAULT_MAX_BYTES);
     assert.equal(details.truncation?.truncated, true);
     assert.equal(details.truncation?.outputLines, DEFAULT_MAX_LINES);
+    assert.equal(Object.hasOwn(details.truncation ?? {}, "content"), false);
+    assert.ok(Buffer.byteLength(JSON.stringify(details), "utf8") < DEFAULT_MAX_BYTES + 8_192);
     assert.equal(Object.hasOwn(details, "final_output"), false);
 
     const text = renderKillResultText(details);

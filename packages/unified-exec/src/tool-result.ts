@@ -22,6 +22,22 @@ const textDecoder = new TextDecoder("utf-8", { fatal: false });
 export type ProcessOperation = "exec_command" | "write_stdin";
 export type ProcessStatus = "running" | "exited";
 export type KillStatus = "killed" | "kill_failed";
+export type TruncationMetadata = Omit<TruncationResult, "content">;
+
+function truncationMetadata(result: TruncationResult): TruncationMetadata {
+  return {
+    truncated: result.truncated,
+    truncatedBy: result.truncatedBy,
+    totalLines: result.totalLines,
+    totalBytes: result.totalBytes,
+    outputLines: result.outputLines,
+    outputBytes: result.outputBytes,
+    lastLinePartial: result.lastLinePartial,
+    firstLineExceedsLimit: result.firstLineExceedsLimit,
+    maxLines: result.maxLines,
+    maxBytes: result.maxBytes,
+  };
+}
 
 /** Fields shared by every result that carries child-process output. */
 export interface OutputResultDetails {
@@ -41,7 +57,7 @@ export interface OutputResultDetails {
   log_path?: string;
   cwd?: string;
   command?: string;
-  truncation?: TruncationResult;
+  truncation?: TruncationMetadata;
   /** Middle bytes dropped by the in-memory retention caps before result truncation. */
   omitted_bytes?: number;
   /** Cumulative bytes this session has produced since spawn. */
@@ -207,7 +223,9 @@ function createOutputEnvelope(input: OutputEnvelopeInput): OutputEnvelope {
   if (input.logPath) envelope.log_path = input.logPath;
   if (input.omittedBytes) envelope.omitted_bytes = input.omittedBytes;
   if (input.totalBytes !== undefined) envelope.output_bytes_total = input.totalBytes;
-  if (truncation.truncated) envelope.truncation = truncation;
+  if (truncation.truncated) {
+    envelope.truncation = truncationMetadata(truncation);
+  }
   return envelope;
 }
 
@@ -274,7 +292,7 @@ export function finalizeKillResult(input: FinalizeKillInput): KillResultDetails 
 
 /** Pi-bash-style marker appended to model-visible text after a truncated body. */
 export function truncationMarker(
-  truncation: TruncationResult | undefined,
+  truncation: TruncationMetadata | undefined,
   logPath: string | undefined,
 ): string | undefined {
   if (!truncation?.truncated) return undefined;

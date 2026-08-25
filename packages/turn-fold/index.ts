@@ -1,8 +1,9 @@
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
-  Theme,
+import {
+  VERSION,
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+  type ExtensionContext,
+  type Theme,
 } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -46,6 +47,7 @@ import {
 import { TurnFoldState } from "./turn-state.ts";
 
 const WINDOW_ARGUMENTS = ["1", "3", "+1", "-1", "all", "reset"] as const;
+export const SUPPORTED_PI_VERSION = "0.84.3";
 
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 
@@ -420,6 +422,14 @@ function startSession(
     runtime.adapter = undefined;
     return;
   }
+  if (VERSION !== SUPPORTED_PI_VERSION) {
+    runtime.adapter = undefined;
+    ctx.ui.notify(
+      `Turn Fold compact transcript disabled: Pi ${VERSION} is not the tested ${SUPPORTED_PI_VERSION} release. History remains available.`,
+      "warning",
+    );
+    return;
+  }
   const shortcutInstallation = installTurnFoldShortcutEditor(ctx, {
     cancel: (error) => {
       shortcut.cancel();
@@ -465,7 +475,7 @@ function registerSessionEvents(
   });
   pi.on("session_compact", (event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
-    runtime.adapter?.markPendingCompaction(event.compactionEntry.id);
+    runtime.adapter?.prepareCompletedCompactionReplay(event.compactionEntry.id);
     const branch = ctx.sessionManager.getBranch();
     const association = state.registerCompaction(
       event.compactionEntry,
@@ -587,7 +597,10 @@ export default function turnFold(pi: ExtensionAPI): void {
       pi.appendEntry(customType, data);
     }),
   };
-  const restorePatches = installRenderPatches(state, () => runtime.currentTheme);
+  const restorePatches =
+    VERSION === SUPPORTED_PI_VERSION
+      ? installRenderPatches(state, () => runtime.currentTheme)
+      : () => undefined;
   const requestConfiguration: RequestConfiguration = async (next, ctx, persist) => {
     await ctx.waitForIdle();
     const branch = ctx.sessionManager.getBranch();
