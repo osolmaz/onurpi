@@ -112,24 +112,28 @@ function writeTextAtomically(target: string, content: string): void {
   }
 }
 
+function withoutLegacyZshBlock(current: string): string | undefined {
+  const first = current.indexOf(ZSH_BLOCK);
+  if (first === -1) return undefined;
+  if (current.includes(ZSH_BLOCK, first + ZSH_BLOCK.length)) {
+    throw new Error("Refusing to remove duplicate restart-aware pi blocks from .zshrc.");
+  }
+  let before = current.slice(0, first);
+  const after = current.slice(first + ZSH_BLOCK.length);
+  if (before.endsWith("\n\n")) before = before.slice(0, -1);
+  if (before.length > 0 && after.length > 0 && !before.endsWith("\n")) before = `${before}\n`;
+  return `${before}${after}`;
+}
+
 export function removeLegacyZshOverride(
   homeDirectory: string,
   platform = process.platform,
 ): CleanupResult {
   if (platform !== "linux") return "unchanged";
-  const target = join(homeDirectory, ".zshrc");
-  const destination = configDestination(target);
+  const destination = configDestination(join(homeDirectory, ".zshrc"));
   if (!destination) return "unchanged";
-  const current = readFileSync(destination, "utf8");
-  const first = current.indexOf(ZSH_BLOCK);
-  if (first === -1) return "unchanged";
-  if (current.includes(ZSH_BLOCK, first + ZSH_BLOCK.length)) {
-    throw new Error("Refusing to remove duplicate restart-aware pi blocks from .zshrc.");
-  }
-  const prefixStart = first > 0 && current[first - 1] === "\n" ? first - 1 : first;
-  writeTextAtomically(
-    destination,
-    `${current.slice(0, prefixStart)}${current.slice(first + ZSH_BLOCK.length)}`,
-  );
+  const updated = withoutLegacyZshBlock(readFileSync(destination, "utf8"));
+  if (updated === undefined) return "unchanged";
+  writeTextAtomically(destination, updated);
   return "removed";
 }

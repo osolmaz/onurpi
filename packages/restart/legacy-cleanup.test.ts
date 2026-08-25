@@ -78,6 +78,15 @@ describe("restart override cleanup", () => {
     expect(removeLegacyZshOverride(home, "linux")).toBe("unchanged");
   });
 
+  it("preserves a single line boundary around the managed Zsh block", () => {
+    const home = temporaryRoot();
+    const zshrc = join(home, ".zshrc");
+    writeFileSync(zshrc, `export X=1\n${block}source ~/.other\n`);
+
+    expect(removeLegacyZshOverride(home, "linux")).toBe("removed");
+    expect(readFileSync(zshrc, "utf8")).toBe("export X=1\nsource ~/.other\n");
+  });
+
   it("preserves a symlinked Zsh configuration", () => {
     const home = temporaryRoot();
     const source = join(home, "dotfiles/zshrc");
