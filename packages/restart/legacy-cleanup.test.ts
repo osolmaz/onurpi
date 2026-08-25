@@ -55,6 +55,23 @@ describe("restart override cleanup", () => {
     expect(restoreLegacyPiBridge(launcher, upstream, target, "linux")).toBe("unchanged");
   });
 
+  it("reads the active Pi package bin path instead of assuming its layout", () => {
+    const root = temporaryRoot();
+    const launcher = executable(join(root, "checkout/packages/restart/bin/pi.ts"));
+    const packageRoot = join(root, "node/lib/node_modules/@earendil-works/pi-coding-agent");
+    const upstream = executable(join(packageRoot, "dist/bundle/cli.js"));
+    const target = join(root, "node/bin/pi");
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({ bin: { pi: "dist/bundle/cli.js" } })}\n`,
+    );
+    symlinkSync(launcher, target);
+
+    expect(restoreLegacyPiBridge(launcher, "", target, "linux")).toBe("restored");
+    expect(resolve(dirname(target), readlinkSync(target))).toBe(upstream);
+  });
+
   it("does not replace an unrelated active Pi command", () => {
     const root = temporaryRoot();
     const launcher = executable(join(root, "checkout/packages/restart/bin/pi.ts"));
