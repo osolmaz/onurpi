@@ -44,7 +44,12 @@ function makeHarness(options: { workflowLoaded?: boolean } = {}) {
     },
     registerFlag: () => undefined,
     sendUserMessage: (content: string, sendOptions?: { expandPromptTemplates?: boolean }) =>
-      sentMessages.push({ content, expandPromptTemplates: sendOptions?.expandPromptTemplates }),
+      sentMessages.push({
+        content,
+        ...(sendOptions?.expandPromptTemplates === undefined
+          ? {}
+          : { expandPromptTemplates: sendOptions.expandPromptTemplates }),
+      }),
     setSessionName: (name: string) => names.push(name),
     on: (event: string, handler: (...args: never[]) => unknown) => {
       lifecycle.set(event, handler);
