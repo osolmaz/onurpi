@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { installPiCommand, installZshOverride } from "./install-command.ts";
+import { installActivePiBridge, installPiCommand, installZshOverride } from "./install-command.ts";
 
 const roots: string[] = [];
 
@@ -71,6 +71,44 @@ describe("restart-aware pi command installer", () => {
     expect(() => installPiCommand(home, source, "linux")).toThrow(/unmanaged command/u);
   });
 
+  it("bridges the active managed Pi command for an already-running shell", () => {
+    const root = temporaryRoot();
+    const source = launcher(root, "checkout");
+    const upstream = join(root, "upstream", "dist", "cli.js");
+    const target = join(root, "node", "bin", "pi");
+    mkdirSync(dirname(upstream), { recursive: true });
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(upstream, "#!/usr/bin/env node\n");
+    chmodSync(upstream, 0o755);
+    symlinkSync(upstream, target);
+
+    expect(installActivePiBridge(source, upstream, target, "linux")).toEqual({
+      status: "installed",
+      target,
+    });
+    expect(readlinkSync(target)).toBe(source);
+    expect(installActivePiBridge(source, upstream, target, "linux").status).toBe("current");
+  });
+
+  it("does not replace an unrelated active Pi command", () => {
+    const root = temporaryRoot();
+    const source = launcher(root, "checkout");
+    const upstream = launcher(root, "upstream");
+    const unrelated = join(root, "unrelated", "pi");
+    const target = join(root, "node", "bin", "pi");
+    mkdirSync(dirname(unrelated), { recursive: true });
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(unrelated, "#!/usr/bin/env node\n");
+    chmodSync(unrelated, 0o755);
+    symlinkSync(unrelated, target);
+
+    expect(installActivePiBridge(source, upstream, target, "linux")).toEqual({
+      status: "unsupported",
+      target,
+    });
+    expect(readlinkSync(target)).toBe(unrelated);
+  });
+
   it("installs an idempotent Zsh function that bypasses cached command paths", () => {
     const home = temporaryRoot();
     const zshrc = join(home, ".zshrc");
@@ -94,6 +132,20 @@ describe("restart-aware pi command installer", () => {
       ].join("\n"),
     );
     expect(installZshOverride(home, "/usr/bin/zsh", "linux").status).toBe("current");
+  });
+
+  it("updates a symlinked Zsh configuration without replacing the symlink", () => {
+    const home = temporaryRoot();
+    const dotfiles = join(home, "dotfiles");
+    const zshrc = join(home, ".zshrc");
+    const source = join(dotfiles, "zshrc");
+    mkdirSync(dotfiles, { recursive: true });
+    writeFileSync(source, "before\n");
+    symlinkSync(source, zshrc);
+
+    expect(installZshOverride(home, "zsh", "linux").status).toBe("installed");
+    expect(lstatSync(zshrc).isSymbolicLink()).toBe(true);
+    expect(readFileSync(source, "utf8")).toContain("# >>> onurpi restart-aware pi >>>");
   });
 
   it("repairs its managed Zsh block without changing surrounding configuration", () => {
