@@ -48,8 +48,8 @@ upstream config module; see the local adaptations below.
 
 ## Local adaptations
 
-- Renamed the private package to `@onurpi/pi-codex-compaction`; pinned Pi peer dependencies to the
-  installed 0.82.1 generation. Nothing is published.
+- Renamed the private package to `@onurpi/pi-codex-compaction`; reviewed it against the installed Pi
+  0.84.3 generation. Nothing is published.
 - Ported the Bun test suite to Vitest and split `native-compaction.ts` into `native-checkpoint.ts`
   (checkpoint parsing/lookup), `responses-input.ts` (Pi message → Responses input conversion), and
   `remote-compaction.ts` (endpoint validation, headers, SSE, retries). `index.ts` is thin wiring
@@ -69,13 +69,12 @@ upstream config module; see the local adaptations below.
   [README.md](README.md#compaction-ownership-in-onurpi)): `context-window-policy` passes Codex
   models through to this extension, and `reliable-compaction` no longer arms its SSE retry override
   for the built-in `openai-codex` provider.
-- Removed the upstream proactive controller as a hard cutover. The package no longer reads
-  `autoCompact` or `thresholdRatio`, listens to `turn_end`, calls `ctx.abort()` to schedule
-  compaction, listens to `agent_settled`, or sends a continuation user message. Pi owns manual,
-  threshold, and overflow scheduling and continuation; the package only supplies native checkpoint
-  results through `session_before_compact`.
-- Other upstream behavior for checkpoint creation, fail-closed cancellation, and duplicate
-  prevention is preserved.
+- Preserves the upstream proactive controller: it reads `autoCompact` and `thresholdRatio`, checks
+  usage after `turn_end`, calls `ctx.abort()` at the configured boundary, compacts after
+  `agent_settled`, and sends one continuation message when no input is already queued. It also
+  recognizes Pi threshold or overflow compaction that finishes first and prevents duplicate work.
+- Other upstream behavior for checkpoint creation, fail-closed cancellation, duplicate prevention,
+  and continuation is preserved.
 - Adopted upstream `c4d6ca8` ("fix(codex-compaction): sanitize cross-provider history", 0.1.4):
   reasoning items, text-signature item ids, and tool-call item ids replay only when the stored
   message's provider and API match the active Codex model, foreign reasoning state is dropped from

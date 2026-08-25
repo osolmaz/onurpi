@@ -4,11 +4,13 @@ import type {
   CompactionEntry,
   ContextEvent,
   SessionBeforeCompactEvent,
+  SessionCompactEvent,
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  CONTINUATION_PROMPT,
   installCodexCompaction,
   type CodexCompactionApi,
   type CodexCompactionContext,
@@ -77,12 +79,20 @@ function validDetails(encrypted: string, key = MODEL_KEY): NativeCompactionDetai
   };
 }
 
+type CompactCall = {
+  onComplete?: (result: unknown) => void;
+  onError?: (error: Error) => void;
+};
+
 type Handlers = {
   context: Parameters<CodexCompactionApi["onContext"]>[0];
   modelSelect: Parameters<CodexCompactionApi["onModelSelect"]>[0];
   beforeProviderHeaders: Parameters<CodexCompactionApi["onBeforeProviderHeaders"]>[0];
   beforeProviderRequest: Parameters<CodexCompactionApi["onBeforeProviderRequest"]>[0];
   sessionBeforeCompact: Parameters<CodexCompactionApi["onSessionBeforeCompact"]>[0];
+  turnEnd: Parameters<CodexCompactionApi["onTurnEnd"]>[0];
+  sessionCompact: Parameters<CodexCompactionApi["onSessionCompact"]>[0];
+  agentSettled: Parameters<CodexCompactionApi["onAgentSettled"]>[0];
   sessionStart: () => void;
 };
 
@@ -96,6 +106,7 @@ type CheckpointParams = {
 type HarnessOptions = {
   model?: CodexCompactionContext["model"];
   createCheckpoint?: (params: CheckpointParams) => Promise<{ details: NativeCompactionDetails }>;
+  autoCompact?: boolean;
   apiKeyAndHeaders?: () => Promise<
     { ok: true; apiKey?: string; headers?: Record<string, string> } | { ok: false; error: string }
   >;
@@ -111,26 +122,51 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
     onBeforeProviderHeaders: (handler) => registered.set("before_provider_headers", handler),
     onBeforeProviderRequest: (handler) => registered.set("before_provider_request", handler),
     onSessionBeforeCompact: (handler) => registered.set("session_before_compact", handler),
+    onTurnEnd: (handler) => registered.set("turn_end", handler),
+    onSessionCompact: (handler) => registered.set("session_compact", handler),
+    onAgentSettled: (handler) => registered.set("agent_settled", handler),
     appendEntry: (customType, data) => {
       statusEntries.push({ customType, data });
+    },
+    sendUserMessage: (content, sendOptions) => {
+      sentUserMessages.push(
+        sendOptions?.deliverAs ? { content, deliverAs: sendOptions.deliverAs } : { content },
+      );
     },
     getAllTools: () => [],
     getActiveTools: () => [],
   };
 
   const statusEntries: { customType: string; data: CompactionStatus }[] = [];
+  const sentUserMessages: { content: string; deliverAs?: "followUp" }[] = [];
   const notifications: string[] = [];
+  const compactCalls: CompactCall[] = [];
   let branch: SessionEntry[] = initialBranch;
   let aborted = 0;
+  let idle = false;
+  let pendingMessages = false;
+  let usageTokens: number | null = 40_000;
 
   const ctx: CodexCompactionContext = {
     model: options.model ?? codexModel(),
     mode: "tui",
+    cwd: "/var/tmp/pi-codex-compaction-test",
     hasUI: true,
     ui: { notify: (message) => notifications.push(message) },
     abort: () => {
       aborted += 1;
     },
+    compact: (compactOptions = {}) => {
+      compactCalls.push(compactOptions as CompactCall);
+    },
+    isIdle: () => idle,
+    isProjectTrusted: () => false,
+    hasPendingMessages: () => pendingMessages,
+    getContextUsage: () => ({
+      tokens: usageTokens,
+      contextWindow: 200_000,
+      percent: usageTokens === null ? null : (usageTokens / 200_000) * 100,
+    }),
     getSystemPrompt: () => "You are Codex.",
     sessionManager: {
       getSessionId: () => TEST_SESSION_ID,
@@ -143,9 +179,15 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
     },
   };
 
+  const autoCompact = options.autoCompact ?? true;
   installCodexCompaction(
     api,
-    options.createCheckpoint ? { createCheckpoint: options.createCheckpoint as never } : undefined,
+    options.createCheckpoint
+      ? {
+          createCheckpoint: options.createCheckpoint as never,
+          readConfig: () => ({ autoCompact, thresholdRatio: 0.9 }),
+        }
+      : { readConfig: () => ({ autoCompact, thresholdRatio: 0.9 }) },
   );
 
   function handler<K extends HandlerKey>(name: string, key: K): Handlers[K] {
@@ -157,9 +199,20 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
   return {
     ctx,
     statusEntries,
+    sentUserMessages,
     notifications,
+    compactCalls,
     setBranch: (next: SessionEntry[]) => {
       branch = next;
+    },
+    setIdle: (value: boolean) => {
+      idle = value;
+    },
+    setPendingMessages: (value: boolean) => {
+      pendingMessages = value;
+    },
+    setUsageTokens: (value: number | null) => {
+      usageTokens = value;
     },
     abortCount: () => aborted,
     handlers: {
@@ -167,6 +220,9 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
       beforeProviderHeaders: () => handler("before_provider_headers", "beforeProviderHeaders"),
       beforeProviderRequest: () => handler("before_provider_request", "beforeProviderRequest"),
       sessionBeforeCompact: () => handler("session_before_compact", "sessionBeforeCompact"),
+      turnEnd: () => handler("turn_end", "turnEnd"),
+      sessionCompact: () => handler("session_compact", "sessionCompact"),
+      agentSettled: () => handler("agent_settled", "agentSettled"),
       sessionStart: () => handler("session_start", "sessionStart"),
       modelSelect: () => handler("model_select", "modelSelect"),
     },
@@ -539,16 +595,115 @@ describe("credential and endpoint failures", () => {
   });
 });
 
-describe("lifecycle ownership", () => {
-  it("resets session-local request state without scheduling compaction", () => {
-    const h = harness();
+describe("forced mid-run compaction", () => {
+  function settledCompactionEvent(): SessionCompactEvent {
+    return {
+      type: "session_compact",
+      compactionEntry: nativeCompactionEntry("compact-1", validDetails("opaque-state")),
+      fromExtension: true,
+      reason: "threshold",
+      willRetry: false,
+    };
+  }
 
-    h.handlers.sessionStart()();
-    h.handlers.modelSelect()(h.ctx);
+  it("aborts at 90 percent, compacts after settlement, and visibly continues", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(1);
+    expect(h.compactCalls).toHaveLength(0);
+
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.compactCalls).toHaveLength(1);
+    h.compactCalls[0]?.onComplete?.({});
+
+    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT }]);
+  });
+
+  it("aborts only once while a forced compaction is pending", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+
+    h.handlers.turnEnd()(h.ctx);
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(1);
+
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.compactCalls).toHaveLength(1);
+  });
+
+  it("uses Pi threshold compaction when it finishes before settlement", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+
+    h.handlers.sessionCompact()(settledCompactionEvent(), h.ctx);
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+
+    expect(h.compactCalls).toHaveLength(0);
+    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT }]);
+  });
+
+  it("does not add a continuation when overflow recovery will retry", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+
+    h.handlers.sessionCompact()(
+      { ...settledCompactionEvent(), reason: "overflow", willRetry: true },
+      h.ctx,
+    );
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+
+    expect(h.compactCalls).toHaveLength(0);
+    expect(h.sentUserMessages).toEqual([]);
+  });
+
+  it("does not interrupt below the configured threshold", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(179_999);
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(0);
+  });
+
+  it("does not auto-continue when input is already queued", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    h.setPendingMessages(true);
+    h.compactCalls[0]?.onComplete?.({});
+    expect(h.sentUserMessages).toEqual([]);
+  });
+
+  it("notifies instead of continuing when the forced compaction fails", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    h.compactCalls[0]?.onError?.(new Error("remote down"));
+
+    expect(h.sentUserMessages).toEqual([]);
+    expect(h.notifications.join("\n")).toContain("compaction failed");
   });
 
   it("leaves non-Codex providers untouched", async () => {
     const h = harness([userEntry("user-1", "hello")], { model: otherModel() });
+    h.setUsageTokens(199_999);
+
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(0);
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.compactCalls).toHaveLength(0);
 
     expect(
       await h.handlers.sessionBeforeCompact()(
@@ -562,6 +717,52 @@ describe("lifecycle ownership", () => {
         h.ctx,
       ),
     ).toBeUndefined();
+  });
+
+  it("resets forced state when the session restarts", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(1);
+
+    h.handlers.sessionStart()();
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.compactCalls).toHaveLength(0);
+  });
+
+  it("respects autoCompact being disabled", () => {
+    const h = harness([userEntry("user-1", "continue the task")], { autoCompact: false });
+    h.setUsageTokens(199_999);
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(0);
+  });
+
+  it("passes through when context usage is unknown", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(null);
+    h.handlers.turnEnd()(h.ctx);
+    expect(h.abortCount()).toBe(0);
+  });
+
+  it("delivers the continuation as a follow-up while the agent is busy", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+    h.handlers.sessionCompact()(settledCompactionEvent(), h.ctx);
+    // Agent is not idle: the continuation is queued as a follow-up.
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT, deliverAs: "followUp" }]);
+  });
+
+  it("resets forced state when the model changes", () => {
+    const h = harness([userEntry("user-1", "continue the task")]);
+    h.setUsageTokens(180_000);
+    h.handlers.turnEnd()(h.ctx);
+    h.handlers.modelSelect()(h.ctx);
+    h.setIdle(true);
+    h.handlers.agentSettled()(h.ctx);
+    expect(h.compactCalls).toHaveLength(0);
   });
 });
 

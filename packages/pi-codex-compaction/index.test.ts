@@ -14,6 +14,7 @@ function fakePi() {
     registerEntryRenderer: (customType: string, renderer: EntryRenderer<CompactionStatus>) =>
       renderers.set(customType, renderer),
     appendEntry: () => undefined,
+    sendUserMessage: () => undefined,
     getAllTools: () => [],
     getActiveTools: () => [],
   } as unknown as ExtensionAPI;
@@ -39,13 +40,16 @@ describe("pi-codex-compaction extension factory", () => {
     codexCompactionExtension(pi);
 
     expect([...handlers.keys()].sort()).toEqual([
+      "agent_settled",
       "before_provider_headers",
       "before_provider_request",
       "context",
       "model_select",
       "session_before_compact",
+      "session_compact",
       "session_shutdown",
       "session_start",
+      "turn_end",
     ]);
     expect(renderers.has(COMPACTION_STATUS_KIND)).toBe(true);
   });
