@@ -12,7 +12,6 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { findPackageJSON } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,9 +41,25 @@ function isManagedLauncher(source: string, launcher: string): boolean {
   return source === launcher || source.endsWith("/packages/restart/bin/pi.ts");
 }
 
-function coInstalledPiEntrypoint(baseUrl = import.meta.url): string | undefined {
-  const packageJson = findPackageJSON("@earendil-works/pi-coding-agent", baseUrl);
-  return packageJson ? join(dirname(packageJson), "dist", "cli.js") : undefined;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function activeNodePiEntrypoint(target: string): string | undefined {
+  const packageJson = resolve(
+    dirname(target),
+    "../lib/node_modules/@earendil-works/pi-coding-agent/package.json",
+  );
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(readFileSync(packageJson, "utf8"));
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  }
+  if (!isRecord(manifest) || !isRecord(manifest["bin"])) return undefined;
+  const entrypoint = manifest["bin"]["pi"];
+  return typeof entrypoint === "string" ? resolve(dirname(packageJson), entrypoint) : undefined;
 }
 
 function replaceLink(target: string, source: string): void {
@@ -75,11 +90,16 @@ function restoreLegacyPiBridgeAt(
 
 export function restoreLegacyPiBridge(
   launcher = LAUNCHER_ENTRYPOINT,
-  upstream = coInstalledPiEntrypoint(),
+  upstream = "",
   target = join(dirname(process.execPath), "pi"),
   platform = process.platform,
 ): CleanupResult {
-  return restoreLegacyPiBridgeAt(launcher, upstream, target, platform);
+  return restoreLegacyPiBridgeAt(
+    launcher,
+    upstream || activeNodePiEntrypoint(target),
+    target,
+    platform,
+  );
 }
 
 function configDestination(target: string): string | undefined {
