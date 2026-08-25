@@ -42,33 +42,16 @@ describe("Pi process adapter", () => {
     expect(resolvePiEntrypoint(pathValue, "linux", wrapperEntrypoint)).toBe(updatedEntrypoint);
   });
 
-  it("uses the co-installed Pi when every PATH command resolves to the wrapper", () => {
+  it("rejects a PATH that contains only the wrapper and unsupported platforms", () => {
     const wrapperRoot = temporaryRoot();
-    const upstreamRoot = temporaryRoot();
     const wrapperEntrypoint = join(wrapperRoot, "pi.ts");
-    const upstreamEntrypoint = join(upstreamRoot, "cli.js");
     writeFileSync(wrapperEntrypoint, "#!/usr/bin/env node\n");
-    writeFileSync(upstreamEntrypoint, "#!/usr/bin/env node\n");
     chmodSync(wrapperEntrypoint, 0o755);
-    chmodSync(upstreamEntrypoint, 0o755);
     symlinkSync(wrapperEntrypoint, join(wrapperRoot, "pi"));
 
-    expect(resolvePiEntrypoint(wrapperRoot, "linux", wrapperEntrypoint, upstreamEntrypoint)).toBe(
-      upstreamEntrypoint,
+    expect(() => resolvePiEntrypoint(wrapperRoot, "linux", wrapperEntrypoint)).toThrow(
+      /upstream pi command/u,
     );
-  });
-
-  it("rejects missing upstream commands and unsupported platforms", () => {
-    const wrapperRoot = temporaryRoot();
-    const wrapperEntrypoint = join(wrapperRoot, "pi.ts");
-    const missingUpstream = join(wrapperRoot, "missing-cli.js");
-    writeFileSync(wrapperEntrypoint, "#!/usr/bin/env node\n");
-    chmodSync(wrapperEntrypoint, 0o755);
-    symlinkSync(wrapperEntrypoint, join(wrapperRoot, "pi"));
-
-    expect(() =>
-      resolvePiEntrypoint(wrapperRoot, "linux", wrapperEntrypoint, missingUpstream),
-    ).toThrow(/upstream pi command/u);
     expect(() => resolvePiEntrypoint("", "darwin", wrapperEntrypoint)).toThrow(/tested Linux/u);
     expect(() => resolvePiEntrypoint("", "win32", wrapperEntrypoint)).toThrow(/tested Linux/u);
   });
