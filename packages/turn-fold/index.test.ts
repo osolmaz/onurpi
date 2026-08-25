@@ -60,10 +60,21 @@ function extensionHarness(): {
 } {
   const commands = new Map<string, Handler>();
   const completions = new Map<string, (prefix: string) => unknown>();
+  const eventHandlers = new Map<string, (data: unknown) => void>();
   const handlers = new Map<string, Handler>();
   const appendEntry = vi.fn();
+  const emitEvent = (channel: string, data: unknown) => {
+    eventHandlers.get(channel)?.(data);
+  };
   const pi = {
     appendEntry,
+    events: {
+      emit: emitEvent,
+      on: (channel: string, handler: (data: unknown) => void) => {
+        eventHandlers.set(channel, handler);
+        return () => eventHandlers.delete(channel);
+      },
+    },
     on: (event: string, handler: Handler) => handlers.set(event, handler),
     registerCommand: (
       name: string,

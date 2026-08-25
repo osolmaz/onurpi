@@ -49,7 +49,26 @@ import { TurnFoldState } from "./turn-state.ts";
 const WINDOW_ARGUMENTS = ["1", "3", "+1", "-1", "all", "reset"] as const;
 export const SUPPORTED_PI_VERSION = "0.84.3";
 
+const FORCED_COMPACTION_DISPLAY_EVENT = "@onurpi/pi-codex-compaction:forced-compaction-display";
+
+type ForcedCompactionDisplayEvent = {
+  action: "hold" | "release";
+  sessionId: string;
+};
+
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
+
+function parseForcedCompactionDisplayEvent(
+  data: unknown,
+): ForcedCompactionDisplayEvent | undefined {
+  if (typeof data !== "object" || data === null) return undefined;
+  const action: unknown = Reflect.get(data, "action");
+  const sessionId: unknown = Reflect.get(data, "sessionId");
+  if ((action !== "hold" && action !== "release") || typeof sessionId !== "string") {
+    return undefined;
+  }
+  return sessionId.length > 0 ? { action, sessionId } : undefined;
+}
 
 function messageTimestamp(message: unknown): number | undefined {
   if (typeof message !== "object" || message === null) return undefined;
@@ -69,10 +88,14 @@ function messageStopReason(message: unknown): string | undefined {
   return typeof stopReason === "string" ? stopReason : undefined;
 }
 
-function registerEndedAssistant(state: TurnFoldState, message: unknown): void {
+function registerEndedAssistant(
+  state: TurnFoldState,
+  message: unknown,
+  settleAborted: boolean,
+): void {
   if (messageRole(message) !== "assistant") return;
   state.endAssistantMessage(message);
-  if (messageStopReason(message) === "aborted") state.abortActive();
+  if (settleAborted && messageStopReason(message) === "aborted") state.abortActive();
 }
 
 function sessionRegistryKey(ctx: ExtensionContext): string {
@@ -314,12 +337,17 @@ type TurnFoldRuntime = {
   configuration: TurnFoldConfiguration;
   currentTheme: Theme | undefined;
   ensureShrinkClearing: () => void;
+  forcedCompactionSessionId: string | undefined;
   knownEntryIds: Set<string>;
   loadedEntryIds: Set<string>;
   restartRequired: boolean;
   restoreEditor: () => void;
   runBoundaries: RunBoundaryRecorder;
 };
+
+function forcedCompactionHeld(runtime: TurnFoldRuntime, ctx: ExtensionContext): boolean {
+  return runtime.forcedCompactionSessionId === ctx.sessionManager.getSessionId();
+}
 
 function recordLoadedLiveEntries(runtime: TurnFoldRuntime, branch: BranchEntries): void {
   const currentEntryIds = entryIds(branch);
@@ -460,6 +488,24 @@ function startSession(
   );
 }
 
+function registerForcedCompactionDisplayEvents(
+  pi: ExtensionAPI,
+  state: TurnFoldState,
+  runtime: TurnFoldRuntime,
+): void {
+  pi.events.on(FORCED_COMPACTION_DISPLAY_EVENT, (data) => {
+    const event = parseForcedCompactionDisplayEvent(data);
+    if (!event) return;
+    if (event.action === "hold") {
+      runtime.forcedCompactionSessionId = event.sessionId;
+      return;
+    }
+    if (runtime.forcedCompactionSessionId !== event.sessionId) return;
+    runtime.forcedCompactionSessionId = undefined;
+    state.settleActive();
+  });
+}
+
 function registerSessionEvents(
   pi: ExtensionAPI,
   state: TurnFoldState,
@@ -471,18 +517,22 @@ function registerSessionEvents(
   pi.on("session_start", (_event, ctx) => {
     runtime.closeExplorer?.();
     runtime.closeExplorer = undefined;
+    runtime.forcedCompactionSessionId = undefined;
     startSession(ctx, state, shortcut, runtime, registry);
   });
   pi.on("session_compact", (event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
     runtime.adapter?.prepareCompletedCompactionReplay(event.compactionEntry.id);
     const branch = ctx.sessionManager.getBranch();
+    const forced = forcedCompactionHeld(runtime, ctx);
+    const displayReason = forced && event.reason === "manual" ? "threshold" : event.reason;
     const association = state.registerCompaction(
       event.compactionEntry,
-      event.reason,
+      displayReason,
       turnEntryIds(branch, event.compactionEntry.id),
     );
     if (association) registry.remember(sessionRegistryKey(ctx), association);
+    if (forced && event.willRetry) runtime.forcedCompactionSessionId = undefined;
   });
   pi.on("session_tree", (_event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
@@ -493,6 +543,7 @@ function registerSessionEvents(
     runtime.closeExplorer?.();
     runtime.closeExplorer = undefined;
     runtime.runBoundaries.reset();
+    runtime.forcedCompactionSessionId = undefined;
     runtime.adapter?.restore();
     runtime.adapter = undefined;
     runtime.restoreEditor();
@@ -510,10 +561,19 @@ function registerAgentEvents(
 ): void {
   pi.on("agent_start", (_event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
+    if (forcedCompactionHeld(runtime, ctx)) {
+      runtime.forcedCompactionSessionId = undefined;
+      state.resumeActive();
+    }
     const hadActiveRun = state.hasActive();
     const startedAt = Date.now();
     state.ensureActive(startedAt);
     if (!hadActiveRun) runtime.runBoundaries.start(ctx.sessionManager.getBranch(), startedAt);
+  });
+  pi.on("model_select", (_event, ctx) => {
+    if (!forcedCompactionHeld(runtime, ctx)) return;
+    runtime.forcedCompactionSessionId = undefined;
+    state.settleActive();
   });
   pi.on("message_start", (event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
@@ -534,7 +594,7 @@ function registerAgentEvents(
   });
   pi.on("message_end", (event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
-    registerEndedAssistant(state, event.message);
+    registerEndedAssistant(state, event.message, !forcedCompactionHeld(runtime, ctx));
   });
   pi.on("turn_end", (event, ctx) => {
     for (const result of event.toolResults) state.registerToolResult(result);
@@ -552,7 +612,7 @@ function registerAgentEvents(
     runtime.currentTheme = ctx.ui.theme;
     runtime.runBoundaries.persist(ctx.sessionManager.getBranch());
     recordLoadedLiveEntries(runtime, ctx.sessionManager.getBranch());
-    state.settleActive();
+    if (!forcedCompactionHeld(runtime, ctx)) state.settleActive();
   });
 }
 
@@ -589,6 +649,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
     currentTheme: undefined,
     ensureShrinkClearing: () => undefined,
+    forcedCompactionSessionId: undefined,
     knownEntryIds: new Set(),
     loadedEntryIds: new Set(),
     restartRequired: false,
@@ -650,6 +711,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     requestConfiguration,
     (ctx) => openHistoryForRuntime(runtime, ctx),
   );
+  registerForcedCompactionDisplayEvents(pi, state, runtime);
   registerSessionEvents(pi, state, shortcut, runtime, registry, restorePatches);
   registerAgentEvents(pi, state, runtime);
 }

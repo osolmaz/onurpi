@@ -14,7 +14,8 @@ function fakePi() {
     registerEntryRenderer: (customType: string, renderer: EntryRenderer<CompactionStatus>) =>
       renderers.set(customType, renderer),
     appendEntry: () => undefined,
-    sendUserMessage: () => undefined,
+    events: { emit: () => undefined },
+    sendMessage: () => undefined,
     getAllTools: () => [],
     getActiveTools: () => [],
   } as unknown as ExtensionAPI;

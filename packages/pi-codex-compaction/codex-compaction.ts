@@ -39,11 +39,25 @@ import {
 } from "./responses-input.ts";
 
 export const COMPACTION_STATUS_KIND = "openai-codex-compaction-status";
+export const CONTINUATION_MESSAGE_KIND = "onurpi-codex-compaction-continuation";
 export const CONTINUATION_PROMPT = "Compaction completed. Continue.";
+export const FORCED_COMPACTION_DISPLAY_EVENT =
+  "@onurpi/pi-codex-compaction:forced-compaction-display";
 
 export type CompactionStatus = {
   state: "running" | "complete" | "failed";
   error?: string;
+};
+
+export type ForcedCompactionDisplayEvent = {
+  action: "hold" | "release";
+  sessionId: string;
+};
+
+type ContinuationMessage = {
+  customType: typeof CONTINUATION_MESSAGE_KIND;
+  content: typeof CONTINUATION_PROMPT;
+  display: false;
 };
 
 type CachedPayloadShape = {
@@ -65,7 +79,6 @@ export type CodexCompactionContext = Pick<
   | "hasUI"
   | "abort"
   | "compact"
-  | "isIdle"
   | "isProjectTrusted"
   | "hasPendingMessages"
   | "getContextUsage"
@@ -105,7 +118,11 @@ export type CodexCompactionApi = {
   ): void;
   onAgentSettled(handler: (ctx: CodexCompactionContext) => void): void;
   appendEntry(customType: string, data: CompactionStatus): void;
-  sendUserMessage(content: string, options?: { deliverAs: "followUp" }): void;
+  emitForcedCompactionDisplay(event: ForcedCompactionDisplayEvent): void;
+  sendMessage(
+    message: ContinuationMessage,
+    options: { deliverAs: "followUp"; triggerTurn: true },
+  ): void;
   getAllTools(): ToolInfo[];
   getActiveTools(): string[];
 };
@@ -351,10 +368,12 @@ function handleTurnEnd(
   const percent = thresholdPercent(deps, state, ctx);
   if (percent === undefined) return;
 
+  const sessionId = ctx.sessionManager.getSessionId();
   state.forcedCompaction = {
-    sessionId: ctx.sessionManager.getSessionId(),
+    sessionId,
     phase: "waitingForSettle",
   };
+  deps.api.emitForcedCompactionDisplay({ action: "hold", sessionId });
   if (ctx.hasUI) {
     ctx.ui.notify(
       `OpenAI Codex context reached ${percent.toFixed(1)}%; stopping for compaction.`,
@@ -395,6 +414,16 @@ function handleSessionCompact(
   state.forcedCompaction = { sessionId: forced.sessionId, phase: "compacted" };
 }
 
+function releaseForcedCompactionDisplay(
+  api: CodexCompactionApi,
+  state: ControllerState,
+  forced: ForcedCompactionState,
+): void {
+  if (state.forcedCompaction !== forced) return;
+  state.forcedCompaction = undefined;
+  api.emitForcedCompactionDisplay({ action: "release", sessionId: forced.sessionId });
+}
+
 function continueAfterCompaction(
   api: CodexCompactionApi,
   state: ControllerState,
@@ -402,12 +431,26 @@ function continueAfterCompaction(
   expected: ForcedCompactionState,
 ): void {
   if (state.forcedCompaction !== expected) return;
+  if (ctx.hasPendingMessages()) {
+    releaseForcedCompactionDisplay(api, state, expected);
+    return;
+  }
+
   state.forcedCompaction = undefined;
-  if (ctx.hasPendingMessages()) return;
-  if (ctx.isIdle()) {
-    api.sendUserMessage(CONTINUATION_PROMPT);
-  } else {
-    api.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" });
+  try {
+    api.sendMessage(
+      {
+        customType: CONTINUATION_MESSAGE_KIND,
+        content: CONTINUATION_PROMPT,
+        display: false,
+      },
+      { deliverAs: "followUp", triggerTurn: true },
+    );
+  } catch (error) {
+    api.emitForcedCompactionDisplay({ action: "release", sessionId: expected.sessionId });
+    if (ctx.hasUI) {
+      ctx.ui.notify(`OpenAI Codex continuation failed: ${errorMessage(error)}`, "error");
+    }
   }
 }
 
@@ -433,7 +476,7 @@ function handleAgentSettled(
     },
     onError: (error) => {
       if (state.forcedCompaction !== compacting) return;
-      state.forcedCompaction = undefined;
+      releaseForcedCompactionDisplay(deps.api, state, compacting);
       if (!ctx.hasUI) return;
       ctx.ui.notify(`OpenAI Codex compaction failed: ${error.message}`, "error");
     },
@@ -463,7 +506,8 @@ export function installCodexCompaction(
   api.onSessionShutdown(reset);
   api.onModelSelect((ctx) => {
     state.payloadShapeBySession.delete(ctx.sessionManager.getSessionId());
-    state.forcedCompaction = undefined;
+    const forced = state.forcedCompaction;
+    if (forced) releaseForcedCompactionDisplay(api, state, forced);
   });
   api.onContext(handleContext);
   api.onBeforeProviderHeaders((event, ctx) => {

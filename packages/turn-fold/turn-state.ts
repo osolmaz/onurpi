@@ -410,6 +410,13 @@ export class TurnFoldState {
 
   compactionVisibleFor = (target: object): boolean => this.compactionVisibility.visible(target);
 
+  resumeActive(): void {
+    const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : undefined;
+    if (!group?.aborted) return;
+    group.aborted = false;
+    this.markGroupChanged(group);
+  }
+
   settleActive(endedAt = Date.now()): void {
     if (!this.activeGroupId) return;
     const group = this.groups.get(this.activeGroupId);

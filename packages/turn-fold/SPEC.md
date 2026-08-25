@@ -12,7 +12,7 @@ A **run boundary** is a `onurpi-turn-fold-run` custom entry containing `version`
 
 An **activity row** is a visible assistant text or thinking row, or a tool execution row. An assistant shell that contains only tool calls is not an activity row.
 
-An **attached compaction** is an automatic threshold or overflow compaction observed while a Turn Fold turn is active. It is ephemeral display state and is not an activity row or final content row. A manual compaction performed while Pi is idle is a **standalone compaction**.
+An **attached compaction** is an automatic threshold or overflow compaction observed while a Turn Fold turn is active. It also includes a compaction that the Codex controller marks through Pi's process-local event bus before its safe turn-boundary abort. Turn Fold keeps that run active until the controller's hidden continuation starts or the controller releases the hold. Attached compaction state is ephemeral display state and is not an activity row or final content row. A manual compaction performed while Pi is idle is a **standalone compaction**.
 
 A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for`.
 
@@ -194,8 +194,10 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Terminal tool failures retain the correct failed tool row and failure count.
 - Reload and history reconstruction produce the correct first frame for process-local associations.
 - The compact transcript hides attached automatic compaction rows and reports them in the turn summary.
+- A forced Codex turn-boundary compaction remains attached across the controller abort, settlement, manual Pi compaction call, and hidden continuation.
+- A failed forced compaction releases its display hold and settles the interrupted run.
 - Manual, unobserved, and post-restart compactions remain standalone.
-- Compaction handling performs no Pi session or sidecar writes.
+- Compaction display coordination performs no Pi session or sidecar writes.
 - The explorer initially admits the newest three compaction windows and loads at most three older windows for one backward boundary action.
 - The explorer renders viewport-near entries through documented Pi TUI APIs and keeps its render cache bounded.
 - Explorer open, scroll, older-history loading, and close never require a restart or append session state.

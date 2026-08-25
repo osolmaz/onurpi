@@ -14,11 +14,11 @@
 ## Reviewed contents
 
 The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.ts`,
-`native-compaction.ts`, and `index.test.ts` at the pinned commit. OnurPi no longer includes the
-upstream config module; see the local adaptations below.
+`native-compaction.ts`, and `index.test.ts` at the pinned commit.
 
 - **Process/shell execution:** none.
-- **Filesystem access:** none. OnurPi removed the upstream config lookup and does not create files.
+- **Filesystem access:** reads the optional global and trusted-project JSON configuration files. It
+  does not write files.
 - **Network access:** exactly one outbound call shape — `POST <baseUrl>/codex/responses` with the
   session history — plus header-only interception of Pi's own Codex provider requests.
 - **Credential handling:** resolves the active Codex API key through Pi's documented
@@ -73,6 +73,10 @@ upstream config module; see the local adaptations below.
   usage after `turn_end`, calls `ctx.abort()` at the configured boundary, compacts after
   `agent_settled`, and sends one continuation message when no input is already queued. It also
   recognizes Pi threshold or overflow compaction that finishes first and prevents duplicate work.
+- Makes the continuation a hidden Pi custom message instead of a visible synthetic user message.
+  Process-local event-bus coordination lets Turn Fold attach the safe abort and manual compaction to
+  the original run summary. This changes display only; the continuation still enters model context
+  and triggers the next turn.
 - Other upstream behavior for checkpoint creation, fail-closed cancellation, duplicate prevention,
   and continuation is preserved.
 - Adopted upstream `c4d6ca8` ("fix(codex-compaction): sanitize cross-provider history", 0.1.4):

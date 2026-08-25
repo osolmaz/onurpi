@@ -16,10 +16,15 @@ place, so direct compaction requests use the account leased to the current agent
 
 During a tool-driven run, the extension checks Pi's reported context usage after each completed
 turn. At 90%, it aborts before the next provider request, waits for `agent_settled`, and invokes
-Pi's normal compaction lifecycle. After successful compaction, it sends a visible continuation
-message (`Compaction completed. Continue.`) unless messages are already queued. If Pi's threshold or
-overflow compaction runs first, the extension uses that result instead of compacting twice. Overflow
-recovery remains owned by Pi.
+Pi's normal compaction lifecycle. After successful compaction, it sends a hidden custom continuation
+message unless messages are already queued. The model receives `Compaction completed. Continue.`,
+but Pi does not render it as a user message. If Pi's threshold or overflow compaction runs first,
+the extension uses that result instead of compacting twice. Overflow recovery remains owned by Pi.
+
+The extension also announces this forced lifecycle through Pi's process-local event bus. When
+`@onurpi/turn-fold` is loaded, it keeps the interrupted run open until compaction is attached. The
+main transcript then shows `compacted` in the existing run summary instead of a standalone
+compaction row. A failed compaction releases that display hold and settles the interrupted run.
 
 Pi requires compaction events to store a summary string, so entries receive a short local checkpoint
 marker. The marker is filtered from provider context and is never sent to OpenAI. In interactive
@@ -73,9 +78,11 @@ configuration. `thresholdRatio` must be greater than 0 and less than 1. Pi's
 ## Persistence
 
 Session state only: the native checkpoint lives in Pi's normal `CompactionEntry.details` (opaque
-`encrypted_content` from OpenAI plus the replacement history), and TUI status updates are appended
-as `openai-codex-compaction-status` custom entries. Resume, forks, tree navigation, and repeated
-compaction derive state from the newest checkpoint on the active branch. No other files are created.
+`encrypted_content` from OpenAI plus the replacement history), TUI status updates are appended as
+`openai-codex-compaction-status` custom entries, and successful forced compaction appends one hidden
+custom continuation message that enters model context. Resume, forks, tree navigation, and repeated
+compaction derive state from the newest checkpoint on the active branch. Display coordination with
+Turn Fold is process-local and appends no entry. No other files are created.
 
 ## Limitations
 
@@ -89,9 +96,10 @@ construct the compaction request. Extensions loaded later that independently rew
 payloads can therefore create order-dependent behavior.
 
 Pi does not expose a non-aborting compaction barrier between tool turns. The turn-boundary
-controller therefore uses the documented `turn_end`, `agent_settled`, `abort()`, and `compact()`
-interfaces. Aborting after a completed tool turn and sending a continuation message is a temporary
-compatibility path until Pi provides a direct turn-boundary compaction interface.
+controller therefore uses the documented `turn_end`, `agent_settled`, `abort()`, `compact()`,
+`sendMessage()`, and event-bus interfaces. Aborting after a completed tool turn and sending a hidden
+continuation message is a temporary compatibility path until Pi provides a direct turn-boundary
+compaction interface.
 
 ## License
 

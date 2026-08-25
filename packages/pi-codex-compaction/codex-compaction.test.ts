@@ -10,11 +10,13 @@ import type {
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  CONTINUATION_MESSAGE_KIND,
   CONTINUATION_PROMPT,
   installCodexCompaction,
   type CodexCompactionApi,
   type CodexCompactionContext,
   type CompactionStatus,
+  type ForcedCompactionDisplayEvent,
 } from "./codex-compaction.ts";
 import {
   NATIVE_COMPACTION_KIND,
@@ -128,22 +130,30 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
     appendEntry: (customType, data) => {
       statusEntries.push({ customType, data });
     },
-    sendUserMessage: (content, sendOptions) => {
-      sentUserMessages.push(
-        sendOptions?.deliverAs ? { content, deliverAs: sendOptions.deliverAs } : { content },
-      );
+    emitForcedCompactionDisplay: (event) => {
+      forcedCompactionDisplayEvents.push(event);
+    },
+    sendMessage: (message, sendOptions) => {
+      sentMessages.push({ message, options: sendOptions });
     },
     getAllTools: () => [],
     getActiveTools: () => [],
   };
 
   const statusEntries: { customType: string; data: CompactionStatus }[] = [];
-  const sentUserMessages: { content: string; deliverAs?: "followUp" }[] = [];
+  const sentMessages: {
+    message: {
+      customType: typeof CONTINUATION_MESSAGE_KIND;
+      content: typeof CONTINUATION_PROMPT;
+      display: false;
+    };
+    options: { deliverAs: "followUp"; triggerTurn: true };
+  }[] = [];
+  const forcedCompactionDisplayEvents: ForcedCompactionDisplayEvent[] = [];
   const notifications: string[] = [];
   const compactCalls: CompactCall[] = [];
   let branch: SessionEntry[] = initialBranch;
   let aborted = 0;
-  let idle = false;
   let pendingMessages = false;
   let usageTokens: number | null = 40_000;
 
@@ -159,7 +169,6 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
     compact: (compactOptions = {}) => {
       compactCalls.push(compactOptions as CompactCall);
     },
-    isIdle: () => idle,
     isProjectTrusted: () => false,
     hasPendingMessages: () => pendingMessages,
     getContextUsage: () => ({
@@ -199,14 +208,12 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
   return {
     ctx,
     statusEntries,
-    sentUserMessages,
+    sentMessages,
+    forcedCompactionDisplayEvents,
     notifications,
     compactCalls,
     setBranch: (next: SessionEntry[]) => {
       branch = next;
-    },
-    setIdle: (value: boolean) => {
-      idle = value;
     },
     setPendingMessages: (value: boolean) => {
       pendingMessages = value;
@@ -606,20 +613,42 @@ describe("forced mid-run compaction", () => {
     };
   }
 
-  it("aborts at 90 percent, compacts after settlement, and visibly continues", () => {
+  function expectedContinuation() {
+    return [
+      {
+        message: {
+          customType: CONTINUATION_MESSAGE_KIND,
+          content: CONTINUATION_PROMPT,
+          display: false,
+        },
+        options: { deliverAs: "followUp", triggerTurn: true },
+      },
+    ];
+  }
+
+  function expectedHoldAndRelease(): ForcedCompactionDisplayEvent[] {
+    return [
+      { action: "hold", sessionId: TEST_SESSION_ID },
+      { action: "release", sessionId: TEST_SESSION_ID },
+    ];
+  }
+
+  it("aborts at 90 percent, compacts after settlement, and continues without a visible row", () => {
     const h = harness([userEntry("user-1", "continue the task")]);
     h.setUsageTokens(180_000);
 
     h.handlers.turnEnd()(h.ctx);
     expect(h.abortCount()).toBe(1);
     expect(h.compactCalls).toHaveLength(0);
+    expect(h.forcedCompactionDisplayEvents).toEqual([
+      { action: "hold", sessionId: TEST_SESSION_ID },
+    ]);
 
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     expect(h.compactCalls).toHaveLength(1);
     h.compactCalls[0]?.onComplete?.({});
 
-    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT }]);
+    expect(h.sentMessages).toEqual(expectedContinuation());
   });
 
   it("aborts only once while a forced compaction is pending", () => {
@@ -630,7 +659,6 @@ describe("forced mid-run compaction", () => {
     h.handlers.turnEnd()(h.ctx);
     expect(h.abortCount()).toBe(1);
 
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     h.handlers.agentSettled()(h.ctx);
     expect(h.compactCalls).toHaveLength(1);
@@ -642,11 +670,10 @@ describe("forced mid-run compaction", () => {
     h.handlers.turnEnd()(h.ctx);
 
     h.handlers.sessionCompact()(settledCompactionEvent(), h.ctx);
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
 
     expect(h.compactCalls).toHaveLength(0);
-    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT }]);
+    expect(h.sentMessages).toEqual(expectedContinuation());
   });
 
   it("does not add a continuation when overflow recovery will retry", () => {
@@ -658,11 +685,10 @@ describe("forced mid-run compaction", () => {
       { ...settledCompactionEvent(), reason: "overflow", willRetry: true },
       h.ctx,
     );
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
 
     expect(h.compactCalls).toHaveLength(0);
-    expect(h.sentUserMessages).toEqual([]);
+    expect(h.sentMessages).toEqual([]);
   });
 
   it("does not interrupt below the configured threshold", () => {
@@ -670,28 +696,30 @@ describe("forced mid-run compaction", () => {
     h.setUsageTokens(179_999);
     h.handlers.turnEnd()(h.ctx);
     expect(h.abortCount()).toBe(0);
+    expect(h.forcedCompactionDisplayEvents).toEqual([]);
   });
 
-  it("does not auto-continue when input is already queued", () => {
+  it("releases the display hold when input is already queued", () => {
     const h = harness([userEntry("user-1", "continue the task")]);
     h.setUsageTokens(180_000);
     h.handlers.turnEnd()(h.ctx);
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     h.setPendingMessages(true);
     h.compactCalls[0]?.onComplete?.({});
-    expect(h.sentUserMessages).toEqual([]);
+
+    expect(h.sentMessages).toEqual([]);
+    expect(h.forcedCompactionDisplayEvents).toEqual(expectedHoldAndRelease());
   });
 
-  it("notifies instead of continuing when the forced compaction fails", () => {
+  it("releases the display hold when the forced compaction fails", () => {
     const h = harness([userEntry("user-1", "continue the task")]);
     h.setUsageTokens(180_000);
     h.handlers.turnEnd()(h.ctx);
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     h.compactCalls[0]?.onError?.(new Error("remote down"));
 
-    expect(h.sentUserMessages).toEqual([]);
+    expect(h.sentMessages).toEqual([]);
+    expect(h.forcedCompactionDisplayEvents).toEqual(expectedHoldAndRelease());
     expect(h.notifications.join("\n")).toContain("compaction failed");
   });
 
@@ -701,7 +729,6 @@ describe("forced mid-run compaction", () => {
 
     h.handlers.turnEnd()(h.ctx);
     expect(h.abortCount()).toBe(0);
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     expect(h.compactCalls).toHaveLength(0);
 
@@ -726,7 +753,6 @@ describe("forced mid-run compaction", () => {
     expect(h.abortCount()).toBe(1);
 
     h.handlers.sessionStart()();
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
     expect(h.compactCalls).toHaveLength(0);
   });
@@ -745,24 +771,15 @@ describe("forced mid-run compaction", () => {
     expect(h.abortCount()).toBe(0);
   });
 
-  it("delivers the continuation as a follow-up while the agent is busy", () => {
-    const h = harness([userEntry("user-1", "continue the task")]);
-    h.setUsageTokens(180_000);
-    h.handlers.turnEnd()(h.ctx);
-    h.handlers.sessionCompact()(settledCompactionEvent(), h.ctx);
-    // Agent is not idle: the continuation is queued as a follow-up.
-    h.handlers.agentSettled()(h.ctx);
-    expect(h.sentUserMessages).toEqual([{ content: CONTINUATION_PROMPT, deliverAs: "followUp" }]);
-  });
-
-  it("resets forced state when the model changes", () => {
+  it("releases the display hold when the model changes", () => {
     const h = harness([userEntry("user-1", "continue the task")]);
     h.setUsageTokens(180_000);
     h.handlers.turnEnd()(h.ctx);
     h.handlers.modelSelect()(h.ctx);
-    h.setIdle(true);
     h.handlers.agentSettled()(h.ctx);
+
     expect(h.compactCalls).toHaveLength(0);
+    expect(h.forcedCompactionDisplayEvents).toEqual(expectedHoldAndRelease());
   });
 });
 
