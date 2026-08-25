@@ -40,7 +40,7 @@ Pi builds its main transcript through `SessionManager.buildContextEntries()`. `t
 
 The adapter never replaces `buildSessionContext()`, which remains Pi's source for model messages. Compaction therefore removes old messages from model context even when the selected transcript range still displays them.
 
-During compaction, Pi rebuilds stored rows and then appends a synthetic live summary. The adapter omits the pending persisted compaction entry from one rebuild so the summary appears once. The next projection includes the stored entry again.
+During compaction, Pi 0.84.3 requires the completed compaction as the first replay entry, excludes that entry from stored-row rendering, and then appends a synthetic live summary. The adapter preserves the entry at the front for exactly that rebuild. Later projections apply the normal sparse display policy.
 
 This method replacement is an undocumented compatibility boundary. Turn Fold isolates it in one module and adds no Pi source changes. A future public transcript-range API can replace the adapter while the remaining Turn Fold behavior stays unchanged.
 

@@ -107,7 +107,7 @@ Pi does not expose a public whole-turn renderer or transcript projection API. Tu
 
 The history explorer adds no private integration. It uses documented `ctx.ui.custom()` overlays, public Pi TUI components and key matching, Pi's theme, and the active session branch. It renders Turn Fold's own stable message and tool presentation because Pi does not expose a public factory for its native transcript components.
 
-The package targets Pi 0.84.2 through 0.84.x. Pi 0.84.2 is the first release that forwards fullscreen wheel input to a focused overlay. Turn Fold must be retested when Pi changes the interactive replay path or TUI mode contract.
+The package targets exactly Pi 0.84.3. Pi 0.84.2 is the first release that forwards fullscreen wheel input to a focused overlay, but Pi 0.84.3 changed the successful-compaction replay contract. Turn Fold disables its compact main-transcript adapter on any untested Pi version. The public history explorer remains available.
 
 ## Quality checks
 

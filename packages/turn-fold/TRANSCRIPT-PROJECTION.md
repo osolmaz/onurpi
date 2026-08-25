@@ -34,7 +34,7 @@ Each replay MUST use one root-to-leaf branch snapshot. The adapter performs thes
 
 1. Read the branch once.
 2. Select the configured compaction windows from that branch.
-3. Apply the one-rebuild pending-compaction omission.
+3. For the first replay after successful compaction, preserve that compaction as the first entry required by Pi.
 4. Reduce the selected entries into Turn Fold run state.
 5. Build the display projection from the same selected entries and run state.
 6. Publish the new state and return the projected entries.
@@ -65,7 +65,7 @@ An attached compaction contributes to its run summary and stays out of the compa
 
 The process-local compaction registry remains the authority for this distinction. Projection MUST NOT infer attachment from timestamps, neighboring messages, or entry order.
 
-Pi performs a transcript rebuild after every successful compaction. The rebuilt projection removes hidden live-tail components from the component tree.
+Pi performs a transcript rebuild after every successful compaction. Pi 0.84.3 requires the completed compaction as the first replay entry, removes it from the replay slice, and appends its live summary once at the chronological position. Turn Fold forces that entry to the front for this one rebuild even when compact display policy normally hides it. Later projections use the normal sparse display.
 
 ## User and custom entries
 

@@ -15,7 +15,7 @@ export type TranscriptProjector = (entries: BranchEntries) => BranchEntries;
 
 export type TranscriptWindowAdapter = {
   getValue: () => TranscriptWindowValue;
-  markPendingCompaction: (entryId: string) => void;
+  prepareCompletedCompactionReplay: (entryId: string) => void;
   restore: () => void;
   setProjector: (projector: TranscriptProjector, onError?: (error: Error) => void) => void;
   setValue: (value: TranscriptWindowValue) => void;
@@ -30,7 +30,7 @@ function isAdapterState(value: unknown): value is AdapterState {
   return (
     typeof Reflect.get(value, "buildEntries") === "function" &&
     typeof Reflect.get(value, "getValue") === "function" &&
-    typeof Reflect.get(value, "markPendingCompaction") === "function" &&
+    typeof Reflect.get(value, "prepareCompletedCompactionReplay") === "function" &&
     typeof Reflect.get(value, "restore") === "function" &&
     typeof Reflect.get(value, "setProjector") === "function" &&
     typeof Reflect.get(value, "setValue") === "function"
@@ -50,18 +50,19 @@ function defineAdapterState(manager: object, state: AdapterState): void {
   }
 }
 
-function withoutPendingCompaction(
-  entries: BranchEntries,
-  pendingCompactionEntryId: string | undefined,
+function completedCompactionFirst(
+  source: BranchEntries,
+  projected: BranchEntries,
+  completedCompactionEntryId: string | undefined,
 ): BranchEntries {
-  if (!pendingCompactionEntryId) return entries;
-  const pendingIndex = entries.findIndex((entry) => entry.id === pendingCompactionEntryId);
-  if (pendingIndex < 0) {
+  if (!completedCompactionEntryId) return projected;
+  const compaction = source.find((entry) => entry.id === completedCompactionEntryId);
+  if (compaction?.type !== "compaction") {
     throw new Error(
-      `Pending Turn Fold compaction ${pendingCompactionEntryId} is absent from the selected transcript`,
+      `Completed Turn Fold compaction ${completedCompactionEntryId} is absent from the selected transcript`,
     );
   }
-  return [...entries.slice(0, pendingIndex), ...entries.slice(pendingIndex + 1)];
+  return [compaction, ...projected.filter((entry) => entry.id !== completedCompactionEntryId)];
 }
 
 function errorFrom(value: unknown): Error {
@@ -84,7 +85,7 @@ export function installTranscriptWindowAdapter(
 
   const originalBuildEntries = manager.buildContextEntries;
   let value = initialValue;
-  let pendingCompactionEntryId: string | undefined;
+  let completedCompactionEntryId: string | undefined;
   let projector = initialProjector;
   let onError = initialOnError;
   let warned = false;
@@ -93,11 +94,10 @@ export function installTranscriptWindowAdapter(
   const state: AdapterState = {
     buildEntries: () => {
       const selected = selectTranscriptEntries(manager.getBranch(), value);
-      const pending = pendingCompactionEntryId;
-      pendingCompactionEntryId = undefined;
-      const source = withoutPendingCompaction(selected, pending);
+      const completed = completedCompactionEntryId;
+      completedCompactionEntryId = undefined;
       try {
-        return projector(source);
+        return completedCompactionFirst(selected, projector(selected), completed);
       } catch (error) {
         if (!warned) {
           warned = true;
@@ -107,9 +107,9 @@ export function installTranscriptWindowAdapter(
       }
     },
     getValue: () => value,
-    markPendingCompaction: (entryId) => {
-      if (!entryId) throw new Error("Pending compaction entry ID must not be empty");
-      pendingCompactionEntryId = entryId;
+    prepareCompletedCompactionReplay: (entryId) => {
+      if (!entryId) throw new Error("Completed compaction entry ID must not be empty");
+      completedCompactionEntryId = entryId;
     },
     restore: () => {
       if (manager.buildContextEntries === state.buildEntries) {

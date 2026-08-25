@@ -2,7 +2,6 @@ import type {
   AgentToolUpdateCallback,
   ExtensionContext,
   ToolDefinition,
-  TruncationResult,
 } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 
@@ -10,6 +9,7 @@ import type { CompletionCoordinator, OnExitPolicy } from "./completion.ts";
 import type { PrepareCommandEnvironment } from "./command-environment.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { ExecSession } from "./session.ts";
+import type { TruncationMetadata } from "./tool-result.ts";
 
 export type WaitMode = "relative" | "absolute";
 export type WaitStatus =
@@ -52,7 +52,7 @@ export type UnifiedExecDetails = Readonly<{
   cwd?: string | undefined;
   command?: string | undefined;
   yield_time_ms?: number | undefined;
-  truncation?: TruncationResult | undefined;
+  truncation?: TruncationMetadata | undefined;
   omitted_bytes?: number | undefined;
   output_bytes_total?: number | undefined;
   wait_mode?: WaitMode | undefined;

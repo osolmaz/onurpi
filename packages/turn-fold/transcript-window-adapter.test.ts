@@ -98,26 +98,39 @@ describe("transcript window adapter", () => {
     );
   });
 
-  it("omits a pending persisted compaction from one rebuild", () => {
+  it("places a completed compaction first for one Pi 0.84.3 rebuild", () => {
     const branch = [user("old"), compaction("c1"), custom("now")];
-    const { adapter, sessionManager } = install(branch, 1);
-    adapter.markPendingCompaction("c1");
+    const sessionManager = manager(branch);
+    const adapter = installTranscriptWindowAdapter(sessionManager, 1, (entries) =>
+      entries.filter((entry) => entry.id !== "c1"),
+    );
+    adapter.prepareCompletedCompactionReplay("c1");
 
-    expect(sessionManager.buildContextEntries().map((entry) => entry.id)).toEqual(["old", "now"]);
     expect(sessionManager.buildContextEntries().map((entry) => entry.id)).toEqual([
-      "old",
       "c1",
+      "old",
       "now",
     ]);
+    expect(sessionManager.buildContextEntries().map((entry) => entry.id)).toEqual(["old", "now"]);
   });
 
-  it("clears invalid pending state after reporting the mismatch", () => {
+  it("clears invalid completed state and falls back to Pi replay", () => {
     const branch = [user("old"), compaction("c1"), custom("now")];
-    const { adapter, sessionManager } = install(branch, 1);
-    adapter.markPendingCompaction("missing");
+    const sessionManager = manager(branch);
+    const native = [compaction("native"), custom("native-now")];
+    sessionManager.buildContextEntries = vi.fn(() => native);
+    const onError = vi.fn();
+    const adapter = installTranscriptWindowAdapter(
+      sessionManager,
+      1,
+      (entries) => entries,
+      onError,
+    );
+    adapter.prepareCompletedCompactionReplay("missing");
 
-    expect(() => sessionManager.buildContextEntries()).toThrow(
-      "Pending Turn Fold compaction missing is absent from the selected transcript",
+    expect(sessionManager.buildContextEntries()).toBe(native);
+    expect(onError).toHaveBeenCalledWith(
+      new Error("Completed Turn Fold compaction missing is absent from the selected transcript"),
     );
     expect(sessionManager.buildContextEntries().map((entry) => entry.id)).toEqual([
       "old",
@@ -188,11 +201,11 @@ describe("transcript window adapter", () => {
     expect(buildSessionContext).toHaveBeenCalledOnce();
   });
 
-  it("rejects empty pending IDs and non-extensible managers", () => {
+  it("rejects empty completed IDs and non-extensible managers", () => {
     const extensible = install([custom("now")]);
     expect(() => {
-      extensible.adapter.markPendingCompaction("");
-    }).toThrow("Pending compaction entry ID must not be empty");
+      extensible.adapter.prepareCompletedCompactionReplay("");
+    }).toThrow("Completed compaction entry ID must not be empty");
 
     const frozen = Object.preventExtensions(manager([custom("now")]));
     expect(() => installTranscriptWindowAdapter(frozen, 1)).toThrow(
