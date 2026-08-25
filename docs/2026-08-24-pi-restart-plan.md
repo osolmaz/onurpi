@@ -24,15 +24,17 @@ Create a private `@onurpi/restart` package under `packages/restart`. The package
 - a Pi extension that registers `/restart`;
 - a private in-memory IPC connection between the launcher and the extension.
 
-Users continue to start Pi with `pi`. OnurPi installs its launcher at `~/.local/bin/pi`, which is
-before the upstream Pi command in `PATH`. The launcher skips itself, finds the next `pi` executable,
-and runs that upstream runtime as its child. This keeps one process in control of the terminal
-before, during, and after a restart. It avoids a race in which a shell or Herdr takes the terminal
-after the old Pi process exits.
+Users continue to start Pi with `pi`. OnurPi installs its launcher at `~/.local/bin/pi` and adds a
+marked Zsh function that calls this stable path. The function prevents Zsh's command cache from
+continuing to select an older direct Pi path after installation. The launcher skips itself, finds
+the next `pi` executable, and runs that upstream runtime as its child. If all PATH entries resolve
+to the launcher, it uses the co-installed Pi package entry point. This keeps one process in control
+of the terminal before, during, and after a restart. It avoids a race in which a shell or Herdr
+takes the terminal after the old Pi process exits.
 
-The stable user-level command survives an upstream Pi reinstall. OnurPi's install step creates or
-repairs the link without changing shell configuration. If an unmanaged command already exists at
-that path, installation must stop instead of replacing it.
+The stable user-level command and Zsh function survive an upstream Pi reinstall. OnurPi's install
+step creates or repairs both managed entries. If an unmanaged command already exists at the stable
+path or the marked Zsh block is malformed, installation must stop instead of replacing it.
 
 ## Restart flow
 
@@ -231,8 +233,9 @@ request and verify that its CI checks pass.
 ## Rollout and compatibility
 
 The private OnurPi install provides the restart-aware launcher as the normal `pi` command. Users do
-not need a second command. The stable `~/.local/bin/pi` link remains in place when upstream Pi is
-reinstalled and discovers the updated upstream executable on the next start.
+not need a second command. The stable `~/.local/bin/pi` link and managed Zsh function remain in
+place when upstream Pi is reinstalled and discover the updated upstream executable on the next
+start.
 
 Initial support is limited to persisted interactive sessions on POSIX terminals that pass the real
 PTY tests. Ephemeral sessions, startup prompts, forks, RPC mode, print mode, unknown flags,
@@ -244,8 +247,8 @@ socket, state file, or persistent coordination data.
 ## Pi contract impact
 
 - **Session state:** No restart entry is appended and no existing entry is changed.
-- **Other persistent data:** Installation manages the `~/.local/bin/pi` symlink. It adds no state
-  file or settings schema.
+- **Other persistent data:** Installation manages the `~/.local/bin/pi` symlink and one marked
+  function block in `~/.zshrc`. It adds no state file or settings schema.
 - **Pi internals:** None.
 - **Public API:** The extension uses `registerCommand`, documented session getters, lifecycle hooks,
   UI notifications, and `ctx.shutdown()`.
@@ -260,5 +263,5 @@ This work does not include:
 - Pi core or private API changes;
 - services, daemons, sockets, or persistent restart stores;
 - Herdr internals or Herdr production changes;
-- shell aliases or shell startup-file changes;
+- unmarked or unrelated shell startup-file changes;
 - releases or deployment.
