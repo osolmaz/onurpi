@@ -13,6 +13,8 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { removeLegacyZshOverride, restoreLegacyPiBridge } from "./legacy-cleanup.ts";
+
 const LAUNCHER_ENTRYPOINT = fileURLToPath(new URL("./bin/pi.ts", import.meta.url));
 
 export type InstallResult = {
@@ -79,6 +81,8 @@ export function installPiCommand(
 }
 
 function main(): void {
+  restoreLegacyPiBridge();
+  removeLegacyZshOverride(homedir());
   const result = installPiCommand();
   if (result.status === "unsupported") {
     process.stdout.write("Skipped the restart-aware pi command on an untested platform.\n");
