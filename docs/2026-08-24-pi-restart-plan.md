@@ -24,17 +24,20 @@ Create a private `@onurpi/restart` package under `packages/restart`. The package
 - a Pi extension that registers `/restart`;
 - a private in-memory IPC connection between the launcher and the extension.
 
-Users continue to start Pi with `pi`. OnurPi installs its launcher at `~/.local/bin/pi` and adds a
-marked Zsh function that calls this stable path. The function prevents Zsh's command cache from
-continuing to select an older direct Pi path after installation. The launcher skips itself, finds
-the next `pi` executable, and runs that upstream runtime as its child. If all PATH entries resolve
-to the launcher, it uses the co-installed Pi package entry point. This keeps one process in control
-of the terminal before, during, and after a restart. It avoids a race in which a shell or Herdr
-takes the terminal after the old Pi process exits.
+Users continue to start Pi with `pi`. OnurPi installs its launcher at `~/.local/bin/pi`, safely
+redirects the active Node installation's managed `pi` link, and adds a marked Zsh function that
+calls the stable path. The active link bridge makes the current shell's cached direct path use the
+launcher without another shell command. The Zsh function keeps future shells on the stable path. The
+launcher skips itself, finds the next `pi` executable, and runs that upstream runtime as its child.
+If all PATH entries resolve to the launcher, it uses the co-installed Pi package entry point. This
+keeps one process in control of the terminal before, during, and after a restart. It avoids a race
+in which a shell or Herdr takes the terminal after the old Pi process exits.
 
-The stable user-level command and Zsh function survive an upstream Pi reinstall. OnurPi's install
-step creates or repairs both managed entries. If an unmanaged command already exists at the stable
-path or the marked Zsh block is malformed, installation must stop instead of replacing it.
+The stable user-level command and Zsh function survive an upstream Pi reinstall. The active bridge
+can be replaced by that reinstall, after which the Zsh function remains authoritative. OnurPi's
+install step creates or repairs all managed entries. If a command link is unrelated, the stable path
+is unmanaged, or the marked Zsh block is malformed, installation must stop or skip that target
+instead of replacing unrelated user state.
 
 ## Restart flow
 
@@ -149,15 +152,18 @@ Register `packages/restart/index.ts` through the root Pi manifest. Generate the 
 entry in tracked settings with the repository settings scripts. Do not edit `settings.json` by hand.
 
 Keep the launcher entry point in the restart package. The package postinstall step must create or
-repair the stable `~/.local/bin/pi` link to that entry point. Do not add a shell alias, change shell
-startup files, or change Herdr configuration.
+repair the stable `~/.local/bin/pi` link, redirect only the active Node installation's symlink when
+it resolves to the co-installed Pi CLI, and atomically create or repair one marked Zsh function
+block. It must not replace unrelated commands, truncate shell configuration, change unmarked shell
+content, or change Herdr configuration.
 
 ## Implementation plan
 
 1. Create the private `@onurpi/restart` package with strict TypeScript, tests, this package's
    README, and a restart-aware `pi` entry point.
-2. Add an idempotent package postinstall step that manages `~/.local/bin/pi` and refuses to replace
-   an unmanaged command.
+2. Add an idempotent package postinstall step that manages `~/.local/bin/pi`, bridges the active
+   managed Pi command, atomically manages the marked Zsh function, and refuses to replace unrelated
+   user state.
 3. Define and test the validated `onurpi-restart-v1` IPC protocol.
 4. Implement the foreground launcher with structured process arguments and inherited terminal
    streams.
@@ -188,7 +194,9 @@ Unit and process tests must cover:
 - signal handling;
 - no automatic restart loop;
 - no orphaned child process;
-- paths that contain spaces, quotes, newlines, and shell metacharacters without shell execution.
+- paths that contain spaces, quotes, newlines, and shell metacharacters without shell execution;
+- active managed-command bridging without replacement of unrelated links;
+- idempotent and atomic Zsh block updates, including symlinked `.zshrc` files.
 
 A real-Pi PTY test must verify:
 
@@ -247,8 +255,9 @@ socket, state file, or persistent coordination data.
 ## Pi contract impact
 
 - **Session state:** No restart entry is appended and no existing entry is changed.
-- **Other persistent data:** Installation manages the `~/.local/bin/pi` symlink and one marked
-  function block in `~/.zshrc`. It adds no state file or settings schema.
+- **Other persistent data:** Installation manages the `~/.local/bin/pi` symlink, the active Node
+  installation's managed `pi` link, and one marked function block in `~/.zshrc`. It adds no state
+  file or settings schema.
 - **Pi internals:** None.
 - **Public API:** The extension uses `registerCommand`, documented session getters, lifecycle hooks,
   UI notifications, and `ctx.shutdown()`.

@@ -1,10 +1,12 @@
 import {
   accessSync,
+  chmodSync,
   constants,
   lstatSync,
   mkdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -14,6 +16,8 @@ import {
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { coInstalledPiEntrypoint } from "./pi-package.ts";
 
 const LAUNCHER_ENTRYPOINT = fileURLToPath(new URL("./bin/pi.ts", import.meta.url));
 const ZSH_BLOCK_START = "# >>> onurpi restart-aware pi >>>";
@@ -89,6 +93,40 @@ export function installPiCommand(
   return { status: "installed", target };
 }
 
+function resolvesToSameFile(left: string, right: string): boolean {
+  try {
+    return realpathSync(left) === realpathSync(right);
+  } catch {
+    return false;
+  }
+}
+
+function installActivePiBridgeAt(
+  source: string,
+  upstream: string,
+  target: string,
+  platform: NodeJS.Platform,
+): InstallResult {
+  if (platform !== "linux") return { status: "unsupported", target };
+  validateSource(source);
+  validateSource(upstream);
+  const existing = targetState(target);
+  if (existing.kind !== "link") return { status: "unsupported", target };
+  if (isManagedLink(existing.source, source)) return { status: "current", target };
+  if (!resolvesToSameFile(existing.source, upstream)) return { status: "unsupported", target };
+  writeLink(target, source);
+  return { status: "installed", target };
+}
+
+export function installActivePiBridge(
+  source = LAUNCHER_ENTRYPOINT,
+  upstream = coInstalledPiEntrypoint(),
+  target = join(dirname(process.execPath), "pi"),
+  platform = process.platform,
+): InstallResult {
+  return installActivePiBridgeAt(source, upstream, target, platform);
+}
+
 function readTextOrEmpty(path: string): string {
   try {
     return readFileSync(path, "utf8");
@@ -125,6 +163,35 @@ function updatedZshConfig(current: string): string | undefined {
   return `${current.slice(0, range.start)}${ZSH_BLOCK}${current.slice(range.end)}`;
 }
 
+function configWritePath(target: string): string {
+  try {
+    const status = lstatSync(target);
+    if (status.isSymbolicLink()) return realpathSync(target);
+    if (status.isFile()) return target;
+    throw new Error(`Zsh configuration is not a file: ${target}.`);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return target;
+    throw error;
+  }
+}
+
+function writeTextAtomically(target: string, content: string): void {
+  const destination = configWritePath(target);
+  const temporary = `${destination}.onurpi-${String(process.pid)}`;
+  rmSync(temporary, { force: true });
+  try {
+    writeFileSync(temporary, content, { mode: 0o600 });
+    try {
+      chmodSync(temporary, statSync(destination).mode);
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    }
+    renameSync(temporary, destination);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
 export function installZshOverride(
   homeDirectory = homedir(),
   shell = process.env["SHELL"] ?? "",
@@ -136,7 +203,7 @@ export function installZshOverride(
   }
   const updated = updatedZshConfig(readTextOrEmpty(target));
   if (updated === undefined) return { status: "current", target };
-  writeFileSync(target, updated);
+  writeTextAtomically(target, updated);
   return { status: "installed", target };
 }
 
@@ -149,6 +216,7 @@ function describe(result: InstallResult, name: string): string {
 
 function main(): void {
   process.stdout.write(describe(installPiCommand(), "Restart-aware pi command"));
+  process.stdout.write(describe(installActivePiBridge(), "Active Pi command bridge"));
   process.stdout.write(describe(installZshOverride(), "Restart-aware Zsh override"));
 }
 

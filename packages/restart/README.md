@@ -14,17 +14,20 @@ pi
 ```
 
 The installed `pi` command is the restart-aware launcher. OnurPi puts it at `~/.local/bin/pi`, ahead
-of the upstream Pi command in `PATH`. It also installs a small managed Zsh function that calls this
-stable path directly. The function prevents an existing Zsh command cache from selecting an older Pi
-command after the override is installed.
+of the upstream Pi command in `PATH`. It safely redirects the active Node installation's managed
+`pi` link to this launcher. This makes an already-running shell's cached path use the launcher
+without a `rehash` command. It also installs a small managed Zsh function that calls the stable path
+directly in future shells.
 
-The launcher skips itself and runs the next `pi` executable as its child. If an already-running
-shell still points to a managed upstream command path, the launcher can use the co-installed Pi
-package entry point. It keeps control of the terminal while Pi restarts.
+The launcher skips itself and runs the next `pi` executable as its child. When PATH entries resolve
+back to the launcher, it uses the co-installed Pi package entry point. It keeps control of the
+terminal while Pi restarts.
 
 The user-level link and Zsh function survive an upstream Pi reinstall and automatically find the
-updated runtime. OnurPi creates or repairs them during installation. It refuses to replace an
-unrelated file at the stable command path or a malformed managed Zsh block.
+updated runtime. OnurPi creates or repairs them during installation. The active Node command bridge
+can be replaced by an upstream reinstall, but the stable Zsh function remains authoritative. OnurPi
+refuses to replace an unrelated command link, an unrelated file at the stable command path, or a
+malformed managed Zsh block.
 
 ## Restart
 
@@ -77,8 +80,9 @@ The private `onurpi-restart-v1` IPC protocol carries only:
 - working directory.
 
 It carries no credentials, prompts, provider data, or session content. The persistent install
-changes are the `~/.local/bin/pi` symlink and one marked function block in `~/.zshrc`. The package
-creates no state file, service, daemon, or socket and does not write to the session file.
+changes are the `~/.local/bin/pi` symlink, the active Node installation's managed `pi` link, and one
+marked function block in `~/.zshrc`. The package creates no state file, service, daemon, or socket
+and does not write to the session file.
 
 ## Development
 
