@@ -76,10 +76,9 @@ pi install git:github.com/osolmaz/onurpi
 ```
 
 Installation creates `~/.local/bin/pi`, which starts the restart-aware launcher and then the
-upstream Pi runtime. It redirects the active Node installation's managed `pi` link so the current
-shell cannot keep using a cached direct path. It also adds a marked Zsh function to `~/.zshrc` for
-future shells. The stable link and function survive upstream Pi reinstalls, find the updated
-runtime, and keep the normal `pi` command seamless.
+upstream Pi runtime. Keep `~/.local/bin` before the upstream Pi directory in `PATH`. Start one new
+shell after the first installation so the shell resolves the new command path. The stable launcher
+then survives upstream Pi reinstalls and keeps the normal `pi` command seamless.
 
 Run `/reload` in an existing Pi session after installation. After new commits land on `main`, run
 `pi install git:github.com/osolmaz/onurpi` again (or `pi update --extensions`) and `/reload` to pick

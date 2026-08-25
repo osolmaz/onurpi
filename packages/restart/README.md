@@ -14,20 +14,15 @@ pi
 ```
 
 The installed `pi` command is the restart-aware launcher. OnurPi puts it at `~/.local/bin/pi`, ahead
-of the upstream Pi command in `PATH`. It safely redirects the active Node installation's managed
-`pi` link to this launcher. This makes an already-running shell's cached path use the launcher
-without a `rehash` command. It also installs a small managed Zsh function that calls the stable path
-directly in future shells.
+of the upstream Pi command in `PATH`. Start one new shell after the first installation so the shell
+forgets any older cached command path.
 
-The launcher skips itself and runs the next `pi` executable as its child. When PATH entries resolve
-back to the launcher, it uses the co-installed Pi package entry point. It keeps control of the
-terminal while Pi restarts.
+The launcher skips itself, runs the next `pi` executable as its child, and keeps control of the
+terminal while Pi restarts. It does not modify the upstream Pi installation or shell startup files.
 
-The user-level link and Zsh function survive an upstream Pi reinstall and automatically find the
-updated runtime. OnurPi creates or repairs them during installation. The active Node command bridge
-can be replaced by an upstream reinstall, but the stable Zsh function remains authoritative. OnurPi
-refuses to replace an unrelated command link, an unrelated file at the stable command path, or a
-malformed managed Zsh block.
+The user-level link survives an upstream Pi reinstall and automatically finds the updated runtime.
+OnurPi creates or repairs this link during installation. It refuses to replace an unrelated file at
+that path.
 
 ## Restart
 
@@ -79,10 +74,9 @@ The private `onurpi-restart-v1` IPC protocol carries only:
 - session ID;
 - working directory.
 
-It carries no credentials, prompts, provider data, or session content. The persistent install
-changes are the `~/.local/bin/pi` symlink, the active Node installation's managed `pi` link, and one
-marked function block in `~/.zshrc`. The package creates no state file, service, daemon, or socket
-and does not write to the session file.
+It carries no credentials, prompts, provider data, or session content. The only persistent install
+change is the `~/.local/bin/pi` symlink. The package creates no state file, service, daemon, or
+socket and does not write to the session file.
 
 ## Development
 

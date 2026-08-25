@@ -3,7 +3,6 @@ import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { coInstalledPiEntrypoint } from "./pi-package.ts";
 import type { LauncherOutboundMessage } from "./protocol.ts";
 
 type MessageListener = (message: unknown) => void;
@@ -60,38 +59,19 @@ function resolvedPathPiEntrypoint(
   return undefined;
 }
 
-function resolvedCoInstalledEntrypoint(
-  candidate: string,
-  launcherEntrypoint: string,
-): string | undefined {
-  const resolved = resolvedExecutable(candidate, "");
-  if (!resolved) return undefined;
-  return resolved === realpathSync(launcherEntrypoint) ? undefined : resolved;
-}
-
-function resolvePiEntrypointFrom(
-  pathValue: string,
-  platform: NodeJS.Platform,
-  launcherEntrypoint: string,
-  coInstalledEntrypoint: string,
+export function resolvePiEntrypoint(
+  pathValue = process.env["PATH"] ?? "",
+  platform = process.platform,
+  launcherEntrypoint = DEFAULT_LAUNCHER_ENTRYPOINT,
 ): string {
   if (platform !== "linux") {
     throw new Error("The restart-aware pi command currently supports tested Linux terminals only.");
   }
   const fromPath = resolvedPathPiEntrypoint(pathValue, launcherEntrypoint);
   if (fromPath) return fromPath;
-  const coInstalled = resolvedCoInstalledEntrypoint(coInstalledEntrypoint, launcherEntrypoint);
-  if (coInstalled) return coInstalled;
-  throw new Error("Could not find the upstream pi command in PATH or the co-installed Pi package.");
-}
-
-export function resolvePiEntrypoint(
-  pathValue = process.env["PATH"] ?? "",
-  platform = process.platform,
-  launcherEntrypoint = DEFAULT_LAUNCHER_ENTRYPOINT,
-  coInstalledEntrypoint = coInstalledPiEntrypoint(),
-): string {
-  return resolvePiEntrypointFrom(pathValue, platform, launcherEntrypoint, coInstalledEntrypoint);
+  throw new Error(
+    "Could not find the upstream pi command after the restart-aware launcher in PATH.",
+  );
 }
 
 function childWorker(child: ChildProcess): PiWorker {
