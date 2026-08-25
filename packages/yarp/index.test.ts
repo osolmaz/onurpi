@@ -13,7 +13,7 @@ describe("YARP package", () => {
   });
 
   it("loads the reviewed release and output limits", () => {
-    expect(YARP_PACKAGE_VERSION).toBe("0.3.0");
+    expect(YARP_PACKAGE_VERSION).toBe("0.3.1");
     expect(DEFAULT_OUTPUT_CAP_BYTES).toBe(5 * 1024);
     expect(DEFAULT_RECOVERY_CAP_BYTES).toBe(32 * 1024);
     expect(DEFAULT_RECOVERY_CAP_LINES).toBe(1_900);

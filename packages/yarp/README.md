@@ -5,10 +5,10 @@ call in one private local SQLite database. It applies typed summaries to reviewe
 commands, then caps remaining result text at 5,120 UTF-8 bytes by default. Exact omitted output
 remains available through short local references.
 
-Unsupported or ambiguous commands execute unchanged. Initial archive failures block execution so a
-tool call cannot run without its input record. Post-execution archive failures remain visible and
-restore raw shell output when possible. A generic cap is applied only after its recovery source
-commits.
+Unsupported or ambiguous commands execute unchanged. Initial archive capture has one two-second
+deadline. If capture fails, YARP runs the original tool unchanged without rewriting, pruning, or
+capping it. Post-execution archive failures remain visible and restore raw shell output when
+possible. A generic cap is applied only after its recovery source commits.
 
 Direct `yarp search` and `yarp read` commands use separate configurable byte and line limits. Rust
 classifies these commands through `yarp plan --json`, and the extension does not add another outer
@@ -19,7 +19,7 @@ cap marker to proven recovery output.
 The extension requires the matching `yarp` binary on `PATH`:
 
 ```sh
-cargo install yarp-cli --version 0.3.0 --locked --force
+cargo install yarp-cli --version 0.3.1 --locked --force
 ```
 
 ## Configuration
