@@ -3,6 +3,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readlinkSync,
   rmSync,
   symlinkSync,
@@ -12,7 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { installPiCommand } from "./install-command.ts";
+import { installPiCommand, installZshOverride } from "./install-command.ts";
 
 const roots: string[] = [];
 
@@ -70,7 +71,63 @@ describe("restart-aware pi command installer", () => {
     expect(() => installPiCommand(home, source, "linux")).toThrow(/unmanaged command/u);
   });
 
-  it("does not install on an untested platform", () => {
+  it("installs an idempotent Zsh function that bypasses cached command paths", () => {
+    const home = temporaryRoot();
+    const zshrc = join(home, ".zshrc");
+    writeFileSync(zshrc, 'export PATH="$HOME/.local/bin:$PATH"\n');
+
+    expect(installZshOverride(home, "/usr/bin/zsh", "linux")).toEqual({
+      status: "installed",
+      target: zshrc,
+    });
+    expect(readFileSync(zshrc, "utf8")).toBe(
+      [
+        'export PATH="$HOME/.local/bin:$PATH"',
+        "",
+        "# >>> onurpi restart-aware pi >>>",
+        "unalias pi 2>/dev/null",
+        "function pi {",
+        '  "$HOME/.local/bin/pi" "$@"',
+        "}",
+        "# <<< onurpi restart-aware pi <<<",
+        "",
+      ].join("\n"),
+    );
+    expect(installZshOverride(home, "/usr/bin/zsh", "linux").status).toBe("current");
+  });
+
+  it("repairs its managed Zsh block without changing surrounding configuration", () => {
+    const home = temporaryRoot();
+    const zshrc = join(home, ".zshrc");
+    writeFileSync(
+      zshrc,
+      [
+        "before",
+        "# >>> onurpi restart-aware pi >>>",
+        "old command",
+        "# <<< onurpi restart-aware pi <<<",
+        "after",
+        "",
+      ].join("\n"),
+    );
+
+    expect(installZshOverride(home, "zsh", "linux").status).toBe("installed");
+    const result = readFileSync(zshrc, "utf8");
+    expect(result).toMatch(/^before\n/u);
+    expect(result).toMatch(/\n# <<< onurpi restart-aware pi <<<\nafter\n$/u);
+    expect(result).toContain('"$HOME/.local/bin/pi" "$@"');
+  });
+
+  it("refuses malformed blocks and skips unsupported shells and platforms", () => {
+    const home = temporaryRoot();
+    const zshrc = join(home, ".zshrc");
+    writeFileSync(zshrc, "# >>> onurpi restart-aware pi >>>\n");
+    expect(() => installZshOverride(home, "zsh", "linux")).toThrow(/malformed/u);
+    expect(installZshOverride(home, "/bin/bash", "linux").status).toBe("unsupported");
+    expect(installZshOverride(home, "/bin/zsh", "darwin").status).toBe("unsupported");
+  });
+
+  it("does not install the command on an untested platform", () => {
     const home = temporaryRoot();
     expect(installPiCommand(home, "/checkout/packages/restart/bin/pi.ts", "darwin")).toEqual({
       status: "unsupported",

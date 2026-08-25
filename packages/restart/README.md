@@ -14,12 +14,17 @@ pi
 ```
 
 The installed `pi` command is the restart-aware launcher. OnurPi puts it at `~/.local/bin/pi`, ahead
-of the upstream Pi command in `PATH`. The launcher skips itself and runs the next `pi` executable as
-its child. It keeps control of the terminal while Pi restarts.
+of the upstream Pi command in `PATH`. It also installs a small managed Zsh function that calls this
+stable path directly. The function prevents an existing Zsh command cache from selecting an older Pi
+command after the override is installed.
 
-The user-level link survives an upstream Pi reinstall and automatically finds the updated runtime.
-OnurPi creates or repairs this link during installation. It refuses to replace an unrelated file at
-that path.
+The launcher skips itself and runs the next `pi` executable as its child. If an already-running
+shell still points to a managed upstream command path, the launcher can use the co-installed Pi
+package entry point. It keeps control of the terminal while Pi restarts.
+
+The user-level link and Zsh function survive an upstream Pi reinstall and automatically find the
+updated runtime. OnurPi creates or repairs them during installation. It refuses to replace an
+unrelated file at the stable command path or a malformed managed Zsh block.
 
 ## Restart
 
@@ -71,9 +76,9 @@ The private `onurpi-restart-v1` IPC protocol carries only:
 - session ID;
 - working directory.
 
-It carries no credentials, prompts, provider data, or session content. The only persistent install
-change is the `~/.local/bin/pi` symlink. The package creates no state file, service, daemon, or
-socket and does not write to the session file.
+It carries no credentials, prompts, provider data, or session content. The persistent install
+changes are the `~/.local/bin/pi` symlink and one marked function block in `~/.zshrc`. The package
+creates no state file, service, daemon, or socket and does not write to the session file.
 
 ## Development
 

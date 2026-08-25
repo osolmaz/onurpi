@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { accessSync, constants, realpathSync, statSync } from "node:fs";
-import { delimiter, isAbsolute, join } from "node:path";
+import { findPackageJSON } from "node:module";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { LauncherOutboundMessage } from "./protocol.ts";
@@ -47,6 +48,11 @@ function resolvedExecutable(command: string, directory: string): string | undefi
 
 const DEFAULT_LAUNCHER_ENTRYPOINT = fileURLToPath(new URL("./bin/pi.ts", import.meta.url));
 
+function defaultUpstreamEntrypoint(): string {
+  const packageJson = findPackageJSON("@earendil-works/pi-coding-agent", import.meta.url);
+  return packageJson ? join(dirname(packageJson), "dist", "cli.js") : "";
+}
+
 function resolvedPathPiEntrypoint(
   pathValue: string,
   launcherEntrypoint: string,
@@ -59,19 +65,38 @@ function resolvedPathPiEntrypoint(
   return undefined;
 }
 
-export function resolvePiEntrypoint(
-  pathValue = process.env["PATH"] ?? "",
-  platform = process.platform,
-  launcherEntrypoint = DEFAULT_LAUNCHER_ENTRYPOINT,
+function resolvedCoInstalledEntrypoint(
+  candidate: string,
+  launcherEntrypoint: string,
+): string | undefined {
+  const resolved = resolvedExecutable(candidate, "");
+  if (!resolved) return undefined;
+  return resolved === realpathSync(launcherEntrypoint) ? undefined : resolved;
+}
+
+function resolvePiEntrypointFrom(
+  pathValue: string,
+  platform: NodeJS.Platform,
+  launcherEntrypoint: string,
+  coInstalledEntrypoint: string,
 ): string {
   if (platform !== "linux") {
     throw new Error("The restart-aware pi command currently supports tested Linux terminals only.");
   }
   const fromPath = resolvedPathPiEntrypoint(pathValue, launcherEntrypoint);
   if (fromPath) return fromPath;
-  throw new Error(
-    "Could not find the upstream pi command after the restart-aware launcher in PATH.",
-  );
+  const coInstalled = resolvedCoInstalledEntrypoint(coInstalledEntrypoint, launcherEntrypoint);
+  if (coInstalled) return coInstalled;
+  throw new Error("Could not find the upstream pi command in PATH or the co-installed Pi package.");
+}
+
+export function resolvePiEntrypoint(
+  pathValue = process.env["PATH"] ?? "",
+  platform = process.platform,
+  launcherEntrypoint = DEFAULT_LAUNCHER_ENTRYPOINT,
+  coInstalledEntrypoint = defaultUpstreamEntrypoint(),
+): string {
+  return resolvePiEntrypointFrom(pathValue, platform, launcherEntrypoint, coInstalledEntrypoint);
 }
 
 function childWorker(child: ChildProcess): PiWorker {

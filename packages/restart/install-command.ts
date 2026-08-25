@@ -3,17 +3,28 @@ import {
   constants,
   lstatSync,
   mkdirSync,
+  readFileSync,
   readlinkSync,
   renameSync,
   rmSync,
   statSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const LAUNCHER_ENTRYPOINT = fileURLToPath(new URL("./bin/pi.ts", import.meta.url));
+const ZSH_BLOCK_START = "# >>> onurpi restart-aware pi >>>";
+const ZSH_BLOCK_END = "# <<< onurpi restart-aware pi <<<";
+const ZSH_BLOCK = `${ZSH_BLOCK_START}
+unalias pi 2>/dev/null
+function pi {
+  "$HOME/.local/bin/pi" "$@"
+}
+${ZSH_BLOCK_END}
+`;
 
 export type InstallResult = {
   status: "installed" | "current" | "unsupported";
@@ -78,17 +89,67 @@ export function installPiCommand(
   return { status: "installed", target };
 }
 
-function main(): void {
-  const result = installPiCommand();
-  if (result.status === "unsupported") {
-    process.stdout.write("Skipped the restart-aware pi command on an untested platform.\n");
-    return;
+function readTextOrEmpty(path: string): string {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return "";
+    throw error;
   }
-  process.stdout.write(
-    result.status === "current"
-      ? `Restart-aware pi command is current at ${result.target}.\n`
-      : `Installed restart-aware pi command at ${result.target}.\n`,
-  );
+}
+
+type ManagedBlockRange = { start: number; end: number };
+
+function managedBlockRange(current: string): ManagedBlockRange | undefined {
+  const start = current.indexOf(ZSH_BLOCK_START);
+  const endMarker = current.indexOf(ZSH_BLOCK_END);
+  if (start === -1 && endMarker === -1) return undefined;
+  if (start === -1 || endMarker < start) {
+    throw new Error("Refusing to replace a malformed restart-aware pi block in .zshrc.");
+  }
+  const afterMarker = endMarker + ZSH_BLOCK_END.length;
+  const end = current[afterMarker] === "\n" ? afterMarker + 1 : afterMarker;
+  return { start, end };
+}
+
+function appendedZshConfig(current: string): string {
+  if (current.length === 0) return ZSH_BLOCK;
+  const separator = current.endsWith("\n") ? "\n" : "\n\n";
+  return `${current}${separator}${ZSH_BLOCK}`;
+}
+
+function updatedZshConfig(current: string): string | undefined {
+  const range = managedBlockRange(current);
+  if (!range) return appendedZshConfig(current);
+  if (current.slice(range.start, range.end) === ZSH_BLOCK) return undefined;
+  return `${current.slice(0, range.start)}${ZSH_BLOCK}${current.slice(range.end)}`;
+}
+
+export function installZshOverride(
+  homeDirectory = homedir(),
+  shell = process.env["SHELL"] ?? "",
+  platform = process.platform,
+): InstallResult {
+  const target = join(homeDirectory, ".zshrc");
+  if (platform !== "linux" || basename(shell) !== "zsh") {
+    return { status: "unsupported", target };
+  }
+  const updated = updatedZshConfig(readTextOrEmpty(target));
+  if (updated === undefined) return { status: "current", target };
+  writeFileSync(target, updated);
+  return { status: "installed", target };
+}
+
+function describe(result: InstallResult, name: string): string {
+  if (result.status === "unsupported") return `Skipped ${name} on an untested shell or platform.\n`;
+  return result.status === "current"
+    ? `${name} is current at ${result.target}.\n`
+    : `Installed ${name} at ${result.target}.\n`;
+}
+
+function main(): void {
+  process.stdout.write(describe(installPiCommand(), "Restart-aware pi command"));
+  process.stdout.write(describe(installZshOverride(), "Restart-aware Zsh override"));
 }
 
 const invokedPath = process.argv[1];
