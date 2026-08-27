@@ -254,6 +254,96 @@ describe("Responses conversion", () => {
   });
 });
 
+describe("function call pairing", () => {
+  /** Every function_call_output must follow an earlier function_call with the same call_id. */
+  function expectOutputsMatchEarlierCalls(input: ResponseItem[]): void {
+    const seenCalls = new Set<string>();
+    for (const item of input) {
+      const callId = item["call_id"];
+      if (item.type === "function_call") {
+        if (typeof callId === "string") seenCalls.add(callId);
+        continue;
+      }
+      if (item.type === "function_call_output") {
+        expect(typeof callId).toBe("string");
+        expect(seenCalls.has(callId as string)).toBe(true);
+      }
+    }
+  }
+
+  it("pairs every tool result with an earlier matching function call", () => {
+    const branch = branchOf(
+      userEntry("u1", "inspect the repo"),
+      assistantEntry("a1", [
+        { type: "toolCall", id: "call_1|fc_1", name: "read", arguments: { path: "a.ts" } },
+      ]),
+      toolResultEntry("t1", "call_1|fc_1", [{ type: "text", text: "file contents" }]),
+      assistantEntry("a2", [
+        { type: "toolCall", id: "call_2|fc_2", name: "edit", arguments: { path: "a.ts" } },
+      ]),
+      toolResultEntry("t2", "call_2|fc_2", [{ type: "text", text: "edited" }]),
+      userEntry("u2", "thanks"),
+    );
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+    expect(input.filter((item) => item.type === "function_call_output")).toHaveLength(2);
+    expectOutputsMatchEarlierCalls(input);
+  });
+
+  it("pairs synthesized outputs for orphaned tool calls", () => {
+    const branch = branchOf(
+      assistantEntry("a1", [
+        { type: "toolCall", id: "call_1|fc_1", name: "read", arguments: { path: "a.ts" } },
+      ]),
+      userEntry("u1", "stop and explain"),
+    );
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+    expectOutputsMatchEarlierCalls(input);
+  });
+
+  it("pairs tool results that follow a native checkpoint", () => {
+    const checkpoint: SessionEntry = {
+      type: "compaction",
+      id: "compact-1",
+      parentId: "u1",
+      timestamp: new Date().toISOString(),
+      summary: "marker",
+      firstKeptEntryId: "u1",
+      tokensBefore: 100,
+      details: {
+        kind: "openai-codex-native-compaction",
+        version: 1,
+        modelKey: "openai-codex:openai-codex-responses:gpt-test",
+        replacementHistory: [{ type: "compaction", encrypted_content: "opaque" }],
+      },
+    };
+    const branch = branchOf(
+      userEntry("u1", "start"),
+      checkpoint,
+      assistantEntry("a1", [
+        { type: "toolCall", id: "call_1|fc_1", name: "read", arguments: { path: "a.ts" } },
+      ]),
+      toolResultEntry("t1", "call_1|fc_1", [{ type: "text", text: "file contents" }]),
+    );
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+    expectOutputsMatchEarlierCalls(input);
+  });
+
+  it("drops tool calls from aborted assistant messages instead of emitting unpaired items", () => {
+    const branch = branchOf(
+      userEntry("u1", "start"),
+      assistantEntry(
+        "a1",
+        [{ type: "toolCall", id: "call_1|fc_1", name: "edit", arguments: {} }],
+        "aborted",
+      ),
+      userEntry("u2", "what happened?"),
+    );
+    const input = effectiveInputForBranch({ branch, model: model(), tools: [] });
+    expect(JSON.stringify(input)).not.toContain("call_1");
+    expectOutputsMatchEarlierCalls(input);
+  });
+});
+
 describe("cross-provider sanitization", () => {
   it("drops foreign reasoning state and response item ids", () => {
     const foreign = assistantEntry(

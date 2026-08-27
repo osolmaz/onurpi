@@ -8,23 +8,17 @@ the security review, and the local adaptations.
 ## Behavior
 
 When the active model uses the built-in `openai-codex` provider with the `openai-codex-responses`
-API, the extension intercepts Pi's manual, threshold, and overflow compaction events. It sends the
-finalized Responses history to the official Codex endpoint with a trailing `compaction_trigger`,
-stores the returned opaque `compaction` item in Pi's real `CompactionEntry.details`, and lets Pi
-rebuild the active transcript from that boundary. The Codex switcher overrides that same provider in
-place, so direct compaction requests use the account leased to the current agent run.
+API, the extension serves Pi's manual, threshold, and overflow compaction events as a
+`session_before_compact` provider. It sends the finalized Responses history to the official Codex
+endpoint with a trailing `compaction_trigger`, stores the returned opaque `compaction` item in Pi's
+real `CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary. The
+Codex switcher overrides that same provider in place, so direct compaction requests use the account
+leased to the current agent run.
 
-During a tool-driven run, the extension checks Pi's reported context usage after each completed
-turn. At 90%, it aborts before the next provider request, waits for `agent_settled`, and invokes
-Pi's normal compaction lifecycle. After successful compaction, it sends a hidden custom continuation
-message unless messages are already queued. The model receives `Compaction completed. Continue.`,
-but Pi does not render it as a user message. If Pi's threshold or overflow compaction runs first,
-the extension uses that result instead of compacting twice. Overflow recovery remains owned by Pi.
-
-The extension also announces this forced lifecycle through Pi's process-local event bus. When
-`@onurpi/turn-fold` is loaded, it keeps the interrupted run open until compaction is attached. The
-main transcript then shows `compacted` in the existing run summary instead of a standalone
-compaction row. A failed compaction releases that display hold and settles the interrupted run.
+The extension never triggers compaction itself. It registers no `turn_end`, `agent_settled`, or
+`session_compact` handlers, never calls `ctx.abort()` or `ctx.compact()` for its own lifecycle, and
+sends no continuation message. Pi's serialized built-in threshold, overflow, and manual compaction
+lifecycle stays in charge of when compaction happens.
 
 Pi requires compaction events to store a summary string, so entries receive a short local checkpoint
 marker. The marker is filtered from provider context and is never sent to OpenAI. In interactive
@@ -35,10 +29,22 @@ Native compaction activates only for the built-in `openai-codex` provider. Other
 through every hook unchanged and never receive the opaque checkpoint or the local marker. The
 extension performs no text-summary model call.
 
+## Branch snapshot fence
+
+Remote compaction is asynchronous: the request body is computed from the `branchEntries` snapshot of
+the `session_before_compact` event, and the response arrives later. Before the extension returns a
+native checkpoint, it re-reads the active branch and compares it with the recorded snapshot tip.
+Only non-context status entries from the same compaction operation may appear after that tip. If the
+branch moved, changed, or gained any context-bearing entry — for example an assistant function call
+whose result is still pending — the extension discards the checkpoint, cancels Pi's compaction
+without content, and records a failed status with a bounded error. This fail-closed fence keeps a
+remote checkpoint from being spliced between a function call and its function result.
+
 ## Fail-closed policy
 
-- If a native compaction request fails or is aborted, Pi's compaction is cancelled and the previous
-  history remains intact. The extension never silently falls back to Pi text summarization.
+- If a native compaction request fails, is aborted, or is fenced out by a moved branch, Pi's
+  compaction is cancelled and the previous history remains intact. The extension never silently
+  falls back to Pi text summarization.
 - If the persisted native checkpoint on the active branch is malformed or belongs to a different
   Codex model, the next provider request is aborted rather than rebuilt from a bad checkpoint.
 - Active Codex credentials are sent only to a validated official Codex endpoint (`chatgpt.com`,
@@ -47,42 +53,23 @@ extension performs no text-summary model call.
 
 ## Compaction ownership in OnurPi
 
-- **`@onurpi/pi-codex-compaction`** owns all compaction for the built-in `openai-codex` provider:
-  the 90% mid-run threshold, the remote native checkpoint, and the compaction entry.
-- **`@onurpi/context-window-policy`** keeps its model-relative 90% settlement compaction for every
-  other model and passes `openai-codex` through untouched, so the two extensions never request
-  duplicate or racing compactions.
+- **`@onurpi/pi-codex-compaction`** owns all compaction content for the built-in `openai-codex`
+  provider: the remote native checkpoint and the compaction entry. Pi itself owns the manual,
+  threshold, and overflow triggers.
 - **`@onurpi/reliable-compaction`** still stabilizes ordinary Pi text compaction for other custom
   providers that use the `openai-codex-responses` API, but passes `openai-codex` through because
   native compaction replaces its text-summary path.
 
-The root manifest registers `pi-codex-compaction` before both policy packages, and the repository
+The root manifest registers `pi-codex-compaction` before `reliable-compaction`, and the repository
 tests assert that ordering.
-
-## Configuration
-
-Turn-boundary compaction is enabled at 90% by default:
-
-```json
-{
-  "autoCompact": true,
-  "thresholdRatio": 0.9
-}
-```
-
-Save this as `~/.pi/agent/pi-codex-compaction.json` or project-local `.pi/pi-codex-compaction.json`.
-Project configuration applies only to trusted projects and takes precedence over global
-configuration. `thresholdRatio` must be greater than 0 and less than 1. Pi's
-`compaction.reserveTokens` still controls Pi's built-in threshold compaction.
 
 ## Persistence
 
 Session state only: the native checkpoint lives in Pi's normal `CompactionEntry.details` (opaque
-`encrypted_content` from OpenAI plus the replacement history), TUI status updates are appended as
-`openai-codex-compaction-status` custom entries, and successful forced compaction appends one hidden
-custom continuation message that enters model context. Resume, forks, tree navigation, and repeated
-compaction derive state from the newest checkpoint on the active branch. Display coordination with
-Turn Fold is process-local and appends no entry. No other files are created.
+`encrypted_content` from OpenAI plus the replacement history), and TUI status updates are appended
+as `openai-codex-compaction-status` custom entries that never enter model context. Resume, forks,
+tree navigation, and repeated compaction derive state from the newest checkpoint on the active
+branch. No other files are created.
 
 ## Limitations
 
@@ -94,12 +81,6 @@ Pi does not expose a finalized provider payload during `session_before_compact`.
 mirrors Pi's Codex message conversion and combines it with the latest observed request shape to
 construct the compaction request. Extensions loaded later that independently rewrite provider
 payloads can therefore create order-dependent behavior.
-
-Pi does not expose a non-aborting compaction barrier between tool turns. The turn-boundary
-controller therefore uses the documented `turn_end`, `agent_settled`, `abort()`, `compact()`,
-`sendMessage()`, and event-bus interfaces. Aborting after a completed tool turn and sending a hidden
-continuation message is a temporary compatibility path until Pi provides a direct turn-boundary
-compaction interface.
 
 ## License
 

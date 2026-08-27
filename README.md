@@ -24,7 +24,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/codex-switcher`](packages/codex-switcher/)                     | Usage-aware Codex account profiles and fallback routing          |
 | [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                 |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                   |
-| [`@onurpi/context-window-policy`](packages/context-window-policy/)       | Model-relative context compaction threshold                      |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                 |
 | [`@onurpi/onur-openclaw-maintainer`](packages/onur-openclaw-maintainer/) | Read-only OpenClaw local-model issue workflow                    |
 | [`@onurpi/pi-usage`](packages/pi-usage/)                                 | Multi-provider usage reports and model-gated usage status        |
@@ -58,8 +57,8 @@ repositories.
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
 provider natively. The Codex switcher keeps that provider identity while changing its account
-credential. `context-window-policy` and `reliable-compaction` pass `openai-codex` through and keep
-covering every other model. See the
+credential. `reliable-compaction` passes `openai-codex` through and keeps covering every other
+model. See the
 [package README](packages/pi-codex-compaction/README.md#compaction-ownership-in-onurpi).
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts

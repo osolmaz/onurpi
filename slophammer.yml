@@ -57,7 +57,6 @@ typescript:
       - packages/prompt-queue/message-text.ts
       - packages/prompt-queue/widget-lines.ts
       - packages/prompt-queue/window-state.ts
-      - packages/context-window-policy/context-window-policy.ts
       - packages/codex-switcher/codex-family.ts
       - packages/codex-switcher/config.ts
       - packages/codex-switcher/native-provider.ts
@@ -65,7 +64,6 @@ typescript:
       - packages/codex-switcher/usage-client.ts
       - packages/codex-switcher/usage-policy.ts
       - packages/pi-codex-compaction/codex-compaction.ts
-      - packages/pi-codex-compaction/config.ts
       - packages/pi-codex-compaction/native-checkpoint.ts
       - packages/pi-codex-compaction/remote-compaction.ts
       - packages/pi-codex-compaction/responses-input.ts
@@ -105,10 +103,6 @@ typescript:
     - from: packages/restart
       allow:
         - packages/restart
-    - from: packages/context-window-policy
-      allow:
-        - packages/context-window-policy
-        - packages/codex-switcher
     - from: packages/codex-switcher
       allow:
         - packages/codex-switcher

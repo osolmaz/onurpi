@@ -17,8 +17,8 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
 `native-compaction.ts`, and `index.test.ts` at the pinned commit.
 
 - **Process/shell execution:** none.
-- **Filesystem access:** reads the optional global and trusted-project JSON configuration files. It
-  does not write files.
+- **Filesystem access:** none (the historical optional JSON configuration files were removed with
+  the proactive controller).
 - **Network access:** exactly one outbound call shape — `POST <baseUrl>/codex/responses` with the
   session history — plus header-only interception of Pi's own Codex provider requests.
 - **Credential handling:** resolves the active Codex API key through Pi's documented
@@ -35,7 +35,7 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
   `openai-codex` models from the stored native checkpoint; `before_provider_headers` merges the
   `remote_compaction_v2` beta feature. Both pass non-Codex models through untouched.
 - **Tool overrides:** none. Registered tools are only serialized into the compaction request body.
-- **Trust handling:** project-local config is honored only when `ctx.isProjectTrusted()` is true.
+- **Trust handling:** no configuration input remains, so project trust no longer changes behavior.
 - **Background resources:** none. Retry backoff uses in-memory timers bound to the request's abort
   signal.
 - **Session persistence:** native checkpoints are stored in Pi's normal `CompactionEntry.details`;
@@ -66,19 +66,19 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
 - Added test coverage for credential/base-URL safety, model-mismatched checkpoints, auth resolution
   failure, and non-Codex pass-through of every hook.
 - Resolved the interaction with OnurPi's compaction packages (hard cutover, documented in
-  [README.md](README.md#compaction-ownership-in-onurpi)): `context-window-policy` passes Codex
-  models through to this extension, and `reliable-compaction` no longer arms its SSE retry override
-  for the built-in `openai-codex` provider.
-- Preserves the upstream proactive controller: it reads `autoCompact` and `thresholdRatio`, checks
-  usage after `turn_end`, calls `ctx.abort()` at the configured boundary, compacts after
-  `agent_settled`, and sends one continuation message when no input is already queued. It also
-  recognizes Pi threshold or overflow compaction that finishes first and prevents duplicate work.
-- Makes the continuation a hidden Pi custom message instead of a visible synthetic user message.
-  Process-local event-bus coordination lets Turn Fold attach the safe abort and manual compaction to
-  the original run summary. This changes display only; the continuation still enters model context
-  and triggers the next turn.
-- Other upstream behavior for checkpoint creation, fail-closed cancellation, duplicate prevention,
-  and continuation is preserved.
+  [README.md](README.md#compaction-ownership-in-onurpi)): `reliable-compaction` does not arm its SSE
+  retry override for the built-in `openai-codex` provider.
+- Removed the upstream proactive controller entirely. The extension no longer reads `autoCompact` or
+  `thresholdRatio`, no longer aborts after `turn_end`, compacts after `agent_settled`, or sends a
+  continuation message, and the extension-local configuration file is gone. The proactive controller
+  could append a native checkpoint between an assistant function call and its function result; Pi's
+  serialized built-in threshold, overflow, and manual compaction lifecycle now owns every trigger,
+  and this extension only provides the remote checkpoint.
+- Added a fail-closed branch snapshot fence around the remote call: the branch tip from
+  `event.branchEntries` is recorded, and before a checkpoint is returned the active branch must not
+  have moved past it except for non-context status entries from that same operation. Any other
+  change cancels the compaction without content and records a failed status.
+- Other upstream behavior for checkpoint creation and fail-closed cancellation is preserved.
 - Adopted upstream `c4d6ca8` ("fix(codex-compaction): sanitize cross-provider history", 0.1.4):
   reasoning items, text-signature item ids, and tool-call item ids replay only when the stored
   message's provider and API match the active Codex model, foreign reasoning state is dropped from

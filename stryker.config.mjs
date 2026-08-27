@@ -33,7 +33,6 @@ export default {
     "packages/prompt-queue/widget-lines.ts",
     "packages/prompt-queue/window-state.ts",
     "packages/reliable-compaction/reliable-compaction.ts",
-    "packages/context-window-policy/context-window-policy.ts",
     "packages/pi-usage/src/core.ts",
     "packages/pi-usage/src/format.ts",
     "packages/pi-usage/src/query.ts",

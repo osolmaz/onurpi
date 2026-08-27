@@ -199,7 +199,6 @@ describe("OnurPi package loading", () => {
     expect(switcher).toBeGreaterThanOrEqual(0);
     expect(switcher).toBeLessThan(codex);
     expect(codex).toBeLessThan(extensions.indexOf("./packages/reliable-compaction/index.ts"));
-    expect(codex).toBeLessThan(extensions.indexOf("./packages/context-window-policy/index.ts"));
   });
 
   it("runs Loop Guard before Goal settlement handlers", () => {

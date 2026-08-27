@@ -8,7 +8,6 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       include: [
         "codex-compaction.ts",
-        "config.ts",
         "native-checkpoint.ts",
         "remote-compaction.ts",
         "responses-input.ts",

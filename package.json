@@ -21,7 +21,6 @@
       "./packages/codex-switcher/index.ts",
       "./packages/pi-codex-compaction/index.ts",
       "./packages/reliable-compaction/index.ts",
-      "./packages/context-window-policy/index.ts",
       "./packages/infinite-retry/index.ts",
       "./packages/pi-usage/index.ts",
       "./packages/plan-checklist/index.ts",
