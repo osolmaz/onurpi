@@ -20,11 +20,21 @@ An **edit diffstat** is the cumulative number of added and removed lines from su
 
 The **final content row** is the one assistant or tool row retained after a compact turn settles.
 
+A **display unit** is one item in compact replay selection. A run unit contains its prompt, its compact assistant or tool representation, and every displayable pass-through entry owned by that run. A displayable pass-through entry with no run owner is a standalone unit.
+
+The **chronological suffix** is the newest uninterrupted sequence of complete display units that fits the component budget.
+
 A **compaction window** is an active-branch range between compaction entries. The current window ends at the active leaf. The **window value** is a positive integer or `all` and controls how much of the active branch Pi renders in its main transcript. **Pre-compaction visibility** is `show` or `hide`; `hide` starts the main transcript at the newest compaction boundary after window selection.
 
 ## Display invariants
 
 Turn Fold MUST apply compact transcript configuration in this order: select windows, then apply pre-compaction visibility. A numeric range starts at the nearest persisted run boundary before its oldest compaction boundary and includes that boundary's prompt entry. A user message remains the fallback anchor for sessions that predate run boundaries. `all` selects the complete active branch. `show` preserves the selected range. `hide` removes entries before the newest compaction while retaining that compaction entry and everything after it.
+
+Compact replay MUST keep one chronological suffix of display units. It walks units from newest to oldest and keeps each complete unit while its full component cost fits. At the first unit that does not fit, selection stops. That unit and every older unit are omitted, even when a smaller older unit would fit. The cutoff may leave part of the budget unused.
+
+A run unit MUST be kept or omitted as a whole. No assistant, tool, compaction, shell, branch-summary, custom, or extension row owned by a run may remain in compact replay without that run's prompt. Standalone units keep their source position and receive no reserved capacity or priority.
+
+If the newest or active run alone exceeds the complete component budget, Turn Fold MUST retain only its prompt and omit every older unit. This fallback also applies when the component limit is one. An older run that does not fit becomes the cutoff and receives no fallback.
 
 Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
@@ -77,7 +87,7 @@ Final assistant response
                               18:43
 ```
 
-The settled summary reports elapsed time with compact second, minute, hour, day, and week units, omitting zero-valued units. It may include assistant-message, tool, failure, compaction, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
+The settled summary reports elapsed time with compact units from seconds through weeks, omitting zero-valued units. It may include assistant-message and tool counts, failure and compaction counts, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
 The compact transcript MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
 
@@ -121,7 +131,7 @@ The explorer MUST read one active-branch snapshot, omit Turn Fold's internal run
 
 The explorer MUST render only the viewport plus bounded overscan. It MUST cache a bounded number of entry blocks by entry identity, width, theme revision, entry controls, search query, detail page, and segment. Large entries begin with a bounded terminal-safe preview and can show more only after an explicit `Enter`. Expanded entries MUST remain split into bounded render segments and detail pages, and continuous scrolling MUST expose every page past any fixed character cap. Thinking and tool output MUST start expanded while diffs start collapsed. `t`, `o`, and `d` MUST control thinking, tool output, and diff-like content for the focused entry through per-entry overrides on a session default. `T`, `O`, and `D` MUST flip the same session default for all entries and clear that section's per-entry overrides. User entries MUST render every block line, including headers and separators, with the user message background and foreground from the public theme. The explorer MUST clear its index, scroll state, entry controls, and render cache when it closes.
 
-The explorer MUST support `Up`, `Down`, `b`, `f`, and optional `Ctrl+P` or `Ctrl+N` for one line back or forward; `Left`, `Right`, `p`, `n`, Space, and optional Page Up or Page Down for one page back or forward; `[` and `]` for previous and next entry; `{` and `}` for previous and next user message with nearby context and navigation-history recording; and `g` or `G` for the admitted start or newest content. `Tab` and `Shift+Tab` MUST navigate a bounded back and forward jump history after hops, searches, jumps and filter relocation. While a search is active, `n` and `N` navigate matches instead of pages. Page Up and Page Down MUST NOT be the only paths for any action. Tool blocks MUST merge the call and its result into one background-tinted box with a bounded output preview when collapsed, and blocks with backgrounds MUST pad with exactly one background-colored blank line above and below. Help, filter, and jump subviews MUST fill the full content height so the conversation never shows through.
+The explorer MUST support `Up`, `Down`, `b`, `f`, and optional `Ctrl+P` or `Ctrl+N` for one line back or forward. It MUST support `Left`, `Right`, `p`, `n`, Space, and optional Page Up or Page Down for one page back or forward. `[` and `]` move to the previous or next entry. `{` and `}` move to the previous or next user message with nearby context and navigation-history recording. `g` and `G` move to the admitted start or newest content. `Tab` and `Shift+Tab` MUST navigate a bounded back and forward jump history after hops, searches, jumps and filter relocation. While a search is active, `n` and `N` navigate matches instead of pages. Page Up and Page Down MUST NOT be the only paths for any action. Tool blocks MUST merge the call and its result into one background-tinted box with a bounded output preview when collapsed, and blocks with backgrounds MUST pad with exactly one background-colored blank line above and below. The help subview MUST fill the full content height so the conversation never shows through. Filter and jump subviews MUST do the same.
 
 `/` MUST open a bounded editable search field. Search MUST be case-insensitive and literal, scan the complete active branch in bounded entry and character slices, yield between slices, retain at most one bounded result per entry, and avoid rendering unseen entries. It MUST show scan progress and result count. `n` and `N` MUST navigate results with wrapping, admit the target window, highlight visible matches, reveal a matching collapsed section, and keep nearby transcript context visible. `Esc` MUST cancel search editing or clear active search before it closes the explorer.
 
@@ -140,6 +150,8 @@ A requested compact scope MUST apply in place when every required entry is alrea
 ## History and reload
 
 Turn Fold reconstructs run groups from the selected active-branch range when Pi starts, reloads, switches trees, changes the window value, or rebuilds the transcript after compaction. It pre-indexes run boundaries so a marker written after a run's first assistant response still anchors the earlier prompt entry. Its run index and Pi's TUI projection MUST use the same entry snapshot.
+
+The chronological suffix is recalculated when the existing Pi replay or supported in-place refresh path runs. Components added after replay form a live tail until the next replay. Turn Fold MUST NOT add another private replay trigger to remove that tail.
 
 Every compact configuration change MUST wait for Pi to become idle before updating the active view. Changing from a numeric window value to `all` MUST report the active-branch entry count and require confirmation because scanning the full branch can increase startup work. Cancellation leaves the existing value and transcript unchanged. A TUI `--no-session` run MUST reject compact widening that requires omitted entries because the requested state cannot survive a full restart.
 
@@ -196,7 +208,7 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - The compact transcript hides attached automatic compaction rows and reports them in the turn summary.
 - A forced Codex turn-boundary compaction remains attached across the controller abort, settlement, manual Pi compaction call, and hidden continuation.
 - A failed forced compaction releases its display hold and settles the interrupted run.
-- Manual, unobserved, and post-restart compactions remain standalone.
+- Manual and unobserved compactions remain standalone. Compactions seen after restart also remain standalone.
 - Compaction display coordination performs no Pi session or sidecar writes.
 - The explorer initially admits the newest three compaction windows and loads at most three older windows for one backward boundary action.
 - The explorer renders viewport-near entries through documented Pi TUI APIs and keeps its render cache bounded.
@@ -213,6 +225,13 @@ A release is conforming only when automated or PTY tests verify all of the follo
 - Compact diffstats use Pi's addition and deletion colors.
 - Every compact diffstat lists unique absolute paths in first-edit order below the summary, shows cumulative colored counters beside each file, truncates long paths so each file fits one row, and escapes terminal controls.
 - Compact replay creates no component for hidden source entries and remains within its component budget.
+- Compact replay keeps one chronological suffix of complete run and standalone units, stops at the first overflow, and never fills a gap with older units.
+- Adding a newest unit removes only a prefix of older units from the next projection.
+- A retained run-owned row always has its prompt, while an omitted run contributes no display entry.
+- A newest or active run that exceeds the full budget falls back to its prompt, including when the limit is one.
+- Projected entries retain their original object identity and source order.
+- Omitted-run counts and the oldest retained prompt come from the same retained unit set.
+- Replayed and live user components take timestamps only from projected role-user prompts in the same order.
 - Repeated unchanged renders perform no edit aggregation, path resolution, activity sorting, or assistant-content rescans.
 - User-started and extension-started runs replay as separate groups after restart.
 - Each new fold run appends one strict run-boundary entry, while retries append none.

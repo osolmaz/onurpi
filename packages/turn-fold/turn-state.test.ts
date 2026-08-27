@@ -21,6 +21,10 @@ function assistantMessage(
   };
 }
 
+function userEntry(id: string, timestamp: number, content: string): Record<string, unknown> {
+  return { id, message: { content, role: "user", timestamp }, type: "message" };
+}
+
 function registerAssistant(
   state: TurnFoldState,
   component: object,
@@ -536,6 +540,35 @@ describe("historical transcript", () => {
 
     expect(state.userTimestampFor(first)).toBe(100);
     expect(state.userTimestampFor(second)).toBe(200);
+  });
+
+  it("appends an active user once after history reconstruction", () => {
+    const state = new TurnFoldState();
+    const first = {};
+    const second = {};
+    const active = {};
+    const entries = [
+      userEntry("user-1", 100, "same"),
+      {
+        id: "assistant-1",
+        message: assistantMessage(110, [{ text: "done", type: "text" }]),
+        type: "message",
+      },
+      userEntry("user-2", 200, "same"),
+      userEntry("user-3", 300, "active"),
+    ];
+
+    state.loadHistory(entries.slice(0, 3));
+    state.startUserTurn(300);
+    state.applyHistoryProjection(entries, entries);
+    state.associateUser(first);
+    state.associateUser(second);
+    state.associateUser(active);
+    state.associateUser(active);
+
+    expect(state.userTimestampFor(first)).toBe(100);
+    expect(state.userTimestampFor(second)).toBe(200);
+    expect(state.userTimestampFor(active)).toBe(300);
   });
 
   it("reconstructs extension-started runs from persisted boundaries", () => {

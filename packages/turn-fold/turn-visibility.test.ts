@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 
 import { TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
+import { projectedUserGroupIds } from "./turn-visibility.ts";
 
 function assistantMessage(timestamp: number, text: string): Record<string, unknown> {
   return {
@@ -59,6 +60,50 @@ it("does not make a group visible from pass-through metadata alone", () => {
   state.associateAssistant(assistant, assistantHistory);
 
   expect(state.viewFor(assistant)?.display).toBe("hidden");
+});
+
+it("derives the user cursor only from projected user entries", () => {
+  const entries = [
+    { id: "user-1", message: { content: "Same", role: "user", timestamp: 100 }, type: "message" },
+    {
+      content: "Status",
+      customType: "workflow-status",
+      display: true,
+      id: "status-1",
+      type: "custom_message",
+    },
+    { id: "user-2", message: { content: "Same", role: "user", timestamp: 200 }, type: "message" },
+  ];
+  const groupByEntryId = new Map([
+    ["user-1", "group-1"],
+    ["status-1", "group-1"],
+    ["user-2", "group-2"],
+  ]);
+
+  expect(projectedUserGroupIds([entries[1], entries[2]], groupByEntryId)).toEqual(["group-2"]);
+});
+
+it("does not let a projected custom row shift a later user timestamp", () => {
+  const state = new TurnFoldState();
+  const visibleUser = {};
+  const secondAssistant = assistantMessage(210, "Second answer");
+  const entries = [
+    { id: "user-1", message: { content: "First", role: "user", timestamp: 100 }, type: "message" },
+    {
+      content: "Status",
+      customType: "workflow-status",
+      display: true,
+      id: "status-1",
+      type: "custom_message",
+    },
+    { id: "user-2", message: { content: "Second", role: "user", timestamp: 200 }, type: "message" },
+    { id: "answer-2", message: secondAssistant, type: "message" },
+  ];
+
+  state.applyHistoryProjection(entries, [entries[1], entries[2], entries[3]]);
+  state.associateUser(visibleUser);
+
+  expect(state.userTimestampFor(visibleUser)).toBe(200);
 });
 
 it("keeps post-compaction output visible when a boundary splits a run", () => {

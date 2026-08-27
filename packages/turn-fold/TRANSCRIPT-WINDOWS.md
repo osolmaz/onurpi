@@ -52,7 +52,7 @@ Pi calls every loaded transcript component whenever it draws a TUI frame. Turn F
 
 A hidden component returns before invoking its native Markdown or tool renderer. Pi still visits every component in the compact selected range. A long run can cross several compaction boundaries, so a numeric window setting alone does not reliably bound the component count.
 
-Turn Fold keeps the selected entries as a source snapshot for one-pass summary reconstruction and returns a sparse display projection to Pi. Compact replay retains each prompt, one final display component for a settled run, and at most three activities for a reconstructed active run. Hidden source entries remain in session and model history without entering Pi's component tree. [TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) defines that behavior, and the [implementation plan](../../docs/turn-fold-sparse-transcript-implementation-plan.md) lists the delivery and latency gates.
+Turn Fold keeps the selected entries as a source snapshot for one-pass summary reconstruction and returns a sparse display projection to Pi. Compact replay groups each run's prompt, compact assistant or tool representation, and run-owned display rows into one unit. An unowned display row is a standalone unit. Projection keeps the newest uninterrupted sequence of complete units that fits 512 components. It stops at the first unit that does not fit, so new replayed units enter at the bottom and old units leave only from the top. Hidden source entries remain in session and model history without entering Pi's component tree. [TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) defines that behavior, and the [implementation plan](../../docs/turn-fold-sparse-transcript-implementation-plan.md) lists the delivery and latency gates.
 
 ## Configuration
 
@@ -68,6 +68,6 @@ The unlicensed vendored package has been removed. None of its source was copied 
 
 ## Verification
 
-Unit tests cover exact and relative values, reset, `all`, pre-compaction scope, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, explorer range growth, anchor stability, and adapter reuse. Integration tests verify strict configuration persistence, in-place subset changes, restart-required compact widening, and restart-free history access.
+Unit tests cover exact and relative values, reset, `all`, pre-compaction scope, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, explorer range growth, anchor stability, and adapter reuse. Projection tests cover the chronological suffix, stopping at the first overflow, whole-run ownership, standalone rows, oversized-run fallback, component accounting, source identity, omission metadata, and the one-component limit. Integration tests verify strict configuration persistence, in-place subset changes, restart-required compact widening, and restart-free history access.
 
-Turn-state tests verify that unchanged renders do not sort activity or rescan assistant content. Workspace checks and the Pi extension-load smoke test cover the package alongside the rest of OnurPi.
+Turn-state tests verify that projected user rows keep their own timestamps and that unchanged renders do not sort activity or rescan assistant content. A generated workflow-heavy fixture and a read-only aggregate diagnostic cover long sessions. Workspace checks and the Pi extension-load smoke test cover the package alongside the rest of OnurPi.

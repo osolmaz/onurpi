@@ -27,6 +27,21 @@ type ProjectedRun = {
   toolResults: Map<string, BranchEntry>;
 };
 
+type RunDisplayUnit = {
+  componentCount: number;
+  entries: BranchEntry[];
+  kind: "run";
+  run: ProjectedRun;
+};
+
+type StandaloneDisplayUnit = {
+  componentCount: number;
+  entries: BranchEntry[];
+  kind: "standalone";
+};
+
+type DisplayUnit = RunDisplayUnit | StandaloneDisplayUnit;
+
 export type TranscriptProjectionOptions = {
   activeRun: boolean;
   attachedCompactionEntryIds: ReadonlySet<string>;
@@ -276,18 +291,6 @@ function isPassThroughComponent(
   return isNativePassThroughComponent(entry, attachedCompactionEntryIds);
 }
 
-function boundedPassThroughEntries(
-  entries: BranchEntries,
-  owners: ReadonlyMap<BranchEntry, ProjectedRun>,
-  attachedCompactionEntryIds: ReadonlySet<string>,
-  componentLimit: number,
-): ReadonlySet<BranchEntry> {
-  const candidates = entries.filter((entry) =>
-    isPassThroughComponent(entry, owners.get(entry), attachedCompactionEntryIds),
-  );
-  return new Set(candidates.slice(-componentLimit));
-}
-
 function promptOnlyEntryIds(run: ProjectedRun): Set<string> {
   const keep = new Set<string>();
   const promptId = entryId(run.promptEntry);
@@ -295,97 +298,159 @@ function promptOnlyEntryIds(run: ProjectedRun): Set<string> {
   return keep;
 }
 
-function boundedRunEntryIds(
+function runDisplayUnit(
   run: ProjectedRun,
   active: boolean,
-  componentLimit: number,
-): Set<string> {
-  if (componentLimit <= 0) return new Set();
-  const keep = compactRunEntryIds(run, active);
-  const fallback = promptOnlyEntryIds(run);
-  return estimatedComponents(run, keep) <= componentLimit ? keep : fallback;
-}
+  attachedCompactionEntryIds: ReadonlySet<string>,
+): RunDisplayUnit {
+  const managedEntryIds = compactRunEntryIds(run, active);
+  const unitEntries: BranchEntry[] = [];
+  let passThroughComponents = 0;
 
-function retainedRuns(
-  runs: readonly ProjectedRun[],
-  activeRun: boolean,
-  componentLimit: number,
-): { keepByRun: Map<ProjectedRun, Set<string>>; omittedRunCount: number } {
-  const keepByRun = new Map<ProjectedRun, Set<string>>();
-  let components = 0;
-  let omittedRunCount = 0;
-
-  for (let index = runs.length - 1; index >= 0; index -= 1) {
-    const run = runs[index];
-    if (!run) continue;
-    const keep = boundedRunEntryIds(run, activeRun && index === runs.length - 1, componentLimit);
-    const nextComponents = estimatedComponents(run, keep);
-    if (nextComponents === 0 || components + nextComponents > componentLimit) {
-      omittedRunCount += 1;
+  for (const entry of run.entries) {
+    const id = entryId(entry);
+    if (id !== undefined && managedEntryIds.has(id)) {
+      unitEntries.push(entry);
       continue;
     }
-    keepByRun.set(run, keep);
-    components += nextComponents;
+    if (!shouldPassThrough(entry, attachedCompactionEntryIds)) continue;
+    unitEntries.push(entry);
+    if (isPassThroughComponent(entry, run, attachedCompactionEntryIds)) {
+      passThroughComponents += 1;
+    }
   }
-  return { keepByRun, omittedRunCount };
+
+  return {
+    componentCount: estimatedComponents(run, managedEntryIds) + passThroughComponents,
+    entries: unitEntries,
+    kind: "run",
+    run,
+  };
 }
 
-function isKeptRunEntry(
-  run: ProjectedRun | undefined,
-  id: string | undefined,
-  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
-): boolean {
-  return run !== undefined && id !== undefined && keepByRun.get(run)?.has(id) === true;
-}
-
-function shouldProjectEntry(
+function standaloneDisplayUnit(
   entry: BranchEntry,
-  run: ProjectedRun | undefined,
-  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
-  allowedPassThroughEntries: ReadonlySet<BranchEntry>,
   attachedCompactionEntryIds: ReadonlySet<string>,
-): boolean {
-  if (isKeptRunEntry(run, entryId(entry), keepByRun)) return true;
-  if (isPassThroughComponent(entry, run, attachedCompactionEntryIds)) {
-    return allowedPassThroughEntries.has(entry);
-  }
-  if (entryType(entry) === "custom_message" && run?.promptEntry === entry) return false;
-  return shouldPassThrough(entry, attachedCompactionEntryIds);
+): StandaloneDisplayUnit {
+  return {
+    componentCount: isPassThroughComponent(entry, undefined, attachedCompactionEntryIds) ? 1 : 0,
+    entries: [entry],
+    kind: "standalone",
+  };
 }
 
-function projectedEntries(
+function displayUnits(
   entries: BranchEntries,
+  runs: readonly ProjectedRun[],
   owners: ReadonlyMap<BranchEntry, ProjectedRun>,
-  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
-  allowedPassThroughEntries: ReadonlySet<BranchEntry>,
+  activeRun: boolean,
   attachedCompactionEntryIds: ReadonlySet<string>,
-): BranchEntries {
-  return entries.filter((entry) =>
-    shouldProjectEntry(
-      entry,
-      owners.get(entry),
-      keepByRun,
-      allowedPassThroughEntries,
-      attachedCompactionEntryIds,
-    ),
-  );
+): DisplayUnit[] {
+  const runByFirstEntry = new Map<BranchEntry, ProjectedRun>();
+  for (const run of runs) {
+    const firstEntry = run.entries[0];
+    if (firstEntry) runByFirstEntry.set(firstEntry, run);
+  }
+
+  const units: DisplayUnit[] = [];
+  const newestRun = runs.at(-1);
+  for (const entry of entries) {
+    const run = runByFirstEntry.get(entry);
+    if (run) {
+      units.push(runDisplayUnit(run, activeRun && run === newestRun, attachedCompactionEntryIds));
+      continue;
+    }
+    if (owners.has(entry) || !shouldPassThrough(entry, attachedCompactionEntryIds)) continue;
+    units.push(standaloneDisplayUnit(entry, attachedCompactionEntryIds));
+  }
+  return units;
+}
+
+type RetainedDisplay = {
+  entries: ReadonlySet<BranchEntry>;
+  omittedRunCount: number;
+  oldestRetainedEntryId: string | undefined;
+  projectedComponentCount: number;
+};
+
+function addUnitEntries(target: Set<BranchEntry>, unit: DisplayUnit): void {
+  for (const entry of unit.entries) target.add(entry);
 }
 
 function oldestRetainedRunEntryId(
-  runs: readonly ProjectedRun[],
-  keepByRun: ReadonlyMap<ProjectedRun, ReadonlySet<string>>,
+  units: readonly DisplayUnit[],
+  retainedRuns: ReadonlySet<ProjectedRun>,
 ): string | undefined {
-  for (const run of runs) {
-    const keep = keepByRun.get(run);
-    if (!keep) continue;
-    const promptId = entryId(run.promptEntry);
-    if (promptId && keep.has(promptId)) return promptId;
-    for (const entry of run.entries) {
-      const id = entryId(entry);
-      if (id && keep.has(id)) return id;
-    }
+  for (const unit of units) {
+    if (unit.kind !== "run" || !retainedRuns.has(unit.run)) continue;
+    const promptId = entryId(unit.run.promptEntry);
+    if (promptId) return promptId;
   }
   return undefined;
+}
+
+function countRunUnits(units: readonly DisplayUnit[], lastIndex: number): number {
+  let count = 0;
+  for (let index = 0; index <= lastIndex; index += 1) {
+    if (units[index]?.kind === "run") count += 1;
+  }
+  return count;
+}
+
+function oversizedNewestFallback(
+  unit: DisplayUnit,
+  newestRun: RunDisplayUnit | undefined,
+  projectedComponentCount: number,
+  componentLimit: number,
+): RunDisplayUnit | undefined {
+  if (unit.kind !== "run" || unit !== newestRun) return undefined;
+  if (projectedComponentCount > 0 || unit.componentCount <= componentLimit) return undefined;
+  return unit;
+}
+
+function retainDisplaySuffix(
+  units: readonly DisplayUnit[],
+  componentLimit: number,
+): RetainedDisplay {
+  const entries = new Set<BranchEntry>();
+  const retainedRuns = new Set<ProjectedRun>();
+  const newestRun = [...units].reverse().find((unit) => unit.kind === "run");
+  let projectedComponentCount = 0;
+  let lastOmittedUnitIndex = -1;
+
+  for (let index = units.length - 1; index >= 0; index -= 1) {
+    const unit = units[index];
+    if (!unit) continue;
+    if (projectedComponentCount + unit.componentCount <= componentLimit) {
+      addUnitEntries(entries, unit);
+      projectedComponentCount += unit.componentCount;
+      if (unit.kind === "run") retainedRuns.add(unit.run);
+      continue;
+    }
+
+    const fallback = oversizedNewestFallback(
+      unit,
+      newestRun,
+      projectedComponentCount,
+      componentLimit,
+    );
+    if (fallback?.run.promptEntry) {
+      entries.add(fallback.run.promptEntry);
+      retainedRuns.add(fallback.run);
+      projectedComponentCount = 1;
+      lastOmittedUnitIndex = index - 1;
+    } else {
+      lastOmittedUnitIndex = index;
+    }
+    break;
+  }
+
+  return {
+    entries,
+    omittedRunCount: countRunUnits(units, lastOmittedUnitIndex),
+    oldestRetainedEntryId: oldestRetainedRunEntryId(units, retainedRuns),
+    projectedComponentCount,
+  };
 }
 
 export function projectTranscriptEntries(
@@ -396,31 +461,22 @@ export function projectTranscriptEntries(
   const { runs } = groupEntries(sourceEntries);
   const componentLimit = Math.max(1, options.componentLimit ?? DEFAULT_PROJECTED_COMPONENT_LIMIT);
   const owners = entryOwners(runs);
-  const allowedPassThroughEntries = boundedPassThroughEntries(
+  const units = displayUnits(
     sourceEntries,
+    runs,
     owners,
-    options.attachedCompactionEntryIds,
-    componentLimit,
-  );
-  const passThroughComponents = allowedPassThroughEntries.size;
-  const runComponentLimit = componentLimit - passThroughComponents;
-  const { keepByRun, omittedRunCount } = retainedRuns(runs, options.activeRun, runComponentLimit);
-  const displayEntries = projectedEntries(
-    sourceEntries,
-    owners,
-    keepByRun,
-    allowedPassThroughEntries,
+    options.activeRun,
     options.attachedCompactionEntryIds,
   );
-  const projectedComponentCount =
-    passThroughComponents +
-    [...keepByRun].reduce((count, [run, keep]) => count + estimatedComponents(run, keep), 0);
-  const oldestRetainedEntryId = oldestRetainedRunEntryId(runs, keepByRun);
+  const retained = retainDisplaySuffix(units, componentLimit);
+  const displayEntries = sourceEntries.filter((entry) => retained.entries.has(entry));
   return {
     displayEntries,
-    omittedRunCount,
-    projectedComponentCount,
+    omittedRunCount: retained.omittedRunCount,
+    projectedComponentCount: retained.projectedComponentCount,
     sourceEntries,
-    ...(oldestRetainedEntryId === undefined ? {} : { oldestRetainedEntryId }),
+    ...(retained.oldestRetainedEntryId === undefined
+      ? {}
+      : { oldestRetainedEntryId: retained.oldestRetainedEntryId }),
   };
 }
