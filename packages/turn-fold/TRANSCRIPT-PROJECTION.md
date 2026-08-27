@@ -18,6 +18,12 @@ The **display projection** is the ordered subset of source entries returned to P
 
 A **display anchor** is an existing assistant or tool-call entry whose component renders a Turn Fold summary, retained activity, or final content. The projection does not create synthetic session entries.
 
+A **run display unit** contains one run's prompt, compact assistant or tool representation, and every displayable pass-through entry owned by that run.
+
+A **standalone display unit** contains one displayable pass-through entry that has no run owner.
+
+The **chronological suffix** is the newest uninterrupted sequence of complete display units that fits the component budget.
+
 The **live tail** contains components that Pi adds after the latest replay. Pi clears and rebuilds this tail after a successful compaction.
 
 ## Projection boundary
@@ -57,7 +63,7 @@ A reconstructed active run keeps its prompt and at most the latest three activit
 
 When earlier activity exists, the first retained activity acts as the streaming-summary anchor. The component renderer emits the cached summary before its native content. If no activity can serve as an anchor, Turn Fold retains one existing compaction or assistant entry that can render the summary without changing session data.
 
-Components added after replay form the live tail. Render-time folding remains responsible for that tail until Pi's next successful compaction rebuild. Live-tail lookups MUST be constant time, and summary aggregation MUST happen only when an event changes the run.
+Components added after replay form the live tail. Render-time folding remains responsible for that tail until Pi's next successful compaction rebuild or another existing supported refresh. Live-tail lookups MUST be constant time, and summary aggregation MUST happen only when an event changes the run. Turn Fold MUST NOT add another private replay trigger to enforce the projection budget between these refreshes.
 
 ## Compaction entries
 
@@ -71,9 +77,11 @@ Pi performs a transcript rebuild after every successful compaction. Pi 0.84.3 re
 
 Every prompt entry that begins a projected run remains in source order. Its native content and Turn Fold timestamp behavior stay unchanged.
 
-Custom entries outside Turn Fold's managed assistant, tool, and compaction rows pass through unchanged. This preserves other extensions' registered entry renderers. Entering or leaving a scope that contains an unpatched custom entry, custom message, or branch summary requires a full restart because Turn Fold cannot patch that renderer in place. Turn Fold's own run-boundary and configuration entries continue to have no renderer and create no visible component.
+Custom entries keep their registered renderers. A displayable custom entry owned by a run belongs to that run's display unit. A displayable custom entry with no run owner is a standalone unit. Neither kind receives priority over other units. Entering or leaving a scope that contains an unpatched custom entry, custom message, or branch summary requires a full restart because Turn Fold cannot patch that renderer in place. Turn Fold's own run-boundary and configuration entries continue to have no renderer and create no visible component.
 
 The projection MUST preserve the original entry objects and ordering. It MUST NOT clone entries with changed messages, append display entries, or alter parent links.
+
+General group visibility comes from retained run content. User-component association MUST use only projected entries whose message role is `user`, in projected order. Reconstruction removes stale user groups, resets the positional cursor, and adds the active user group at most once. This keeps Pi 0.84.3's positional user components aligned with their persisted timestamps.
 
 ## Cached run snapshots
 
@@ -85,11 +93,19 @@ A display component may cache formatted lines by run revision, width, detail sta
 
 ## Projection budget
 
-Compact projection MUST have a hard component budget independent of the number of entries in one run or compaction window. The implementation defines a conservative default from the latency benchmark in the implementation plan.
+Compact projection has a hard default budget of 512 rendered components, independent of the number of entries in one run or compaction window. Managed assistant and tool rows use the existing component estimator. Each displayable pass-through entry has the existing cost of one component.
 
-If the selected windows contain more settled runs than the budget allows, Turn Fold keeps the newest complete runs. Native pass-through components, including branch summaries, persisted shell executions, standalone compactions, and unrelated extension entries, consume the same budget; the newest ones are retained when they fill it. The oldest retained display anchor reports how many earlier runs were omitted from the active transcript. Omitted entries remain in the source snapshot, session tree, and model history.
+Projection builds one source-ordered list of run and standalone display units. It walks that list from newest to oldest and retains a complete unit only when the unit's full cost fits the remaining budget. At the first overflow, selection stops. The overflowing unit and every older unit are omitted, even when a smaller older unit would fit. The result can leave unused capacity at the top cutoff.
 
-A single retained final message may exceed the ordinary byte estimate. Turn Fold may render a bounded preview in the main transcript and make the complete content available through the history viewer. It MUST NOT mutate or truncate the stored message.
+A run unit is retained or omitted as a whole. No run-owned pass-through entry can survive without its prompt. A standalone pass-through entry keeps its chronological position and receives no reserved capacity or priority.
+
+If the newest or active run alone exceeds the complete budget, projection retains only its prompt and omits every older unit. A component limit of one therefore returns that prompt only. An older run that does not fit becomes the cutoff and receives no fallback.
+
+The projected entries are a source-ordered identity filter over the source snapshot. Projection returns the exact original entry objects. It does not clone, rewrite, or reorder them.
+
+The projected component count, omitted-run count, and oldest retained entry come from the same retained unit set. The run that causes the cutoff counts as omitted. A fallback-retained newest run does not. The oldest retained run prompt receives the omitted-run notice. Projection creates no synthetic anchor when no run is retained.
+
+Omitted entries remain in the source snapshot, session tree, model history, and history explorer. A single retained final message may exceed the ordinary byte estimate. Turn Fold may render a bounded preview in the main transcript and make the complete content available through the history viewer. It MUST NOT mutate or truncate the stored message.
 
 ## Virtual history
 

@@ -286,7 +286,7 @@ describe("compact transcript projection budgets and boundaries", () => {
     expect(ids(project(entries).displayEntries)).toEqual(["user", "status", "final"]);
   });
 
-  it("uses the whole component budget for newer pass-through entries", () => {
+  it("falls back to the prompt when run-owned pass-through rows exceed the budget", () => {
     const entries: Entry[] = [
       user("user", 100),
       assistant("final", 110, [{ text: "Done", type: "text" }]),
@@ -297,25 +297,181 @@ describe("compact transcript projection budgets and boundaries", () => {
 
     const result = project(entries);
 
-    expect(result.projectedComponentCount).toBe(512);
-    expect(result.displayEntries).toHaveLength(512);
-    expect(ids(result.displayEntries).at(0)).toBe("custom-0");
-    expect(result.omittedRunCount).toBe(1);
+    expect(ids(result.displayEntries)).toEqual(["user"]);
+    expect(result.projectedComponentCount).toBe(1);
+    expect(result.omittedRunCount).toBe(0);
+    expect(result.oldestRetainedEntryId).toBe("user");
   });
 
-  it("counts native branch summaries and bash executions against the budget", () => {
-    const entries: Entry[] = [user("user", 100)];
-    for (let index = 0; index < 300; index += 1) {
-      entries.push(branchSummary(`branch-${String(index)}`));
-      entries.push(bashExecution(`bash-${String(index)}`));
+  it("counts native branch summaries and bash executions in their run unit", () => {
+    const entries: Entries = [
+      user("user", 100),
+      branchSummary("branch-1"),
+      bashExecution("bash-1"),
+      branchSummary("branch-2"),
+      bashExecution("bash-2"),
+      assistant("final", 110, [{ text: "Done", type: "text" }]),
+    ];
+
+    const result = project(entries, { componentLimit: 6 });
+
+    expect(ids(result.displayEntries)).toEqual(ids(entries));
+    expect(result.projectedComponentCount).toBe(6);
+    expect(result.omittedRunCount).toBe(0);
+  });
+
+  it("stops at the first run that does not fit", () => {
+    const entries: Entries = [
+      user("old-user", 100),
+      assistant("old-final", 110, [{ text: "Old", type: "text" }]),
+      user("middle-user", 200),
+      custom("middle-status-1"),
+      custom("middle-status-2"),
+      assistant("middle-final", 210, [{ text: "Middle", type: "text" }]),
+      user("new-user", 300),
+      assistant("new-final", 310, [{ text: "New", type: "text" }]),
+    ];
+
+    const result = project(entries, { componentLimit: 3 });
+
+    expect(ids(result.displayEntries)).toEqual(["new-user", "new-final"]);
+    expect(result.projectedComponentCount).toBe(2);
+    expect(result.omittedRunCount).toBe(2);
+    expect(result.oldestRetainedEntryId).toBe("new-user");
+  });
+});
+
+describe("compact transcript chronological cutoff", () => {
+  it("moves the chronological cutoff only from the top", () => {
+    const first = user("first-user", 100);
+    const firstFinal = assistant("first-final", 110, [{ text: "First", type: "text" }]);
+    const second = user("second-user", 200);
+    const secondFinal = assistant("second-final", 210, [{ text: "Second", type: "text" }]);
+    const third = user("third-user", 300);
+    const thirdFinal = assistant("third-final", 310, [{ text: "Third", type: "text" }]);
+    const before: Entries = [first, firstFinal, second, secondFinal];
+    const after: Entries = [...before, third, thirdFinal];
+
+    expect(ids(project(before, { componentLimit: 4 }).displayEntries)).toEqual(ids(before));
+    const shifted = project(after, { componentLimit: 4 });
+
+    expect(ids(shifted.displayEntries)).toEqual([
+      "second-user",
+      "second-final",
+      "third-user",
+      "third-final",
+    ]);
+    expect(shifted.displayEntries[0]).toBe(second);
+    expect(shifted.displayEntries.at(-1)).toBe(thirdFinal);
+  });
+
+  it("keeps standalone rows in chronological order without giving them priority", () => {
+    const entries: Entries = [
+      custom("standalone-1"),
+      custom("standalone-2"),
+      custom("standalone-3"),
+      user("user", 100),
+      assistant("final", 110, [{ text: "Done", type: "text" }]),
+    ];
+
+    const result = project(entries, { componentLimit: 3 });
+
+    expect(ids(result.displayEntries)).toEqual(["standalone-3", "user", "final"]);
+    expect(result.projectedComponentCount).toBe(3);
+    expect(result.omittedRunCount).toBe(0);
+  });
+
+  it("falls back to the active prompt for a large tool batch and pass-through tail", () => {
+    const toolCalls: AssistantMessage["content"] = Array.from({ length: 12 }, (_, index) => ({
+      arguments: {},
+      id: `active-call-${String(index)}`,
+      name: "read",
+      type: "toolCall" as const,
+    }));
+    const entries: Entry[] = [user("active-user", 100), assistant("active", 110, toolCalls)];
+    for (let index = 0; index < 12; index += 1) {
+      entries.push(toolResult(`active-result-${String(index)}`, `active-call-${String(index)}`));
     }
+    for (let index = 0; index < 512; index += 1) {
+      entries.push(customMessage(`status-${String(index)}`, "Working"));
+    }
+
+    const result = project(entries, { activeRun: true });
+
+    expect(ids(result.displayEntries)).toEqual(["active-user"]);
+    expect(result.projectedComponentCount).toBe(1);
+    expect(result.omittedRunCount).toBe(0);
+  });
+
+  it("uses the prompt-only fallback when the component limit is one", () => {
+    const entries: Entries = [
+      user("user", 100),
+      assistant("final", 110, [{ text: "Done", type: "text" }]),
+    ];
+
+    const result = project(entries, { componentLimit: 1 });
+
+    expect(ids(result.displayEntries)).toEqual(["user"]);
+    expect(result.projectedComponentCount).toBe(1);
+    expect(result.oldestRetainedEntryId).toBe("user");
+  });
+
+  it("omits every older run when the newest run needs the prompt fallback", () => {
+    const entries: Entry[] = [
+      user("old-user", 100),
+      assistant("old-final", 110, [{ text: "Old", type: "text" }]),
+      user("new-user", 200),
+    ];
+    for (let index = 0; index < 4; index += 1) {
+      entries.push(custom(`new-status-${String(index)}`));
+    }
+
+    const result = project(entries, { componentLimit: 3 });
+
+    expect(ids(result.displayEntries)).toEqual(["new-user"]);
+    expect(result.projectedComponentCount).toBe(1);
+    expect(result.omittedRunCount).toBe(1);
+    expect(result.oldestRetainedEntryId).toBe("new-user");
+  });
+
+  it("returns no synthetic anchor for standalone-only input", () => {
+    const first = custom("first");
+    const second = custom("second");
+    const result = project([first, second], { componentLimit: 1 });
+
+    expect(result.displayEntries).toEqual([second]);
+    expect(result.displayEntries[0]).toBe(second);
+    expect(result.projectedComponentCount).toBe(1);
+    expect(result.omittedRunCount).toBe(0);
+    expect(result.oldestRetainedEntryId).toBeUndefined();
+  });
+
+  it("returns an empty bounded projection for empty input", () => {
+    expect(project([], { componentLimit: 1 })).toMatchObject({
+      displayEntries: [],
+      omittedRunCount: 0,
+      projectedComponentCount: 0,
+      sourceEntries: [],
+    });
+  });
+
+  it("does not apply the prompt fallback to an older oversized run", () => {
+    const entries: Entry[] = [user("old-user", 100)];
+    for (let index = 0; index < 512; index += 1) {
+      entries.push(custom(`old-status-${String(index)}`));
+    }
+    entries.push(
+      assistant("old-final", 110, [{ text: "Old", type: "text" }]),
+      user("new-user", 200),
+      assistant("new-final", 210, [{ text: "New", type: "text" }]),
+    );
 
     const result = project(entries);
 
-    expect(result.projectedComponentCount).toBe(512);
-    expect(result.displayEntries).toHaveLength(512);
-    expect(ids(result.displayEntries).at(0)).toBe("branch-44");
+    expect(ids(result.displayEntries)).toEqual(["new-user", "new-final"]);
+    expect(result.projectedComponentCount).toBe(2);
     expect(result.omittedRunCount).toBe(1);
+    expect(result.oldestRetainedEntryId).toBe("new-user");
   });
 
   it("omits old complete runs when the component budget is exhausted", () => {

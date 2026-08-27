@@ -11,7 +11,7 @@ import {
   reassignGroupIds,
   reloadedActiveGroups,
 } from "./turn-history-reload.ts";
-import { projectedGroupIds } from "./turn-visibility.ts";
+import { projectedGroupIds, projectedUserQueueGroupIds } from "./turn-visibility.ts";
 import {
   assistantSnapshot,
   type AssistantSnapshot,
@@ -210,7 +210,15 @@ export class TurnFoldState {
     );
     this.compactionVisibility.apply(displayEntries);
     if (this.activeGroupId) this.visibleGroupIds.add(this.activeGroupId);
-    this.userGroupIds = this.userGroupIds.filter((groupId) => this.visibleGroupIds.has(groupId));
+
+    this.userGroupIds = projectedUserQueueGroupIds(
+      displayEntries,
+      this.historicalGroupByEntryId,
+      this.groups,
+      this.activeGroupId,
+    );
+    this.userComponentGroup = new WeakMap();
+    this.userGroupCursor = 0;
     this.applyOmittedRuns(omittedRuns, oldestRetainedEntryId);
   }
 
