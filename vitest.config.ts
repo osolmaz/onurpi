@@ -53,6 +53,7 @@ export default defineConfig({
         "packages/codex-switcher/router.ts",
         "packages/codex-switcher/usage-client.ts",
         "packages/codex-switcher/usage-policy.ts",
+        "packages/context-window-policy/context-window-policy.ts",
         "packages/pi-codex-compaction/codex-compaction.ts",
         "packages/pi-codex-compaction/native-checkpoint.ts",
         "packages/pi-codex-compaction/remote-compaction.ts",
