@@ -17,8 +17,8 @@ leased to the current agent run.
 
 The extension never triggers compaction itself. It registers no `turn_end`, `agent_settled`, or
 `session_compact` handlers, never calls `ctx.abort()` or `ctx.compact()` for its own lifecycle, and
-sends no continuation message. Pi's serialized built-in threshold, overflow, and manual compaction
-lifecycle stays in charge of when compaction happens.
+sends no continuation message. `@onurpi/context-window-policy` can request compaction at a safe turn
+boundary, while Pi's serialized compaction lifecycle remains in charge of the operation.
 
 Pi requires compaction events to store a summary string, so entries receive a short local checkpoint
 marker. The marker is filtered from provider context and is never sent to OpenAI. In interactive
@@ -53,15 +53,17 @@ remote checkpoint from being spliced between a function call and its function re
 
 ## Compaction ownership in OnurPi
 
+- **`@onurpi/context-window-policy`** owns the proactive 90% turn-boundary request. It stops a long
+  Codex tool loop, waits for settlement, then uses Pi's public compaction API.
 - **`@onurpi/pi-codex-compaction`** owns all compaction content for the built-in `openai-codex`
-  provider: the remote native checkpoint and the compaction entry. Pi itself owns the manual,
-  threshold, and overflow triggers.
+  provider: the remote native checkpoint and the compaction entry. Pi still owns manual, threshold,
+  and overflow operations.
 - **`@onurpi/reliable-compaction`** still stabilizes ordinary Pi text compaction for other custom
   providers that use the `openai-codex-responses` API, but passes `openai-codex` through because
   native compaction replaces its text-summary path.
 
-The root manifest registers `pi-codex-compaction` before `reliable-compaction`, and the repository
-tests assert that ordering.
+The root manifest registers Codex routing, context timing, native content, and text fallback in that
+order, and the repository tests assert it.
 
 ## Persistence
 

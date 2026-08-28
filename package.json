@@ -19,6 +19,7 @@
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
       "./packages/codex-switcher/index.ts",
+      "./packages/context-window-policy/index.ts",
       "./packages/pi-codex-compaction/index.ts",
       "./packages/reliable-compaction/index.ts",
       "./packages/infinite-retry/index.ts",
