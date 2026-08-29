@@ -91,6 +91,7 @@ type ContextOptions = {
   compact?: (options: CompactOptions) => void;
   contextWindow?: number;
   hasPendingMessages?: boolean;
+  isIdle?: boolean;
   model?: "codex" | "custom" | "none";
   sessionId?: string;
   tokens?: number | null;
@@ -131,6 +132,7 @@ function context(options: ContextOptions = {}): ContextWindowPolicyContext {
     },
     hasPendingMessages: () => options.hasPendingMessages ?? false,
     hasUI: true,
+    isIdle: () => options.isIdle ?? true,
     model,
     sessionManager: { getSessionId: () => options.sessionId ?? "session-1" },
     ui: { notify: vi.fn() },
@@ -308,6 +310,40 @@ describe("turn-boundary compaction", () => {
     controller.agentSettled(settledCtx);
     complete(h.compactCalls[0]);
 
+    expect(h.sentMessages).toEqual([]);
+  });
+
+  it("defers compaction over settlement work and suppresses its continuation", () => {
+    const h = harness();
+    const abort = vi.fn();
+    const compact = (options: CompactOptions) => h.compactCalls.push(options);
+    const controller = createContextWindowPolicyController(h.api);
+
+    controller.turnEnded(turnEvent(), context({ abort, tokens: 244_800 }));
+    controller.agentSettled(context({ compact, isIdle: false, tokens: 244_800 }));
+    controller.agentSettled(context({ compact, hasPendingMessages: true, tokens: 244_800 }));
+    expect(h.compactCalls).toEqual([]);
+
+    controller.agentSettled(context({ compact, tokens: 244_800 }));
+    complete(h.compactCalls[0]);
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(h.compactCalls).toHaveLength(1);
+    expect(h.sentMessages).toEqual([]);
+  });
+
+  it("defers final-turn compaction until settlement work finishes", () => {
+    const h = harness();
+    const compact = (options: CompactOptions) => h.compactCalls.push(options);
+    const controller = createContextWindowPolicyController(h.api);
+
+    controller.agentSettled(context({ compact, isIdle: false, tokens: 244_800 }));
+    expect(h.compactCalls).toEqual([]);
+
+    controller.agentSettled(context({ compact, tokens: 244_800 }));
+    complete(h.compactCalls[0]);
+
+    expect(h.compactCalls).toHaveLength(1);
     expect(h.sentMessages).toEqual([]);
   });
 

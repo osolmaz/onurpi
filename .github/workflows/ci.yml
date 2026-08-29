@@ -198,9 +198,6 @@ jobs:
       - name: Mutate @onurpi/codex-switcher package
         working-directory: packages/codex-switcher
         run: npm run mutate
-      - name: Mutate @onurpi/context-window-policy package
-        working-directory: packages/context-window-policy
-        run: npm run mutate
       - name: Mutate @onurpi/reliable-compaction package
         working-directory: packages/reliable-compaction
         run: npm run mutate
