@@ -2,6 +2,7 @@ import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai"
 import type {
   CompactOptions,
   CompactionResult,
+  SessionBeforeCompactEvent,
   SessionCompactEvent,
   TurnEndEvent,
 } from "@earendil-works/pi-coding-agent";
@@ -153,7 +154,9 @@ function harness(): Harness {
     api: {
       onAgentSettled: () => undefined,
       onModelSelect: () => undefined,
+      onSessionBeforeCompact: () => undefined,
       onSessionCompact: () => undefined,
+      onSessionCompactFailed: () => undefined,
       onSessionShutdown: () => undefined,
       onSessionStart: () => undefined,
       onTurnEnd: () => undefined,
@@ -205,34 +208,67 @@ describe("context-window threshold", () => {
 
 describe("settlement scheduling", () => {
   function scheduledHarness(): {
+    agentSettled(ctx: ContextWindowPolicyContext): void;
     api: ContextWindowPolicyApi;
-    agentSettled: () => ((ctx: ContextWindowPolicyContext) => void) | undefined;
-    reset: () => (() => void) | undefined;
+    reset(): void;
     scheduled: (() => void)[];
+    sentMessages: { message: unknown; options: unknown }[];
+    sessionBeforeCompact(ctx: ContextWindowPolicyContext): void;
+    sessionCompacted(event: SessionCompactEvent, ctx: ContextWindowPolicyContext): void;
+    sessionCompactionFailed(ctx: ContextWindowPolicyContext): void;
+    turnEnded(event: TurnEndEvent, ctx: ContextWindowPolicyContext): void;
   } {
     let agentSettledHandler: ((ctx: ContextWindowPolicyContext) => void) | undefined;
+    let beforeCompactHandler:
+      | ((event: SessionBeforeCompactEvent, ctx: ContextWindowPolicyContext) => void)
+      | undefined;
+    let compactHandler:
+      | ((event: SessionCompactEvent, ctx: ContextWindowPolicyContext) => void)
+      | undefined;
+    let compactFailedHandler: ((ctx: ContextWindowPolicyContext) => void) | undefined;
     let resetHandler: (() => void) | undefined;
+    let turnEndHandler:
+      | ((event: TurnEndEvent, ctx: ContextWindowPolicyContext) => void)
+      | undefined;
     const scheduled: (() => void)[] = [];
+    const sentMessages: { message: unknown; options: unknown }[] = [];
     return {
+      agentSettled: (ctx) => agentSettledHandler?.(ctx),
       api: {
         onAgentSettled: (handler) => {
           agentSettledHandler = handler;
         },
         onModelSelect: () => undefined,
-        onSessionCompact: () => undefined,
+        onSessionBeforeCompact: (handler) => {
+          beforeCompactHandler = handler;
+        },
+        onSessionCompact: (handler) => {
+          compactHandler = handler;
+        },
+        onSessionCompactFailed: (handler) => {
+          compactFailedHandler = handler;
+        },
         onSessionShutdown: () => undefined,
         onSessionStart: (handler) => {
           resetHandler = handler;
         },
-        onTurnEnd: () => undefined,
+        onTurnEnd: (handler) => {
+          turnEndHandler = handler;
+        },
         scheduleAfterSettlement: (handler) => {
           scheduled.push(handler);
         },
-        sendMessage: () => undefined,
+        sendMessage: (message, options) => {
+          sentMessages.push({ message, options });
+        },
       },
-      agentSettled: () => agentSettledHandler,
-      reset: () => resetHandler,
+      reset: () => resetHandler?.(),
       scheduled,
+      sentMessages,
+      sessionBeforeCompact: (ctx) => beforeCompactHandler?.({} as SessionBeforeCompactEvent, ctx),
+      sessionCompacted: (event, ctx) => compactHandler?.(event, ctx),
+      sessionCompactionFailed: (ctx) => compactFailedHandler?.(ctx),
+      turnEnded: (event, ctx) => turnEndHandler?.(event, ctx),
     };
   }
 
@@ -247,7 +283,7 @@ describe("settlement scheduling", () => {
     ctx.isIdle = () => idle;
     installContextWindowPolicy(h.api);
 
-    h.agentSettled()?.(ctx);
+    h.agentSettled(ctx);
     expect(h.scheduled).toHaveLength(1);
     expect(compactCalls).toEqual([]);
 
@@ -256,8 +292,54 @@ describe("settlement scheduling", () => {
     expect(compactCalls).toEqual([]);
 
     idle = true;
-    h.agentSettled()?.(ctx);
+    h.agentSettled(ctx);
     h.scheduled.shift()?.();
+    expect(compactCalls).toHaveLength(1);
+  });
+
+  it("waits for an external compaction and resumes after it succeeds", () => {
+    const h = scheduledHarness();
+    const abort = vi.fn();
+    const compactCalls: CompactOptions[] = [];
+    const ctx = context({
+      abort,
+      compact: (options) => compactCalls.push(options),
+      tokens: 244_800,
+    });
+    installContextWindowPolicy(h.api);
+
+    h.turnEnded(turnEvent(), ctx);
+    h.agentSettled(ctx);
+    h.sessionBeforeCompact(ctx);
+    h.scheduled.shift()?.();
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(compactCalls).toEqual([]);
+
+    h.sessionCompacted(compactEvent(), ctx);
+    expect(h.scheduled).toHaveLength(1);
+    h.scheduled.shift()?.();
+
+    expect(compactCalls).toEqual([]);
+    expect(h.sentMessages).toHaveLength(1);
+  });
+
+  it("retries after an external compaction fails", () => {
+    const h = scheduledHarness();
+    const compactCalls: CompactOptions[] = [];
+    const ctx = context({
+      compact: (options) => compactCalls.push(options),
+      tokens: 244_800,
+    });
+    installContextWindowPolicy(h.api);
+
+    h.turnEnded(turnEvent(), ctx);
+    h.agentSettled(ctx);
+    h.sessionBeforeCompact(ctx);
+    h.scheduled.shift()?.();
+    h.sessionCompactionFailed(ctx);
+    h.scheduled.shift()?.();
+
     expect(compactCalls).toHaveLength(1);
   });
 
@@ -271,7 +353,7 @@ describe("settlement scheduling", () => {
     });
     installContextWindowPolicy(h.api);
 
-    h.agentSettled()?.(ctx);
+    h.agentSettled(ctx);
     expect(() => h.scheduled.shift()?.()).not.toThrow();
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       "Context compaction failed: synchronous failure",
@@ -288,8 +370,8 @@ describe("settlement scheduling", () => {
     });
     installContextWindowPolicy(h.api);
 
-    h.agentSettled()?.(ctx);
-    h.reset()?.();
+    h.agentSettled(ctx);
+    h.reset();
     h.scheduled.shift()?.();
 
     expect(compactCalls).toEqual([]);

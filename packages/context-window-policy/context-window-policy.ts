@@ -1,5 +1,6 @@
 import type {
   ExtensionContext,
+  SessionBeforeCompactEvent,
   SessionCompactEvent,
   TurnEndEvent,
 } from "@earendil-works/pi-coding-agent";
@@ -32,9 +33,13 @@ export type ContextWindowPolicyContext = Pick<
 export type ContextWindowPolicyApi = {
   onAgentSettled(handler: (ctx: ContextWindowPolicyContext) => void): void;
   onModelSelect(handler: () => void): void;
+  onSessionBeforeCompact(
+    handler: (event: SessionBeforeCompactEvent, ctx: ContextWindowPolicyContext) => void,
+  ): void;
   onSessionCompact(
     handler: (event: SessionCompactEvent, ctx: ContextWindowPolicyContext) => void,
   ): void;
+  onSessionCompactFailed(handler: (ctx: ContextWindowPolicyContext) => void): void;
   onSessionShutdown(handler: () => void): void;
   onSessionStart(handler: () => void): void;
   onTurnEnd(handler: (event: TurnEndEvent, ctx: ContextWindowPolicyContext) => void): void;
@@ -57,17 +62,22 @@ type ActiveRequest = {
   phase: "compacted" | "compacting" | "stopping";
   resume: boolean;
   sessionId: string;
+  settlementReached: boolean;
 };
 
 type ControllerState = {
   active: ActiveRequest | undefined;
+  externalCompactions: number;
 };
 
 export type ContextWindowPolicyController = {
   agentSettled(ctx: ContextWindowPolicyContext): void;
+  agentSettlementStarted(ctx: ContextWindowPolicyContext): void;
   evaluate(ctx: ContextWindowPolicyContext): PolicyEvaluation;
   reset(): void;
-  sessionCompacted(event: SessionCompactEvent, ctx: ContextWindowPolicyContext): void;
+  sessionBeforeCompact(ctx: ContextWindowPolicyContext): void;
+  sessionCompacted(event: SessionCompactEvent, ctx: ContextWindowPolicyContext): boolean;
+  sessionCompactionFailed(ctx: ContextWindowPolicyContext): boolean;
   turnEnded(event: TurnEndEvent, ctx: ContextWindowPolicyContext): void;
 };
 
@@ -123,8 +133,12 @@ function clearExpected(state: ControllerState, expected: ActiveRequest): boolean
   return true;
 }
 
-function hasCompactionConflict(ctx: ContextWindowPolicyContext): boolean {
+function hasTurnConflict(ctx: ContextWindowPolicyContext): boolean {
   return !ctx.isIdle() || ctx.hasPendingMessages();
+}
+
+function hasCompactionConflict(state: ControllerState, ctx: ContextWindowPolicyContext): boolean {
+  return state.externalCompactions > 0 || hasTurnConflict(ctx);
 }
 
 function continueAfterCompaction(
@@ -133,7 +147,8 @@ function continueAfterCompaction(
   ctx: ContextWindowPolicyContext,
   expected: ActiveRequest,
 ): void {
-  if (!clearExpected(state, expected) || !expected.resume || hasCompactionConflict(ctx)) return;
+  if (!clearExpected(state, expected) || !expected.resume || hasCompactionConflict(state, ctx))
+    return;
   try {
     api.sendMessage(
       {
@@ -159,6 +174,7 @@ function startCompaction(
     phase: "compacting",
     resume,
     sessionId: ctx.sessionManager.getSessionId(),
+    settlementReached: true,
   };
   state.active = request;
   try {
@@ -183,11 +199,22 @@ function compactAtSafeSettlement(
   ctx: ContextWindowPolicyContext,
   resume: boolean,
 ): void {
-  if (hasCompactionConflict(ctx)) {
+  const sessionId = ctx.sessionManager.getSessionId();
+  if (state.externalCompactions > 0) {
+    state.active = {
+      phase: "stopping",
+      resume,
+      sessionId,
+      settlementReached: true,
+    };
+    return;
+  }
+  if (hasTurnConflict(ctx)) {
     state.active = {
       phase: "stopping",
       resume: false,
-      sessionId: ctx.sessionManager.getSessionId(),
+      sessionId,
+      settlementReached: true,
     };
     return;
   }
@@ -215,6 +242,7 @@ function handleTurnEnd(
     phase: "stopping",
     resume: !ctx.hasPendingMessages(),
     sessionId: ctx.sessionManager.getSessionId(),
+    settlementReached: false,
   };
   state.active = request;
   notify(
@@ -230,18 +258,47 @@ function handleTurnEnd(
   }
 }
 
+function handleSessionBeforeCompact(state: ControllerState): void {
+  if (state.active?.phase !== "compacting") state.externalCompactions += 1;
+}
+
+function finishExternalCompaction(state: ControllerState): boolean {
+  if (state.externalCompactions === 0) return false;
+  state.externalCompactions -= 1;
+  return true;
+}
+
 function handleSessionCompact(
   state: ControllerState,
   event: SessionCompactEvent,
   ctx: ContextWindowPolicyContext,
-): void {
+): boolean {
+  const wasExternal = finishExternalCompaction(state);
   const active = activeForContext(state, ctx);
-  if (active?.phase !== "stopping") return;
+  if (active?.phase !== "stopping") return false;
   if (event.willRetry) {
     state.active = undefined;
-    return;
+    return false;
   }
   state.active = { ...active, phase: "compacted" };
+  return wasExternal && active.settlementReached;
+}
+
+function handleSessionCompactionFailed(
+  state: ControllerState,
+  ctx: ContextWindowPolicyContext,
+): boolean {
+  const wasExternal = finishExternalCompaction(state);
+  const active = activeForContext(state, ctx);
+  return wasExternal && active?.phase === "stopping" && active.settlementReached;
+}
+
+function handleAgentSettlementStarted(
+  state: ControllerState,
+  ctx: ContextWindowPolicyContext,
+): void {
+  const active = activeForContext(state, ctx);
+  if (active?.phase === "stopping") active.settlementReached = true;
 }
 
 function handleAgentSettled(
@@ -265,18 +322,24 @@ function handleAgentSettled(
 export function createContextWindowPolicyController(
   api: ContextWindowPolicyApi,
 ): ContextWindowPolicyController {
-  const state: ControllerState = { active: undefined };
+  const state: ControllerState = { active: undefined, externalCompactions: 0 };
   return {
     agentSettled: (ctx) => {
       handleAgentSettled(api, state, ctx);
     },
+    agentSettlementStarted: (ctx) => {
+      handleAgentSettlementStarted(state, ctx);
+    },
     evaluate,
     reset: () => {
       state.active = undefined;
+      state.externalCompactions = 0;
     },
-    sessionCompacted: (event, ctx) => {
-      handleSessionCompact(state, event, ctx);
+    sessionBeforeCompact: () => {
+      handleSessionBeforeCompact(state);
     },
+    sessionCompacted: (event, ctx) => handleSessionCompact(state, event, ctx),
+    sessionCompactionFailed: (ctx) => handleSessionCompactionFailed(state, ctx),
     turnEnded: (event, ctx) => {
       handleTurnEnd(state, event, ctx);
     },
@@ -290,10 +353,7 @@ export function installContextWindowPolicy(api: ContextWindowPolicyApi): void {
     lifecycleVersion += 1;
     controller.reset();
   };
-  api.onTurnEnd((event, ctx) => {
-    controller.turnEnded(event, ctx);
-  });
-  api.onAgentSettled((ctx) => {
+  const schedulePolicyCheck = (ctx: ContextWindowPolicyContext): void => {
     const expectedVersion = lifecycleVersion;
     api.scheduleAfterSettlement(() => {
       if (lifecycleVersion !== expectedVersion) return;
@@ -304,9 +364,22 @@ export function installContextWindowPolicy(api: ContextWindowPolicyApi): void {
         notify(ctx, `Context compaction failed: ${message}`, "error");
       }
     });
+  };
+  api.onTurnEnd((event, ctx) => {
+    controller.turnEnded(event, ctx);
+  });
+  api.onAgentSettled((ctx) => {
+    controller.agentSettlementStarted(ctx);
+    schedulePolicyCheck(ctx);
+  });
+  api.onSessionBeforeCompact((_event, ctx) => {
+    controller.sessionBeforeCompact(ctx);
   });
   api.onSessionCompact((event, ctx) => {
-    controller.sessionCompacted(event, ctx);
+    if (controller.sessionCompacted(event, ctx)) schedulePolicyCheck(ctx);
+  });
+  api.onSessionCompactFailed((ctx) => {
+    if (controller.sessionCompactionFailed(ctx)) schedulePolicyCheck(ctx);
   });
   api.onModelSelect(reset);
   api.onSessionStart(reset);

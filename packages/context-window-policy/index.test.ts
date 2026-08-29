@@ -31,7 +31,9 @@ describe("context-window-policy extension", () => {
     expect([...handlers.keys()].sort()).toEqual([
       "agent_settled",
       "model_select",
+      "session_before_compact",
       "session_compact",
+      "session_compact_failed",
       "session_shutdown",
       "session_start",
       "turn_end",
