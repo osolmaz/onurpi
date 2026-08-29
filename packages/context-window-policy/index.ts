@@ -28,6 +28,9 @@ export default function contextWindowPolicy(pi: ExtensionAPI): void {
     onSessionShutdown: (handler) => {
       pi.on("session_shutdown", handler);
     },
+    scheduleAfterSettlement: (handler) => {
+      setTimeout(handler, 0);
+    },
     sendMessage: (message, options) => {
       pi.sendMessage(message, options);
     },

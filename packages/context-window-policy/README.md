@@ -16,12 +16,13 @@ method. `@onurpi/pi-codex-compaction` then supplies the native OpenAI checkpoint
 `session_before_compact` event.
 
 Before it aborts a tool-driven run, the extension records whether Pi has queued work. This state
-must survive until settlement because `ctx.abort()` can move pending messages out of Pi's queue. At
-settlement, the extension also checks whether another extension started or queued work. It keeps the
-compaction request pending until Pi is idle and disables its own continuation when this occurs.
-After successful compaction, it checks once more and sends one hidden custom continuation message
-only when no competing work appeared before or after abort. This keeps queued user work ahead of the
-continuation and prevents a duplicate turn.
+must survive until settlement because `ctx.abort()` can move pending messages out of Pi's queue.
+After `agent_settled`, the extension defers its safety check to the next timer turn. This gives
+later synchronous settlement handlers time to start or queue their work. The extension then keeps
+the compaction request pending until Pi is idle and disables its own continuation when competing
+work appears. After successful compaction, it checks once more and sends one hidden custom
+continuation message only when no competing work appeared before or after abort. This keeps queued
+user work ahead of the continuation and prevents a duplicate turn.
 
 If Pi's built-in threshold or overflow compaction runs first, the extension uses that successful
 compaction and does not start a duplicate. Overflow recovery remains owned by Pi.

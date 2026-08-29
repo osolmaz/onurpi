@@ -7,9 +7,10 @@
   value is unavailable or invalid.
 - Own compaction timing only. `@onurpi/pi-codex-compaction` owns native Codex checkpoint content and
   its branch fence.
-- Interrupt only a completed tool turn. Wait for `agent_settled` before calling `ctx.compact()`.
-  Require `ctx.isIdle()` and no pending messages. If another extension starts or queues work, retain
-  the compaction request and suppress the policy continuation.
+- Interrupt only a completed tool turn. After `agent_settled`, defer the safety check to the next
+  timer turn so later synchronous settlement handlers can run. Then require `ctx.isIdle()` and no
+  pending messages. If another extension starts or queues work, retain the compaction request and
+  suppress the policy continuation.
 - Do not interrupt a final assistant turn. Compact it after settlement without starting another
   model turn.
 - Keep Pi's built-in threshold and overflow compaction enabled as fallbacks. Do not duplicate a
