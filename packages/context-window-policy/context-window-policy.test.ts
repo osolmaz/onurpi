@@ -12,6 +12,7 @@ import {
   CONTINUATION_MESSAGE_KIND,
   CONTINUATION_PROMPT,
   createContextWindowPolicyController,
+  installContextWindowPolicy,
   isCodexNativeModel,
   type ContextWindowPolicyApi,
   type ContextWindowPolicyContext,
@@ -156,6 +157,7 @@ function harness(): Harness {
       onSessionShutdown: () => undefined,
       onSessionStart: () => undefined,
       onTurnEnd: () => undefined,
+      scheduleAfterSettlement: () => undefined,
       sendMessage: (message, options) => {
         sentMessages.push({ message, options });
       },
@@ -198,6 +200,99 @@ describe("context-window threshold", () => {
       }),
     ).toBe(false);
     expect(isCodexNativeModel(undefined)).toBe(false);
+  });
+});
+
+describe("settlement scheduling", () => {
+  function scheduledHarness(): {
+    api: ContextWindowPolicyApi;
+    agentSettled: () => ((ctx: ContextWindowPolicyContext) => void) | undefined;
+    reset: () => (() => void) | undefined;
+    scheduled: (() => void)[];
+  } {
+    let agentSettledHandler: ((ctx: ContextWindowPolicyContext) => void) | undefined;
+    let resetHandler: (() => void) | undefined;
+    const scheduled: (() => void)[] = [];
+    return {
+      api: {
+        onAgentSettled: (handler) => {
+          agentSettledHandler = handler;
+        },
+        onModelSelect: () => undefined,
+        onSessionCompact: () => undefined,
+        onSessionShutdown: () => undefined,
+        onSessionStart: (handler) => {
+          resetHandler = handler;
+        },
+        onTurnEnd: () => undefined,
+        scheduleAfterSettlement: (handler) => {
+          scheduled.push(handler);
+        },
+        sendMessage: () => undefined,
+      },
+      agentSettled: () => agentSettledHandler,
+      reset: () => resetHandler,
+      scheduled,
+    };
+  }
+
+  it("rechecks after downstream settlement handlers can start work", () => {
+    const h = scheduledHarness();
+    const compactCalls: CompactOptions[] = [];
+    const ctx = context({
+      compact: (options) => compactCalls.push(options),
+      tokens: 244_800,
+    });
+    let idle = true;
+    ctx.isIdle = () => idle;
+    installContextWindowPolicy(h.api);
+
+    h.agentSettled()?.(ctx);
+    expect(h.scheduled).toHaveLength(1);
+    expect(compactCalls).toEqual([]);
+
+    idle = false;
+    h.scheduled.shift()?.();
+    expect(compactCalls).toEqual([]);
+
+    idle = true;
+    h.agentSettled()?.(ctx);
+    h.scheduled.shift()?.();
+    expect(compactCalls).toHaveLength(1);
+  });
+
+  it("contains errors from deferred settlement work", () => {
+    const h = scheduledHarness();
+    const ctx = context({
+      compact: () => {
+        throw new Error("synchronous failure");
+      },
+      tokens: 244_800,
+    });
+    installContextWindowPolicy(h.api);
+
+    h.agentSettled()?.(ctx);
+    expect(() => h.scheduled.shift()?.()).not.toThrow();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Context compaction failed: synchronous failure",
+      "error",
+    );
+  });
+
+  it("ignores a deferred settlement after lifecycle reset", () => {
+    const h = scheduledHarness();
+    const compactCalls: CompactOptions[] = [];
+    const ctx = context({
+      compact: (options) => compactCalls.push(options),
+      tokens: 244_800,
+    });
+    installContextWindowPolicy(h.api);
+
+    h.agentSettled()?.(ctx);
+    h.reset()?.();
+    h.scheduled.shift()?.();
+
+    expect(compactCalls).toEqual([]);
   });
 });
 

@@ -38,6 +38,7 @@ export type ContextWindowPolicyApi = {
   onSessionShutdown(handler: () => void): void;
   onSessionStart(handler: () => void): void;
   onTurnEnd(handler: (event: TurnEndEvent, ctx: ContextWindowPolicyContext) => void): void;
+  scheduleAfterSettlement(handler: () => void): void;
   sendMessage(
     message: ContinuationMessage,
     options: { deliverAs: "followUp"; triggerTurn: true },
@@ -284,22 +285,30 @@ export function createContextWindowPolicyController(
 
 export function installContextWindowPolicy(api: ContextWindowPolicyApi): void {
   const controller = createContextWindowPolicyController(api);
+  let lifecycleVersion = 0;
+  const reset = (): void => {
+    lifecycleVersion += 1;
+    controller.reset();
+  };
   api.onTurnEnd((event, ctx) => {
     controller.turnEnded(event, ctx);
   });
   api.onAgentSettled((ctx) => {
-    controller.agentSettled(ctx);
+    const expectedVersion = lifecycleVersion;
+    api.scheduleAfterSettlement(() => {
+      if (lifecycleVersion !== expectedVersion) return;
+      try {
+        controller.agentSettled(ctx);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        notify(ctx, `Context compaction failed: ${message}`, "error");
+      }
+    });
   });
   api.onSessionCompact((event, ctx) => {
     controller.sessionCompacted(event, ctx);
   });
-  api.onModelSelect(() => {
-    controller.reset();
-  });
-  api.onSessionStart(() => {
-    controller.reset();
-  });
-  api.onSessionShutdown(() => {
-    controller.reset();
-  });
+  api.onModelSelect(reset);
+  api.onSessionStart(reset);
+  api.onSessionShutdown(reset);
 }
