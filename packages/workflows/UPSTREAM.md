@@ -2,7 +2,7 @@
 
 - Repository: https://github.com/osolmaz/pi-workflows
 - Latest release at review: `v0.14.0`
-- Source commit: `5ad289e69a4cb1dca9a7055cbd642572de458451`
+- Source commit: `01b1a6811be56ce7d09f7e970304b4440075f363`
 - Package source: immutable Git dependency at the reviewed commit
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
@@ -12,7 +12,8 @@ The reviewed source provides workflow and controller commands, model-managed wor
 durable controller state, child workflow scheduling, and the standalone workflow host. The reviewed
 commit adds the incremental and virtualized `piw` viewer after release `0.14.0`. It keeps JSON Patch
 for bounded viewer updates, pages replay data, shares watched-run projections, and uses bounded
-node-owned graph cards. Its SQLite shape replaces the release schema in place. Existing release
+node-owned graph cards. Boxed cards reserve separate space for paired labels, and Git-package builds
+keep the command executable. Its SQLite shape replaces the release schema in place. Existing release
 state must be backed up and converted before this source is activated.
 
 Release `0.14.0` also adds a verified terminal decision that can restart a supported completed,
