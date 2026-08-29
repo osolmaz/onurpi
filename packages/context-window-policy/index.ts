@@ -14,9 +14,19 @@ export default function contextWindowPolicy(pi: ExtensionAPI): void {
         handler(ctx);
       });
     },
+    onSessionBeforeCompact: (handler) => {
+      pi.on("session_before_compact", (event, ctx) => {
+        handler(event, ctx);
+      });
+    },
     onSessionCompact: (handler) => {
       pi.on("session_compact", (event, ctx) => {
         handler(event, ctx);
+      });
+    },
+    onSessionCompactFailed: (handler) => {
+      pi.on("session_compact_failed", (_event, ctx) => {
+        handler(ctx);
       });
     },
     onModelSelect: (handler) => {
