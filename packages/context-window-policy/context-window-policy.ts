@@ -23,7 +23,7 @@ type ContinuationMessage = {
 
 export type ContextWindowPolicyContext = Pick<
   ExtensionContext,
-  "abort" | "compact" | "getContextUsage" | "hasPendingMessages" | "hasUI" | "model"
+  "abort" | "compact" | "getContextUsage" | "hasPendingMessages" | "hasUI" | "isIdle" | "model"
 > & {
   sessionManager: Pick<ExtensionContext["sessionManager"], "getSessionId">;
   ui: Pick<ExtensionContext["ui"], "notify">;
@@ -122,13 +122,17 @@ function clearExpected(state: ControllerState, expected: ActiveRequest): boolean
   return true;
 }
 
+function hasCompactionConflict(ctx: ContextWindowPolicyContext): boolean {
+  return !ctx.isIdle() || ctx.hasPendingMessages();
+}
+
 function continueAfterCompaction(
   api: ContextWindowPolicyApi,
   state: ControllerState,
   ctx: ContextWindowPolicyContext,
   expected: ActiveRequest,
 ): void {
-  if (!clearExpected(state, expected) || !expected.resume || ctx.hasPendingMessages()) return;
+  if (!clearExpected(state, expected) || !expected.resume || hasCompactionConflict(ctx)) return;
   try {
     api.sendMessage(
       {
@@ -170,6 +174,23 @@ function startCompaction(
     clearExpected(state, request);
     throw error;
   }
+}
+
+function compactAtSafeSettlement(
+  api: ContextWindowPolicyApi,
+  state: ControllerState,
+  ctx: ContextWindowPolicyContext,
+  resume: boolean,
+): void {
+  if (hasCompactionConflict(ctx)) {
+    state.active = {
+      phase: "stopping",
+      resume: false,
+      sessionId: ctx.sessionManager.getSessionId(),
+    };
+    return;
+  }
+  startCompaction(api, state, ctx, resume);
 }
 
 function activeForContext(
@@ -233,11 +254,11 @@ function handleAgentSettled(
     return;
   }
   if (active?.phase === "stopping") {
-    startCompaction(api, state, ctx, active.resume);
+    compactAtSafeSettlement(api, state, ctx, active.resume);
     return;
   }
   if (active || evaluate(ctx) !== "eligible") return;
-  startCompaction(api, state, ctx, false);
+  compactAtSafeSettlement(api, state, ctx, false);
 }
 
 export function createContextWindowPolicyController(

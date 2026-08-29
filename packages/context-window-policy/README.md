@@ -16,10 +16,12 @@ method. `@onurpi/pi-codex-compaction` then supplies the native OpenAI checkpoint
 `session_before_compact` event.
 
 Before it aborts a tool-driven run, the extension records whether Pi has queued work. This state
-must survive until settlement because `ctx.abort()` can move pending messages out of Pi's queue.
-After successful compaction, the extension checks the queue again. It sends one hidden custom
-continuation message only when neither check found queued work. This keeps queued user work ahead of
-the continuation and prevents a duplicate turn.
+must survive until settlement because `ctx.abort()` can move pending messages out of Pi's queue. At
+settlement, the extension also checks whether another extension started or queued work. It keeps the
+compaction request pending until Pi is idle and disables its own continuation when this occurs.
+After successful compaction, it checks once more and sends one hidden custom continuation message
+only when no competing work appeared before or after abort. This keeps queued user work ahead of the
+continuation and prevents a duplicate turn.
 
 If Pi's built-in threshold or overflow compaction runs first, the extension uses that successful
 compaction and does not start a duplicate. Overflow recovery remains owned by Pi.
@@ -53,13 +55,14 @@ extension runtime.
 
 The extension uses only documented Pi APIs: `turn_end`, `agent_settled`, `session_compact`,
 `model_select`, `session_start`, `session_shutdown`, `ctx.getContextUsage()`, `ctx.abort()`,
-`ctx.compact()`, `ctx.hasPendingMessages()`, and `pi.sendMessage()`.
+`ctx.compact()`, `ctx.hasPendingMessages()`, `ctx.isIdle()`, and `pi.sendMessage()`.
 
 ## Verification
 
-The queue regression must cover pending work that exists before abort but is no longer reported
-after `agent_settled`. The test must prove that this case does not send the hidden continuation. Run
-the package and repository checks from this checkout:
+The queue regressions must cover pending work that exists before abort but is no longer reported
+after `agent_settled`, plus work that another extension starts or queues at settlement. The tests
+must prove that these cases defer compaction safely and do not send the hidden continuation. Run the
+package and repository checks from this checkout:
 
 ```bash
 cd packages/context-window-policy
