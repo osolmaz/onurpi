@@ -117,6 +117,37 @@ Interpretation:
 - DNS/HTTP resolving means the domain is probably registered even if RDAP lookup was inconclusive.
 - Parked pages, registrar pages, and sale pages still mean taken for normal claim purposes.
 
+#### Two-letter TLDs at Namecheap and Cloudflare
+
+Use this list when the user wants a short, two-letter domain extension. It was
+verified on 2026-08-30 from the official [Namecheap TLD
+sitemap](https://www.namecheap.com/nc-tlds-sitemap.xml) and [Cloudflare TLD
+policies](https://domains.cloudflare.com/tld-policies).
+
+Both registrars support:
+
+```text
+.ac .ai .ca .cc .co .fm .io .me .mx .sh .tv .uk .us
+```
+
+Namecheap also supports:
+
+```text
+.bz .ch .cm .cx .de .es .eu .fr .gg .id .in .is
+.la .li .nl .nu .pe .ph .pw .sg .so .to .vc .ws
+```
+
+Cloudflare also supports:
+
+```text
+.nz
+```
+
+Together, these registrars support 38 distinct two-letter TLDs. Recheck the
+official sources before recommending a purchase because registrar support and
+registry rules can change. Also check country-specific eligibility rules and
+the exact domain's availability.
+
 ### X/Twitter
 
 Use multiple signals because X can return bot defenses and odd status codes:
