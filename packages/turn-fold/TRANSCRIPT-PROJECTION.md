@@ -71,7 +71,11 @@ An attached compaction contributes to its run summary and stays out of the compa
 
 The process-local compaction registry remains the authority for this distinction. Projection MUST NOT infer attachment from timestamps, neighboring messages, or entry order.
 
-Pi performs a transcript rebuild after every successful compaction. Pi 0.84.3 requires the completed compaction as the first replay entry, removes it from the replay slice, and appends its live summary once at the chronological position. Turn Fold forces that entry to the front for this one rebuild even when compact display policy normally hides it. Later projections use the normal sparse display.
+Pi performs a transcript rebuild after every successful compaction. Pi 0.84.3 introduced a replay
+contract that requires the completed compaction as the first replay entry, removes it from the replay
+slice, and appends its live summary once at the chronological position. Turn Fold applies that
+handling to later stable Pi releases and forces the entry to the front for this one rebuild even when
+compact display policy normally hides it. Later projections use the normal sparse display.
 
 ## User and custom entries
 
@@ -81,7 +85,10 @@ Custom entries keep their registered renderers. A displayable custom entry owned
 
 The projection MUST preserve the original entry objects and ordering. It MUST NOT clone entries with changed messages, append display entries, or alter parent links.
 
-General group visibility comes from retained run content. User-component association MUST use only projected entries whose message role is `user`, in projected order. Reconstruction removes stale user groups, resets the positional cursor, and adds the active user group at most once. This keeps Pi 0.84.3's positional user components aligned with their persisted timestamps.
+General group visibility comes from retained run content. User-component association MUST use only
+projected entries whose message role is `user`, in projected order. Reconstruction removes stale
+user groups, resets the positional cursor, and adds the active user group at most once. This keeps
+supported Pi positional user components aligned with their persisted timestamps.
 
 ## Cached run snapshots
 

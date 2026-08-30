@@ -391,15 +391,21 @@ describe("installCodexSwitcher", () => {
   });
 
   it("keeps the account manager available with a missing configuration", async () => {
+    const requests: string[] = [];
     const test = harness();
     const runtime = installCodexSwitcher(test.api, {
       configPath: "/agent/codex-switcher.json",
       configResult: { status: "missing" },
-      nativeProvider: fakeNative([]),
+      nativeProvider: fakeNative(requests),
       vault: fakeVault([]),
     });
     expect(runtime?.isAuthenticationReady()).toBe(false);
     expect(test.providers.map((provider) => provider.id)).toEqual(["openai-codex"]);
+    const provider = test.providers[0] as CodexProvider;
+    expect(provider.auth.oauth).toBeDefined();
+    const model = provider.getModels()[0] as CodexModel;
+    await provider.stream(model, { messages: [] }, { apiKey: "canonical-token" }).result();
+    expect(requests).toEqual(["canonical-token"]);
     const notify = vi.fn();
     await test.commands.get("codex-switcher")?.handler("status", {
       ui: { notify },

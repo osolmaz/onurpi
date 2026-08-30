@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import turnFold from "./index.ts";
+import turnFold, { supportsPiVersion } from "./index.ts";
 import { clearRestartMarker } from "./restart-marker.ts";
 import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
 import { TurnFoldState } from "./turn-state.ts";
@@ -151,6 +151,22 @@ afterEach(() => {
   historyViewerMock.defer = false;
   historyViewerMock.entries.length = 0;
   vi.clearAllMocks();
+});
+
+describe("Turn Fold Pi compatibility", () => {
+  it.each(["0.84.3", "0.84.99", "0.85.0", "0.100.0", "1.0.0", "12.34.56"])(
+    "supports stable future release %s",
+    (version) => {
+      expect(supportsPiVersion(version)).toBe(true);
+    },
+  );
+
+  it.each(["0.84.2", "0.83.99", "0.84.4-beta.1", "1.0.0-rc.1", "invalid"])(
+    "rejects unsupported release %s",
+    (version) => {
+      expect(supportsPiVersion(version)).toBe(false);
+    },
+  );
 });
 
 describe("Turn Fold finalized edit results", () => {

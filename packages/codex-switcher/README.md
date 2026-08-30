@@ -36,6 +36,11 @@ chmod 600 ~/.pi/agent/codex-switcher.json
 Array order defines preference and fallback order. Account IDs use lowercase letters, digits, and
 single hyphens.
 
+Until a configured account has a credential in the switcher vault, the provider preserves Pi's
+native OAuth authentication and transport. This keeps normal Pi usable while the switcher is first
+configured or an account is being added. Once a configured vault credential exists, all requests use
+switcher routing.
+
 `subscription-only` stops an account when a subscription window reaches zero. `allow-credits`
 permits paid credits only when the Codex usage response confirms that credits remain.
 

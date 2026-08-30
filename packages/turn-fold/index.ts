@@ -47,7 +47,17 @@ import {
 import { TurnFoldState } from "./turn-state.ts";
 
 const WINDOW_ARGUMENTS = ["1", "3", "+1", "-1", "all", "reset"] as const;
-export const SUPPORTED_PI_VERSION = "0.84.3";
+export const SUPPORTED_PI_RANGE = ">=0.84.3";
+
+export function supportsPiVersion(version: string): boolean {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3]);
+  if (![major, minor, patch].every(Number.isSafeInteger)) return false;
+  return major > 0 || minor > 84 || (minor === 84 && patch >= 3);
+}
 
 type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
 
@@ -422,10 +432,10 @@ function startSession(
     runtime.adapter = undefined;
     return;
   }
-  if (VERSION !== SUPPORTED_PI_VERSION) {
+  if (!supportsPiVersion(VERSION)) {
     runtime.adapter = undefined;
     ctx.ui.notify(
-      `Turn Fold compact transcript disabled: Pi ${VERSION} is not the tested ${SUPPORTED_PI_VERSION} release. History remains available.`,
+      `Turn Fold compact transcript disabled: Pi ${VERSION} is outside the supported ${SUPPORTED_PI_RANGE} range. History remains available.`,
       "warning",
     );
     return;
@@ -597,10 +607,9 @@ export default function turnFold(pi: ExtensionAPI): void {
       pi.appendEntry(customType, data);
     }),
   };
-  const restorePatches =
-    VERSION === SUPPORTED_PI_VERSION
-      ? installRenderPatches(state, () => runtime.currentTheme)
-      : () => undefined;
+  const restorePatches = supportsPiVersion(VERSION)
+    ? installRenderPatches(state, () => runtime.currentTheme)
+    : () => undefined;
   const requestConfiguration: RequestConfiguration = async (next, ctx, persist) => {
     await ctx.waitForIdle();
     const branch = ctx.sessionManager.getBranch();

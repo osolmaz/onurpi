@@ -43,6 +43,28 @@ export type CreateCodexSwitcherProviderOptions = {
   readonly vaultPath?: string;
 };
 
+function switcherTransports(
+  nativeProvider: CodexProvider,
+  routerOptions: {
+    getAccounts: () => CodexSwitcherConfig["accounts"];
+    runtime: SwitcherRuntime;
+    state: SwitcherState;
+  },
+): { stream: CodexTransport; streamSimple: CodexTransport } {
+  return {
+    stream: createCodexSwitcherStream({
+      ...routerOptions,
+      transport: (model, context, streamOptions) =>
+        nativeProvider.stream(model, context, streamOptions),
+    }),
+    streamSimple: createCodexSwitcherStream({
+      ...routerOptions,
+      transport: (model, context, streamOptions) =>
+        nativeProvider.streamSimple(model, context, streamOptions),
+    }),
+  };
+}
+
 export function createCodexSwitcherProvider(
   options: CreateCodexSwitcherProviderOptions,
 ): CodexSwitcherProvider {
@@ -77,20 +99,12 @@ export function createCodexSwitcherProvider(
       state.activeAccountId = account.id;
     },
   };
-  const routerOptions = {
+  const hasSwitcherAccount = (): boolean =>
+    vault.hasAnySync(config.get().accounts.map((account) => account.id));
+  const { stream, streamSimple } = switcherTransports(options.nativeProvider, {
     getAccounts: () => config.get().accounts,
     runtime,
     state,
-  };
-  const stream = createCodexSwitcherStream({
-    ...routerOptions,
-    transport: (model, context, streamOptions) =>
-      options.nativeProvider.stream(model, context, streamOptions),
-  });
-  const streamSimple = createCodexSwitcherStream({
-    ...routerOptions,
-    transport: (model, context, streamOptions) =>
-      options.nativeProvider.streamSimple(model, context, streamOptions),
   });
   const startRun = (): void => {
     if (state.agentRunActive) return;
@@ -107,13 +121,20 @@ export function createCodexSwitcherProvider(
     state.activeAccountId = undefined;
   };
   return {
-    provider: switcherProvider(options.nativeProvider, config, vault, state, stream, streamSimple),
+    provider: switcherProvider(
+      options.nativeProvider,
+      config,
+      vault,
+      state,
+      stream,
+      streamSimple,
+      hasSwitcherAccount,
+    ),
     config,
     oauth,
     state,
     vault,
-    isAuthenticationReady: () =>
-      vault.hasAnySync(config.get().accounts.map((account) => account.id)),
+    isAuthenticationReady: hasSwitcherAccount,
     startRun,
     finishRun,
     close,
@@ -167,6 +188,7 @@ function switcherProvider(
   state: SwitcherState,
   stream: CodexTransport,
   streamSimple: CodexTransport,
+  hasSwitcherAccount: () => boolean,
 ): CodexProvider {
   return createProvider({
     id: native.id,
@@ -174,6 +196,7 @@ function switcherProvider(
     ...(native.baseUrl ? { baseUrl: native.baseUrl } : {}),
     ...(native.headers ? { headers: native.headers } : {}),
     auth: {
+      ...(native.auth.oauth ? { oauth: native.auth.oauth } : {}),
       apiKey: {
         name: "Codex switcher account vault",
         check: async () =>
@@ -186,9 +209,13 @@ function switcherProvider(
     models: native.getModels(),
     api: {
       stream: (model, context, streamOptions) =>
-        stream(model as CodexModel, context, streamOptions),
+        hasSwitcherAccount()
+          ? stream(model as CodexModel, context, streamOptions)
+          : native.stream(model as CodexModel, context, streamOptions),
       streamSimple: (model, context, streamOptions) =>
-        streamSimple(model as CodexModel, context, streamOptions),
+        hasSwitcherAccount()
+          ? streamSimple(model as CodexModel, context, streamOptions)
+          : native.streamSimple(model as CodexModel, context, streamOptions),
     },
   });
 }

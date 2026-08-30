@@ -98,7 +98,7 @@ describe("transcript window adapter", () => {
     );
   });
 
-  it("places a completed compaction first for one Pi 0.84.3 rebuild", () => {
+  it("places a completed compaction first for one supported Pi rebuild", () => {
     const branch = [user("old"), compaction("c1"), custom("now")];
     const sessionManager = manager(branch);
     const adapter = installTranscriptWindowAdapter(sessionManager, 1, (entries) =>
