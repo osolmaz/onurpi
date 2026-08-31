@@ -57,6 +57,19 @@ a locally modified skill with `--force`.
 
 ## Personal tips and tricks
 
+### Split fine-grained read and write roles
+
+A Hugging Face fine-grained token cannot combine a read-only resource grant
+with read/write grants. When a Job must read a control repository and write to
+a separate status repository or Bucket, use two purpose-scoped tokens. Bind the
+read-only token only to the reader or control store and bind the writer token
+only to status, artifact, and publication stores.
+
+Do not solve this limitation by giving the control repository write access or
+by attaching a broad account token. Give each Job secret a role-specific name,
+construct each client with the matching token explicitly, and test both access
+paths before launch.
+
 ### Use the official Git credential integration
 
 For HTTPS Git operations against `huggingface.co`, prefer Hugging Face's
