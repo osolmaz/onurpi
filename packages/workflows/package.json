@@ -33,7 +33,7 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.3",
+    "@earendil-works/pi-coding-agent": "0.84.4",
     "@eslint/js": "9.39.2",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
@@ -51,6 +51,6 @@
     "qs": "6.15.3"
   },
   "dependencies": {
-    "@osolmaz/pi-workflows": "git+https://github.com/osolmaz/pi-workflows.git#01b1a6811be56ce7d09f7e970304b4440075f363"
+    "@osolmaz/pi-workflows": "0.15.1"
   }
 }

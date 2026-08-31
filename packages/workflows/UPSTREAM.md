@@ -1,38 +1,32 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.14.0`
-- Source commit: `01b1a6811be56ce7d09f7e970304b4440075f363`
-- Package source: immutable Git dependency at the reviewed commit
+- Latest release at review: `v0.15.1`
+- Source commit: `b405ff5c5bafd307507c1b62cc6eeefcde3794ca`
+- Package source: exact npm release `0.15.1`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
 
-The reviewed source provides workflow and controller commands, model-managed workflow controls,
-durable controller state, child workflow scheduling, and the standalone workflow host. The reviewed
-commit adds the incremental and virtualized `piw` viewer after release `0.14.0`. It keeps JSON Patch
-for bounded viewer updates, pages replay data, shares watched-run projections, and uses bounded
-node-owned graph cards. Boxed cards reserve separate space for paired labels, and Git-package builds
-keep the command executable. Its SQLite shape replaces the release schema in place. Existing release
-state must be backed up and converted before this source is activated.
+The reviewed source provides workflow and controller commands, durable state, child workflow
+scheduling, and the terminal viewer. Release `0.15.0` moved production workflow execution out of the
+origin Pi process. One package-owned host is the normal state writer, and supervised child processes
+run workflow and controller code. Patch `0.15.1` also stops temporary package-discovery hosts when
+the real-Pi end-to-end tests finish.
 
-Release `0.14.0` also adds a verified terminal decision that can restart a supported completed,
-failed, or cancelled workflow from its original input.
+The extension and host use a versioned local protocol with strict validation. Durable interaction
+requests connect a workflow to its origin Pi session and survive Pi restarts. The host uses atomic
+lifecycle changes, stale-run cancellation, typed claim loss, and exact-token lease renewal. An
+expired or replaced owner cannot renew its lease or resume writes.
 
-Workflow resume is idempotent and reports actionable paused and resumable state separately from the
-durable lifecycle status. The bundled workflow skill maps explicit continue or resume requests
-directly to the resume tool action. Autoplan, Autodoc, and Autoimplement now require an explicit
-user request before they start.
+External effects use durable intent and receipt records. An effect with an uncertain result becomes
+ambiguous and needs an explicit recovery decision. The package does not promise exactly-once
+delivery when an external system cannot prove it.
 
-Direct verified answers and periodic recovery use one atomic prepare-or-adopt path for deterministic
-human-decision continuations. One attempt claims and starts the continuation. Compatible concurrent
-attempts adopt it without changing the winning lease or starting the engine again. Prepared-launch
-recovery keeps a temporarily blocked continuation activatable until the session can start it.
-
-Large text that must be stored outside the Pi session uses content-addressed blobs. The store keeps
-one copy and deletes blobs when no record refers to them. Pruning protects active work, pending
-follow-ups, live settings, leases, effects, restart ancestry, and continuation links before it
-removes old runs and unused blobs.
+This alpha release changes SQLite schema version 1 in place and removes embedded production
+execution. It has no compatibility reader or fallback runtime. Before activation, back up and move
+an incompatible `state.sqlite` file together with its `-wal` and `-shm` files. Pi Workflows then
+creates new state. It does not change the incompatible files.
 
 The package bundles the `pi-workflows`, `monitor`, `autoplan`, `autodoc`, and `autoimplement` skills
 with the extension. It also ships the native Herdr plugin and workflow-to-piw actions. Pi package
