@@ -174,6 +174,23 @@ def check(path):
                          f"{triads} exactly-three lists; fine if they enumerate "
                          "real items, a tell if rhetorical"))
 
+    # Phrase triads: "VP1, VP2, and VP3" where every item is a multi-word
+    # phrase. Measured on the corpus these run at 7.6/1k words on the AI
+    # pages against 1.2/1k in the human texts (human max 2.8), so the
+    # rate threshold of 3 carries over from the single-word detector.
+    phrase_triads = []
+    for m in re.finditer(
+            r"([^,;.:]{8,90}?),\s+([^,;.:]{8,90}?),\s+and\s+([^,;.:]{8,110})",
+            text):
+        if all(len(re.findall(r"[\w'’-]+", g)) >= 2 for g in m.groups()):
+            phrase_triads.append(m.group(0).strip())
+    if phrase_triads and per_1k(len(phrase_triads)) > 3:
+        sev = "VIOLATION" if len(phrase_triads) >= 2 else "REVIEW"
+        findings.append((sev, None,
+                         f"phrase triads at {per_1k(len(phrase_triads))}/1k "
+                         f"words (threshold 3), e.g. "
+                         f'"{phrase_triads[0][:80]}"'))
+
     sents = sentences(text)
     frags = [s for s in sents if len(re.findall(r"[\w'’-]+", s)) <= 4]
     if sents and len(frags) / len(sents) > 0.15:

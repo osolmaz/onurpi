@@ -2,4 +2,6 @@ node_modules/
 coverage/
 dist/
 .stryker-tmp/
+__pycache__/
+*.py[cod]
 *.tgz

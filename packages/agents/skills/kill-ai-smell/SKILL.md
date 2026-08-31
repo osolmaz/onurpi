@@ -444,9 +444,9 @@ when any violation remains:
 
 - A `VIOLATION` is a banned pattern or a rate over budget: em dashes
   beyond one per thousand words, semicolon chains, "not just X",
-  hedging phrases, anaphora chains, exactly-three lists past the
-  detector threshold, labeled bullets past 30% of all bullets, and
-  manually numbered headings. Fix all of these by restructuring, then
+  hedging phrases, anaphora chains, exactly-three lists (single-word
+  or multi-word phrase items) past the detector threshold, labeled
+  bullets past 30% of all bullets, and manually numbered headings. Fix all of these by restructuring, then
   rerun until the file is clean.
 - A `REVIEW` needs judgment. "X, not Y" is allowed when the negation is
   the content; a colon before a list is fine; a heading with a comma may

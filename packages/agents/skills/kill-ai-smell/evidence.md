@@ -39,6 +39,14 @@ No overlap. Every AI page is at least 3x every human text, and the
 corpus averages differ about 19x. One of the two detector rules (threshold 3
 per 1k). This is the strongest punctuation-level tell.
 
+**Phrase triads.** The same triad shape with multi-word items ("define
+X as graphs, trigger them with a command, and watch them run live"),
+which the single-word regex misses entirely: AI pages average 7.6 per
+1k words, human texts 1.2, human max 2.8. At the shared threshold of 3
+per 1k the detector fires on 8 of 10 AI pages and 0 of 8 human texts.
+A single occurrence in a short document is a REVIEW rather than a
+VIOLATION, since one triad can be a genuine enumeration.
+
 **Labeled bullets.** Share of bullets that open with a short label,
 then a separator, then elaboration: AI 53-100%, human 0-11%, and five
 of eight human texts never use the shape. The other detector rule
