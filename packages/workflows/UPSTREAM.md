@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.15.2`
-- Source commit: `4ece863149072b475be0f3a07eb785edb469d0e6`
-- Package source: exact npm release `0.15.2`
+- Latest release at review: `v0.15.3`
+- Source commit: `0c301befa45efa5eb91c0badaa06cbdc0fb0b756`
+- Package source: exact npm release `0.15.3`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -15,7 +15,9 @@ run workflow and controller code. Patch `0.15.1` also stops temporary package-di
 the real-Pi end-to-end tests finish. Patch `0.15.2` routes all origin-session deliveries through one
 coordinator, waits for Pi to be idle with no pending messages, confirms each public session entry,
 and adopts existing entries after restart. A live claim cannot renew itself to send another copy,
-and an uncertain delivery stops instead of retrying.
+and an uncertain delivery stops instead of retrying. Patch `0.15.3` keeps claims valid while Pi is
+busy, revalidates each claim before delivery, restores the workflow widget and scrolling, and
+restores Escape-to-pause and in-place resume for origin-session interactions.
 
 The extension and host use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The host uses atomic

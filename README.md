@@ -53,7 +53,7 @@ repositories.
 | [`huggingface-oauth`](packages/huggingface-oauth/) | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
 | [`pi-must-win`](packages/pi-must-win/)             | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) at an immutable commit  |
 | [`regrafter-driver`](packages/regrafter-driver/)   | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit    |
-| [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.15.1   |
+| [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.15.3   |
 | [`demo-mode`](packages/demo-mode/)                 | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
