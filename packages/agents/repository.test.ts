@@ -33,11 +33,12 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(51);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(51);
+    expect(skills).toHaveLength(52);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(52);
     expect(skills.map((skill) => skill.skillId)).not.toContain("plain-language");
     expect(skills.map((skill) => skill.skillId)).not.toContain("paid-compute-launch");
     expect(skills.map((skill) => skill.skillId)).toContain("amk");
+    expect(skills.map((skill) => skill.skillId)).toContain("find-sota");
     expect(skills.map((skill) => skill.skillId)).toEqual(
       expect.arrayContaining(["autodoc-legacy", "autoimplement-legacy"]),
     );
@@ -56,7 +57,7 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(51);
+    expect(topLevelSkillFiles).toHaveLength(52);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
   });
 
