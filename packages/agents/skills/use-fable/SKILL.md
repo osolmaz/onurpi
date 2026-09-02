@@ -23,8 +23,8 @@ availability, or an earlier request. Never silently switch adapters.
 
 ## Required Invocation
 
-Always pass `acpx` and `--model claude-fable-5` explicitly. Run from the target
-repository or pass `--cwd <repo>`.
+Always pass `acpx` and `--model claude-fable-5-1` explicitly. Run from the
+target repository or pass `--cwd <repo>`.
 
 ### Default: local Claude Code
 
@@ -32,7 +32,7 @@ For a short or ordinary task, use a 30-minute timeout:
 
 ```bash
 acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   claude exec "$PROMPT"
 ```
@@ -42,7 +42,7 @@ For a very long task, use a 12-hour timeout and a named persistent session:
 ```bash
 acpx --cwd "$REPO" --timeout 43200 claude sessions ensure --name fable-work
 acpx --cwd "$REPO" --timeout 43200 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   claude -s fable-work "$PROMPT"
 ```
@@ -54,7 +54,7 @@ both session setup and invocation:
 
 ```bash
 acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   cursor exec "$PROMPT"
 ```
@@ -64,7 +64,7 @@ For substantial Cursor work, use a named Cursor session:
 ```bash
 acpx --cwd "$REPO" --timeout 43200 cursor sessions ensure --name fable-work
 acpx --cwd "$REPO" --timeout 43200 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   cursor -s fable-work "$PROMPT"
 ```

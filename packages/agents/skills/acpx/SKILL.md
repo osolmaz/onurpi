@@ -60,7 +60,7 @@ Code CLI, and request Fable explicitly:
 
 ```bash
 acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   claude exec "$PROMPT"
 ```
@@ -70,7 +70,7 @@ through Cursor in the current request:
 
 ```bash
 acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5 \
+  --model claude-fable-5-1 \
   --approve-reads --non-interactive-permissions deny \
   cursor exec "$PROMPT"
 ```
