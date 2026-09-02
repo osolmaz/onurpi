@@ -3,6 +3,8 @@ import {
   collectedOutputFromBytes,
   collectOutputUntilDeadline,
 } from "./collect.ts";
+import { commandInputEvent, throwIfCommandInputRejected } from "./command-input.ts";
+import { runFinalInputPolicies } from "./command-policy.ts";
 import { DEFAULT_WRITE_STDIN_YIELD_MS, LONG_WAIT_UPDATE_INTERVAL_MS } from "./constants.ts";
 import {
   type LongWaitOutcome,
@@ -349,6 +351,30 @@ export async function runWriteStdin(
   const bytes = resolveWriteInput(args);
   const isEmptyPoll = !bytes?.length;
   validateWaitArguments(args, isEmptyPoll);
+  if (bytes?.length) {
+    const inputEvent = commandInputEvent(
+      toolCallId,
+      session.id,
+      session.displayCommand,
+      session.cwd,
+      session.shell,
+      session.tty,
+      bytes,
+    );
+    runtime.prepareInput(inputEvent);
+    throwIfCommandInputRejected(inputEvent);
+    const finalInputEvent = commandInputEvent(
+      toolCallId,
+      session.id,
+      session.displayCommand,
+      session.cwd,
+      session.shell,
+      session.tty,
+      bytes,
+    );
+    runFinalInputPolicies(finalInputEvent);
+    throwIfCommandInputRejected(finalInputEvent);
+  }
   if (args.yield_until) {
     return runAbsoluteWait(runtime, session, args.yield_until, signal, onUpdate, toolCallId);
   }

@@ -7,6 +7,7 @@ import type { TSchema } from "typebox";
 
 import type { CompletionCoordinator, OnExitPolicy } from "./completion.ts";
 import type { PrepareCommandEnvironment } from "./command-environment.ts";
+import type { PrepareCommandInput } from "./command-input.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { ExecSession } from "./session.ts";
 import type { TruncationMetadata } from "./tool-result.ts";
@@ -111,6 +112,7 @@ export type ExtensionRuntime = {
   notifiedBashSource: boolean;
   pendingSessions: Set<ExecSession>;
   prepareEnvironment: PrepareCommandEnvironment;
+  prepareInput: PrepareCommandInput;
   shuttingDown: boolean;
   agentActivity: AgentActivity;
 };

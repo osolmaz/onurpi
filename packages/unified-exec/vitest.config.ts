@@ -10,6 +10,10 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       include: [
         "src/collect.ts",
+        "src/command-environment.ts",
+        "src/command-input.ts",
+        "src/command-policy.ts",
+        "src/command-shell.ts",
         "src/completion.ts",
         "src/constants.ts",
         "src/format-time.ts",

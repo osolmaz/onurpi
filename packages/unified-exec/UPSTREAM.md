@@ -93,11 +93,15 @@ native module cannot load.
 - Ported the upstream unit suites to Vitest, including the v0.8.0–v0.9.0 `output-safety`,
   `tool-result`, and renderer suites. The upstream extension-API harness suites used unchecked `any`
   stubs, so their applicable process, byte-input, PTY, waiting, kill, and wake scenarios were
-  consolidated into a strict typed runtime integration suite. The package currently runs 220 tests,
+  consolidated into a strict typed runtime integration suite. The package currently runs 223 tests,
   plus a platform skip when PTY is unavailable.
 - Retained strict TypeScript, unsafe-operation linting, and the repository's complexity limit.
   Audited upstream lifecycle, scanning, and rendering routines use narrow, justified line-level
   complexity suppressions rather than a package-wide exemption.
+- Added public synchronous events before process spawn and nonempty process input. The spawn event
+  includes the originating tool call and a unique invocation ID. Both events support explicit
+  rejection before bytes reach the child. Added a final policy registry that runs immutable checks
+  after event listeners and immediately before those actions.
 - Deferred synthetic completion delivery while an agent run is active. This lets a finalized
   terminal `write_stdin` result consume the wake before `agent_settled`; truly unobserved
   completions still deliver one follow-up after settlement.

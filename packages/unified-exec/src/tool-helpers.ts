@@ -8,10 +8,9 @@ import {
   MIN_EMPTY_YIELD_TIME_MS,
   MIN_YIELD_TIME_MS,
 } from "./constants.ts";
-import { encode } from "./response.ts";
+import { resolveCommandInput } from "./command-input.ts";
 import { nowUtcIso } from "./time.ts";
 import type { WriteStdinArgs } from "./tool-schema.ts";
-import { unescapeChars } from "./unescape.ts";
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -57,21 +56,6 @@ export function normalizeSignal(raw: string | undefined): NodeJS.Signals {
   return name;
 }
 
-// eslint-disable-next-line complexity -- Keep mutually exclusive text and binary validation together.
 export function resolveWriteInput(args: WriteStdinArgs): Uint8Array | undefined {
-  const hasChars = typeof args.chars === "string" && args.chars.length > 0;
-  const hasBase64 = typeof args.chars_b64 === "string" && args.chars_b64.length > 0;
-  if (hasChars && hasBase64) {
-    throw new Error("write_stdin: pass either `chars` or `chars_b64`, not both.");
-  }
-  if (hasBase64 && args.chars_b64) {
-    const value = args.chars_b64.replace(/\s+/g, "");
-    const completeBase64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-    if (!value || !completeBase64.test(value)) {
-      throw new Error("write_stdin: `chars_b64` is not valid base64.");
-    }
-    return new Uint8Array(Buffer.from(value, "base64"));
-  }
-  if (hasChars && args.chars) return encode(unescapeChars(args.chars));
-  return undefined;
+  return resolveCommandInput(args);
 }

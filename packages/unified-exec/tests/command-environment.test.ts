@@ -11,6 +11,8 @@ describe("command environment event", () => {
   it("uses a stable channel and copies the child environment", () => {
     const baseEnvironment: NodeJS.ProcessEnv = { KEEP_ME: "yes" };
     const event = commandEnvironmentEvent(
+      "call-1",
+      "invocation-1",
       "git status",
       "/repo",
       "/bin/bash",
@@ -20,6 +22,8 @@ describe("command environment event", () => {
 
     expect(COMMAND_ENVIRONMENT_EVENT).toBe("unified-exec:before-spawn");
     expect(event).toMatchObject({
+      toolCallId: "call-1",
+      invocationId: "invocation-1",
       command: "git status",
       cwd: "/repo",
       shell: "/bin/bash",
@@ -35,7 +39,15 @@ describe("command environment event", () => {
     event.reject(failure);
     expect(() => throwIfCommandEnvironmentRejected(event)).toThrow(failure);
 
-    const stringRejected = commandEnvironmentEvent("git status", "/repo", "bash", undefined, {});
+    const stringRejected = commandEnvironmentEvent(
+      "call-2",
+      "invocation-2",
+      "git status",
+      "/repo",
+      "bash",
+      undefined,
+      {},
+    );
     stringRejected.reject("blocked");
     expect(() => throwIfCommandEnvironmentRejected(stringRejected)).toThrow(
       "unified-exec: child environment rejected: blocked",
@@ -47,6 +59,8 @@ describe("command environment event", () => {
     expect(isCommandEnvironmentEvent([])).toBe(false);
     expect(
       isCommandEnvironmentEvent({
+        toolCallId: "call",
+        invocationId: "invocation",
         command: "git status",
         cwd: "/repo",
         shell: "bash",
@@ -57,6 +71,8 @@ describe("command environment event", () => {
     ).toBe(false);
     expect(
       isCommandEnvironmentEvent({
+        toolCallId: "call",
+        invocationId: "invocation",
         command: "git status",
         cwd: "/repo",
         shell: "bash",
@@ -67,6 +83,8 @@ describe("command environment event", () => {
     ).toBe(false);
     expect(
       isCommandEnvironmentEvent({
+        toolCallId: "call",
+        invocationId: "invocation",
         command: "git status",
         cwd: "/repo",
         shell: "bash",

@@ -55,6 +55,7 @@ export class ExecSession {
   readonly command: string[];
   readonly displayCommand: string;
   readonly cwd: string;
+  readonly shell: string;
   readonly startedAt: number;
   readonly pid: number | undefined;
   /** Path to a log file that receives the full stdout+stderr stream. */
@@ -95,6 +96,7 @@ export class ExecSession {
     this.command = opts.command;
     this.displayCommand = opts.displayCommand ?? opts.command.join(" ");
     this.cwd = opts.cwd;
+    this.shell = opts.shell ?? "";
     this.tty = opts.tty;
     this.startedAt = Date.now();
     this.lastUsedAt = this.startedAt;

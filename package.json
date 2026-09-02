@@ -33,7 +33,8 @@
       "./packages/workflows/index.ts",
       "./packages/onur-openclaw-maintainer/index.ts",
       "./packages/demo-mode/index.ts",
-      "./packages/skill-slug/index.ts"
+      "./packages/skill-slug/index.ts",
+      "./packages/command-guard/index.ts"
     ],
     "skills": [
       "./packages/agents/skills/*/SKILL.md",

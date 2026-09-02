@@ -53,9 +53,17 @@ function registerExecCommand(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
       'on_exit defaults to "none". Use "wake" only when the human explicitly requests auto-resume, and disarm abandoned wakes with set_on_exit.',
     ],
     parameters: ExecCommandParameters,
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
-      const details = await runExecCommand(runtime, params, signal, onUpdate, ctx.cwd, ctx.model);
+      const details = await runExecCommand(
+        runtime,
+        params,
+        signal,
+        onUpdate,
+        ctx.cwd,
+        toolCallId,
+        ctx.model,
+      );
       updateRunningSessionsUi(runtime);
       return { content: [{ type: "text", text: renderProcessResultText(details) }], details };
     },

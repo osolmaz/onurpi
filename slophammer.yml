@@ -132,6 +132,10 @@ typescript:
     - from: packages/unified-exec
       allow:
         - packages/unified-exec
+    - from: packages/command-guard
+      allow:
+        - packages/command-guard
+        - packages/unified-exec
     - from: packages/yarp
       allow:
         - packages/yarp

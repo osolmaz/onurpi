@@ -82,6 +82,8 @@ describe("repository disable gate", () => {
       identity: { urlKey: undefined, repoPath: undefined },
     });
     const event = {
+      toolCallId: "call-1",
+      invocationId: "invocation-1",
       command: "git status",
       cwd: "/repo",
       shell: "bash",
@@ -118,6 +120,8 @@ describe("Pi Must Win adapter", () => {
     });
     emitEnvironment(undefined);
     const event = {
+      toolCallId: "call-2",
+      invocationId: "invocation-2",
       command: "git status",
       cwd: "/repo",
       shell: "bash",
@@ -149,6 +153,8 @@ describe("Pi Must Win adapter", () => {
 
   it("validates and attributes Unified Exec environment events", () => {
     const event = {
+      toolCallId: "call-3",
+      invocationId: "invocation-3",
       command: "git commit -m test",
       cwd: "/repo",
       shell: "/bin/bash",

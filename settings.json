@@ -25,6 +25,7 @@
     "../../repos/onurpi/packages/onur-openclaw-maintainer",
     "../../repos/onurpi/packages/demo-mode",
     "../../repos/onurpi/packages/skill-slug",
+    "../../repos/onurpi/packages/command-guard",
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],

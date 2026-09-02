@@ -6,6 +6,7 @@ import {
   type WakeMessage,
 } from "./completion.ts";
 import { COMMAND_ENVIRONMENT_EVENT } from "./command-environment.ts";
+import { COMMAND_INPUT_EVENT } from "./command-input.ts";
 import { LRU_PROTECTED_COUNT, MAX_SESSIONS } from "./constants.ts";
 import { SessionStore } from "./session-store.ts";
 import type { AgentActivity, ExtensionRuntime } from "./tool-types.ts";
@@ -14,6 +15,7 @@ type RuntimeOptions = Readonly<{
   send: (message: WakeMessage) => void | Promise<void>;
   coordinator?: Omit<CompletionCoordinatorOptions, "send" | "canSend" | "onSendError">;
   prepareEnvironment?: ExtensionRuntime["prepareEnvironment"];
+  prepareInput?: ExtensionRuntime["prepareInput"];
 }>;
 
 export function createRuntimeState(options: RuntimeOptions): ExtensionRuntime {
@@ -40,6 +42,7 @@ export function createRuntimeState(options: RuntimeOptions): ExtensionRuntime {
     notifiedBashSource: false,
     pendingSessions: new Set(),
     prepareEnvironment: options.prepareEnvironment ?? (() => undefined),
+    prepareInput: options.prepareInput ?? (() => undefined),
     shuttingDown: false,
     agentActivity,
   };
@@ -50,6 +53,9 @@ export function createRuntime(pi: ExtensionAPI): ExtensionRuntime {
   return createRuntimeState({
     prepareEnvironment: (event) => {
       pi.events.emit(COMMAND_ENVIRONMENT_EVENT, event);
+    },
+    prepareInput: (event) => {
+      pi.events.emit(COMMAND_INPUT_EVENT, event);
     },
     send: (message) => {
       pi.sendMessage(

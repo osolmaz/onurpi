@@ -291,13 +291,13 @@ only modified the built-in `bash` tool. Unified Exec bounds each attached tool c
 underlying process intentionally remains alive for later polls or input. Live processes are capped
 by the session store and terminated when Pi shuts down.
 
-## Child environment event
+## Final command events
 
-Unified Exec emits `unified-exec:before-spawn` through Pi's shared event bus immediately before it
-starts a child process. The event contains the command, working directory, resolved shell, active
+Unified Exec emits two public events through Pi's shared event bus.
+
+`unified-exec:before-spawn` runs immediately before a child starts. It contains the originating tool
+call ID, a unique invocation ID, exact command, final working directory, resolved shell, active
 model identity, and a writable copy of the child environment.
-
-Integration packages can subscribe without changing the `exec_command` schema:
 
 ```ts
 import {
@@ -305,7 +305,7 @@ import {
   isCommandEnvironmentEvent,
 } from "@onurpi/unified-exec/command-environment";
 
-const unsubscribe = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
+const stopSpawn = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
   if (!isCommandEnvironmentEvent(value)) return;
   try {
     value.environment["EXAMPLE"] = "value";
@@ -315,12 +315,41 @@ const unsubscribe = pi.events.on(COMMAND_ENVIRONMENT_EVENT, (value) => {
 });
 ```
 
-Listeners must finish synchronously. Unified Exec spawns the child with `event.environment` after
-every listener returns. Call `event.reject(error)` to stop the command before spawn when an
-integration cannot prepare a valid environment. Pi's shared event bus logs and swallows thrown or
-rejected handler errors, so throwing from the listener is not enough. The integration package must
-validate event-bus values, catch its own failures, and call the returned unsubscribe function during
-`session_shutdown`.
+`unified-exec:before-input` runs immediately before nonempty `write_stdin` bytes go to a managed
+process. It contains the tool call ID, session ID, original command, cwd, shell, TTY mode, and a
+copy of the decoded bytes.
+
+```ts
+import { COMMAND_INPUT_EVENT, isCommandInputEvent } from "@onurpi/unified-exec/command-input";
+
+const stopInput = pi.events.on(COMMAND_INPUT_EVENT, (value) => {
+  if (!isCommandInputEvent(value)) return;
+  if (value.bytes.includes(0)) value.reject(new Error("NUL input is not allowed"));
+});
+```
+
+Listeners must finish synchronously. Call `event.reject(error)` to stop the start or input before it
+reaches the child. Throwing from a listener is not enough because Pi's shared event bus logs and
+swallows handler errors. An integration must validate event-bus values, catch its own failures, call
+`reject`, and unsubscribe during `session_shutdown`.
+
+A security policy should use the final policy registry instead of relying on event-listener order:
+
+```ts
+import { registerFinalCommandPolicy } from "@onurpi/unified-exec/command-policy";
+
+const stopPolicy = registerFinalCommandPolicy({
+  checkSpawn: (request) => (request.command === "blocked" ? "command is blocked" : undefined),
+  checkInput: () => undefined,
+});
+```
+
+Unified Exec runs every registered `FinalCommandPolicy` after all shared-event listeners and
+immediately before spawn or input. It rebuilds the frozen request from the actual spawn arguments or
+input bytes, so a shared listener cannot change event metadata to make the final check inspect a
+different action. A check returns an `Error` or string to reject, or `undefined` to allow. Thrown
+check errors also reject. Registration returns an unsubscribe function. This API cannot approve or
+rewrite a command; it only performs a final check.
 
 ## TUI rendering
 

@@ -7,6 +7,8 @@ export type CommandEnvironmentModel = Readonly<{
 }>;
 
 export type CommandEnvironmentEvent = {
+  readonly toolCallId: string;
+  readonly invocationId: string;
   readonly command: string;
   readonly cwd: string;
   readonly shell: string;
@@ -42,6 +44,8 @@ function isCommandEnvironmentModel(value: unknown): value is CommandEnvironmentM
 
 function hasCommandMetadata(event: Record<string, unknown>): boolean {
   return (
+    typeof event["toolCallId"] === "string" &&
+    typeof event["invocationId"] === "string" &&
     typeof event["command"] === "string" &&
     typeof event["cwd"] === "string" &&
     typeof event["shell"] === "string"
@@ -61,6 +65,8 @@ export function isCommandEnvironmentEvent(value: unknown): value is CommandEnvir
 }
 
 export function commandEnvironmentEvent(
+  toolCallId: string,
+  invocationId: string,
   command: string,
   cwd: string,
   shell: string,
@@ -68,6 +74,8 @@ export function commandEnvironmentEvent(
   environment: NodeJS.ProcessEnv = process.env,
 ): CommandEnvironmentEvent {
   const event: CommandEnvironmentEvent = {
+    toolCallId,
+    invocationId,
     command,
     cwd,
     shell,

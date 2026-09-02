@@ -31,6 +31,7 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/pi-session`](packages/pi-session/)                             | Bounded, read-only recovery views for Pi sessions                |
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                  |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake |
+| [`@onurpi/command-guard`](packages/command-guard/)                       | Fail-closed checks for destructive shell commands                |
 | [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands             |
 | [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)               | Pinned Hugging Face OAuth and provider routes                    |
 | [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                      |

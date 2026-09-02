@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   type CollectedOutput,
   collectedOutputFromBytes,
@@ -8,6 +10,7 @@ import {
   throwIfCommandEnvironmentRejected,
   type CommandEnvironmentModel,
 } from "./command-environment.ts";
+import { runFinalSpawnPolicies } from "./command-policy.ts";
 import {
   DEFAULT_EXEC_YIELD_MS,
   EARLY_EXIT_GRACE_PERIOD_MS,
@@ -103,18 +106,38 @@ function prepareCommand(
 
 function spawn(
   runtime: ExtensionRuntime,
+  toolCallId: string,
   args: ExecCommandArgs,
   prepared: PreparedCommand,
   model: CommandEnvironmentModel | undefined,
 ): ExecSession {
-  const environmentEvent = commandEnvironmentEvent(args.cmd, prepared.cwd, prepared.shell, model);
+  const invocationId = randomUUID();
+  const environmentEvent = commandEnvironmentEvent(
+    toolCallId,
+    invocationId,
+    args.cmd,
+    prepared.cwd,
+    prepared.shell,
+    model,
+  );
   runtime.prepareEnvironment(environmentEvent);
   throwIfCommandEnvironmentRejected(environmentEvent);
+  const finalEnvironmentEvent = commandEnvironmentEvent(
+    toolCallId,
+    invocationId,
+    args.cmd,
+    prepared.cwd,
+    prepared.shell,
+    model,
+    environmentEvent.environment,
+  );
+  runFinalSpawnPolicies(finalEnvironmentEvent);
+  throwIfCommandEnvironmentRejected(finalEnvironmentEvent);
   const id = runtime.store.allocateId();
   const session = ExecSession.spawn(id, {
     command: prepared.command,
     cwd: prepared.cwd,
-    env: environmentEvent.environment,
+    env: finalEnvironmentEvent.environment,
     tty: prepared.tty,
     cols: prepared.cols,
     rows: prepared.rows,
@@ -295,11 +318,12 @@ export async function runExecCommand(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   cwd: string,
+  toolCallId: string,
   model?: CommandEnvironmentModel,
 ): Promise<ProcessResultDetails> {
   if (runtime.shuttingDown) throw new Error("unified-exec: session is shutting down");
   const prepared = prepareCommand(runtime, args, cwd);
-  const session = spawn(runtime, args, prepared, model);
+  const session = spawn(runtime, toolCallId, args, prepared, model);
   if (session.failureMessage) {
     return finalizeProcessResult({
       operation: "exec_command",

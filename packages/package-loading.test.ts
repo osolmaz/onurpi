@@ -211,6 +211,12 @@ describe("OnurPi package loading", () => {
     );
   });
 
+  it("loads Command Guard after every other extension", () => {
+    const extensions = resourceManifest()["extensions"];
+    if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
+    expect(extensions.at(-1)).toBe("./packages/command-guard/index.ts");
+  });
+
   it("registers the Regrafter extension and optional driver skill", () => {
     const pi = resourceManifest();
     expect(pi["extensions"]).toContain("./packages/regrafter-driver/index.ts");

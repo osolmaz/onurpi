@@ -11,6 +11,8 @@ import type {
   PrepareCommandEnvironment,
 } from "../src/command-environment.ts";
 import { runExecCommand } from "../src/exec-command.ts";
+import type { PrepareCommandInput } from "../src/command-input.ts";
+import { registerFinalCommandPolicy } from "../src/command-policy.ts";
 import { isPtyAvailable } from "../src/pty.ts";
 import { createRuntimeState } from "../src/runtime.ts";
 import { sleep } from "../src/notify.ts";
@@ -21,7 +23,10 @@ import { runWriteStdin } from "../src/write-stdin.ts";
 
 const runtimes: ExtensionRuntime[] = [];
 
-function makeRuntime(prepareEnvironment?: PrepareCommandEnvironment): {
+function makeRuntime(
+  prepareEnvironment?: PrepareCommandEnvironment,
+  prepareInput?: PrepareCommandInput,
+): {
   runtime: ExtensionRuntime;
   messages: WakeMessage[];
 } {
@@ -32,6 +37,7 @@ function makeRuntime(prepareEnvironment?: PrepareCommandEnvironment): {
     },
     coordinator: { debounceMs: 5 },
     ...(prepareEnvironment ? { prepareEnvironment } : {}),
+    ...(prepareInput ? { prepareInput } : {}),
   });
   runtimes.push(runtime);
   return { runtime, messages };
@@ -73,6 +79,7 @@ async function start(
     undefined,
     undefined,
     process.cwd(),
+    "start-call",
     options.model,
   );
 }
@@ -154,6 +161,27 @@ describe("runtime integration", () => {
     assert.equal(runtime.store.allocateId(), 1, "rejection happens before session allocation");
   });
 
+  it("applies final registered policy after environment preparation", async () => {
+    const { runtime } = makeRuntime((event) => {
+      event.environment["FINAL_POLICY_TEST"] = "prepared";
+      Reflect.set(event, "command", "mutated shared-event metadata");
+    });
+    const stop = registerFinalCommandPolicy({
+      checkSpawn: (request) =>
+        request.environment["FINAL_POLICY_TEST"] === "prepared" &&
+        request.command === "echo must-not-run"
+          ? "final policy blocked spawn"
+          : "policy did not see the real final request",
+      checkInput: () => undefined,
+    });
+    try {
+      await assert.rejects(start(runtime, "echo must-not-run"), /final policy blocked spawn/);
+      assert.equal(runtime.store.allocateId(), 1);
+    } finally {
+      stop();
+    }
+  });
+
   it("backgrounds a long process and observes its final result directly", async () => {
     const { runtime } = makeRuntime();
     const started = await start(runtime, delayedOutput(600));
@@ -179,6 +207,57 @@ describe("runtime integration", () => {
     );
     runtime.coordinator.handleToolExecutionEnd("chars", false);
     assert.match(result.output, /410a03/);
+  });
+
+  it("rejects input before bytes reach the child", async () => {
+    const { runtime } = makeRuntime(undefined, (event) => {
+      assert.equal(event.command, "cat");
+      assert.equal(event.shell.length > 0, true);
+      assert.deepEqual(event.bytes, new TextEncoder().encode("blocked"));
+      event.reject(new Error("input listener failed"));
+    });
+    const sessionId = requireSessionId(await start(runtime, "cat"));
+
+    await assert.rejects(
+      runWriteStdin(
+        runtime,
+        { session_id: sessionId, chars: "blocked", yield_time_ms: 2000 },
+        undefined,
+        undefined,
+        "input-call",
+      ),
+      /input listener failed/,
+    );
+    assert.equal(runtime.store.get(sessionId)?.hasExited, false);
+  });
+
+  it("applies final registered policy to the real bytes before process input", async () => {
+    const { runtime } = makeRuntime(undefined, (event) => {
+      event.bytes.fill(3);
+    });
+    const sessionId = requireSessionId(await start(runtime, "cat"));
+    const stop = registerFinalCommandPolicy({
+      checkSpawn: () => undefined,
+      checkInput: (request) =>
+        request.bytes[0] === "blocked".charCodeAt(0)
+          ? "final policy blocked input"
+          : "policy did not see the real input bytes",
+    });
+    try {
+      await assert.rejects(
+        runWriteStdin(
+          runtime,
+          { session_id: sessionId, chars: "blocked", yield_time_ms: 2000 },
+          undefined,
+          undefined,
+          "policy-input",
+        ),
+        /final policy blocked input/,
+      );
+      assert.equal(runtime.store.get(sessionId)?.hasExited, false);
+    } finally {
+      stop();
+    }
   });
 
   it("writes raw base64 bytes", async () => {

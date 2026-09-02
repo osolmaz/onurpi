@@ -57,6 +57,7 @@ it("adds Pi trailers only to commits spawned through Unified Exec", async () => 
     undefined,
     undefined,
     attributedDirectory,
+    "commit-call",
     { id: "model-id", name: "Model Name", provider: "provider" },
   );
 
