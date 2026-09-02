@@ -2,8 +2,8 @@ import type { ExtensionAPI, ToolCallEventResult } from "@earendil-works/pi-codin
 import { resolveCommandShell } from "@onurpi/unified-exec/command-shell";
 
 import { AdapterCoverage, commandField } from "./adapters.ts";
-import { ApprovalStore } from "./approval.ts";
-import { authorizeCommand, type ApprovalContext } from "./authorize.ts";
+import { checkCommand } from "./decision.ts";
+import { ExecutionCheckStore } from "./execution-check.ts";
 import { commandContext } from "./contexts.ts";
 import { isControlOnlyInput, resolveCommandInput } from "./events.ts";
 
@@ -21,8 +21,8 @@ export async function guardExecCommand(
     toolCallId: string;
     input: Record<string, unknown>;
   }>,
-  ctx: ApprovalContext & Readonly<{ cwd: string }>,
-  approvals: ApprovalStore,
+  ctx: Readonly<{ cwd: string }>,
+  checks: ExecutionCheckStore,
 ): Promise<ToolCallEventResult | undefined> {
   const command = optionalString(event.input, "cmd");
   if (command === undefined) return block("exec_command has no exact command text");
@@ -34,9 +34,9 @@ export async function guardExecCommand(
     environment: process.env,
     shell,
   });
-  const authorization = await authorizeCommand(context, ctx);
-  if (!authorization.allowed) return block(authorization.reason ?? "command blocked");
-  approvals.remember(event.toolCallId, context, authorization.decision);
+  const result = await checkCommand(context);
+  if (!result.allowed) return block(result.reason ?? "command blocked");
+  checks.remember(event.toolCallId, context, result.decision);
   return undefined;
 }
 
@@ -58,12 +58,12 @@ export function guardWriteStdin(input: Record<string, unknown>): ToolCallEventRe
 
 export function registerToolCallGuards(
   pi: ExtensionAPI,
-  approvals: ApprovalStore,
+  checks: ExecutionCheckStore,
   coverage: AdapterCoverage,
 ): void {
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName === "exec_command") {
-      return guardExecCommand(event, ctx, approvals);
+      return guardExecCommand(event, ctx, checks);
     }
     if (event.toolName === "write_stdin") return guardWriteStdin(event.input);
     if (event.toolName === "bash" || event.toolName === "powershell") return undefined;
@@ -73,6 +73,6 @@ export function registerToolCallGuards(
     return undefined;
   });
   pi.on("tool_execution_end", (event) => {
-    approvals.discard(event.toolCallId);
+    checks.discard(event.toolCallId);
   });
 }

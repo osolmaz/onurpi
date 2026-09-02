@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { ApprovalStore, commandFingerprint } from "../src/approval.ts";
+import { commandFingerprint, ExecutionCheckStore } from "../src/execution-check.ts";
 import { commandContext } from "../src/contexts.ts";
 import { parseLinuxMountRoots, resolveTargets, verifyTargets } from "../src/path-policy.ts";
 import { evaluateCommand } from "../src/policy.ts";
@@ -98,7 +98,7 @@ describe("target resolution", () => {
     ).resolves.toMatchObject({ ok: false, action: "rewrite" });
   });
 
-  it("detects a dangling symlink that appears at an approved missing path", async () => {
+  it("detects a dangling symlink that appears at a checked missing path", async () => {
     const resolution = await resolveTargets([deletion("appears")], directory);
     if (!resolution.ok) throw new Error(resolution.reason);
     symlinkSync(join(directory, "still-missing"), join(directory, "appears"));
@@ -116,7 +116,7 @@ describe("target resolution", () => {
   });
 });
 
-describe("one-use approval", () => {
+describe("one-use final execution check", () => {
   it("binds command, shell, cwd, environment, targets, and expiry", async () => {
     const environment: NodeJS.ProcessEnv = { ...process.env, TARGET: "child/file" };
     const context = commandContext({
@@ -126,31 +126,31 @@ describe("one-use approval", () => {
       shell: "bash",
     });
     const decision = await evaluateCommand(context);
-    if (decision.action !== "approve") throw new Error("expected approval");
+    if (decision.action !== "allow") throw new Error("expected allow");
 
     let now = 100;
-    const approvals = new ApprovalStore(() => now);
-    approvals.remember("one", context, decision);
-    expect(approvals.size).toBe(1);
-    expect(approvals.consume("one", context)).toBe(true);
-    expect(approvals.consume("one", context)).toBe(false);
+    const checks = new ExecutionCheckStore(() => now);
+    checks.remember("one", context, decision);
+    expect(checks.size).toBe(1);
+    expect(checks.consume("one", context)).toBe(true);
+    expect(checks.consume("one", context)).toBe(false);
 
-    approvals.remember("environment", context, decision);
+    checks.remember("environment", context, decision);
     const changedEnvironment = commandContext({
       ...context,
       environment: { ...environment, TARGET: "child/other" },
     });
-    expect(approvals.consume("environment", changedEnvironment)).toBe(false);
+    expect(checks.consume("environment", changedEnvironment)).toBe(false);
 
-    approvals.remember("command", context, decision);
-    expect(approvals.consume("command", { ...context, command: "rm -f child/other" })).toBe(false);
+    checks.remember("command", context, decision);
+    expect(checks.consume("command", { ...context, command: "rm -f child/other" })).toBe(false);
 
-    approvals.remember("shell", context, decision);
-    expect(approvals.consume("shell", { ...context, shell: "/bin/bash" })).toBe(false);
+    checks.remember("shell", context, decision);
+    expect(checks.consume("shell", { ...context, shell: "/bin/bash" })).toBe(false);
 
-    approvals.remember("security-environment", context, decision);
+    checks.remember("security-environment", context, decision);
     expect(
-      approvals.consume("security-environment", {
+      checks.consume("security-environment", {
         ...context,
         environment: { ...environment, BASH_ENV: "/tmp/startup" },
       }),
@@ -158,9 +158,9 @@ describe("one-use approval", () => {
 
     const { GIT_CONFIG_COUNT: gitConfigCount } = environment;
     const gitConfigIndex = Number(gitConfigCount ?? "0");
-    approvals.remember("commit-hook", context, decision);
+    checks.remember("commit-hook", context, decision);
     expect(
-      approvals.consume("commit-hook", {
+      checks.consume("commit-hook", {
         ...context,
         environment: {
           ...environment,
@@ -171,9 +171,9 @@ describe("one-use approval", () => {
       }),
     ).toBe(true);
 
-    approvals.remember("git-worktree", context, decision);
+    checks.remember("git-worktree", context, decision);
     expect(
-      approvals.consume("git-worktree", {
+      checks.consume("git-worktree", {
         ...context,
         environment: {
           ...environment,
@@ -184,10 +184,10 @@ describe("one-use approval", () => {
       }),
     ).toBe(false);
 
-    approvals.remember("expired", context, decision);
+    checks.remember("expired", context, decision);
     now += 60_001;
-    expect(approvals.consume("expired", context)).toBe(false);
-    expect(approvals.size).toBe(0);
+    expect(checks.consume("expired", context)).toBe(false);
+    expect(checks.size).toBe(0);
   });
 
   it("binds variables used in nested command text", async () => {
@@ -199,12 +199,12 @@ describe("one-use approval", () => {
       shell: "bash",
     });
     const decision = await evaluateCommand(context);
-    if (decision.action !== "approve") throw new Error("expected approval");
+    if (decision.action !== "allow") throw new Error("expected allow");
     expect(decision.referencedEnvironment).toMatchObject({ SCRIPT: "rm -f child/file" });
-    const approvals = new ApprovalStore();
-    approvals.remember("nested", context, decision);
+    const checks = new ExecutionCheckStore();
+    checks.remember("nested", context, decision);
     expect(
-      approvals.consume("nested", {
+      checks.consume("nested", {
         ...context,
         environment: { ...environment, SCRIPT: "rm -rf ." },
       }),
@@ -213,14 +213,19 @@ describe("one-use approval", () => {
 
   it("does not remember blocked decisions and can clear records", () => {
     const context = commandContext({ command: "echo safe", cwd: directory, shell: "bash" });
-    const approvals = new ApprovalStore();
-    approvals.remember("blocked", context, { action: "deny", reason: "no" });
-    expect(approvals.size).toBe(0);
-    approvals.remember("allowed", context, { action: "allow", referencedEnvironment: {} });
-    approvals.discard("missing");
-    expect(approvals.size).toBe(1);
-    approvals.clear();
-    expect(approvals.size).toBe(0);
+    const checks = new ExecutionCheckStore();
+    checks.remember("blocked", context, { action: "deny", reason: "no" });
+    expect(checks.size).toBe(0);
+    checks.remember("allowed", context, {
+      action: "allow",
+      operations: [],
+      referencedEnvironment: {},
+      targets: [],
+    });
+    checks.discard("missing");
+    expect(checks.size).toBe(1);
+    checks.clear();
+    expect(checks.size).toBe(0);
     expect(commandFingerprint(context, [], [])).toHaveLength(64);
   });
 });

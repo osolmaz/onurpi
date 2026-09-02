@@ -5,8 +5,8 @@ export default defineConfig({
     coverage: {
       include: [
         "packages/command-guard/src/adapters.ts",
-        "packages/command-guard/src/approval.ts",
-        "packages/command-guard/src/authorize.ts",
+        "packages/command-guard/src/decision.ts",
+        "packages/command-guard/src/execution-check.ts",
         "packages/command-guard/src/bash-parser.ts",
         "packages/command-guard/src/classifier.ts",
         "packages/command-guard/src/contexts.ts",

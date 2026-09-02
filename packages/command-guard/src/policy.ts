@@ -106,7 +106,7 @@ export async function evaluateCommand(context: CommandContext): Promise<PolicyDe
       return { action: "rewrite", reason: classification.uncertainReason };
     }
     if (classification.operations.length === 0) {
-      return { action: "allow", referencedEnvironment: {} };
+      return { action: "allow", operations: [], referencedEnvironment: {}, targets: [] };
     }
     const uncertain = targetUncertainty(classification.operations);
     if (uncertain) {
@@ -116,7 +116,7 @@ export async function evaluateCommand(context: CommandContext): Promise<PolicyDe
     if (!resolution.ok) return { action: resolution.action, reason: resolution.reason };
     const names = referencedVariables(classification);
     return {
-      action: "approve",
+      action: "allow",
       operations: classification.operations,
       referencedEnvironment: environmentSnapshot(names, context.environment),
       targets: resolution.targets,

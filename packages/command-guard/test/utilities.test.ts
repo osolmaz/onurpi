@@ -4,7 +4,6 @@ import { commandEnvironmentEvent } from "@onurpi/unified-exec/command-environmen
 import { commandInputEvent } from "@onurpi/unified-exec/command-input";
 
 import { commandField, hasCommandSchema } from "../src/adapters.ts";
-import { approvalMessage } from "../src/approval.ts";
 import { commandContext, defaultShell } from "../src/contexts.ts";
 import {
   isCommandEnvironmentEvent,
@@ -70,30 +69,5 @@ describe("shell and message helpers", () => {
     expect(hasPossibleDestructiveToken("rm -rf target")).toBe(true);
     expect(hasPossibleDestructiveToken("Remove-Item target")).toBe(true);
     expect(hasPossibleDestructiveToken("format string")).toBe(false);
-  });
-
-  it("formats exact approval details", () => {
-    expect(
-      approvalMessage({
-        action: "approve",
-        operations: [
-          {
-            command: "rm",
-            kind: "recursive-delete",
-            source: "rm -rf child",
-            targets: [{ raw: "child", value: "child", referencedVariables: [] }],
-          },
-        ],
-        referencedEnvironment: {},
-        targets: [
-          {
-            canonicalPath: "/tmp/child",
-            operandPath: "/tmp/child",
-            existed: false,
-            source: "child",
-          },
-        ],
-      }),
-    ).toContain("rm: recursive-delete");
   });
 });

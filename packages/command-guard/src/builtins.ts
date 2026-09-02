@@ -9,15 +9,14 @@ import {
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 
-import { ApprovalStore } from "./approval.ts";
-import { authorizeCommand, type ApprovalContext } from "./authorize.ts";
+import { checkCommand } from "./decision.ts";
+import { ExecutionCheckStore } from "./execution-check.ts";
 import { commandContext } from "./contexts.ts";
 
 export function guardedOperations(
   operations: BashOperations,
   shell: string,
-  extensionContext: ApprovalContext,
-  approvals: ApprovalStore,
+  checks: ExecutionCheckStore,
 ): BashOperations {
   return {
     async exec(command, cwd, options) {
@@ -27,13 +26,13 @@ export function guardedOperations(
         environment: options.env ?? process.env,
         shell,
       });
-      const authorization = await authorizeCommand(context, extensionContext);
-      if (!authorization.allowed) {
-        throw new Error(`command guard: ${authorization.reason ?? "command blocked"}`);
+      const result = await checkCommand(context);
+      if (!result.allowed) {
+        throw new Error(`command guard: ${result.reason ?? "command blocked"}`);
       }
       const invocationId = randomUUID();
-      approvals.remember(invocationId, context, authorization.decision);
-      if (!approvals.consume(invocationId, context)) {
+      checks.remember(invocationId, context, result.decision);
+      if (!checks.consume(invocationId, context)) {
         throw new Error("command guard: final command check failed");
       }
       return operations.exec(command, cwd, options);
@@ -41,41 +40,36 @@ export function guardedOperations(
   };
 }
 
-function registerBashOverride(pi: ExtensionAPI, approvals: ApprovalStore): void {
+function registerBashOverride(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
   const template = createBashToolDefinition(process.cwd());
   pi.registerTool({
     ...template,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const tool = createBashToolDefinition(ctx.cwd, {
-        operations: guardedOperations(createLocalBashOperations(), "bash", ctx, approvals),
+        operations: guardedOperations(createLocalBashOperations(), "bash", checks),
       });
       return tool.execute(toolCallId, params, signal, onUpdate, ctx);
     },
   });
 }
 
-function registerPowerShellOverride(pi: ExtensionAPI, approvals: ApprovalStore): void {
+function registerPowerShellOverride(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
   const template = createPowerShellToolDefinition(process.cwd());
   pi.registerTool({
     ...template,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const tool = createPowerShellToolDefinition(ctx.cwd, {
-        operations: guardedOperations(
-          createLocalPowerShellOperations(),
-          "powershell",
-          ctx,
-          approvals,
-        ),
+        operations: guardedOperations(createLocalPowerShellOperations(), "powershell", checks),
       });
       return tool.execute(toolCallId, params, signal, onUpdate, ctx);
     },
   });
 }
 
-export function registerShellGuards(pi: ExtensionAPI, approvals: ApprovalStore): void {
-  registerBashOverride(pi, approvals);
-  registerPowerShellOverride(pi, approvals);
-  pi.on("user_bash", (_event, ctx) => ({
-    operations: guardedOperations(createLocalBashOperations(), "bash", ctx, approvals),
+export function registerShellGuards(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
+  registerBashOverride(pi, checks);
+  registerPowerShellOverride(pi, checks);
+  pi.on("user_bash", () => ({
+    operations: guardedOperations(createLocalBashOperations(), "bash", checks),
   }));
 }

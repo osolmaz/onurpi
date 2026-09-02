@@ -1,16 +1,10 @@
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
-import { APPROVAL_TTL_MS } from "./limits.ts";
+import { CHECK_TTL_MS } from "./limits.ts";
 import { verifyTargets } from "./path-policy.ts";
 import { shellKind } from "./shell.ts";
-import type {
-  ApprovedCall,
-  ApproveDecision,
-  CommandContext,
-  PolicyDecision,
-  ResolvedTarget,
-} from "./types.ts";
+import type { CheckedCall, CommandContext, PolicyDecision, ResolvedTarget } from "./types.ts";
 
 function environmentValue(environment: NodeJS.ProcessEnv, key: string): string | undefined {
   if (process.platform !== "win32") return environment[key];
@@ -122,18 +116,15 @@ export function commandFingerprint(
 }
 
 function decisionTargets(decision: PolicyDecision): readonly ResolvedTarget[] {
-  return decision.action === "approve" ? decision.targets : [];
+  return decision.action === "allow" ? decision.targets : [];
 }
 
 function decisionEnvironmentKeys(decision: PolicyDecision): readonly string[] {
-  if (decision.action === "allow" || decision.action === "approve") {
-    return Object.keys(decision.referencedEnvironment).sort();
-  }
-  return [];
+  return decision.action === "allow" ? Object.keys(decision.referencedEnvironment).sort() : [];
 }
 
-export class ApprovalStore {
-  readonly #calls = new Map<string, ApprovedCall>();
+export class ExecutionCheckStore {
+  readonly #calls = new Map<string, CheckedCall>();
   readonly #now: () => number;
 
   constructor(now: () => number = Date.now) {
@@ -146,7 +137,7 @@ export class ApprovalStore {
     const targets = decisionTargets(decision);
     this.#calls.set(id, {
       environmentKeys,
-      expiresAt: this.#now() + APPROVAL_TTL_MS,
+      expiresAt: this.#now() + CHECK_TTL_MS,
       fingerprint: commandFingerprint(context, environmentKeys, targets),
       targets,
     });
@@ -171,13 +162,4 @@ export class ApprovalStore {
   get size(): number {
     return this.#calls.size;
   }
-}
-
-export function approvalMessage(decision: ApproveDecision, context?: CommandContext): string {
-  const operations = decision.operations.map((item) => `${item.command}: ${item.kind}`).join("\n");
-  const targets = decision.targets.map((target) => target.canonicalPath).join("\n");
-  const command = context
-    ? `Command:\n${context.command}\n\nShell:\n${context.shell}\n\nWorking directory:\n${resolve(context.cwd)}\n\n`
-    : "";
-  return `${command}Operations:\n${operations}\n\nTargets:\n${targets}\n\nThis operation can remove or replace data. Allow this exact command once?`;
 }

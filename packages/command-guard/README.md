@@ -24,7 +24,7 @@ deletion forms.
 
 The Bash path uses the official Tree-sitter Bash grammar. It reads the exact command, final working
 directory, selected shell, and child environment. A fixed variable such as `$TARGET` is allowed only
-when its value is known and the script does not change it.
+when its value is known and the script does not change it. Command Guard does not add a Yes/No gate.
 
 This incident is blocked:
 
@@ -36,25 +36,25 @@ HOME=$(mktemp -d) command; rm -rf "$HOME"
 
 ## Decisions
 
-Command Guard makes one of four decisions:
+Command Guard makes one of three decisions:
 
-- **Allow:** The command has no covered destructive operation.
-- **Approve:** The operation and every target are exact. A person can approve that one call.
+- **Allow:** The command is safe, or every destructive target is exact and outside the protected
+  paths.
 - **Rewrite:** Shell expansion or command behavior makes the target uncertain. Submit a literal
   path.
-- **Deny:** The target is a critical root or the final check failed.
+- **Deny:** The target is a protected path or the final check failed.
 
 The extension denies filesystem roots, the home directory, the Pi working directory, mount roots,
 and their ancestors. It resolves symlinks, records filesystem object identities, and checks them
 again immediately before execution.
 
-Approval expires after 60 seconds. It is valid once and only for the exact command, shell, working
-directory, referenced environment values, target paths, and object identities. Print and JSON modes
-cannot approve destructive commands.
+Each allowed tool call gets a one-use final check that expires after 60 seconds. It binds the exact
+command, shell, working directory, referenced environment values, target paths, and object
+identities. A changed request is blocked.
 
-There is no model-callable bypass, project setting, environment switch, permanent approval, or
-"allow always" choice. Use a separate terminal when you deliberately need to delete a protected
-root.
+There is no confirmation prompt, model-callable bypass, project setting, environment switch, or
+"allow always" choice. Exact deletions outside protected paths run normally. Use a separate terminal
+when you deliberately need to delete a protected root.
 
 ## Unified Exec input
 

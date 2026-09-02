@@ -12,6 +12,9 @@ tags: [pi, extension, shell, safety]
 Implemented on `feat/command-guard`. The implementation keeps the extension-only design. It adds no
 Pi core changes and uses no Pi private APIs.
 
+The implemented policy has no confirmation gate. Exact destructive targets outside the protected
+paths run normally. Protected or uncertain targets are blocked.
+
 The final Unified Exec design is stronger than the first event-only draft. Unified Exec now exposes
 `registerFinalCommandPolicy()`. It rebuilds frozen, synchronous policy requests from the actual
 spawn arguments or input bytes after all shared-event listeners and immediately before process spawn
@@ -56,9 +59,9 @@ copy projects, watch every filesystem call, run a permanent service, or change P
   sessions.
 - Inspect the last command, shell, working directory, and environment that the extension can see.
 - Treat unclear shell expansion as unsafe instead of guessing.
-- Ask for one-use approval only when the extension knows the exact operation and targets.
-- Never let model approval or project configuration authorize deletion of critical roots.
-- Fail closed when parsing, adapter coverage, or approval is unavailable.
+- Allow exact destructive targets outside the protected paths without a prompt.
+- Never let model or project configuration authorize deletion of protected roots.
+- Fail closed when parsing or adapter coverage is unavailable.
 - Use an independent OnurPi package. Do not change Pi core or use Pi private APIs.
 
 ## Decision
@@ -66,16 +69,15 @@ copy projects, watch every filesystem call, run a permanent service, or change P
 Create `packages/command-guard` as a private package named `@onurpi/command-guard`. Its display name
 will be `pi-command-guard`.
 
-The package will have one pure policy engine and small adapters for each command route. The policy
-engine will parse shell syntax, find destructive operations, resolve targets that can be known
-without running the command, and return one of four decisions:
+The package has one pure policy engine and small adapters for each command route. The policy engine
+parses shell syntax, finds destructive operations, resolves targets that can be known without
+running the command, and returns one of three decisions:
 
-| Decision  | Meaning                                                               | Result                                          |
-| --------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| `allow`   | No covered destructive operation exists                               | Run immediately                                 |
-| `approve` | The destructive operation and every target are exact                  | Ask once, then run that exact call              |
-| `rewrite` | A target or operation depends on uncertain shell behavior             | Block and tell the model to use literal targets |
-| `deny`    | The target is a critical root or the command cannot be checked safely | Block without an approval option                |
+| Decision  | Meaning                                                              | Result                                          |
+| --------- | -------------------------------------------------------------------- | ----------------------------------------------- |
+| `allow`   | The command is safe, or each destructive target is exact and allowed | Run immediately without a prompt                |
+| `rewrite` | A target or operation depends on uncertain shell behavior            | Block and tell the model to use literal targets |
+| `deny`    | The target is protected or the command cannot be checked safely      | Block                                           |
 
 This is a broader form of Codex's command check. Codex added Tree-sitter-based detection for literal
 forced `rm` calls in [PR #33464](https://github.com/openai/codex/pull/33464). Its regression test
@@ -100,8 +102,7 @@ The extension will use these documented APIs:
   checks, after public event listeners.
 - `pi.getActiveTools()`, `pi.getAllTools()`, and `pi.setActiveTools()` to check adapter coverage and
   disable command routes that have no final guard.
-- `ctx.ui.confirm()` for one-use approval when `ctx.hasUI` is true.
-- `tool_execution_end` and `session_shutdown` to clear in-memory approvals and listeners.
+- `tool_execution_end` and `session_shutdown` to clear in-memory final checks and listeners.
 
 Public Pi references:
 
@@ -160,7 +161,7 @@ limits. Reject commands that exceed any limit instead of truncating them:
 Tree-sitter syntax errors are unsafe when the source contains a possible destructive token. A syntax
 error with no destructive token may pass only when the lexical precheck can prove that no covered
 command name or shell launcher occurs. Tests must show that comments and quoted text do not create
-false approval prompts.
+false destructive matches.
 
 For PowerShell, use its official parser in a short-lived, non-interactive helper only after a cheap
 lexical check finds a possible destructive command. Pass source through standard input, return
@@ -183,7 +184,8 @@ For each destructive operand:
 6. For a missing target, resolve the nearest existing ancestor and append the remaining normalized
    components.
 7. Record the canonical target and the filesystem object identity used for the final check.
-8. Recheck the target immediately before spawn. Any drift invalidates approval and blocks the call.
+8. Recheck the target immediately before spawn. Any drift invalidates the final check and blocks the
+   call.
 
 The following forms return `rewrite` because the target is not known before execution:
 
@@ -196,9 +198,9 @@ The following forms return `rewrite` because the target is not known before exec
 - a target split across interactive terminal writes.
 
 The incident command is blocked even if scope analysis is incomplete. `HOME` is assigned in the same
-script and later used by a recursive deletion, so the target is not eligible for approval. A safe
-retry must first obtain the target through a non-destructive command and then submit a literal
-canonical path.
+script and later used by a recursive deletion, so the target is not eligible to run. A safe retry
+must first obtain the target through a non-destructive command and then submit a literal canonical
+path.
 
 ### Critical targets
 
@@ -211,31 +213,20 @@ Return `deny` when any canonical target is:
 - the current Pi working directory itself;
 - an ancestor of the home directory or current working directory;
 - a path whose root, mount, symlink, junction, or case identity cannot be determined;
-- a target changed between approval and final execution.
+- a target changed between the first check and final execution.
 
 A descendant of the home directory or current working directory is not denied only because of its
-location. It can receive one-use approval when it is exact. This keeps the policy independent of
-projects while protecting whole-tree deletion.
+location. An exact target in such a descendant can run without a prompt. This keeps the policy
+independent of projects while protecting whole-tree deletion.
 
 Mount detection will use filesystem identity while walking existing ancestors. Linux may also read
 `/proc/self/mountinfo`. Windows will handle drive and UNC roots explicitly. Missing or inconsistent
 platform evidence returns `deny` for a target that could be a root.
 
-### Approval
+### Final execution check
 
-Every exact destructive operation returns `approve` unless a narrower reviewed rule explicitly
-allows it. The initial release will have no automatic deletion allowlist except cleanup of a path
-that the extension itself created and still tracks in process memory.
-
-The prompt will show:
-
-- the command family and destructive flags;
-- the shell and working directory;
-- every canonical target;
-- whether the operation is recursive, forced, truncating, or replacing;
-- why approval is required.
-
-Approval will bind to a one-use fingerprint of:
+Every exact destructive operation outside the protected paths returns `allow` without a prompt. A
+one-use fingerprint binds that result to:
 
 - tool call or command nonce;
 - exact command bytes;
@@ -244,14 +235,12 @@ Approval will bind to a one-use fingerprint of:
 - canonical target list and object identities;
 - policy version.
 
-Any change creates a new decision. Approval expires after 60 seconds or when the tool call ends,
-whichever comes first. Parallel calls keep separate records. Cancellation, timeout, reload, session
-change, or shutdown clears all pending approvals.
+Any change blocks the call. The final check expires after 60 seconds or when the tool call ends,
+whichever comes first. Parallel calls keep separate records. Reload, session change, or shutdown
+clears all pending checks.
 
-There will be no model-callable bypass, permanent approval, `allow always`, environment-variable
-disable switch, or project setting that weakens the policy. Non-interactive print and JSON modes
-block calls that need approval. RPC mode may approve only through a real client response to Pi's
-public confirmation request.
+There is no confirmation gate, model-callable bypass, `allow always`, environment-variable disable
+switch, or project setting that weakens the policy.
 
 ## Execution adapters
 
@@ -260,9 +249,9 @@ public confirmation request.
 Register guarded replacements with the same built-in names. Preserve Pi's schemas, prompt text,
 renderers, result shapes, cancellation, timeout behavior, output limits, and session environment.
 
-The wrapper will make the asynchronous approval decision in its `execute` path. A guarded operations
-object will recompute and compare the fingerprint immediately before delegating to Pi's local shell
-operations. This final check prevents a later `tool_call` handler from changing an approved command.
+The wrapper will make the command decision in its `execute` path. A guarded operations object will
+recompute and compare the fingerprint immediately before delegating to Pi's local shell operations.
+This final check prevents a later `tool_call` handler from changing an allowed command.
 
 The tools may remain inactive when unified-exec disables built-in Bash. They still need full tests
 so `--keep-builtin-bash` cannot bypass the policy.
@@ -272,9 +261,9 @@ so `--keep-builtin-bash` cannot bypass the policy.
 Handle `user_bash` and return guarded local operations. Use an in-memory nonce because user shell
 events do not have a model tool call ID. Preserve normal `!` and `!!` result behavior.
 
-A direct human command may receive the same exact approval prompt. Critical targets remain blocked;
-the user can leave Pi and use a separate terminal when they deliberately need an operation that the
-firewall forbids.
+A direct human command uses the same rules without a prompt. Protected targets remain blocked; the
+user can leave Pi and use a separate terminal when they deliberately need an operation that the
+guard forbids.
 
 ### Unified Exec
 
@@ -287,8 +276,8 @@ Keep `@onurpi/unified-exec` as the process owner. Extend its public integration 
 - Give both events a documented `reject(error)` method.
 - Add `registerFinalCommandPolicy()` as a deny-only public registry. Run it on frozen snapshots
   after event listeners and immediately before spawn or input.
-- Keep final checks synchronous. The earlier `tool_call` handler performs any UI approval, and the
-  final policy only verifies the approved fingerprint.
+- Keep final checks synchronous. The earlier `tool_call` handler records the allowed fingerprint,
+  and the final policy verifies it.
 
 Update the existing event contract in place. Do not add a parallel version, compatibility reader, or
 second event name. Unified-exec and Command Guard are private alpha packages and will ship together.
@@ -335,7 +324,7 @@ packages/command-guard/
 │   └── run-slophammer.sh
 ├── src/
 │   ├── adapters.ts
-│   ├── approval.ts
+│   ├── execution-check.ts
 │   ├── bash-parser.ts
 │   ├── classifier.ts
 │   ├── limits.ts
@@ -346,7 +335,7 @@ packages/command-guard/
 │   └── types.ts
 └── test/
     ├── adapters.test.ts
-    ├── approval.test.ts
+    ├── path-check.test.ts
     ├── bash-parser.test.ts
     ├── classifier.test.ts
     ├── incident.test.ts
@@ -357,7 +346,7 @@ packages/command-guard/
     └── write-stdin.test.ts
 ```
 
-Keep parsing, target resolution, policy, and approval fingerprints pure where possible. Pi adapters
+Keep parsing, target resolution, policy, and final fingerprints pure where possible. Pi adapters
 must translate public events into those pure inputs and apply the returned decision without copying
 policy logic.
 
@@ -376,7 +365,7 @@ Use these implementation rules:
 - initialize parsers once;
 - do not cache environment-bound parse results unless measured evidence later justifies the added
   invalidation and memory rules;
-- never cache path or approval decisions across cwd or environment changes;
+- never cache path or final decisions across cwd or environment changes;
 - use linear passes over syntax nodes and targets;
 - avoid child processes on the Bash fast path;
 - run the PowerShell helper only after a destructive lexical hit;
@@ -400,17 +389,16 @@ Fail closed in these cases:
 - parser initialization or grammar loading fails;
 - a possible destructive command has invalid or unsupported syntax;
 - path resolution, `realpath`, mount detection, or object identity fails;
-- an approval UI is unavailable, cancelled, or times out;
-- the final command differs from the approved fingerprint;
+- the final command differs from the checked fingerprint;
 - unified-exec emits malformed integration data;
 - a final event listener throws or cannot call `reject`;
 - a command tool has no registered final adapter;
 - extension reload leaves a live session without its input guard.
 
 At startup, show one clear error and remove uncovered command tools instead of repeatedly warning.
-Expose `/command-guard` so the user can see covered tools, blocked tools, and the pending approval
-count. The command must not expose environment values, command text, credentials, or target paths
-from earlier calls.
+Expose `/command-guard` so the user can see covered tools, blocked tools, and the pending final
+check count. The command must not expose environment values, command text, credentials, or target
+paths from earlier calls.
 
 On reload, reject nonempty input to unified-exec sessions that began under an older policy instance.
 Empty polls and session termination remain available so the user can inspect or stop them safely.
@@ -419,8 +407,8 @@ Empty polls and session termination remain available so the user can inspect or 
 
 - **Session state:** Pi records its normal tool calls and results. The extension appends no custom
   entries and changes no existing entry.
-- **Other persistent data:** None. The parser instance, session coverage, and approvals exist only
-  in process memory.
+- **Other persistent data:** None. The parser instance, session coverage, and final checks exist
+  only in process memory.
 - **Pi internals:** None. The package uses documented events, tool overrides, tool factories, active
   tool controls, and UI methods.
 - **Unified-exec contract:** Its public pre-spawn event gains identity fields, and it gains one
@@ -437,7 +425,7 @@ Empty polls and session termination remain available so the user can inspect or 
 - Bash, PowerShell, user shell, unified-exec start, and unified-exec input adapters.
 - The unified-exec event changes needed for final correlation and input rejection.
 - Project-independent target rules.
-- One-use approval and fail-closed non-interactive behavior.
+- One-use final checks and fail-closed behavior.
 - User documentation, status command, package tests, repository tests, and performance tests.
 - Source and license records for parser dependencies and any tracked grammar artifact.
 
@@ -449,7 +437,7 @@ Empty polls and session termination remain available so the user can inspect or 
 - Full detection of filesystem deletion hidden inside an arbitrary binary, native addon, build tool,
   remote host, or another trusted extension's direct Node filesystem call.
 - Recovery, trash, snapshots, backups, or undo after an allowed command runs.
-- Persistent approvals or policy configuration.
+- Confirmation prompts or persistent policy configuration.
 - Automatic mutation testing during normal checks.
 
 ## Implementation steps
@@ -484,7 +472,7 @@ Empty polls and session termination remain available so the user can inspect or 
    values.
 3. Implement canonical path and critical-target checks for POSIX and Windows.
 4. Implement immutable decision reasons and user messages.
-5. Implement approval fingerprints, expiry, one-use consumption, and parallel-call isolation.
+5. Implement final fingerprints, expiry, one-use consumption, and parallel-call isolation.
 6. Enforce parser and recursion limits. Add a parse cache only if later measurements justify it.
 
 ### Pi adapters
@@ -495,7 +483,7 @@ Empty polls and session termination remain available so the user can inspect or 
 4. Extend unified-exec pre-spawn identity and add its pre-input event.
 5. Add final synchronous fingerprint checks that call `reject` on all errors.
 6. Add active-tool coverage checks and `/command-guard`.
-7. Clear listeners and approvals during shutdown and reload.
+7. Clear listeners and final checks during shutdown and reload.
 
 ### OnurPi integration
 
@@ -527,14 +515,14 @@ Use disposable fixtures for:
 - empty, `.`, `..`, relative, absolute, and missing paths;
 - root, home, cwd, ancestors, descendants, drive roots, UNC roots, and mount roots;
 - symlinks, junctions, case changes, and nearest-existing-ancestor resolution;
-- a target replaced between approval and final check;
+- a target replaced between the first and final checks;
 - variables, globs, command substitutions, aliases, functions, and `eval`;
 - paths with spaces, newlines, control bytes, leading dashes, and non-ASCII text.
 
 No test may derive a deletion target from the real home directory. Integration tests must replace
 process execution with spies and prove that no spawn or input write occurred after rejection.
 
-### Adapter and approval tests
+### Adapter and final-check tests
 
 Cover:
 
@@ -543,16 +531,15 @@ Cover:
 - `!` and `!!` commands;
 - pre-spawn rejection, malformed event data, and swallowed event-bus errors;
 - empty and nonempty `write_stdin`, control bytes, base64 bytes, split input, and stale sessions;
-- a later `tool_call` mutation after earlier approval;
-- no UI, cancel, timeout, approval expiry, replay, duplicate calls, and parallel calls;
+- a later `tool_call` mutation after the first check;
+- final-check expiry, replay, duplicate calls, and parallel calls;
 - unknown command tools, re-enabled blocked tools, reload, tree change, and shutdown;
 - status output redaction.
 
 ### Command-family tests
 
-Add allow, approval, rewrite, and denial cases for every listed command family. Each family must
-test option order, `--`, nested use, quoted operands, multiple targets, and a safe command with
-similar text.
+Add allow, rewrite, and denial cases for every listed command family. Each family must test option
+order, `--`, nested use, quoted operands, multiple targets, and a safe command with similar text.
 
 ### Performance tests
 
@@ -565,20 +552,21 @@ from a stable local run.
 
 - The exact reported `HOME` cleanup pattern is blocked before spawn.
 - `rm -rf /`, the home directory itself, the cwd itself, their ancestors, drive roots, UNC roots,
-  and mount roots cannot be approved.
+  and mount roots cannot run.
 - A destructive command with a variable changed in the script, a glob, substitution, `eval`, or an
   unknown target is blocked with a literal-target rewrite instruction.
-- An exact non-critical deletion receives one prompt and runs only after one-use approval.
-- A changed command, cwd, shell, environment, target, or object identity invalidates approval.
+- An exact non-critical deletion runs without a prompt.
+- A changed command, cwd, shell, environment, target, or object identity invalidates the final
+  check.
 - Normal commands run without a prompt and meet the performance limits.
 - Built-in Bash, PowerShell, user shell, unified-exec spawn, and unified-exec input all have a final
   rejection point.
 - Empty unified-exec polls and session termination remain available after reload.
 - Any active command tool without a final adapter is blocked and named by the status command.
-- Print and JSON modes fail closed when approval is needed.
+- Print and JSON modes use the same no-prompt allow-or-block policy.
 - The package works on Linux, macOS, and Windows or blocks unsupported destructive syntax before
   execution.
-- The extension writes no session state, policy file, approval record, telemetry, or secret.
+- The extension writes no session state, policy file, confirmation record, telemetry, or secret.
 - No Pi source or private API is used.
 
 ## Verification
@@ -602,9 +590,9 @@ npx -y @simpledoc/simpledoc check
 Then run controlled extension tests with process spies and harmless commands:
 
 - load the package with `pi -e` in TUI mode;
-- verify one approved literal deletion against a disposable fixture;
+- verify one exact literal deletion against a disposable fixture without a prompt;
 - verify the incident command is rejected without spawning;
-- verify no-UI print and JSON calls reject approval-required commands;
+- verify print and JSON modes use the same decision;
 - start a harmless managed session, test empty polling, and confirm nonempty shell input is blocked;
 - reload Pi and confirm stale session input remains blocked while polling and termination work;
 - run `pi list` and verify the canonical package path;

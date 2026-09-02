@@ -10,7 +10,7 @@ import {
 } from "@onurpi/unified-exec/command-environment";
 import { runFinalSpawnPolicies } from "@onurpi/unified-exec/command-policy";
 
-import { ApprovalStore } from "../src/approval.ts";
+import { ExecutionCheckStore } from "../src/execution-check.ts";
 import { guardedOperations } from "../src/builtins.ts";
 import { commandContext } from "../src/contexts.ts";
 import { evaluateCommand } from "../src/policy.ts";
@@ -24,13 +24,8 @@ beforeAll(() => {
   directory = mkdtempSync(join(tmpdir(), "command-guard-incident-"));
 });
 
-function approvalContext() {
-  return {
-    cwd: directory,
-    hasUI: true,
-    signal: undefined,
-    ui: { confirm: vi.fn(() => Promise.resolve(true)) },
-  };
+function guardContext(): Readonly<{ cwd: string }> {
+  return { cwd: directory };
 }
 
 describe("HOME cleanup incident regression", () => {
@@ -53,8 +48,7 @@ describe("HOME cleanup incident regression", () => {
 
   it("does not delegate the incident through the guarded built-in shell", async () => {
     const exec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const context = approvalContext();
-    const operations = guardedOperations({ exec }, "bash", context, new ApprovalStore());
+    const operations = guardedOperations({ exec }, "bash", new ExecutionCheckStore());
 
     await expect(
       operations.exec(INCIDENT, directory, {
@@ -62,30 +56,28 @@ describe("HOME cleanup incident regression", () => {
         onData: vi.fn(),
       }),
     ).rejects.toThrow("variable HOME is assigned in the script");
-    expect(context.ui.confirm).not.toHaveBeenCalled();
     expect(exec).not.toHaveBeenCalled();
   });
 
   it("blocks the incident at Unified Exec preflight and final spawn", async () => {
-    const approvals = new ApprovalStore();
-    const context = approvalContext();
+    const checks = new ExecutionCheckStore();
+    const context = guardContext();
     const blocked = await guardExecCommand(
       { toolCallId: "incident", input: { cmd: INCIDENT, shell: "bash" } },
       context,
-      approvals,
+      checks,
     );
     expect(blocked).toMatchObject({ block: true });
-    expect(context.ui.confirm).not.toHaveBeenCalled();
-    expect(approvals.size).toBe(0);
+    expect(checks.size).toBe(0);
 
     await expect(
       guardExecCommand(
         { toolCallId: "mutated", input: { cmd: "echo safe", shell: "bash" } },
         context,
-        approvals,
+        checks,
       ),
     ).resolves.toBeUndefined();
-    const stop = registerUnifiedExecGuards(approvals);
+    const stop = registerUnifiedExecGuards(checks);
     try {
       const finalRequest = commandEnvironmentEvent(
         "mutated",
@@ -99,7 +91,7 @@ describe("HOME cleanup incident regression", () => {
       runFinalSpawnPolicies(finalRequest);
       expect(() => {
         throwIfCommandEnvironmentRejected(finalRequest);
-      }).toThrow("does not match an approved tool call");
+      }).toThrow("does not match the checked tool call");
     } finally {
       stop();
     }

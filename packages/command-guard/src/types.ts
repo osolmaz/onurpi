@@ -66,11 +66,6 @@ export type CommandContext = Readonly<{
 
 export type AllowDecision = Readonly<{
   action: "allow";
-  referencedEnvironment: Readonly<Record<string, string | undefined>>;
-}>;
-
-export type ApproveDecision = Readonly<{
-  action: "approve";
   operations: readonly DestructiveOperation[];
   referencedEnvironment: Readonly<Record<string, string | undefined>>;
   targets: readonly ResolvedTarget[];
@@ -80,9 +75,9 @@ export type BlockDecision =
   | Readonly<{ action: "deny"; reason: string }>
   | Readonly<{ action: "rewrite"; reason: string }>;
 
-export type PolicyDecision = AllowDecision | ApproveDecision | BlockDecision;
+export type PolicyDecision = AllowDecision | BlockDecision;
 
-export type ApprovedCall = Readonly<{
+export type CheckedCall = Readonly<{
   environmentKeys: readonly string[];
   expiresAt: number;
   fingerprint: string;

@@ -1,4 +1,4 @@
-import { mkdtempSync, renameSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,9 +12,9 @@ import { commandInputEvent, throwIfCommandInputRejected } from "@onurpi/unified-
 import { runFinalInputPolicies, runFinalSpawnPolicies } from "@onurpi/unified-exec/command-policy";
 
 import { AdapterCoverage } from "../src/adapters.ts";
-import { ApprovalStore } from "../src/approval.ts";
-import { authorizeCommand, type ApprovalContext } from "../src/authorize.ts";
 import { guardedOperations } from "../src/builtins.ts";
+import { checkCommand } from "../src/decision.ts";
+import { ExecutionCheckStore } from "../src/execution-check.ts";
 import { commandContext } from "../src/contexts.ts";
 import { guardExecCommand, guardWriteStdin } from "../src/tool-calls.ts";
 import {
@@ -30,87 +30,31 @@ beforeAll(() => {
   writeFileSync(join(directory, "file"), "data");
 });
 
-function approvalContext(
-  confirmed: boolean,
-  hasUI = true,
-  onConfirm?: () => void,
-): ApprovalContext & Readonly<{ cwd: string }> {
-  return {
-    cwd: directory,
-    hasUI,
-    signal: undefined,
-    ui: {
-      confirm: vi.fn(() => {
-        onConfirm?.();
-        return Promise.resolve(confirmed);
-      }),
-    },
-  };
+function guardContext(): Readonly<{ cwd: string }> {
+  return { cwd: directory };
 }
 
-describe("approval UI", () => {
-  it("allows safe commands without a prompt", async () => {
-    const ctx = approvalContext(false);
-    const result = await authorizeCommand(
-      commandContext({ command: "echo safe", cwd: directory, shell: "bash" }),
-      ctx,
-    );
-    expect(result.allowed).toBe(true);
-    expect(ctx.ui.confirm).not.toHaveBeenCalled();
+describe("command decision", () => {
+  it("allows safe commands and exact non-critical deletions without a prompt", async () => {
+    await expect(
+      checkCommand(commandContext({ command: "echo safe", cwd: directory, shell: "bash" })),
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
+      checkCommand(commandContext({ command: "rm -f file", cwd: directory, shell: "bash" })),
+    ).resolves.toMatchObject({ allowed: true });
   });
 
-  it("requires a positive UI response for destructive commands", async () => {
-    const command = commandContext({ command: "rm -f file", cwd: directory, shell: "bash" });
-    await expect(authorizeCommand(command, approvalContext(true))).resolves.toMatchObject({
-      allowed: true,
-    });
-    await expect(authorizeCommand(command, approvalContext(false))).resolves.toMatchObject({
-      allowed: false,
-      reason: "destructive command was not approved",
-    });
-    const unavailable = await authorizeCommand(command, approvalContext(true, false));
-    expect(unavailable.allowed).toBe(false);
-    expect(unavailable.reason).toContain("approval UI is unavailable");
-  });
-
-  it("rejects a target that changes during approval", async () => {
-    const path = join(directory, "drift");
-    writeFileSync(path, "first");
-    const ctx = approvalContext(true, true, () => {
-      const replaced = `${path}.old`;
-      renameSync(path, replaced);
-      writeFileSync(path, "second");
-    });
-    const result = await authorizeCommand(
-      commandContext({ command: "rm -f drift", cwd: directory, shell: "bash" }),
-      ctx,
-    );
-    expect(result).toMatchObject({
-      allowed: false,
-      reason: "destructive target changed before execution",
-    });
-  });
-
-  it("does not offer approval for a critical target", async () => {
-    const ctx = approvalContext(true);
-    const result = await authorizeCommand(
-      commandContext({ command: "rm -rf .", cwd: directory, shell: "bash" }),
-      ctx,
-    );
-    expect(result).toMatchObject({ allowed: false });
-    expect(ctx.ui.confirm).not.toHaveBeenCalled();
+  it("blocks critical targets", async () => {
+    await expect(
+      checkCommand(commandContext({ command: "rm -rf .", cwd: directory, shell: "bash" })),
+    ).resolves.toMatchObject({ allowed: false });
   });
 });
 
 describe("final shell operation", () => {
-  it("delegates only after the final command passes", async () => {
+  it("delegates exact non-critical deletion but not a blocked command", async () => {
     const exec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const operations = guardedOperations(
-      { exec },
-      "bash",
-      approvalContext(true),
-      new ApprovalStore(),
-    );
+    const operations = guardedOperations({ exec }, "bash", new ExecutionCheckStore());
     const options = { onData: vi.fn(), env: process.env };
     await expect(operations.exec("rm -f file", directory, options)).resolves.toEqual({
       exitCode: 0,
@@ -118,24 +62,19 @@ describe("final shell operation", () => {
     expect(exec).toHaveBeenCalledOnce();
 
     const blockedExec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const blocked = guardedOperations(
-      { exec: blockedExec },
-      "bash",
-      approvalContext(false),
-      new ApprovalStore(),
-    );
-    await expect(blocked.exec("rm -f file", directory, options)).rejects.toThrow("command guard");
+    const blocked = guardedOperations({ exec: blockedExec }, "bash", new ExecutionCheckStore());
+    await expect(blocked.exec("rm -rf .", directory, options)).rejects.toThrow("command guard");
     expect(blockedExec).not.toHaveBeenCalled();
   });
 });
 
 describe("unified-exec adapter", () => {
   it("binds the early tool decision to the final spawn event", async () => {
-    const approvals = new ApprovalStore();
+    const checks = new ExecutionCheckStore();
     const early = await guardExecCommand(
       { toolCallId: "call", input: { cmd: "echo safe", workdir: directory, shell: "bash" } },
-      approvalContext(false),
-      approvals,
+      guardContext(),
+      checks,
     );
     expect(early).toBeUndefined();
     const event = commandEnvironmentEvent(
@@ -147,19 +86,19 @@ describe("unified-exec adapter", () => {
       undefined,
       process.env,
     );
-    handleCommandEnvironment(event, approvals);
+    handleCommandEnvironment(event, checks);
     expect(() => {
       throwIfCommandEnvironmentRejected(event);
     }).not.toThrow();
-    expect(approvals.size).toBe(0);
+    expect(checks.size).toBe(0);
   });
 
-  it("rejects a changed, injected, or unapproved final spawn", async () => {
-    const approvals = new ApprovalStore();
+  it("rejects a changed, injected, or unchecked final spawn", async () => {
+    const checks = new ExecutionCheckStore();
     await guardExecCommand(
       { toolCallId: "changed", input: { cmd: "echo safe" } },
-      approvalContext(false),
-      approvals,
+      guardContext(),
+      checks,
     );
     const changed = commandEnvironmentEvent(
       "changed",
@@ -170,15 +109,15 @@ describe("unified-exec adapter", () => {
       undefined,
       process.env,
     );
-    handleCommandEnvironment(changed, approvals);
+    handleCommandEnvironment(changed, checks);
     expect(() => {
       throwIfCommandEnvironmentRejected(changed);
     }).toThrow("does not match");
 
     await guardExecCommand(
       { toolCallId: "injected", input: { cmd: "echo safe" } },
-      approvalContext(false),
-      approvals,
+      guardContext(),
+      checks,
     );
     const injected = commandEnvironmentEvent(
       "injected",
@@ -189,7 +128,7 @@ describe("unified-exec adapter", () => {
       undefined,
       { ...process.env, LD_PRELOAD: "/tmp/injected.so" },
     );
-    handleCommandEnvironment(injected, approvals);
+    handleCommandEnvironment(injected, checks);
     expect(() => {
       throwIfCommandEnvironmentRejected(injected);
     }).toThrow("does not match");
@@ -203,25 +142,32 @@ describe("unified-exec adapter", () => {
       undefined,
       process.env,
     );
-    handleCommandEnvironment(missing, approvals);
+    handleCommandEnvironment(missing, checks);
     expect(() => {
       throwIfCommandEnvironmentRejected(missing);
     }).toThrow("does not match");
     expect(() => {
-      handleCommandEnvironment({}, approvals);
+      handleCommandEnvironment({}, checks);
     }).not.toThrow();
   });
 
-  it("blocks unsafe or unclear exec_command requests early", async () => {
-    const approvals = new ApprovalStore();
+  it("allows exact non-critical deletion but blocks unsafe or unclear requests", async () => {
+    const checks = new ExecutionCheckStore();
     await expect(
-      guardExecCommand({ toolCallId: "missing", input: {} }, approvalContext(true), approvals),
+      guardExecCommand({ toolCallId: "missing", input: {} }, guardContext(), checks),
     ).resolves.toMatchObject({ block: true });
     await expect(
       guardExecCommand(
         { toolCallId: "delete", input: { cmd: "rm -f file" } },
-        approvalContext(false),
-        approvals,
+        guardContext(),
+        checks,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      guardExecCommand(
+        { toolCallId: "critical", input: { cmd: "rm -rf ." } },
+        guardContext(),
+        checks,
       ),
     ).resolves.toMatchObject({ block: true });
   });
@@ -229,13 +175,13 @@ describe("unified-exec adapter", () => {
 
 describe("unified-exec final adapter", () => {
   it("registers final policies after all event listeners", async () => {
-    const approvals = new ApprovalStore();
+    const checks = new ExecutionCheckStore();
     await guardExecCommand(
       { toolCallId: "registered", input: { cmd: "echo safe", shell: "bash" } },
-      approvalContext(false),
-      approvals,
+      guardContext(),
+      checks,
     );
-    const stop = registerUnifiedExecGuards(approvals);
+    const stop = registerUnifiedExecGuards(checks);
     try {
       const spawn = commandEnvironmentEvent(
         "registered",

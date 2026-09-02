@@ -29,10 +29,10 @@ describe("Bash policy", () => {
     await expect(bash("printf 'rm -rf / is text\\n'")).resolves.toMatchObject({ action: "allow" });
   });
 
-  it("requires approval for an exact non-critical deletion", async () => {
+  it("allows an exact non-critical deletion without a gate", async () => {
     const decision = await bash("rm -f file.txt");
-    expect(decision).toMatchObject({ action: "approve" });
-    if (decision.action !== "approve") throw new Error("expected approval");
+    expect(decision).toMatchObject({ action: "allow" });
+    if (decision.action !== "allow") throw new Error("expected allow");
     expect(decision.operations[0]).toMatchObject({ command: "rm", kind: "delete" });
     expect(decision.targets[0]?.canonicalPath).toBe(join(directory, "file.txt"));
   });
@@ -118,7 +118,7 @@ describe("Bash policy", () => {
     ).resolves.toMatchObject({ action: "rewrite" });
   });
 
-  it("blocks critical roots without offering approval", async () => {
+  it("blocks critical roots", async () => {
     await expect(bash("rm -rf /")).resolves.toMatchObject({ action: "deny" });
     await expect(bash("rm -rf .")).resolves.toMatchObject({ action: "deny" });
     await expect(bash("git checkout other-branch")).resolves.toMatchObject({ action: "deny" });
