@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.0`
-- Source commit: `e3566df5871d9907f44c26023bafdac934a6c663`
-- Package source: exact npm release `0.16.0`
+- Latest release at review: `v0.16.1`
+- Source commit: `2ad2beadeabb875c030d0026b64f96317b4fbf5f`
+- Package source: exact npm release `0.16.1`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -21,7 +21,9 @@ restores Escape-to-pause and in-place resume for origin-session interactions. Re
 routes the extension, CLI, and `piw` through one hosted client, replaces the production `piw` SQLite
 reader with bounded host views, and adds reliable cold-start and live-view recovery. It also adds
 `piw <runId> --once` and packed-package release checks for the Pi widget, workflow lifecycle, `piw`,
-and an exact real-model submission.
+and an exact real-model submission. Patch `0.16.1` makes the Pi widget and `piw` use the same live
+status. Interactive timeouts now count only active origin-session model turns and remain suspended
+while the workflow is paused, Pi is disconnected, or the host is down.
 
 The extension and host use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The host uses atomic
