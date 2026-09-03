@@ -17,13 +17,14 @@ leased to the current agent run.
 
 The extension never triggers compaction itself. It registers no `turn_end`, `agent_settled`, or
 `session_compact` handlers, never calls `ctx.abort()` or `ctx.compact()` for its own lifecycle, and
-sends no continuation message. `@onurpi/context-window-policy` can request compaction at a safe turn
-boundary, while Pi's serialized compaction lifecycle remains in charge of the operation.
+sends no continuation message. Pi's native scheduler checks the context before each assistant
+response, including responses after tool results. OnurPi reserves 27,200 tokens for its default
+272,000-token Codex model, so Pi starts threshold compaction at 90% and resumes the same agent run.
 
 Pi requires compaction events to store a summary string, so entries receive a short local checkpoint
-marker. The marker is filtered from provider context and is never sent to OpenAI. In interactive
-mode, each native compaction adds durable `OpenAI compaction running…` / complete / failed status
-entries to the chat transcript; these custom entries are never included in model context.
+marker. The marker is filtered from provider context and is never sent to OpenAI. Pi renders the
+operation with its built-in transient compaction indicator. The extension does not add status
+entries to the session.
 
 Native compaction activates only for the built-in `openai-codex` provider. Other providers pass
 through every hook unchanged and never receive the opaque checkpoint or the local marker. The
@@ -33,12 +34,10 @@ extension performs no text-summary model call.
 
 Remote compaction is asynchronous: the request body is computed from the `branchEntries` snapshot of
 the `session_before_compact` event, and the response arrives later. Before the extension returns a
-native checkpoint, it re-reads the active branch and compares it with the recorded snapshot tip.
-Only non-context status entries from the same compaction operation may appear after that tip. If the
-branch moved, changed, or gained any context-bearing entry — for example an assistant function call
-whose result is still pending — the extension discards the checkpoint, cancels Pi's compaction
-without content, and records a failed status with a bounded error. This fail-closed fence keeps a
-remote checkpoint from being spliced between a function call and its function result.
+native checkpoint, it checks that the active branch still contains the same entries in the same
+order. If any entry changed or appeared, the extension discards the checkpoint and cancels Pi's
+compaction without content. This keeps a remote checkpoint from being inserted between a function
+call and its result or into another active branch.
 
 ## Fail-closed policy
 
@@ -53,25 +52,25 @@ remote checkpoint from being spliced between a function call and its function re
 
 ## Compaction ownership in OnurPi
 
-- **`@onurpi/context-window-policy`** owns the proactive 90% turn-boundary request. It stops a long
-  Codex tool loop, waits for settlement, then uses Pi's public compaction API.
-- **`@onurpi/pi-codex-compaction`** owns all compaction content for the built-in `openai-codex`
-  provider: the remote native checkpoint and the compaction entry. Pi still owns manual, threshold,
-  and overflow operations.
-- **`@onurpi/reliable-compaction`** still stabilizes ordinary Pi text compaction for other custom
-  providers that use the `openai-codex-responses` API, but passes `openai-codex` through because
+- **`@onurpi/codex-switcher`** keeps the built-in `openai-codex` provider identity while it changes
+  the active account.
+- **Pi's native scheduler** owns manual, threshold, and overflow timing. The normal compaction
+  settings put the default Codex threshold at 90%.
+- **`@onurpi/pi-codex-compaction`** owns the remote native checkpoint and compaction content for the
+  built-in `openai-codex` provider.
+- **`@onurpi/reliable-compaction`** stabilizes ordinary Pi text compaction for other custom
+  providers that use the `openai-codex-responses` API. It passes `openai-codex` through because
   native compaction replaces its text-summary path.
 
-The root manifest registers Codex routing, context timing, native content, and text fallback in that
-order, and the repository tests assert it.
+The root manifest registers Codex routing, native content, and text fallback in that order. The
+repository tests assert the order and the native compaction settings.
 
 ## Persistence
 
 Session state only: the native checkpoint lives in Pi's normal `CompactionEntry.details` (opaque
-`encrypted_content` from OpenAI plus the replacement history), and TUI status updates are appended
-as `openai-codex-compaction-status` custom entries that never enter model context. Resume, forks,
-tree navigation, and repeated compaction derive state from the newest checkpoint on the active
-branch. No other files are created.
+`encrypted_content` from OpenAI plus the replacement history). Resume, forks, tree navigation, and
+repeated compaction derive state from the newest checkpoint on the active branch. The transient Pi
+status indicator is not saved. No other files are created.
 
 ## Limitations
 

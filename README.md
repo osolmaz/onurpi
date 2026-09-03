@@ -22,7 +22,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager        |
 | [`@onurpi/restart`](packages/restart/)                                   | Full Pi process restart on the exact persisted session           |
 | [`@onurpi/codex-switcher`](packages/codex-switcher/)                     | Usage-aware Codex account profiles and fallback routing          |
-| [`@onurpi/context-window-policy`](packages/context-window-policy/)       | Turn-boundary Codex compaction before context exhaustion         |
 | [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                 |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                   |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                 |

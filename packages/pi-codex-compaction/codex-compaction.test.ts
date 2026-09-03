@@ -3,7 +3,6 @@ import type {
   BeforeProviderRequestEvent,
   CompactionEntry,
   ContextEvent,
-  CustomEntry,
   SessionBeforeCompactEvent,
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
@@ -11,11 +10,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   BRANCH_FENCE_ERROR,
-  COMPACTION_STATUS_KIND,
   installCodexCompaction,
   type CodexCompactionApi,
   type CodexCompactionContext,
-  type CompactionStatus,
 } from "./codex-compaction.ts";
 import {
   NATIVE_COMPACTION_KIND,
@@ -80,17 +77,6 @@ function validDetails(encrypted: string, key = MODEL_KEY): NativeCompactionDetai
   };
 }
 
-function statusEntry(id: string, status: CompactionStatus): CustomEntry<CompactionStatus> {
-  return {
-    type: "custom",
-    id,
-    parentId: null,
-    timestamp: new Date().toISOString(),
-    customType: COMPACTION_STATUS_KIND,
-    data: status,
-  };
-}
-
 type Handlers = {
   context: Parameters<CodexCompactionApi["onContext"]>[0];
   modelSelect: Parameters<CodexCompactionApi["onModelSelect"]>[0];
@@ -125,21 +111,16 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
     onBeforeProviderHeaders: (handler) => registered.set("before_provider_headers", handler),
     onBeforeProviderRequest: (handler) => registered.set("before_provider_request", handler),
     onSessionBeforeCompact: (handler) => registered.set("session_before_compact", handler),
-    appendEntry: (customType, data) => {
-      statusEntries.push({ customType, data });
-    },
     getAllTools: () => [],
     getActiveTools: () => [],
   };
 
-  const statusEntries: { customType: string; data: CompactionStatus }[] = [];
   const notifications: string[] = [];
   let branch: SessionEntry[] = initialBranch;
   let aborted = 0;
 
   const ctx: CodexCompactionContext = {
     model: options.model ?? codexModel(),
-    mode: "tui",
     hasUI: true,
     ui: { notify: (message) => notifications.push(message) },
     abort: () => {
@@ -171,7 +152,6 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
   return {
     ctx,
     registered,
-    statusEntries,
     notifications,
     setBranch: (next: SessionEntry[]) => {
       branch = next;
@@ -231,7 +211,6 @@ describe("session_before_compact", () => {
     expect(result?.compaction?.firstKeptEntryId).toBe("user-1");
     expect(result?.compaction?.details).toEqual(validDetails("opaque-state"));
     expect(requests).toHaveLength(1);
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "complete"]);
   });
 
   it.each(["manual", "threshold", "overflow"] as const)(
@@ -251,7 +230,6 @@ describe("session_before_compact", () => {
 
       expect(result?.cancel).toBeUndefined();
       expect(result?.compaction?.details?.kind).toBe(NATIVE_COMPACTION_KIND);
-      expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "complete"]);
     },
   );
 
@@ -298,8 +276,6 @@ describe("session_before_compact", () => {
     expect(result).toEqual({ cancel: true });
     expect(h.notifications.join("\n")).toContain("non-official endpoint");
     expect(h.notifications.join("\n")).not.toContain(makeToken());
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
-    expect(JSON.stringify(h.statusEntries)).not.toContain(makeToken());
   });
 
   it("cancels Pi compaction instead of falling back to text summarization", async () => {
@@ -313,7 +289,6 @@ describe("session_before_compact", () => {
 
     expect(result).toEqual({ cancel: true });
     expect(h.notifications[0]).toContain("native compaction failed");
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
   });
 
   it("retries a message-less stream error once and then succeeds", async () => {
@@ -405,41 +380,28 @@ describe("branch snapshot fence", () => {
 
     expect(result?.cancel).toBeUndefined();
     expect(result?.compaction?.details).toEqual(validDetails("opaque-state"));
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "complete"]);
   });
 
-  it("permits only the current operation's status entries after the snapshot tip", async () => {
+  it("discards the checkpoint when any custom entry appears during the remote call", async () => {
     const branch = [userEntry("user-1", "Remember BLUE-42.")];
     const checkpoint = deferredCheckpoint();
     const h = harness(branch, { createCheckpoint: () => checkpoint.promise });
+    const customEntry: SessionEntry = {
+      type: "custom",
+      id: "custom-1",
+      parentId: "user-1",
+      timestamp: new Date().toISOString(),
+      customType: "other-extension-state",
+      data: {},
+    };
 
     const pending = h.handlers.sessionBeforeCompact()(beforeCompactEvent(branch), h.ctx);
-    const running = h.statusEntries.at(-1)?.data;
-    if (!running) throw new Error("Expected the running status entry");
-    h.setBranch([...branch, statusEntry("status-running", running)]);
-    checkpoint.resolve({ details: validDetails("opaque-state") });
-    const result = await pending;
-
-    expect(result?.cancel).toBeUndefined();
-    expect(result?.compaction?.details?.kind).toBe(NATIVE_COMPACTION_KIND);
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "complete"]);
-  });
-
-  it("discards the checkpoint when another operation adds a status entry", async () => {
-    const branch = [userEntry("user-1", "Remember BLUE-42.")];
-    const checkpoint = deferredCheckpoint();
-    const h = harness(branch, { createCheckpoint: () => checkpoint.promise });
-
-    const pending = h.handlers.sessionBeforeCompact()(beforeCompactEvent(branch), h.ctx);
-    h.setBranch([
-      ...branch,
-      statusEntry("other-status", { operationId: "other-operation", state: "running" }),
-    ]);
+    h.setBranch([...branch, customEntry]);
     checkpoint.resolve({ details: validDetails("opaque-state") });
     const result = await pending;
 
     expect(result).toEqual({ cancel: true });
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
+    expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
   });
 
   it("discards the checkpoint when a context message arrives during the remote call", async () => {
@@ -448,22 +410,14 @@ describe("branch snapshot fence", () => {
     const h = harness(branch, { createCheckpoint: () => checkpoint.promise });
 
     const pending = h.handlers.sessionBeforeCompact()(beforeCompactEvent(branch), h.ctx);
-    const running = h.statusEntries.at(-1)?.data;
-    if (!running) throw new Error("Expected the running status entry");
     // Interleaving: another context-bearing entry lands before the remote compaction returns.
-    h.setBranch([
-      ...branch,
-      statusEntry("status-running", running),
-      { ...userEntry("user-2", "one more thing"), parentId: "user-1" },
-    ]);
+    h.setBranch([...branch, { ...userEntry("user-2", "one more thing"), parentId: "user-1" }]);
     checkpoint.resolve({ details: validDetails("opaque-state") });
     const result = await pending;
 
     expect(result).toEqual({ cancel: true });
     expect(result?.compaction).toBeUndefined();
     expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
-    expect(h.statusEntries.at(-1)?.data.error).toBe(BRANCH_FENCE_ERROR);
   });
 
   it("discards the checkpoint when an assistant tool call lands during the remote call", async () => {
@@ -503,7 +457,7 @@ describe("branch snapshot fence", () => {
 
     // The checkpoint must not be spliced between the function call and its future result.
     expect(result).toEqual({ cancel: true });
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
+    expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
   });
 
   it("discards the checkpoint when another compaction entry lands during the remote call", async () => {
@@ -517,7 +471,7 @@ describe("branch snapshot fence", () => {
     const result = await pending;
 
     expect(result).toEqual({ cancel: true });
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
+    expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
   });
 
   it("discards the checkpoint when the snapshot tip is no longer on the active branch", async () => {
@@ -532,7 +486,6 @@ describe("branch snapshot fence", () => {
 
     expect(result).toEqual({ cancel: true });
     expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
   });
 
   it("discards the checkpoint from an empty snapshot when a foreign entry appears", async () => {
@@ -540,14 +493,12 @@ describe("branch snapshot fence", () => {
     const h = harness([], { createCheckpoint: () => checkpoint.promise });
 
     const pending = h.handlers.sessionBeforeCompact()(beforeCompactEvent([]), h.ctx);
-    const running = h.statusEntries.at(-1)?.data;
-    if (!running) throw new Error("Expected the running status entry");
-    h.setBranch([statusEntry("status-running", running), userEntry("user-1", "hi")]);
+    h.setBranch([userEntry("user-1", "hi")]);
     checkpoint.resolve({ details: validDetails("opaque-state") });
     const result = await pending;
 
     expect(result).toEqual({ cancel: true });
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
+    expect(h.notifications.join("\n")).toContain(BRANCH_FENCE_ERROR);
   });
 
   it("stays silent about a fenced checkpoint when the compaction signal is aborted", async () => {
@@ -567,7 +518,6 @@ describe("branch snapshot fence", () => {
 
     expect(result).toEqual({ cancel: true });
     expect(h.notifications).toEqual([]);
-    expect(h.statusEntries.map((entry) => entry.data.state)).toEqual(["running", "failed"]);
   });
 });
 
@@ -793,7 +743,6 @@ describe("lifecycle registration", () => {
         h.ctx,
       ),
     ).toBeUndefined();
-    expect(h.statusEntries).toEqual([]);
   });
 
   it("drops the cached payload shape when the session restarts or the model changes", async () => {

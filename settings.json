@@ -10,7 +10,6 @@
     "../../repos/onurpi/packages/live-stats",
     "../../repos/onurpi/packages/nyan-mode",
     "../../repos/onurpi/packages/codex-switcher",
-    "../../repos/onurpi/packages/context-window-policy",
     "../../repos/onurpi/packages/pi-codex-compaction",
     "../../repos/onurpi/packages/reliable-compaction",
     "../../repos/onurpi/packages/infinite-retry",
@@ -29,11 +28,16 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.84.3",
+  "lastChangelogVersion": "0.84.4",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "xhigh",
   "outputPad": 0,
   "tuiMode": "fullscreen",
-  "theme": "onur-dark"
+  "theme": "onur-dark",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 27200,
+    "keepRecentTokens": 20000
+  }
 }

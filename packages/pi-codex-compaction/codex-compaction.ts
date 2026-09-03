@@ -7,7 +7,6 @@ import type {
   ContextEvent,
   ExtensionContext,
   SessionBeforeCompactEvent,
-  SessionEntry,
   ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 
@@ -37,20 +36,12 @@ import {
   stripInputFromPayload,
 } from "./responses-input.ts";
 
-export const COMPACTION_STATUS_KIND = "openai-codex-compaction-status";
-
 /**
  * Bounded error for the branch snapshot fence. A remote checkpoint computed from a stale input
  * snapshot must never be appended, so the fence failure cancels Pi's compaction without content.
  */
 export const BRANCH_FENCE_ERROR =
   "Session branch changed while the OpenAI Codex remote compaction was in flight; the checkpoint was discarded.";
-
-export type CompactionStatus = {
-  operationId: string;
-  state: "running" | "complete" | "failed";
-  error?: string;
-};
 
 type CachedPayloadShape = {
   modelKey: string;
@@ -60,7 +51,7 @@ type CachedPayloadShape = {
 /** Minimal context surface the controller needs; `ExtensionContext` satisfies it. */
 export type CodexCompactionContext = Pick<
   ExtensionContext,
-  "model" | "mode" | "hasUI" | "abort" | "getSystemPrompt"
+  "model" | "hasUI" | "abort" | "getSystemPrompt"
 > & {
   sessionManager: Pick<ExtensionContext["sessionManager"], "getSessionId" | "getBranch">;
   modelRegistry: Pick<ExtensionContext["modelRegistry"], "getApiKeyAndHeaders">;
@@ -90,7 +81,6 @@ export type CodexCompactionApi = {
       ctx: CodexCompactionContext,
     ) => Promise<CompactionHookResult>,
   ): void;
-  appendEntry(customType: string, data: CompactionStatus): void;
   getAllTools(): ToolInfo[];
   getActiveTools(): string[];
 };
@@ -177,35 +167,6 @@ async function createNativeCheckpoint(params: CheckpointParams): Promise<Checkpo
   };
 }
 
-function appendCompactionStatus(
-  api: CodexCompactionApi,
-  ctx: CodexCompactionContext,
-  status: CompactionStatus,
-): void {
-  if (ctx.mode === "tui") api.appendEntry(COMPACTION_STATUS_KIND, status);
-}
-
-async function withCompactionStatus<T>(
-  deps: ControllerDeps,
-  ctx: CodexCompactionContext,
-  operationId: string,
-  operation: () => Promise<T>,
-): Promise<T> {
-  appendCompactionStatus(deps.api, ctx, { operationId, state: "running" });
-  try {
-    const result = await operation();
-    appendCompactionStatus(deps.api, ctx, { operationId, state: "complete" });
-    return result;
-  } catch (error) {
-    appendCompactionStatus(deps.api, ctx, {
-      operationId,
-      state: "failed",
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
 function handleContext(event: ContextEvent, ctx: CodexCompactionContext): ContextHookResult {
   const checkpoint = findNativeCheckpoint(ctx.sessionManager.getBranch());
   if (checkpoint.status === "none") return undefined;
@@ -275,42 +236,17 @@ function checkpointParams(
   };
 }
 
-/** Only non-context status entries from this compaction operation may follow the snapshot tip. */
-function isOwnStatusEntry(entry: SessionEntry, operationId: string): boolean {
-  if (
-    entry.type !== "custom" ||
-    entry.customType !== COMPACTION_STATUS_KIND ||
-    typeof entry.data !== "object" ||
-    entry.data === null
-  ) {
-    return false;
-  }
-  return Reflect.get(entry.data, "operationId") === operationId;
-}
-
 /**
  * Fail closed when the active branch moved past the compaction input snapshot. The remote
- * checkpoint was computed from `event.branchEntries`; appending it after new context-bearing
- * entries (for example an assistant function call whose result is still pending) would splice the
- * checkpoint between those entries and corrupt the replayed Responses history.
+ * checkpoint was computed from `event.branchEntries`; appending it after any new entry would splice
+ * the checkpoint into a different branch state and corrupt the replayed Responses history.
  */
-function assertBranchFence(
-  ctx: CodexCompactionContext,
-  snapshotTipId: string | null,
-  operationId: string,
-): void {
+function assertBranchFence(ctx: CodexCompactionContext, snapshotEntryIds: string[]): void {
   const branch = ctx.sessionManager.getBranch();
-  let tipIndex = -1;
-  if (snapshotTipId !== null) {
-    for (let index = branch.length - 1; index >= 0; index--) {
-      if (branch[index]?.id === snapshotTipId) {
-        tipIndex = index;
-        break;
-      }
-    }
-    if (tipIndex < 0) throw new Error(BRANCH_FENCE_ERROR);
-  }
-  if (branch.slice(tipIndex + 1).some((entry) => !isOwnStatusEntry(entry, operationId))) {
+  if (
+    branch.length !== snapshotEntryIds.length ||
+    branch.some((entry, index) => entry.id !== snapshotEntryIds[index])
+  ) {
     throw new Error(BRANCH_FENCE_ERROR);
   }
 }
@@ -335,16 +271,10 @@ async function handleSessionBeforeCompact(
   const model = ctx.model;
   if (!isOpenAICodexModel(model)) return undefined;
 
-  const snapshotTipId = event.branchEntries.at(-1)?.id ?? null;
-  const operationId = randomUUID();
+  const snapshotEntryIds = event.branchEntries.map((entry) => entry.id);
   try {
-    const native = await withCompactionStatus(deps, ctx, operationId, async () => {
-      const checkpoint = await deps.createCheckpoint(
-        checkpointParams(deps, state, event, ctx, model),
-      );
-      assertBranchFence(ctx, snapshotTipId, operationId);
-      return checkpoint;
-    });
+    const native = await deps.createCheckpoint(checkpointParams(deps, state, event, ctx, model));
+    assertBranchFence(ctx, snapshotEntryIds);
     return {
       compaction: {
         summary: deps.marker(),

@@ -38,9 +38,9 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
 - **Trust handling:** no configuration input remains, so project trust no longer changes behavior.
 - **Background resources:** none. Retry backoff uses in-memory timers bound to the request's abort
   signal.
-- **Session persistence:** native checkpoints are stored in Pi's normal `CompactionEntry.details`;
-  TUI status updates are appended as `openai-codex-compaction-status` custom entries. The stored
-  `encrypted_content` is opaque provider state, not a credential.
+- **Session persistence:** native checkpoints are stored in Pi's normal `CompactionEntry.details`.
+  Pi's transient compaction indicator is not saved. The stored `encrypted_content` is opaque
+  provider state, not a credential.
 - **Malformed external data:** SSE streams, checkpoint payloads, and JWT structure are validated;
   failures are fail-closed (compaction cancelled or request aborted) rather than fallbacks. Upstream
   error paths could embed unbounded HTTP error bodies in UI notifications; OnurPi bounds them to a
@@ -74,10 +74,12 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
   could append a native checkpoint between an assistant function call and its function result; Pi's
   serialized built-in threshold, overflow, and manual compaction lifecycle now owns every trigger,
   and this extension only provides the remote checkpoint.
-- Added a fail-closed branch snapshot fence around the remote call: the branch tip from
-  `event.branchEntries` is recorded, and before a checkpoint is returned the active branch must not
-  have moved past it except for non-context status entries from that same operation. Any other
-  change cancels the compaction without content and records a failed status.
+- Removed OnurPi's temporary `context-window-policy` controller after Pi 0.84.4 added a native
+  pre-response compaction barrier for tool loops. Normal Pi settings now put the default Codex model
+  at a 90% threshold without aborting the active turn.
+- Added a fail-closed branch snapshot fence around the remote call. Before a checkpoint is returned,
+  the active branch must contain the same entry IDs in the same order as `event.branchEntries`. Any
+  change cancels the compaction without content.
 - Other upstream behavior for checkpoint creation and fail-closed cancellation is preserved.
 - Adopted upstream `c4d6ca8` ("fix(codex-compaction): sanitize cross-provider history", 0.1.4):
   reasoning items, text-signature item ids, and tool-call item ids replay only when the stored

@@ -102,6 +102,15 @@ describe("OnurPi package loading", () => {
     ).toEqual(expected);
   });
 
+  it("configures Pi native compaction at 90% of the default Codex context", () => {
+    const settings = readJson("settings.json");
+    expect(settings["compaction"]).toEqual({
+      enabled: true,
+      reserveTokens: 27_200,
+      keepRecentTokens: 20_000,
+    });
+  });
+
   it("pins external extensions in private wrapper packages", () => {
     const rootManifest = readJson("package.json");
     expect(rootManifest["dependencies"]).toBeUndefined();
@@ -191,16 +200,15 @@ describe("OnurPi package loading", () => {
     );
   });
 
-  it("loads Codex routing, timing, native content, and text fallback in order", () => {
+  it("loads Codex routing, native content, and text fallback in order", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
     const switcher = extensions.indexOf("./packages/codex-switcher/index.ts");
-    const policy = extensions.indexOf("./packages/context-window-policy/index.ts");
     const codex = extensions.indexOf("./packages/pi-codex-compaction/index.ts");
     expect(switcher).toBeGreaterThanOrEqual(0);
-    expect(switcher).toBeLessThan(policy);
-    expect(policy).toBeLessThan(codex);
+    expect(switcher).toBeLessThan(codex);
     expect(codex).toBeLessThan(extensions.indexOf("./packages/reliable-compaction/index.ts"));
+    expect(extensions).not.toContain("./packages/context-window-policy/index.ts");
   });
 
   it("runs Loop Guard before Goal settlement handlers", () => {
