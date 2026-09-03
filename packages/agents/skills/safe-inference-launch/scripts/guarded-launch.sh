@@ -141,12 +141,63 @@ echo "guarded-launch: starting $label"
 echo "guarded-launch: memory floors: MemAvailable >= ${min_mem_gb}GiB, SwapFree >= ${min_swap_gb}GiB"
 echo "guarded-launch: command: $*"
 
-setsid "$@" &
-child_pid=$!
-pgid="$child_pid"
+launch_state="$(mktemp "${TMPDIR:-/tmp}/guarded-launch.XXXXXX")"
+child_pid=""
+pgid=""
 pressure_killed=0
 child_reaped=0
 child_status=0
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [[ "${pressure_killed:-0}" == "0" ]] && [[ -n "${pgid:-}" ]] && group_alive "$pgid"; then
+    kill_group "$pgid" "guard script exiting"
+  fi
+  rm -f "$launch_state"
+  exit "$status"
+}
+trap cleanup EXIT INT TERM
+
+# Force setsid to fork so its waitable supervisor PID can never be mistaken for the new process
+# group ID. The session leader reports the real process group before it executes the command.
+setsid --fork --wait sh -c '
+  state_file="$1"
+  shift
+  printf "%s\n" "$$" > "$state_file"
+  exec "$@"
+' guarded-launch-session "$launch_state" "$@" &
+child_pid=$!
+
+for _ in {1..500}; do
+  candidate=""
+  if IFS= read -r candidate < "$launch_state" && [[ "$candidate" =~ ^[0-9]+$ ]]; then
+    pgid="$candidate"
+    break
+  fi
+  if ! kill -0 "$child_pid" 2>/dev/null; then
+    if wait "$child_pid"; then
+      child_status=0
+    else
+      child_status=$?
+    fi
+    child_reaped=1
+    echo "guarded-launch: failed to establish the $label process group" >&2
+    if [[ "$child_status" == "0" ]]; then
+      exit 5
+    fi
+    exit "$child_status"
+  fi
+  sleep 0.01
+done
+
+if [[ -z "$pgid" ]]; then
+  echo "guarded-launch: timed out while establishing the $label process group" >&2
+  kill "$child_pid" 2>/dev/null || true
+  wait "$child_pid" 2>/dev/null || true
+  child_reaped=1
+  exit 5
+fi
 
 reap_child_if_exited() {
   local state=""
@@ -165,16 +216,6 @@ reap_child_if_exited() {
     child_reaped=1
   fi
 }
-
-cleanup() {
-  local status=$?
-  trap - EXIT INT TERM
-  if [[ "${pressure_killed:-0}" == "0" ]] && group_alive "$pgid"; then
-    kill_group "$pgid" "guard script exiting"
-  fi
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
 
 while true; do
   reap_child_if_exited

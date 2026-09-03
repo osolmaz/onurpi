@@ -71,9 +71,7 @@ describe("guarded-launch process groups", () => {
         "guarded-launch-test",
         marker,
       ],
-      // The test observes the marker, not process output. Ignore standard streams so an orphaned
-      // group member cannot keep a CI capture pipe open after the launcher exits.
-      { stdio: "ignore", timeout: 10_000 },
+      { encoding: "utf8", timeout: 10_000 },
     );
 
     expect(result.error).toBeUndefined();
