@@ -294,9 +294,9 @@ describe("codex switcher startup", () => {
           nativeProvider: fakeNative([]),
           vault: fakeVault(),
         },
-        { piVersion: "0.85.0" },
+        { piVersion: "0.86.0" },
       ),
-    ).toThrow("supports Pi >=0.84.2 <0.85.0");
+    ).toThrow("supports Pi >=0.84.2 <0.86.0");
     expect(test.providers).toEqual([existing]);
   });
 

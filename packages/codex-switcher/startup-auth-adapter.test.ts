@@ -130,7 +130,7 @@ describe("startup auth adapter", () => {
     expect(Reflect.get(runtimePrototype, "hasConfiguredAuth")).toBe(original);
   });
 
-  it.each(["0.84.1", "0.85.0", "1.0.0", "0.84.2-beta.1"])(
+  it.each(["0.84.1", "0.86.0", "1.0.0", "0.84.2-beta.1"])(
     "rejects unsupported Pi version %s before patching",
     (piVersion) => {
       const test = prototypeWith(false);
@@ -140,7 +140,7 @@ describe("startup auth adapter", () => {
           piVersion,
           runtimePrototype: test.prototype,
         }),
-      ).toThrow("supports Pi >=0.84.2 <0.85.0");
+      ).toThrow("supports Pi >=0.84.2 <0.86.0");
       expect(test.prototype.hasConfiguredAuth).toBe(test.original);
     },
   );

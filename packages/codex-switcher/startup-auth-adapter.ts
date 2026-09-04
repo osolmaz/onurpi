@@ -46,11 +46,11 @@ function isAdapterState(value: unknown): value is AdapterState {
 }
 
 function assertSupportedPiVersion(version: string): void {
-  const match = /^0\.84\.(\d+)$/u.exec(version);
-  const patch = match?.[1] === undefined ? undefined : Number(match[1]);
-  if (patch === undefined || !Number.isSafeInteger(patch) || patch < MINIMUM_PATCH) {
+  const supported =
+    /^0\.84\.(?:[2-9]|[1-9]\d+)$/u.test(version) || /^0\.85\.(?:0|[1-9]\d*)$/u.test(version);
+  if (!supported) {
     throw new Error(
-      `Codex switcher session restore supports Pi >=0.84.${String(MINIMUM_PATCH)} <0.85.0; found ${version}.`,
+      `Codex switcher session restore supports Pi >=0.84.${String(MINIMUM_PATCH)} <0.86.0; found ${version}.`,
     );
   }
 }

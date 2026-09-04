@@ -41,6 +41,8 @@ const noForegrounds: Record<ThemeColor, string> = {
   muted: "#888888",
   dim: "#888888",
   text: "#888888",
+  scrollbarTrack: "#888888",
+  scrollbarThumb: "#888888",
   searchMatchText: "#888888",
   thinkingText: "#888888",
   userMessageText: "#888888",

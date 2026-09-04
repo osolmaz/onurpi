@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.3`
-- Source commit: `e296d00a8cf0dd1951ff6d8271e596ff0ecdb84b`
-- Package source: exact npm release `0.16.3`
+- Latest release at review: `v0.16.4`
+- Source commit: `f7c72fc05a1cdf701791ce03259d08696ae4dae2`
+- Package source: exact npm release `0.16.4`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -34,7 +34,8 @@ continuation replies small by sending only current run state and keeping session
 server-owned SQLite. Required large values use verified content references and bounded reads, and
 pruning cannot delete response content while an active runner needs it. The release also completes
 the public naming cutover to Workflow Server, Workflow Runner, Resource Manager, Resource Runner,
-and Managed Resource.
+and Managed Resource. Patch `0.16.4` removes the upper Pi peer-version limit, verifies the package
+with Pi `0.85.0`, and includes the official Pi server package required by that Pi SDK release.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic

@@ -9,7 +9,7 @@
 - Never fall back after text, thinking, or a tool call starts.
 - Keep the committed account fixed through the complete agent run.
 - Use documented Pi provider, auth, model, command, event, and status APIs except for the reviewed
-  Pi 0.84.x startup adapter. That adapter may wrap only the public exported
+  Pi 0.84.x and 0.85.x startup adapter. That adapter may wrap only the public exported
   `ModelRuntime.prototype.hasConfiguredAuth` method during saved-model restoration. It must be
   version-locked, reversible, guarded against duplicate installation, and removed when Pi registers
   providers before model restoration.
