@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.1`
-- Source commit: `2ad2beadeabb875c030d0026b64f96317b4fbf5f`
-- Package source: exact npm release `0.16.1`
+- Latest release at review: `v0.16.2`
+- Source commit: `0a25ab1e55b5ab878d10ada52a71e28294cb0189`
+- Package source: exact npm release `0.16.2`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -23,7 +23,13 @@ reader with bounded host views, and adds reliable cold-start and live-view recov
 `piw <runId> --once` and packed-package release checks for the Pi widget, workflow lifecycle, `piw`,
 and an exact real-model submission. Patch `0.16.1` makes the Pi widget and `piw` use the same live
 status. Interactive timeouts now count only active origin-session model turns and remain suspended
-while the workflow is paused, Pi is disconnected, or the host is down.
+while the workflow is paused, Pi is disconnected, or the host is down. Patch `0.16.2` makes the host
+the only authority for workflow-turn ownership. Provider failures, terminal races, reconnects, and
+late reports cannot leave stale ownership or attach later chat turns to old workflow work. Matching
+repeated reports return the saved result, while conflicting reports remain errors. The release also
+gives managed effects full compiled identities, uses explicit worker commands, commits terminal
+state before presentation, retries terminal presentation, and parks workers that exit without
+progress with a clear recovery reason.
 
 The extension and host use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The host uses atomic

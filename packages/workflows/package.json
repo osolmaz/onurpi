@@ -51,6 +51,6 @@
     "qs": "6.15.3"
   },
   "dependencies": {
-    "@osolmaz/pi-workflows": "0.16.1"
+    "@osolmaz/pi-workflows": "0.16.2"
   }
 }
