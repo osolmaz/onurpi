@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.4`
-- Source commit: `f7c72fc05a1cdf701791ce03259d08696ae4dae2`
-- Package source: exact npm release `0.16.4`
+- Latest release at review: `v0.16.5`
+- Source commit: `ca46ad9236075bb1012d0de4131e76523acd7c19`
+- Package source: exact npm release `0.16.5`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -35,7 +35,12 @@ server-owned SQLite. Required large values use verified content references and b
 pruning cannot delete response content while an active runner needs it. The release also completes
 the public naming cutover to Workflow Server, Workflow Runner, Resource Manager, Resource Runner,
 and Managed Resource. Patch `0.16.4` removes the upper Pi peer-version limit, verifies the package
-with Pi `0.85.0`, and includes the official Pi server package required by that Pi SDK release.
+with Pi `0.85.0`, and includes the official Pi server package required by that Pi SDK release. Patch
+`0.16.5` automatically removes safe terminal workflow trees after 30 days and collects unreferenced
+blobs. It protects active, unsettled, resumable, and undelivered work, reuses freed pages, and
+compacts the database only when the server is idle and enough space is reclaimable. A measured
+regression test also prevents repeated runner results from copying complete session history. The
+retention period is not a database-size cap.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
