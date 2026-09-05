@@ -10,12 +10,12 @@ import { TurnFoldState } from "./turn-state.ts";
 
 type Entry = Parameters<typeof selectTranscriptEntries>[0][number];
 
-function goalRun(run: number): Entry[] {
-  const promptId = `goal-prompt-${String(run)}`;
+function extensionRun(run: number): Entry[] {
+  const promptId = `extension-prompt-${String(run)}`;
   const entries: Entry[] = [
     {
-      content: "Continue the active goal.",
-      customType: "pi-goal-event",
+      content: "Continue the extension run.",
+      customType: "test-extension-event",
       details: { kind: "continuation" },
       display: true,
       id: promptId,
@@ -50,7 +50,7 @@ function goalRun(run: number): Entry[] {
       customType: TURN_FOLD_RUN_ENTRY,
       data: {
         promptEntryId: promptId,
-        runId: `goal-run-${String(run)}`,
+        runId: `extension-run-${String(run)}`,
         startedAt: run * 10,
         version: 1,
       },
@@ -244,19 +244,19 @@ function expectUserTimestamps(source: readonly Entry[], displayed: readonly Entr
   }
 }
 
-describe("Goal-heavy transcript windows", () => {
+describe("Custom-run-heavy transcript windows", () => {
   it("bounds a synthetic 4,228-run session by durable run boundaries", () => {
-    const branch = Array.from({ length: 4_228 }, (_, index) => goalRun(index + 1)).flat();
+    const branch = Array.from({ length: 4_228 }, (_, index) => extensionRun(index + 1)).flat();
     const selected = selectTranscriptEntries(branch, 3);
 
     expect(branch.length).toBeGreaterThan(12_000);
-    expect(selected[0]?.id).toBe("goal-prompt-4000");
+    expect(selected[0]?.id).toBe("extension-prompt-4000");
     expect(selected.at(-1)?.id).toBe("boundary-4228");
     expect(selected.length).toBeLessThan(1_000);
   });
 
   it("keeps full-history compact replay within the component budget", () => {
-    const branch = Array.from({ length: 4_228 }, (_, index) => goalRun(index + 1)).flat();
+    const branch = Array.from({ length: 4_228 }, (_, index) => extensionRun(index + 1)).flat();
     const projection = projectTranscriptEntries(branch, {
       activeRun: false,
       attachedCompactionEntryIds: new Set(),

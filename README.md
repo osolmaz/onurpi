@@ -14,7 +14,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------- |
 | [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync      |
 | [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                  |
-| [`@onurpi/goal`](packages/goal/)                                         | Bounded autonomous goals with no-progress circuit breakers       |
 | [`@onurpi/loop-guard`](packages/loop-guard/)                             | Opt-in bounded detection and interruption of repeated work       |
 | [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering Turkish working messages with live response metrics   |
 | [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                          |

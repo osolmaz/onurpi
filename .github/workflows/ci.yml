@@ -33,12 +33,6 @@ jobs:
       - name: Check @onurpi/turn-fold package with Slophammer
         working-directory: packages/turn-fold
         run: npm run slophammer
-      - name: Check @onurpi/goal package
-        working-directory: packages/goal
-        run: npm run check
-      - name: Check @onurpi/goal package with Slophammer
-        working-directory: packages/goal
-        run: npm run slophammer
       - name: Check @onurpi/loop-guard package
         working-directory: packages/loop-guard
         run: npm run check
@@ -170,9 +164,6 @@ jobs:
       - run: npm run mutate
       - name: Mutate @onurpi/turn-fold package
         working-directory: packages/turn-fold
-        run: npm run mutate
-      - name: Mutate @onurpi/goal package
-        working-directory: packages/goal
         run: npm run mutate
       - name: Mutate @onurpi/loop-guard package
         working-directory: packages/loop-guard

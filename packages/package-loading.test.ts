@@ -211,14 +211,6 @@ describe("OnurPi package loading", () => {
     expect(extensions).not.toContain("./packages/context-window-policy/index.ts");
   });
 
-  it("runs Loop Guard before Goal settlement handlers", () => {
-    const extensions = resourceManifest()["extensions"];
-    if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
-    expect(extensions.indexOf("./packages/loop-guard/index.ts")).toBeLessThan(
-      extensions.indexOf("./packages/goal/index.ts"),
-    );
-  });
-
   it("loads Command Guard after every other extension", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");

@@ -136,16 +136,16 @@ describe("transcript window selection", () => {
     const branch = [
       user("old-user"),
       entry("old-answer"),
-      customMessage("goal-prompt"),
-      entry("goal-answer"),
-      runMarker("goal-run", "goal-prompt"),
+      customMessage("extension-prompt"),
+      entry("extension-answer"),
+      runMarker("extension-run", "extension-prompt"),
       entry("c1", "compaction"),
       entry("after"),
     ];
     expect(ids(selectTranscriptEntries(branch, 1))).toEqual([
-      "goal-prompt",
-      "goal-answer",
-      "goal-run",
+      "extension-prompt",
+      "extension-answer",
+      "extension-run",
       "c1",
       "after",
     ]);

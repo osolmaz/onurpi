@@ -16,26 +16,26 @@ function assistantMessage(timestamp: number, text: string): Record<string, unkno
 it("keeps custom-prompt runs visible when their projected entries are displayed", () => {
   const state = new TurnFoldState();
   const assistant = {};
-  const assistantHistory = assistantMessage(110, "Goal continuation");
+  const assistantHistory = assistantMessage(110, "Extension continuation");
   const entries = [
     {
-      content: "Continue the active goal.",
-      customType: "pi-goal-event",
+      content: "Continue the extension run.",
+      customType: "test-extension-event",
       details: { kind: "continuation" },
       display: true,
-      id: "goal-prompt",
+      id: "extension-prompt",
       type: "custom_message",
     },
-    { id: "goal-answer", message: assistantHistory, type: "message" },
+    { id: "extension-answer", message: assistantHistory, type: "message" },
     {
       customType: TURN_FOLD_RUN_ENTRY,
       data: {
-        promptEntryId: "goal-prompt",
-        runId: "goal-run",
+        promptEntryId: "extension-prompt",
+        runId: "extension-run",
         startedAt: 100,
         version: 1,
       },
-      id: "goal-boundary",
+      id: "extension-boundary",
       type: "custom",
     },
   ];
