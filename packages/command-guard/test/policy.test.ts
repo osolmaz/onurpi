@@ -121,7 +121,6 @@ describe("Bash policy", () => {
   it("blocks critical roots", async () => {
     await expect(bash("rm -rf /")).resolves.toMatchObject({ action: "deny" });
     await expect(bash("rm -rf .")).resolves.toMatchObject({ action: "deny" });
-    await expect(bash("git checkout other-branch")).resolves.toMatchObject({ action: "deny" });
     if (process.env["HOME"]) {
       await expect(bash('rm -rf "$HOME"')).resolves.toMatchObject({ action: "deny" });
     }
@@ -169,7 +168,8 @@ describe("Bash command classifiers", () => {
       "git reset --hard HEAD",
       "git restore -- file.txt",
       "git checkout -- file.txt",
-      "git switch other-branch",
+      "git checkout --force other-branch",
+      "git switch --discard-changes other-branch",
       "truncate -s 0 file.txt",
       "dd if=/dev/null of=file.txt",
       ": > file.txt",
@@ -189,6 +189,10 @@ describe("Bash command classifiers", () => {
       "rsync -a source/ child/",
       "git clean -n",
       "git reset --soft HEAD",
+      "git switch other-branch",
+      "git switch -c new-branch",
+      "git checkout other-branch",
+      "git checkout -b new-branch",
       "dd if=/dev/null",
     ]) {
       await expect(classifyBash(source, process.env, parser), source).resolves.toMatchObject({

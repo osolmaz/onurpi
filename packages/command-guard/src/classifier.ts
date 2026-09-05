@@ -217,10 +217,17 @@ function classifyGit(command: ParsedCommand): DestructiveOperation[] {
     return [operation("git reset --hard", "git-reset", command.source, [worktree])];
   }
   if (subcommand === "switch") {
-    return [operation("git switch", "replace", command.source, [worktree])];
+    const forced = rest.some(
+      (arg) =>
+        arg.value === "--discard-changes" ||
+        arg.value === "--force" ||
+        /^-[^-]*f/u.test(arg.value ?? ""),
+    );
+    return forced ? [operation("git switch", "replace", command.source, [worktree])] : [];
   }
   if (subcommand === "checkout" && !rest.some((arg) => arg.value === "--")) {
-    return [operation("git checkout", "replace", command.source, [worktree])];
+    const forced = rest.some((arg) => arg.value === "--force" || /^-[^-]*f/u.test(arg.value ?? ""));
+    return forced ? [operation("git checkout", "replace", command.source, [worktree])] : [];
   }
   if (subcommand !== "restore" && subcommand !== "checkout") return [];
   const targets = gitPathTargets(rest);

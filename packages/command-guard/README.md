@@ -18,9 +18,9 @@ not have a reviewed final execution adapter. Unknown shells are also blocked bec
 and expansion rules cannot be checked safely.
 
 It recognizes direct and nested forms of `rm`, `unlink`, `rmdir`, `shred`, `find -delete`,
-destructive `find -exec`, `xargs`, `rsync --delete`, destructive Git worktree commands, `truncate`,
-`dd` output, and truncating shell redirection. It also checks direct PowerShell and `cmd.exe`
-deletion forms.
+destructive `find -exec`, `xargs`, `rsync --delete`, Git commands that explicitly discard worktree
+files, `truncate`, `dd` output, and truncating shell redirection. It also checks direct PowerShell
+and `cmd.exe` deletion forms.
 
 The Bash path uses the official Tree-sitter Bash grammar. It reads the exact command, final working
 directory, selected shell, and child environment. A fixed variable such as `$TARGET` is allowed only
@@ -45,8 +45,10 @@ Command Guard makes one of three decisions:
 - **Deny:** The target is a protected path or the final check failed.
 
 The extension denies filesystem roots, the home directory, the Pi working directory, mount roots,
-and their ancestors. It resolves symlinks, records filesystem object identities, and checks them
-again immediately before execution.
+and their ancestors. Normal `git switch` and branch-form `git checkout` commands are allowed because
+Git itself refuses to overwrite conflicting worktree changes. Forced switches remain blocked. It
+resolves symlinks, records filesystem object identities, and checks them again immediately before
+execution.
 
 Each allowed tool call gets a one-use final check that expires after 60 seconds. It binds the exact
 command, shell, working directory, referenced environment values, target paths, and object
