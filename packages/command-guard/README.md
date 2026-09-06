@@ -8,7 +8,7 @@ It is a Pi extension. It does not change Pi core.
 
 Command Guard checks these command routes:
 
-- Pi's built-in `bash` and `powershell` tools;
+- Pi's built-in `bash` tool and its Windows-only `powershell` tool;
 - direct `!` and `!!` Bash commands;
 - OnurPi Unified Exec `exec_command` starts;
 - nonempty Unified Exec `write_stdin` input.
@@ -21,6 +21,14 @@ It recognizes direct and nested forms of `rm`, `unlink`, `rmdir`, `shred`, `find
 destructive `find -exec`, `xargs`, `rsync --delete`, Git commands that explicitly discard worktree
 files, `truncate`, `dd` output, and truncating shell redirection. It also checks direct PowerShell
 and `cmd.exe` deletion forms.
+
+Bash lookups such as `command -v pwsh` and `command -V bash` are allowed. Their arguments are
+command names to inspect. Substitutions, redirections, and other commands in the same input still
+receive the normal safety checks.
+
+PowerShell commands use the official parser when the input might contain a covered operation. Parsed
+read-only Git commands are allowed. Destructive Git commands receive the same target checks as their
+Bash forms. A missing parser or unchecked nested execution remains blocked.
 
 The Bash path uses the official Tree-sitter Bash grammar. It reads the exact command, final working
 directory, selected shell, and child environment. A fixed variable such as `$TARGET` is allowed only
@@ -74,8 +82,15 @@ Run:
 /command-guard
 ```
 
-The command shows active guarded tools, unsupported command tools that were disabled, and pending
-one-use checks. It does not show environment values or command contents.
+The command shows active guarded tools, unsupported command tools that were disabled, pending
+one-use checks, platform support, and parser availability. A parser check does not prove that a
+shell command can execute. Status output does not show environment values or command contents.
+
+A refusal applies to the checked command. After a parser, syntax, platform, or tool-availability
+failure, the agent should test one small, independent read-only command through an available guarded
+shell before reporting that command execution is unavailable. The extension includes this rule in
+model-visible guidance. It never permits rerouting a denied destructive action or disabling the
+guard.
 
 ## Limits
 

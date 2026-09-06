@@ -1,6 +1,8 @@
 import { basename } from "node:path";
 
 import { hasPossibleDestructiveToken } from "./lexical.ts";
+import { classifyGit, hasSupportedNativeGitArguments } from "./git.ts";
+import { operation } from "./operations.ts";
 import { MAX_DESTRUCTIVE_TARGETS, MAX_NESTING_DEPTH } from "./limits.ts";
 import type { BashParser } from "./bash-parser.ts";
 import { classifyRsync } from "./rsync.ts";
@@ -114,15 +116,6 @@ function rmKind(args: readonly ResolvedWord[]): DestructiveKind {
   return "delete";
 }
 
-function operation(
-  command: string,
-  kind: DestructiveKind,
-  source: string,
-  targets: readonly ResolvedWord[],
-): DestructiveOperation {
-  return { command, kind, source, targets };
-}
-
 function classifyFind(command: ParsedCommand): DestructiveOperation[] {
   const values = command.args.map((arg) => arg.value);
   if (!values.includes("-delete")) return [];
@@ -159,87 +152,6 @@ function findEmbeddedCommands(command: ParsedCommand): ParsedCommand[] {
     if (name) embedded.push({ name, args, source: command.source });
   }
   return embedded;
-}
-
-const DESTRUCTIVE_GIT_SUBCOMMANDS = new Set(["checkout", "clean", "reset", "restore", "switch"]);
-
-function gitSubcommandIndex(args: readonly ResolvedWord[]): number {
-  return args.findIndex((arg) => DESTRUCTIVE_GIT_SUBCOMMANDS.has(arg.value ?? ""));
-}
-
-function gitHasAlternateWorktree(args: readonly ResolvedWord[], subcommandIndex: number): boolean {
-  return args
-    .slice(0, subcommandIndex)
-    .some((arg) =>
-      /^(?:-C|--git-dir(?:=|$)|--work-tree(?:=|$)|--namespace(?:=|$))/u.test(arg.value ?? ""),
-    );
-}
-
-// eslint-disable-next-line complexity -- Git restore options and path separators need one ordered scan.
-function gitPathTargets(rest: readonly ResolvedWord[]): readonly ResolvedWord[] {
-  const separator = rest.findIndex((arg) => arg.value === "--");
-  if (separator >= 0) return rest.slice(separator + 1);
-  const optionsWithValue = new Set(["-s", "--source", "--conflict", "--pathspec-from-file"]);
-  const targets: ResolvedWord[] = [];
-  for (let index = 0; index < rest.length; index++) {
-    const value = rest[index]?.value;
-    if (value?.startsWith("--") && value.includes("=")) continue;
-    if (value && optionsWithValue.has(value)) {
-      index++;
-      continue;
-    }
-    if (!value?.startsWith("-")) {
-      const target = rest[index];
-      if (target) targets.push(target);
-    }
-  }
-  return targets;
-}
-
-// eslint-disable-next-line complexity -- Keep related destructive Git forms in one classifier.
-function classifyGit(command: ParsedCommand): DestructiveOperation[] {
-  const subcommandIndex = gitSubcommandIndex(command.args);
-  if (subcommandIndex < 0) return [];
-  const subcommand = command.args[subcommandIndex]?.value;
-  const rest = command.args.slice(subcommandIndex + 1);
-  const cwd = { raw: ".", value: ".", referencedVariables: [] } satisfies ResolvedWord;
-  const uncertainCwd = {
-    raw: "git worktree option",
-    referencedVariables: [],
-    reason: "Git uses an alternate working tree",
-  } satisfies ResolvedWord;
-  const worktree = gitHasAlternateWorktree(command.args, subcommandIndex) ? uncertainCwd : cwd;
-  if (subcommand === "clean") {
-    const forced = rest.some((arg) => arg.value === "--force" || /^-[^-]*f/u.test(arg.value ?? ""));
-    return forced ? [operation("git clean", "git-clean", command.source, [worktree])] : [];
-  }
-  if (subcommand === "reset" && rest.some((arg) => arg.value === "--hard")) {
-    return [operation("git reset --hard", "git-reset", command.source, [worktree])];
-  }
-  if (subcommand === "switch") {
-    const forced = rest.some(
-      (arg) =>
-        arg.value === "--discard-changes" ||
-        arg.value === "--force" ||
-        /^-[^-]*f/u.test(arg.value ?? ""),
-    );
-    return forced ? [operation("git switch", "replace", command.source, [worktree])] : [];
-  }
-  if (subcommand === "checkout" && !rest.some((arg) => arg.value === "--")) {
-    const forced = rest.some((arg) => arg.value === "--force" || /^-[^-]*f/u.test(arg.value ?? ""));
-    return forced ? [operation("git checkout", "replace", command.source, [worktree])] : [];
-  }
-  if (subcommand !== "restore" && subcommand !== "checkout") return [];
-  const targets = gitPathTargets(rest);
-  return [
-    operation(`git ${subcommand}`, "replace", command.source, [
-      {
-        raw: targets.map((target) => target.raw).join(" ") || "Git pathspec",
-        referencedVariables: targets.flatMap((target) => target.referencedVariables),
-        reason: "Git pathspec targets cannot be canonicalized without running Git",
-      },
-    ]),
-  ];
 }
 
 function classifyTruncate(command: ParsedCommand): DestructiveOperation[] {
@@ -289,6 +201,19 @@ function simpleWrapperCommandIndex(name: string, args: readonly ResolvedWord[]):
     return -1;
   }
   return -1;
+}
+
+function isCommandLookup(command: ParsedCommand): boolean {
+  if (commandName(command.name) !== "command") return false;
+  let lookup = false;
+  for (const arg of command.args) {
+    const value = arg.value;
+    if (value === undefined) return lookup;
+    if (value === "--" || !value.startsWith("-")) break;
+    if (!/^-[pVv]+$/u.test(value)) return false;
+    if (/[Vv]/u.test(value)) lookup = true;
+  }
+  return lookup;
 }
 
 function unwrapSimple(command: ParsedCommand): ParsedCommand | undefined {
@@ -542,6 +467,8 @@ async function classifyCommand(
     return { operations: [], uncertainReason: "nested command depth exceeds safety limit" };
   }
   const name = commandName(command.name);
+  // The script walk still checks substitutions and redirections around a lookup.
+  if (isCommandLookup(command)) return { operations: [] };
   if (name && CWD_MUTATORS.has(name)) return { operations: [], changesCwd: true };
   if (
     (name === "env" || name === "sudo") &&
@@ -727,20 +654,59 @@ function powerShellWord(element: PowerShellElement): ResolvedWord {
   };
 }
 
+const POWERSHELL_CWD_MUTATORS = new Set([
+  ...CWD_MUTATORS,
+  "chdir",
+  "set-location",
+  "sl",
+  "push-location",
+  "pop-location",
+]);
+
 function classifyPowerShellCommand(
-  name: string,
+  name: string | undefined,
   source: string,
   elements: readonly PowerShellElement[],
-): DestructiveOperation[] {
-  const normalized = name.toLowerCase();
+): Classification {
+  if (!name) return { operations: [], uncertainReason: "dynamic PowerShell command name" };
+  const word: ResolvedWord = { raw: name, value: name, referencedVariables: [] };
+  const normalized = basename(name.replaceAll("\\", "/"))
+    .toLowerCase()
+    .replace(/\.exe$/u, "");
   const args = elements.slice(1).map(powerShellWord);
+  if (POWERSHELL_CWD_MUTATORS.has(normalized)) return { operations: [], changesCwd: true };
   if (POWERSHELL_DELETE_COMMANDS.has(normalized)) {
-    return [operation(name, "recursive-delete", source, rmTargets(args))];
+    return { operations: [operation(name, "recursive-delete", source, rmTargets(args))] };
   }
   if (POWERSHELL_CLEAR_COMMANDS.has(normalized)) {
-    return [operation(name, "truncate", source, rmTargets(args))];
+    return { operations: [operation(name, "truncate", source, rmTargets(args))] };
   }
-  return [];
+  if (normalized === "git") {
+    return classifyPowerShellGit({ name: word, args, source });
+  }
+  return unsupportedPowerShellCommand(normalized)
+    ? { operations: [], uncertainReason: `PowerShell command ${name} cannot be checked` }
+    : { operations: [] };
+}
+
+function classifyPowerShellGit(command: ParsedCommand): Classification {
+  if (command.args.some((arg) => arg.value === undefined)) {
+    return { operations: [], uncertainReason: "PowerShell Git arguments are not fixed strings" };
+  }
+  return hasSupportedNativeGitArguments(command.args)
+    ? { operations: classifyGit(command) }
+    : { operations: [], uncertainReason: "PowerShell Git invocation cannot be checked" };
+}
+
+function unsupportedPowerShellCommand(name: string): boolean {
+  return (
+    hasPossibleDestructiveToken(name) ||
+    SHELL_NAMES.has(name) ||
+    UNSUPPORTED_SHELL_NAMES.has(name) ||
+    UNSUPPORTED_COMMAND_WRAPPERS.has(name) ||
+    isWrapperCommand(name) ||
+    DYNAMIC_COMMANDS.has(name)
+  );
 }
 
 function hasTruncatingRedirection(source: string): boolean {
@@ -756,7 +722,15 @@ function hasDynamicPowerShellCommand(source: string): boolean {
 }
 
 function hasPowerShellLauncher(source: string): boolean {
-  return /\b(?:cmd|powershell|pwsh)\b/iu.test(source);
+  return (source.match(/[A-Za-z][A-Za-z0-9_-]*/gu) ?? []).some((word) => {
+    const name = word.toLowerCase();
+    return (
+      SHELL_NAMES.has(name) ||
+      UNSUPPORTED_SHELL_NAMES.has(name) ||
+      UNSUPPORTED_COMMAND_WRAPPERS.has(name) ||
+      isWrapperCommand(name)
+    );
+  });
 }
 
 // eslint-disable-next-line complexity -- Parser availability, syntax, and target certainty fail closed in one pass.
@@ -781,28 +755,31 @@ export async function classifyPowerShell(
   if (parsed.errors.length > 0) {
     return { operations: [], uncertainReason: "PowerShell syntax contains errors" };
   }
-  let operations = parsed.commands.flatMap((command) =>
-    command.name ? classifyPowerShellCommand(command.name, command.source, command.elements) : [],
-  );
-  operations = [
-    ...operations,
-    ...parsed.redirects.map((redirect) =>
+  let result: Classification = { operations: [] };
+  for (const command of parsed.commands) {
+    result = combine(
+      result,
+      classifyPowerShellCommand(command.name, command.source, command.elements),
+    );
+  }
+  result = combine(result, {
+    operations: parsed.redirects.map((redirect) =>
       operation("PowerShell redirection", "truncate", redirect.source, [
         powerShellWord(redirect.destination),
       ]),
     ),
-  ];
-  const dynamic = parsed.commands.some((command) => command.name === undefined);
-  const uncertainTarget = operations.some((item) =>
-    item.targets.some((target) => target.value === undefined),
-  );
-  if (dynamic || uncertainTarget || operations.length === 0) {
-    return { operations, uncertainReason: "PowerShell command or target is not a fixed string" };
+  });
+  if (result.uncertainReason) return result;
+  if (result.changesCwd && result.operations.length > 0) {
+    return { ...result, uncertainReason: "working directory changes before a destructive command" };
   }
-  const targetCount = operations.reduce((count, item) => count + item.targets.length, 0);
+  if (result.operations.some((item) => item.targets.some((target) => target.value === undefined))) {
+    return { ...result, uncertainReason: "PowerShell target is not a fixed string" };
+  }
+  const targetCount = result.operations.reduce((count, item) => count + item.targets.length, 0);
   return targetCount > MAX_DESTRUCTIVE_TARGETS
     ? { operations: [], uncertainReason: "destructive target count exceeds safety limit" }
-    : { operations };
+    : result;
 }
 
 // eslint-disable-next-line complexity -- Cmd expansion and compound syntax are blocked before tokenization.

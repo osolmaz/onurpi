@@ -3,14 +3,16 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { AdapterCoverage } from "./src/adapters.ts";
 import { registerShellGuards } from "./src/builtins.ts";
 import { ExecutionCheckStore } from "./src/execution-check.ts";
+import { withCommandGuardGuidance } from "./src/guidance.ts";
+import { shellStatus } from "./src/status.ts";
 import { registerToolCallGuards } from "./src/tool-calls.ts";
 import { registerUnifiedExecGuards } from "./src/unified-adapter.ts";
 
-function statusText(
+async function statusText(
   pi: ExtensionAPI,
   coverage: AdapterCoverage,
   checks: ExecutionCheckStore,
-): string {
+): Promise<string> {
   coverage.enforce();
   const active = new Set(pi.getActiveTools());
   const guarded = ["bash", "powershell", "exec_command", "write_stdin"].filter((name) =>
@@ -22,6 +24,7 @@ function statusText(
     `Guarded active tools: ${guarded.length > 0 ? guarded.join(", ") : "none"}.`,
     `Unsupported command tools disabled: ${disabled}.`,
     `Pending final command checks: ${String(checks.size)}.`,
+    ...(await shellStatus()),
     `Non-control write_stdin input is blocked. There is no bypass or confirmation gate.`,
   ].join("\n");
 }
@@ -36,17 +39,17 @@ export default function commandGuard(pi: ExtensionAPI): void {
 
   pi.registerCommand("command-guard", {
     description: "Show Command Guard coverage and pending checks",
-    handler: (_args, ctx) => {
-      ctx.ui.notify(statusText(pi, coverage, checks), "info");
-      return Promise.resolve();
+    handler: async (_args, ctx) => {
+      ctx.ui.notify(await statusText(pi, coverage, checks), "info");
     },
   });
   pi.on("session_start", () => {
     checks.clear();
     coverage.enforce();
   });
-  pi.on("before_agent_start", () => {
+  pi.on("before_agent_start", (event) => {
     coverage.enforce();
+    return { systemPrompt: withCommandGuardGuidance(event.systemPrompt) };
   });
   pi.on("session_before_switch", () => {
     checks.clear();

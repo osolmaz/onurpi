@@ -1,3 +1,5 @@
+import { supportsPowerShellTool } from "./shell.ts";
+
 const GUARDED_TOOLS = new Set(["bash", "powershell", "exec_command", "write_stdin"]);
 const COMMAND_FIELDS = new Set(["cmd", "command", "script"]);
 
@@ -48,7 +50,9 @@ export class AdapterCoverage {
         .map((tool) => tool.name),
     );
     const active = this.#pi.getActiveTools();
-    const filtered = active.filter((name) => !unsupported.has(name));
+    const filtered = active.filter(
+      (name) => !unsupported.has(name) && (name !== "powershell" || supportsPowerShellTool()),
+    );
     if (filtered.length !== active.length) this.#pi.setActiveTools(filtered);
     this.#disabled = [...unsupported].sort();
   }

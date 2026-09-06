@@ -320,10 +320,14 @@ describe("non-Bash classification", () => {
     await expect(
       classifyPowerShell(
         "cmd /c echo safe",
-        powerShellParser({ errors: [], redirects: [], commands: [] }),
+        powerShellParser({
+          errors: [],
+          redirects: [],
+          commands: [{ name: "cmd", source: "cmd /c echo safe", elements: [] }],
+        }),
       ),
     ).resolves.toMatchObject({
-      uncertainReason: "PowerShell command or target is not a fixed string",
+      uncertainReason: "PowerShell command cmd cannot be checked",
     });
     await expect(
       classifyPowerShell(

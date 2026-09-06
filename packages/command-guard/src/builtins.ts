@@ -12,6 +12,7 @@ import {
 import { checkCommand } from "./decision.ts";
 import { ExecutionCheckStore } from "./execution-check.ts";
 import { commandContext } from "./contexts.ts";
+import { supportsPowerShellTool } from "./shell.ts";
 
 export function guardedOperations(
   operations: BashOperations,
@@ -40,7 +41,9 @@ export function guardedOperations(
   };
 }
 
-function registerBashOverride(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
+type ShellGuardAPI = Pick<ExtensionAPI, "registerTool" | "on">;
+
+function registerBashOverride(pi: ShellGuardAPI, checks: ExecutionCheckStore): void {
   const template = createBashToolDefinition(process.cwd());
   pi.registerTool({
     ...template,
@@ -53,7 +56,7 @@ function registerBashOverride(pi: ExtensionAPI, checks: ExecutionCheckStore): vo
   });
 }
 
-function registerPowerShellOverride(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
+function registerPowerShellOverride(pi: ShellGuardAPI, checks: ExecutionCheckStore): void {
   const template = createPowerShellToolDefinition(process.cwd());
   pi.registerTool({
     ...template,
@@ -66,9 +69,9 @@ function registerPowerShellOverride(pi: ExtensionAPI, checks: ExecutionCheckStor
   });
 }
 
-export function registerShellGuards(pi: ExtensionAPI, checks: ExecutionCheckStore): void {
+export function registerShellGuards(pi: ShellGuardAPI, checks: ExecutionCheckStore): void {
   registerBashOverride(pi, checks);
-  registerPowerShellOverride(pi, checks);
+  if (supportsPowerShellTool()) registerPowerShellOverride(pi, checks);
   pi.on("user_bash", () => ({
     operations: guardedOperations(createLocalBashOperations(), "bash", checks),
   }));

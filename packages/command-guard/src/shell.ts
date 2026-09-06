@@ -1,5 +1,9 @@
 import type { ShellKind } from "./types.ts";
 
+export function supportsPowerShellTool(): boolean {
+  return process.platform === "win32";
+}
+
 export function shellKind(shell: string): ShellKind {
   const fileName = shell.replaceAll("\\", "/").split("/").at(-1)?.toLowerCase() ?? "";
   const normalized = fileName.endsWith(".exe") ? fileName.slice(0, -4) : fileName;
