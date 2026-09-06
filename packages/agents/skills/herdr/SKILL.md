@@ -330,6 +330,24 @@ herdr pane get "$RIGHT"
 After launch, inspect both panes to verify that the left pane renders the PR and
 the right pane contains an idle Codex session in the intended checkout.
 
+## Updates and live handoff
+
+Treat a Herdr live handoff as a running server replacement. It is designed to
+preserve pane processes, but it still replaces the server and can require
+clients to reconnect.
+
+Do not run `herdr update`, `herdr update --handoff`, or call
+`server.live_handoff` unless the user explicitly asks to update Herdr or replace
+the named running server. A request to install, repair, or test a plugin or
+integration does not authorize a Herdr update or live handoff.
+
+Herdr can refuse an update from inside a managed pane. Never unset, remove, or
+override `HERDR_ENV` or other `HERDR_*` variables to bypass that guard. Stop and
+tell the user that the update must run from outside Herdr. Before an authorized
+live handoff, state that it will replace the server, identify the target
+session, and explain that pane processes should remain active while clients may
+need to reconnect.
+
 ## Safety and coordination rules
 
 - Use `--no-focus` for background work unless the user asked to switch context.
