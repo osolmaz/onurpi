@@ -24,6 +24,30 @@ explain how to open a terminal or press Enter unless the user asks or the task
 requires an unusual interaction. Explain unfamiliar tools and relevant options
 when they first become necessary.
 
+## Keep commands human-writable
+
+Give commands that a person would normally remember and type. Prefer a familiar
+command with ordinary output over a compact command that uses a tool-specific
+formatting language. Do not combine several checks or add custom labels only to
+make the output easier for the agent to parse. Give a second simple command in
+a later step when it checks a separate fact.
+
+Do not give a command like this:
+
+```bash
+docker info --format 'Docker {{.ServerVersion}} | architecture {{.Architecture}} | CPUs {{.NCPU}} | memory {{.MemTotal}} bytes'
+```
+
+The Go-template expression is harder to type and understand than the check it
+performs. Use a normal command such as this instead:
+
+```bash
+docker --version
+```
+
+If machine architecture matters, ask for it as a separate step with
+`uname -m`.
+
 ## Give one step at a time
 
 For each step:
