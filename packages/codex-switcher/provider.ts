@@ -1,4 +1,4 @@
-import { createProvider, type Model, type Provider } from "@earendil-works/pi-ai";
+import type { Provider } from "@earendil-works/pi-ai";
 
 import type { ConfigController } from "./account-manager.ts";
 import {
@@ -19,7 +19,6 @@ import { codexSwitcherVaultPath, createAccountVault, type AccountVault } from ".
 
 const DEFAULT_REFRESH_MS = 5 * 60_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
-type CodexModel = Model<"openai-codex-responses">;
 export type CodexProvider = Provider<"openai-codex-responses">;
 
 export type CodexSwitcherProvider = {
@@ -190,11 +189,8 @@ function switcherProvider(
   streamSimple: CodexTransport,
   hasSwitcherAccount: () => boolean,
 ): CodexProvider {
-  return createProvider({
-    id: native.id,
-    name: native.name,
-    ...(native.baseUrl ? { baseUrl: native.baseUrl } : {}),
-    ...(native.headers ? { headers: native.headers } : {}),
+  const provider: CodexProvider = {
+    ...native,
     auth: {
       ...(native.auth.oauth ? { oauth: native.auth.oauth } : {}),
       apiKey: {
@@ -206,16 +202,15 @@ function switcherProvider(
         resolve: ({ signal }) => resolveProviderAuth(config.get(), vault, state, signal),
       },
     },
-    models: native.getModels(),
-    api: {
-      stream: (model, context, streamOptions) =>
-        hasSwitcherAccount()
-          ? stream(model as CodexModel, context, streamOptions)
-          : native.stream(model as CodexModel, context, streamOptions),
-      streamSimple: (model, context, streamOptions) =>
-        hasSwitcherAccount()
-          ? streamSimple(model as CodexModel, context, streamOptions)
-          : native.streamSimple(model as CodexModel, context, streamOptions),
-    },
-  });
+    getModels: () => native.getModels(),
+    stream: (model, context, streamOptions) =>
+      hasSwitcherAccount()
+        ? stream(model, context, streamOptions)
+        : native.stream(model, context, streamOptions),
+    streamSimple: (model, context, streamOptions) =>
+      hasSwitcherAccount()
+        ? streamSimple(model, context, streamOptions)
+        : native.streamSimple(model, context, streamOptions),
+  };
+  return provider;
 }

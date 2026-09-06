@@ -14,27 +14,43 @@ afterEach(() => {
 });
 
 describe("Pi Factory provider module", () => {
-  it("loads the official provider instead of trusting an injected provider", async () => {
+  it("inherits the host provider and delegates its model catalog", async () => {
     const agentDir = await mkdtemp(path.join(os.tmpdir(), "codex-provider-module-"));
     try {
       const nativeProvider = await loadOpenAICodexProvider();
+      let models = [...nativeProvider.getModels()];
       const injectedProvider: Provider = {
         ...nativeProvider,
-        getModels: () => [],
+        getModels: () => models,
       };
-      const created = await createProvider({
+      const created = createProvider({
         providerId: "openai-codex",
         agentDir,
         nativeProvider: injectedProvider,
       });
       expect(version).toBe(1);
       expect(created.provider.id).toBe("openai-codex");
-      expect(created.provider.getModels().map((model) => model.id)).toEqual(
-        nativeProvider.getModels().map((model) => model.id),
-      );
+      expect(created.provider.getModels()).toEqual(models);
+
+      const template = models[0];
+      if (!template) throw new Error("The native provider model catalog is empty.");
+      models = [...models, { ...template, id: "gpt-future", name: "GPT Future" }];
+      expect(created.provider.getModels().map((model) => model.id)).toContain("gpt-future");
+
       created.startRun("review");
       created.finishRun("review");
       created.close();
+    } finally {
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed without a compatible host provider", async () => {
+    const agentDir = await mkdtemp(path.join(os.tmpdir(), "codex-provider-module-"));
+    try {
+      expect(() => createProvider({ providerId: "openai-codex", agentDir })).toThrow(
+        "requires the host OpenAI Codex provider",
+      );
     } finally {
       await rm(agentDir, { recursive: true, force: true });
     }

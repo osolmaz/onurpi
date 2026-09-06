@@ -1,7 +1,7 @@
 import type { Provider } from "@earendil-works/pi-ai";
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { loadOpenAICodexProvider } from "./native-provider.ts";
+import { isOpenAICodexProvider, loadOpenAICodexProvider } from "./native-provider.ts";
 import { createCodexSwitcherProvider } from "./provider.ts";
 
 export const version = 1 as const;
@@ -13,15 +13,17 @@ type CreateProviderInput = {
   readonly signal?: AbortSignal;
 };
 
-export async function createProvider(input: CreateProviderInput) {
+export function createProvider(input: CreateProviderInput) {
   input.signal?.throwIfAborted();
   if (input.providerId !== "openai-codex") {
     throw new Error(`Codex switcher cannot provide ${input.providerId}.`);
   }
-  const nativeProvider = await loadOpenAICodexProvider();
+  if (!isOpenAICodexProvider(input.nativeProvider)) {
+    throw new Error("Codex switcher requires the host OpenAI Codex provider.");
+  }
   const runtime = createCodexSwitcherProvider({
     agentDir: input.agentDir,
-    nativeProvider,
+    nativeProvider: input.nativeProvider,
   });
   return {
     provider: runtime.provider,
@@ -38,9 +40,11 @@ export async function createProvider(input: CreateProviderInput) {
 }
 
 export default async function codexSwitcherProviderExtension(pi: ExtensionAPI): Promise<void> {
-  const created = await createProvider({
+  const nativeProvider = await loadOpenAICodexProvider();
+  const created = createProvider({
     providerId: "openai-codex",
     agentDir: getAgentDir(),
+    nativeProvider,
   });
   pi.registerProvider(created.provider);
   const start = (): void => {
