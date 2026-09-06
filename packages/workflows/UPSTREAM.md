@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.5`
-- Source commit: `ca46ad9236075bb1012d0de4131e76523acd7c19`
-- Package source: exact npm release `0.16.5`
+- Latest release at review: `v0.16.6`
+- Source commit: `19e22f1fd84764e7d0999065b8b6ed333c923155`
+- Package source: exact npm release `0.16.6`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -40,7 +40,11 @@ with Pi `0.85.0`, and includes the official Pi server package required by that P
 blobs. It protects active, unsettled, resumable, and undelivered work, reuses freed pages, and
 compacts the database only when the server is idle and enough space is reclaimable. A measured
 regression test also prevents repeated runner results from copying complete session history. The
-retention period is not a database-size cap.
+retention period is not a database-size cap. Patch `0.16.6` rejects mismatched workflow responses
+before state changes, targets agent responses by exact durable request, shows controls for the
+actual response type, and completes checkpoints in their original runs. It also puts queue
+admission, response receipts, follow-ups, terminal capture, pause timing, and execution-revision
+recovery on one checked durable execution path.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic

@@ -1,4 +1,4 @@
-import { agent, compute, defineWorkflow } from "@onurpi/workflows";
+import { agent, assistantMessage, compute, defineWorkflow } from "@onurpi/workflows";
 
 import type { MaintainerWorkflowInput } from "./maintainer.ts";
 
@@ -16,14 +16,6 @@ export default defineWorkflow({
     const issue = readInput(input);
     return `OpenClaw #${String(issue.issueNumber)} maintainer workflow test`;
   },
-  presentationPrompt: ({ finalOutput }) =>
-    [
-      "Present the maintainer triage result in plain language.",
-      "Start by saying this was a workflow test and that nothing was merged or written to GitHub.",
-      "State whether the issue reproduces or is otherwise proven, the root cause, whether the right fix is local or general, and the next human decision.",
-      "Do not claim tests ran unless the recorded proof says they ran.",
-      `Structured result: ${JSON.stringify(finalOutput)}`,
-    ].join("\n"),
   maxSteps: 8,
   startAt: "inspect_issue",
   nodes: {
@@ -132,11 +124,31 @@ export default defineWorkflow({
         };
       },
     }),
+    present: agent({
+      expectedOutput: assistantMessage(),
+      statusDetail: "presenting the maintainer result",
+      prompt: ({ outputs }) =>
+        [
+          ...NO_WRITE_RULES,
+          "",
+          "Present the maintainer triage result in plain language.",
+          "Start by saying this was a workflow test and that nothing was merged or written to GitHub.",
+          "State whether the issue reproduces or is otherwise proven, the root cause, whether the right fix is local or general, and the next human decision.",
+          "Do not claim tests ran unless the recorded proof says they ran.",
+          "Do not use tools or change any state.",
+          `Structured result: ${JSON.stringify(outputs["finalize"])}`,
+        ].join("\n"),
+    }),
+    finish: compute({
+      run: ({ outputs }) => outputs["finalize"],
+    }),
   },
   edges: [
     { from: "inspect_issue", to: "prove_issue" },
     { from: "prove_issue", to: "recommend_solution" },
     { from: "recommend_solution", to: "finalize" },
+    { from: "finalize", to: "present" },
+    { from: "present", to: "finish" },
   ],
 });
 

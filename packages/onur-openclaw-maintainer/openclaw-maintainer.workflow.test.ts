@@ -37,6 +37,9 @@ const proof = {
   workingTreeClean: true,
 };
 
+const presentation =
+  "This was a workflow test. Nothing was merged or written to GitHub. The issue was reproduced, and the next decision belongs to the maintainer.";
+
 const recommendation = {
   route: "actionable",
   solutionScope: "general",
@@ -49,10 +52,18 @@ const recommendation = {
 };
 
 class MaintainerExecutor implements AgentStepExecutor {
+  readonly assistantMessageMode = "visible" as const;
   readonly requests: AgentStepRequest[] = [];
 
   async runAgentStep(request: AgentStepRequest): Promise<AgentStepSubmission> {
     this.requests.push(request);
+    if (request.contract.nodeId === "present") {
+      return {
+        output: presentation,
+        assistantMessage: { entryId: "assistant-1", sha256: "a".repeat(64) },
+        conversation: { firstEntryId: "prompt-1", lastEntryId: "assistant-1" },
+      };
+    }
     const output =
       request.contract.nodeId === "inspect_issue"
         ? inspection
@@ -77,6 +88,8 @@ describe("OpenClaw maintainer workflow", () => {
       "prove_issue",
       "recommend_solution",
       "finalize",
+      "present",
+      "finish",
     ]);
   });
 
@@ -91,7 +104,7 @@ describe("OpenClaw maintainer workflow", () => {
       databasePath: join(stateRoot, "state.sqlite"),
     }).run(workflow, input);
 
-    expect(result.state.status).toBe("completed");
+    expect(result.state.status, JSON.stringify(result.state.error)).toBe("completed");
     expect(result.state.finalOutput).toEqual({
       workflowTest: true,
       merged: false,
@@ -105,7 +118,7 @@ describe("OpenClaw maintainer workflow", () => {
       recommendation,
       note: "This is a workflow test. Do not merge automatically.",
     });
-    expect(executor.requests).toHaveLength(3);
+    expect(executor.requests).toHaveLength(4);
     for (const request of executor.requests) {
       expect(request.prompt).toContain("This is a test of the maintainer workflow.");
       expect(request.prompt).toContain("Do not create commits");
@@ -113,6 +126,8 @@ describe("OpenClaw maintainer workflow", () => {
     expect(executor.requests[0]?.prompt).toContain("Do not run reproductions or tests");
     expect(executor.requests[1]?.prompt).toContain("full literal command");
     expect(executor.requests[1]?.prompt).toContain("Never use ellipses");
+    expect(executor.requests[3]?.prompt).toContain("Present the maintainer triage result");
+    expect(executor.requests[3]?.prompt).toContain(JSON.stringify(recommendation));
   });
 
   it("rejects writable or malformed input", () => {
