@@ -55,13 +55,18 @@ For each step:
 1. Explain plainly what the action does and why it is needed. Keep the
    explanation close to the instruction.
 2. Give one terminal command by default, or one concrete non-terminal action.
-3. Say what result to inspect or what part of the output to send back. Ask the
-   user to remove secrets before sharing output.
-4. Stop. Wait for the user's result or confirmation before giving the next step.
+3. Ask for output only when it changes the next instruction, identifies a
+   failure, or proves an important result. Ask for the smallest relevant part,
+   and ask the user to remove secrets before sharing it.
+4. When successful output does not matter, do not ask the user to send it. Wait
+   only for completion confirmation, and ask for error output only if the
+   command fails.
+5. Stop. Wait for the user's result or confirmation before giving the next step.
 
-Use the result to choose the next instruction. If a command fails, explain the
-failure and give one diagnostic or repair step. Do not dump a troubleshooting
-tree, assume success, or advance through steps the user has not completed.
+Use material results to choose the next instruction. If a command fails,
+explain the failure and give one diagnostic or repair step. Do not dump a
+troubleshooting tree, assume success, or advance through steps the user has not
+completed.
 
 If the user asks a question, answer it before continuing. Reveal background,
 options, and warnings when they matter to the current step. Do not send the
