@@ -102,6 +102,9 @@ export async function evaluateCommand(context: CommandContext): Promise<PolicyDe
     }
     const kind = context.shellKind ?? shellKind(context.shell);
     const classification = await classify(context, kind);
+    if (classification.denyReason) {
+      return { action: "deny", reason: classification.denyReason };
+    }
     if (classification.uncertainReason) {
       return { action: "rewrite", reason: classification.uncertainReason };
     }

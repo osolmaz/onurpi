@@ -31,6 +31,7 @@ export type DestructiveKind =
   | "delete"
   | "recursive-delete"
   | "replace"
+  | "device-write"
   | "truncate"
   | "git-clean"
   | "git-reset";

@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { hasPossibleDestructiveToken } from "./lexical.ts";
 import { classifyGit, hasSupportedNativeGitArguments } from "./git.ts";
 import { operation } from "./operations.ts";
+import { classifyStorage } from "./storage.ts";
 import { MAX_DESTRUCTIVE_TARGETS, MAX_NESTING_DEPTH } from "./limits.ts";
 import type { BashParser } from "./bash-parser.ts";
 import { classifyRsync } from "./rsync.ts";
@@ -21,6 +22,7 @@ import type {
 
 export type Classification = Readonly<{
   operations: readonly DestructiveOperation[];
+  denyReason?: string;
   uncertainReason?: string;
   changesCwd?: boolean;
   referencedVariables?: readonly string[];
@@ -160,16 +162,16 @@ function classifyTruncate(command: ParsedCommand): DestructiveOperation[] {
 }
 
 function classifyDd(command: ParsedCommand): DestructiveOperation[] {
-  const targets = command.args.flatMap((arg) => {
+  const targets: ResolvedWord[] = command.args.flatMap((arg) => {
     if (!arg.value?.startsWith("of=")) return [];
     return [{ ...arg, raw: arg.raw.slice(3), value: arg.value.slice(3) }];
   });
-  return targets.length > 0 ? [operation("dd", "replace", command.source, targets)] : [];
+  const uncertainArgument = command.args.find((arg) => arg.value === undefined);
+  if (targets.length === 0 && uncertainArgument) targets.push(uncertainArgument);
+  return targets.length > 0 ? [operation("dd", "device-write", command.source, targets)] : [];
 }
 
-function classifyDirect(command: ParsedCommand): DestructiveOperation[] {
-  const name = commandName(command.name);
-  if (!name) return [];
+function classifyFilesystemCommand(command: ParsedCommand, name: string): DestructiveOperation[] {
   if (DELETE_COMMANDS.has(name)) {
     return [operation(name, rmKind(command.args), command.source, rmTargets(command.args))];
   }
@@ -179,6 +181,16 @@ function classifyDirect(command: ParsedCommand): DestructiveOperation[] {
   if (name === "truncate") return classifyTruncate(command);
   if (name === "dd") return classifyDd(command);
   return [];
+}
+
+function classifyDirect(command: ParsedCommand): Classification {
+  const name = commandName(command.name);
+  if (!name) return { operations: [] };
+  return (
+    classifyStorage(command, name) ?? {
+      operations: classifyFilesystemCommand(command, name),
+    }
+  );
 }
 
 // eslint-disable-next-line complexity -- Each simple wrapper has a small closed option set.
@@ -447,9 +459,11 @@ function combine(current: Classification, next: Classification): Classification 
     ...(current.referencedVariables ?? []),
     ...(next.referencedVariables ?? []),
   ]);
+  const denyReason = current.denyReason ?? next.denyReason;
   const uncertainReason = current.uncertainReason ?? next.uncertainReason;
   return {
     operations: [...current.operations, ...next.operations],
+    ...(denyReason ? { denyReason } : {}),
     ...(uncertainReason ? { uncertainReason } : {}),
     changesCwd: current.changesCwd === true || next.changesCwd === true,
     referencedVariables: [...referencedVariables].sort(),
@@ -499,7 +513,7 @@ async function classifyCommand(
   if (name && UNSUPPORTED_SHELL_NAMES.has(name)) {
     return { operations: [], uncertainReason: `${name} shell source cannot be checked` };
   }
-  let result: Classification = { operations: classifyDirect(command) };
+  let result: Classification = classifyDirect(command);
   for (const nested of findEmbeddedCommands(command)) {
     result = combine(result, await classifyCommand(nested, parser, environment, depth + 1));
   }
@@ -684,6 +698,8 @@ function classifyPowerShellCommand(
   if (normalized === "git") {
     return classifyPowerShellGit({ name: word, args, source });
   }
+  const storage = classifyStorage({ name: word, args, source }, normalized);
+  if (storage) return storage;
   return unsupportedPowerShellCommand(normalized)
     ? { operations: [], uncertainReason: `PowerShell command ${name} cannot be checked` }
     : { operations: [] };

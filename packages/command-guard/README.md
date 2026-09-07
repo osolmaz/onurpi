@@ -19,7 +19,9 @@ and expansion rules cannot be checked safely.
 
 It recognizes direct and nested forms of `rm`, `unlink`, `rmdir`, `shred`, `find -delete`,
 destructive `find -exec`, `xargs`, `rsync --delete`, Git commands that explicitly discard worktree
-files, `truncate`, `dd` output, and truncating shell redirection. It also checks direct PowerShell
+files, `truncate`, `dd` output, and truncating shell redirection. It denies raw storage targets used
+by `dd`, `mkfs*`, `mke2fs`, `newfs*`, destructive `wipefs`, and `blkdiscard`. Destructive `diskutil`
+erase, partition, and APFS deletion operations are always denied. It also checks direct PowerShell
 and `cmd.exe` deletion forms.
 
 Bash lookups such as `command -v pwsh` and `command -V bash` are allowed. Their arguments are
@@ -50,7 +52,8 @@ Command Guard makes one of three decisions:
   paths.
 - **Rewrite:** Shell expansion or command behavior makes the target uncertain. Submit a literal
   path.
-- **Deny:** The target is a protected path or the final check failed.
+- **Deny:** The target is a protected path or raw storage device, the command is a destructive
+  `diskutil` operation, or the final check failed.
 
 The extension denies filesystem roots, the home directory, the Pi working directory, mount roots,
 and their ancestors. Normal `git switch` and branch-form `git checkout` commands are allowed because
@@ -63,8 +66,10 @@ command, shell, working directory, referenced environment values, target paths, 
 identities. A changed request is blocked.
 
 There is no confirmation prompt, model-callable bypass, project setting, environment switch, or
-"allow always" choice. Exact deletions outside protected paths run normally. Use a separate terminal
-when you deliberately need to delete a protected root.
+"allow always" choice. Exact deletions outside protected paths run normally. Storage commands can
+write regular image files outside protected paths, and `dd` can write safe endpoints such as
+`/dev/null`. Use a separate terminal when you deliberately need to delete a protected root or change
+a raw storage device.
 
 ## Unified Exec input
 

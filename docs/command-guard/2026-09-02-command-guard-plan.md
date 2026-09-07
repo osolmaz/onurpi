@@ -13,7 +13,8 @@ Implemented on `feat/command-guard`. The implementation keeps the extension-only
 Pi core changes and uses no Pi private APIs.
 
 The implemented policy has no confirmation gate. Exact destructive targets outside the protected
-paths run normally. Protected or uncertain targets are blocked.
+paths run normally. Protected, raw-storage, or uncertain targets are blocked. Destructive `diskutil`
+erase, partition, and APFS deletion operations are always denied.
 
 The final Unified Exec design is stronger than the first event-only draft. Unified Exec now exposes
 `registerFinalCommandPolicy()`. It rebuilds frozen, synchronous policy requests from the actual
@@ -60,7 +61,10 @@ copy projects, watch every filesystem call, run a permanent service, or change P
 - Inspect the last command, shell, working directory, and environment that the extension can see.
 - Treat unclear shell expansion as unsafe instead of guessing.
 - Allow exact destructive targets outside the protected paths without a prompt.
-- Never let model or project configuration authorize deletion of protected roots.
+- Allow storage commands to write regular image files outside the protected paths.
+- Deny raw storage writes, filesystem formatting, signature wiping, and block discard operations.
+- Deny destructive `diskutil` erase, partition, and APFS deletion operations.
+- Never let model or project configuration authorize deletion of protected roots or raw storage.
 - Fail closed when parsing or adapter coverage is unavailable.
 - Use an independent OnurPi package. Do not change Pi core or use Pi private APIs.
 

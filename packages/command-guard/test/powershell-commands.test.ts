@@ -130,6 +130,23 @@ describe("parsed PowerShell commands", () => {
     });
   });
 
+  it("classifies parsed storage commands and denies destructive diskutil verbs", async () => {
+    const format = command("mkfs.ext4", ["C:\\images\\disk.img"]);
+    await expect(classifyPowerShell(format.source, parser([format]))).resolves.toMatchObject({
+      operations: [{ kind: "device-write" }],
+    });
+
+    const erase = command("diskutil", ["eraseDisk", "APFS", "Empty", "disk2"]);
+    await expect(classifyPowerShell(erase.source, parser([erase]))).resolves.toMatchObject({
+      denyReason: "diskutil eraseDisk can erase storage",
+    });
+
+    const list = command("diskutil", ["list"]);
+    await expect(classifyPowerShell(list.source, parser([list]))).resolves.toMatchObject({
+      operations: [],
+    });
+  });
+
   it("checks every command and redirection after a read-only command", async () => {
     const commands = [command("git", ["status"]), command("Remove-Item", ["/"])];
     const redirects = [

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, parse, relative, resolve, sep } from "node:path";
 
 import type {
+  DestructiveKind,
   DestructiveOperation,
   ObjectIdentity,
   ResolvedTarget,
@@ -18,6 +19,7 @@ type ExistingPath = Readonly<{
   canonicalPath: string;
   identity: ObjectIdentity;
   operandIdentity: ObjectIdentity;
+  isBlockDevice: boolean;
   isMountRoot: boolean;
 }>;
 
@@ -86,6 +88,7 @@ async function existingPath(path: string): Promise<ExistingPath | undefined> {
     canonicalPath,
     identity: identityFromStat(targetInfo),
     operandIdentity: identityFromStat(operandInfo),
+    isBlockDevice: targetInfo.isBlockDevice(),
     isMountRoot,
   };
 }
@@ -105,6 +108,16 @@ async function resolveMissing(
 function normalizedForCompare(path: string): string {
   const normalized = resolve(path);
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+const POSIX_RAW_STORAGE_PATH =
+  /^\/dev\/(?:r?disk\d+(?:s\d+)*|(?:sd|hd|vd|xvd)[a-z]+\d*|nvme\d+n\d+(?:p\d+)?|mmcblk\d+(?:p\d+)?|loop\d+(?:p\d+)?|md\d+(?:p\d+)?|dm-\d+|zram\d+|nbd\d+(?:p\d+)?|rbd\d+(?:p\d+)?|(?:ada|da|nvd|vtbd|mmcsd)\d+(?:p\d+|s\d+)?|mapper\/(?!control$)[^/]+|disk\/by-(?:id|path|uuid|partuuid|label)\/[^/]+|(?:dsk|rdsk)\/.+)$/iu;
+const WINDOWS_RAW_STORAGE_PATH =
+  /^\/\/[.?]\/(?:[a-z]:|physicaldrive\d+|globalroot\/device\/harddisk[^/]+|volume\{[^}]+\})/iu;
+
+export function isRawStoragePath(path: string): boolean {
+  const normalized = path.replaceAll("\\", "/");
+  return POSIX_RAW_STORAGE_PATH.test(normalized) || WINDOWS_RAW_STORAGE_PATH.test(normalized);
 }
 
 function sameOrAncestor(candidate: string, protectedPath: string): boolean {
@@ -132,8 +145,11 @@ async function criticalReason(
   cwd: string,
   existing: ExistingPath | undefined,
   mountRoots: ReadonlySet<string> | undefined,
-  recursive: boolean,
+  kind: DestructiveKind,
 ): Promise<string | undefined> {
+  if (kind === "device-write" && (isRawStoragePath(target) || existing?.isBlockDevice === true)) {
+    return "raw storage device";
+  }
   const root = parse(target).root;
   if (normalizedForCompare(target) === normalizedForCompare(root)) return "filesystem root";
   const [home, workingDirectory] = await Promise.all([
@@ -143,7 +159,11 @@ async function criticalReason(
   if (sameOrAncestor(target, home)) return "home directory or its ancestor";
   if (sameOrAncestor(target, workingDirectory)) return "working directory or its ancestor";
   if (existing?.isMountRoot || mountRoots?.has(normalizedForCompare(target))) return "mount root";
-  if (recursive && mountRoots && containsMountRoot(target, mountRoots)) {
+  if (
+    (kind === "recursive-delete" || kind === "git-clean") &&
+    mountRoots &&
+    containsMountRoot(target, mountRoots)
+  ) {
     return "ancestor of a mount root";
   }
   return undefined;
@@ -154,7 +174,7 @@ async function resolveWord(
   word: ResolvedWord,
   cwd: string,
   mountRoots: ReadonlySet<string> | undefined,
-  recursive: boolean,
+  kind: DestructiveKind,
 ): Promise<TargetResolution> {
   if (word.value === undefined) {
     return { ok: false, action: "rewrite", reason: word.reason ?? "target is not exact" };
@@ -162,10 +182,13 @@ async function resolveWord(
   if (word.value.length === 0) {
     return { ok: false, action: "deny", reason: "empty destructive target" };
   }
+  if (kind === "device-write" && isRawStoragePath(word.value)) {
+    return { ok: false, action: "deny", reason: "refusing destructive target: raw storage device" };
+  }
   const candidate = isAbsolute(word.value) ? resolve(word.value) : resolve(cwd, word.value);
   const existing = await existingPath(candidate);
   const canonicalPath = existing?.canonicalPath ?? (await resolveMissing(candidate));
-  const critical = await criticalReason(canonicalPath, cwd, existing, mountRoots, recursive);
+  const critical = await criticalReason(canonicalPath, cwd, existing, mountRoots, kind);
   if (critical)
     return { ok: false, action: "deny", reason: `refusing destructive target: ${critical}` };
   return {
@@ -195,12 +218,7 @@ export async function resolveTargets(
       return { ok: false, action: "rewrite", reason: `${operation.command} has no exact target` };
     }
     for (const word of operation.targets) {
-      const result = await resolveWord(
-        word,
-        cwd,
-        mountRoots,
-        operation.kind === "recursive-delete" || operation.kind === "git-clean",
-      );
+      const result = await resolveWord(word, cwd, mountRoots, operation.kind);
       if (!result.ok) return result;
       targets.push(...result.targets);
     }
