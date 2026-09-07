@@ -1,0 +1,4 @@
+interface:
+  display_name: "Astra 3D modeling"
+  short_description: "Quality-focused Blender modeling with GPT-6 Astra"
+  default_prompt: "Use $astra-3d-modeling to create or refine this 3D scene with GPT-6 Astra, inspect renders, and correct visible defects before delivery."
