@@ -81,9 +81,11 @@ Optimize for readable steps rather than the fewest tool calls or lines.
   options without giving a full command reference.
 - Use concrete paths and values when known. Clearly identify any value the user
   must replace before running the command.
-- Prefer a normal editor for structured files. Show readable, indented JSON,
-  YAML, configuration, or code in small useful sections. Ask the user to save
-  and check each section as needed.
+- Prefer a normal editor for structured files. Show readable JSON, YAML,
+  configuration, or code in small useful sections. Put file contents at the
+  left edge of the code block. Do not add outer indentation from a list, quote,
+  or prose layout. Keep only indentation that the file syntax requires, such as
+  YAML nesting. Ask the user to save and check each section as needed.
 - Do not hide file content in huge `echo`, `printf`, heredoc, base64, or inline
   Python/Node commands. A helper script must itself be readable and taught as
   part of the task; it must not silently perform the remaining steps.
