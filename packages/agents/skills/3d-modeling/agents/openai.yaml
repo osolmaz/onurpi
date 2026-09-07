@@ -1,0 +1,4 @@
+interface:
+  display_name: "3D modeling"
+  short_description: "Quality-focused 3D modeling and visual review"
+  default_prompt: "Use $3d-modeling to create or refine this 3D scene. Inspect renders and correct visible defects before delivery."

@@ -1,23 +1,19 @@
 ---
-name: astra-3d-modeling
+name: 3d-modeling
 description:
-  Create and refine 3D models and scenes with GPT-6 Astra, primarily in Blender. Use for Astra-led
-  modeling, cutaways, materials, cinematic rendering, or interactive 3D assets when visual quality
-  matters. Requires rendered inspection and correction before visual completion.
+  Create and refine detailed 3D models and scenes, primarily in Blender. Use for modeling, cutaways,
+  materials, cinematic rendering, or interactive 3D assets when visual quality matters. Requires
+  rendered inspection and correction before visual completion.
 ---
 
-# Astra 3D modeling
+# 3D modeling
 
-This skill guides GPT-6 Astra through 3D modeling with visual review. Deliver the requested level of
-finish in an editable scene, with images that show what was actually built.
+This skill guides 3D modeling with visual review. Deliver the requested level of finish in an
+editable scene, with images that show what was actually built.
 
-Use Astra's image understanding throughout the work. Inspect the model after meaningful changes and
-identify specific visible defects. Edit the affected parts before continuing. A successful script or
-export does not establish visual quality.
-
-This skill does not select a model or change agent settings. Use the active model information when
-available. If another model is active, disclose that before claiming Astra-specific results. Do not
-substitute models without permission.
+Use image inspection throughout the work. Inspect the model after meaningful changes and identify
+specific visible defects. Edit the affected parts before continuing. A successful script or export
+does not establish visual quality.
 
 ## Brief and references
 
@@ -142,5 +138,4 @@ OpenAI's
 describes Blender Python modeling with render inspection and interactive export.
 [Building games with Astra](https://developers.openai.com/blog/how-to-build-games-with-astra)
 describes reference-driven visual development and browser testing. These are workflow examples. This
-skill's acceptance checks are project guidance and do not establish a measured Astra quality
-guarantee.
+skill's acceptance checks are project guidance and do not establish a measured quality guarantee.

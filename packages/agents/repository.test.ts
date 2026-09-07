@@ -35,7 +35,8 @@ describe("@onurpi/agents package", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
     expect(skills).toHaveLength(54);
     expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(54);
-    expect(skills.map((skill) => skill.skillId)).toContain("astra-3d-modeling");
+    expect(skills.map((skill) => skill.skillId)).toContain("3d-modeling");
+    expect(skills.map((skill) => skill.skillId)).not.toContain("astra-3d-modeling");
     expect(skills.map((skill) => skill.skillId)).toContain("reverse-centaur-mode");
     expect(skills.map((skill) => skill.skillId)).not.toContain("plain-language");
     expect(skills.map((skill) => skill.skillId)).not.toContain("paid-compute-launch");
