@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.6`
-- Source commit: `19e22f1fd84764e7d0999065b8b6ed333c923155`
-- Package source: exact npm release `0.16.6`
+- Latest release at review: `v0.16.7`
+- Source commit: `2d759a1fb144e0e5c8e4805a4294b4531187a831`
+- Package source: exact npm release `0.16.7`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -44,7 +44,9 @@ retention period is not a database-size cap. Patch `0.16.6` rejects mismatched w
 before state changes, targets agent responses by exact durable request, shows controls for the
 actual response type, and completes checkpoints in their original runs. It also puts queue
 admission, response receipts, follow-ups, terminal capture, pause timing, and execution-revision
-recovery on one checked durable execution path.
+recovery on one checked durable execution path. Patch `0.16.7` stops normal chat from claiming
+workflow turns, keeps one delivery identity through delayed acknowledgments and automatic retries,
+and rejects resume when the recorded workflow source or graph changed.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
