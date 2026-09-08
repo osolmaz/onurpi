@@ -50,8 +50,7 @@ and rejects resume when the recorded workflow source or graph changed. Patch `0.
 workflows as running while an agent or supervised runner is active, refreshes lists when that
 activity changes, and recovers interrupted verification repairs without losing completed work. Patch
 `0.16.9` restores bounded workflow recovery after interrupted agent and runner work. It keeps
-submission reminders and terminal handoffs recoverable without creating duplicate continuation
-runs.
+submission reminders and terminal handoffs recoverable without creating duplicate continuation runs.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
