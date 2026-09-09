@@ -100,8 +100,9 @@ For scripts that call an absolute runtime path, wrap the binary in place:
 
 ```bash
 SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+RUNTIME_ROOT='<approved runtime root>'
 "$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" \
-  --wrap ~/runtimes/vllm/current/.venv/bin/vllm
+  --wrap "$RUNTIME_ROOT/vllm/current/.venv/bin/vllm"
 ```
 
 The in-place wrapper moves the original executable to `vllm.real` and replaces
@@ -119,9 +120,10 @@ Uninstall managed shims with:
 
 ```bash
 SAFE_INFERENCE_SKILL_DIR='<absolute directory containing this SKILL.md>'
+RUNTIME_ROOT='<approved runtime root>'
 "$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" --uninstall
 "$SAFE_INFERENCE_SKILL_DIR/scripts/install-shims.sh" \
-  --uninstall --wrap ~/runtimes/vllm/current/.venv/bin/vllm
+  --uninstall --wrap "$RUNTIME_ROOT/vllm/current/.venv/bin/vllm"
 ```
 
 Use `--allow-no-earlyoom` only for tiny CPU-only tests or when the user

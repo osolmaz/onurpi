@@ -5,11 +5,12 @@ description: Inspect PNG files for C2PA, EXIF, text, timestamp, and trailing met
 
 # Sanitize PNG Metadata
 
-Use the Rust `pngscrub` CLI from the tools repository:
+Use the Rust `pngscrub` CLI from its configured source checkout. Let machine
+instructions identify that checkout, then set `PNGSCRUB_MANIFEST`:
 
 ```bash
-cargo run --quiet --manifest-path ~/repos/tools/pngscrub/Cargo.toml -- inspect IMAGE.png
-cargo run --quiet --manifest-path ~/repos/tools/pngscrub/Cargo.toml -- clean IMAGE.png
+cargo run --quiet --manifest-path "$PNGSCRUB_MANIFEST" -- inspect IMAGE.png
+cargo run --quiet --manifest-path "$PNGSCRUB_MANIFEST" -- clean IMAGE.png
 ```
 
 ## Workflow

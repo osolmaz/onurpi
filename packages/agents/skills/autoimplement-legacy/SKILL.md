@@ -11,7 +11,7 @@ Do the following in the order that makes sense. Choose the most efficient order 
    - Implement the most elegant and long-term production-ready solution, but do not take longer than necessary.
    - Context compaction might happen during implementation or review. If not enough of the plan was preserved after compaction, re-read the written plan to stay on track with the plan.
    - Finish to completion. If there is a PR open for the implementation plan, do it in the same PR. If there is no PR already, open PR.
-   - Before finishing, commit and push any new or changed documentation, specification, or plan file in the relevant repo or repos, including the `~/scratch` repo when used, unless the user asked not to.
+   - Before finishing, commit and push any new or changed documentation, specification, or plan file in the relevant repo or repos, including the configured planning or scratch repository when used, unless the user asked not to.
 
 2. Once you finish implementing, make sure to test it.
    - This will depend on the nature of the problem. If needed, run local smoke tests, spin up dev servers, make requests and such.

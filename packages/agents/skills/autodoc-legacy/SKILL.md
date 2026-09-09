@@ -13,15 +13,15 @@ description: Use when preparing or updating an implementation plan, documentatio
 - In plans, state the scope, non-goals, acceptance criteria, and exact verification steps.
 - If there is no plan markdown document for the task which the skill is triggered for, create a `.md` file for that plan and then proceed with implementation.
 - If the repo is owned by `osolmaz`, create or update the documentation, specification, and implementation plan in the relevant repo or repos, depending on the context.
-- If it is someone else's project, create them in the scratch repo at `~/scratch`. Keep the plan outside someone else's implementation repo unless the user explicitly asks to track it there.
+- If it is someone else's project, use the planning or scratch repository set by machine instructions. Keep the plan outside someone else's implementation repo unless the user explicitly asks to track it there.
 - Create or update the requisite amount of documentation in either existing files or new files in the relevant repos.
 - Avoid unnecessary duplication and keep the relevant existing documentation up to date.
 - When work spans repositories, keep one canonical explanation and link to it rather than copying the same text.
 - After implementation, update the docs to match what actually shipped and record meaningful departures from the plan.
 - Do not spend a long time updating a large set of docs only for this purpose.
 - Use the `plain-writing` skill for all documentation.
-- Read the SimpleDoc specification from the local checkout at `~/repos/SimpleDoc/docs/SIMPLEDOC_SPEC.md`. Do not fetch the specification or related SimpleDoc documentation from online sources.
-- If `~/repos/SimpleDoc` is missing, clone `https://github.com/osolmaz/SimpleDoc.git` there, then read the specification from the local checkout. If the checkout exists, do not switch its branch or modify it only to read the specification.
+- Read the SimpleDoc specification from the checkout set by machine instructions. Do not fetch the specification or related SimpleDoc documentation from online sources.
+- If the configured checkout is missing, clone `https://github.com/osolmaz/SimpleDoc.git` into the approved source-checkout directory, then read the specification. If the checkout exists, do not switch its branch or modify it only to read the specification.
 - Use the `simpledoc` skill and follow the locally read SimpleDoc convention when creating or updating documentation.
 - Use capitalized filenames for evergreen, long-term documentation and specifications, and dated SimpleDoc filenames for time-bound documents tied to a certain time.
 - Name specification files after the feature itself without `spec` or `specification` in the filename. The document title may include `Spec` or `Specification`.

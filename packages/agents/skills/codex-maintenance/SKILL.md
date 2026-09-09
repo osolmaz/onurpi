@@ -5,8 +5,9 @@ description: Use when maintaining local Codex state, including changing or repai
 
 # Codex Maintenance
 
-Use this skill for local Codex state maintenance. The source tool is
-`~/repos/tools/codex-tools`.
+Use this skill for local Codex state maintenance. Let machine instructions
+identify the `codex-tools` source checkout. Set `CODEX_TOOLS_ROOT` to that
+checkout before you run the examples below.
 
 ## Core Rules
 
@@ -30,7 +31,7 @@ only reports the shell's current directory and does not validate or repair
 persisted Codex session state.
 
 ```bash
-cd ~/repos/tools/codex-tools
+cd "$CODEX_TOOLS_ROOT"
 cargo run --bin codex-tools -- set-cwd <session-id-or-prefix-or-rollout-jsonl> <new-cwd> --dry-run
 cargo run --bin codex-tools -- set-cwd <session-id-or-prefix-or-rollout-jsonl> <new-cwd>
 ```
@@ -59,7 +60,7 @@ updates. If it fails, stop and inspect before retrying.
 Use transcript extraction for readable summaries or migration/debugging.
 
 ```bash
-cd ~/repos/tools/codex-tools
+cd "$CODEX_TOOLS_ROOT"
 cargo run --bin codex-tools -- extract <rollout.jsonl>
 cargo run --bin codex-tools -- extract <rollout.jsonl> --jsonl
 ```
@@ -73,17 +74,13 @@ When the user asks to transfer, copy, migrate, move, export, import, or resume a
 Codex session on another machine, use `cct` from Onur's fork:
 `https://github.com/osolmaz/codex-claude-transfer`.
 
-The local source checkout is usually:
+Let machine instructions identify the local source checkout. Set
+`CODEX_TRANSFER_ROOT` to that checkout. If it is missing, clone the fork into
+an approved source-checkout directory:
 
 ```bash
-cd ~/repos/codex-claude-transfer
-```
-
-If it is missing, clone the fork into `~/repos`:
-
-```bash
-git clone https://github.com/osolmaz/codex-claude-transfer.git ~/repos/codex-claude-transfer
-cd ~/repos/codex-claude-transfer
+git clone https://github.com/osolmaz/codex-claude-transfer.git "$CODEX_TRANSFER_ROOT"
+cd "$CODEX_TRANSFER_ROOT"
 ```
 
 If the `cct` binary is not present, build it from the checkout:
@@ -154,13 +151,13 @@ while no Codex process is actively writing to the database. Verify
 When changing the maintenance tooling itself:
 
 ```bash
-cd ~/repos/tools/codex-tools
+cd "$CODEX_TOOLS_ROOT"
 cargo test
 cargo clippy -- -D warnings
 ```
 
-Keep edits in `~/repos/tools`. To refresh installed agent resources, switch to
-the OnurPi checkout and run:
+Keep edits in the configured tools source checkout. To refresh installed agent
+resources, switch to the OnurPi checkout and run:
 
 ```bash
 npm run agents:sync -- codex-maintenance

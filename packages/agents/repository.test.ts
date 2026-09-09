@@ -33,13 +33,14 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(54);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(54);
+    expect(skills).toHaveLength(53);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(53);
     expect(skills.map((skill) => skill.skillId)).toContain("3d-modeling");
     expect(skills.map((skill) => skill.skillId)).not.toContain("astra-3d-modeling");
     expect(skills.map((skill) => skill.skillId)).toContain("reverse-centaur-mode");
     expect(skills.map((skill) => skill.skillId)).not.toContain("plain-language");
     expect(skills.map((skill) => skill.skillId)).not.toContain("paid-compute-launch");
+    expect(skills.map((skill) => skill.skillId)).not.toContain("browse-x-posts");
     expect(skills.map((skill) => skill.skillId)).toContain("amk");
     expect(skills.map((skill) => skill.skillId)).toContain("find-sota");
     expect(skills.map((skill) => skill.skillId)).toEqual(
@@ -60,7 +61,7 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(54);
+    expect(topLevelSkillFiles).toHaveLength(53);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
   });
 

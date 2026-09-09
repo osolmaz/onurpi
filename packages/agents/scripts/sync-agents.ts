@@ -28,6 +28,7 @@ import {
 } from "./sync-skills.ts";
 
 const PRIVATE_REPOSITORY_NAME = "agents";
+const PUBLIC_REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const LEGACY_STATE_FILE_NAME = ".tools-agents-skill-sync.json";
 
 type Command = "check" | "sync";
@@ -68,7 +69,7 @@ function resolvePrivateRoot(explicitPrivateRoot: string | undefined): string {
   const configured = process.env["AGENTS_REPO"];
   return (
     explicitPrivateRoot ??
-    replaceHome(configured ?? join(homedir(), "repos", PRIVATE_REPOSITORY_NAME))
+    replaceHome(configured ?? resolve(PUBLIC_REPOSITORY_ROOT, "..", PRIVATE_REPOSITORY_NAME))
   );
 }
 

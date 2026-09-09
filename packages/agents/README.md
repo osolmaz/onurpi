@@ -7,8 +7,8 @@ The package is private to the workspace and is not published to npm.
 
 ## Install
 
-Keep the public and private repositories as sibling checkouts under `~/repos`, install the OnurPi
-dependencies, and run:
+Keep the public and private repositories as sibling checkouts in the same parent directory, install
+the OnurPi dependencies, and run:
 
 ```sh
 npm run agents:sync

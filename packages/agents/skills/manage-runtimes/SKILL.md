@@ -9,10 +9,13 @@ description: Use when creating, updating, selecting, promoting, auditing, or del
 
 Use canonical runtime roots instead of scratch, service, or repo-local environments.
 
-Default layout:
+Let the repository or machine instructions define the runtime root. Stop and
+ask if no approved root is available.
+
+Use this layout below that root:
 
 ```text
-~/runtimes/<engine>/
+<runtime-root>/<engine>/
   current -> versions/<runtime-name>
   versions/
     <runtime-name>/
@@ -27,16 +30,18 @@ Default layout:
 For vLLM, use:
 
 ```text
-~/runtimes/vllm/current/.venv/bin/vllm
+<runtime-root>/vllm/current/.venv/bin/vllm
 ```
 
-Do not create new inference runtime environments under `~/scratch`, `~/services`, `~/repos`, or project-local `.venv` directories unless the user explicitly approves a one-off exception.
+Do not create inference runtime environments in source checkouts, temporary
+work directories, service directories, or project-local `.venv` directories
+unless the user explicitly approves a one-off exception. Keep model caches out
+of the runtime root and follow machine instructions for cache storage.
 
 ## Version control
 
-`~/runtimes` is the working tree for the private repository
-`https://github.com/osolmaz/runtimes`. Its default-deny `.gitignore` tracks only
-lightweight control and provenance files:
+Follow the repository instructions when the runtime root includes tracked
+control files. Track only lightweight control and provenance files:
 
 - runtime manifests and notes;
 - serving profiles;
@@ -44,23 +49,15 @@ lightweight control and provenance files:
 - benchmark protocols and specs;
 - concise failure or invalidation summaries.
 
-Installed environments, binaries, compiled objects, source checkouts, model
-files, caches, logs, telemetry, raw requests, benchmark results, databases, and
-reports must remain ignored.
+Keep installed environments, binaries, compiled objects, source checkouts,
+model files, caches, logs, telemetry, raw requests, benchmark results,
+databases, and reports out of version control.
 
-Before changing tracked runtime files, run `git pull --ff-only` in
-`~/runtimes`. After every intentional tracked change:
-
-1. Run `scripts/check-repo.sh`.
-2. Inspect `git status --short` and stage only the intended files.
-3. Never use `git add -f` to bypass the allowlist.
-4. Commit with a Conventional Commit message.
-5. Push `origin/main` in the same task unless the user explicitly requests
-   local-only work.
-
-If a new lightweight file type belongs in the repository, update the narrow
-`.gitignore` allowlist and repository checks before adding it. Never run or
-resume a benchmark recipe from a directory containing `INVALID.json`.
+Before a tracked change, update the repository without rewriting its history.
+Run its required checks, stage only the intended files, use a Conventional
+Commit message, and follow its push policy. Do not use `git add -f` to bypass a
+narrow allowlist. Never run or resume a benchmark recipe from a directory that
+contains `INVALID.json`.
 
 ## Runtime provenance
 
@@ -68,7 +65,7 @@ A request to benchmark, serve, or test a model does not authorize a new runtime 
 
 Without further approval, use only:
 
-- an existing canonical runtime under `~/runtimes/<engine>/`, or
+- an existing canonical runtime under `<runtime-root>/<engine>/`, or
 - an official pinned release from the inference engine or model publisher.
 
 Community images, forks, custom builds, benchmark-author images, and third-party
@@ -114,7 +111,7 @@ benchmark, serve, or test a model does not authorize a source build.
 
 Before proposing or starting a build, check these options in order:
 
-1. Existing canonical runtimes under `~/runtimes/<engine>/`.
+1. Existing canonical runtimes under `<runtime-root>/<engine>/`.
 2. Official release binaries for the target operating system and architecture.
 3. Official container images, including remote multi-platform manifests rather
    than only images already present locally.
@@ -134,9 +131,9 @@ Before requesting source-build approval, report:
 - the intended canonical runtime path;
 - the exact build command.
 
-Do not configure or compile a runtime in `~/repos`, `~/scratch`, or another ad
-hoc location. An approved source build belongs in a versioned directory under
-`~/runtimes/<engine>/versions/`.
+Do not configure or compile a runtime in a source checkout or temporary work
+directory. An approved source build belongs in a versioned directory under
+`<runtime-root>/<engine>/versions/`.
 
 ## Runtime Names
 
@@ -163,8 +160,8 @@ Minimum fields:
   "engine": "vllm",
   "status": "candidate",
   "created_at": "2026-07-01",
-  "runtime_path": "/home/bob/runtimes/vllm/versions/vllm-0.23.1-qwen36-sm121-flashinfer",
-  "executable": "/home/bob/runtimes/vllm/current/.venv/bin/vllm",
+  "runtime_path": "/path/to/runtime-root/vllm/versions/vllm-0.23.1-qwen36-sm121-flashinfer",
+  "executable": "/path/to/runtime-root/vllm/current/.venv/bin/vllm",
   "versions": {
     "python": "3.12",
     "vllm": "0.23.1rc1",
@@ -234,7 +231,7 @@ Benchmark specs should describe workload shape: prompt length, output length, re
 3. Stop for explicit approval before any source build or before downloading or running any `community` source.
 4. Classify the source as `official`, `community`, or `local`. Record its owner, immutable provenance, and approval evidence in the manifest.
 5. Report expected disk impact before creating, replacing, or deleting a runtime.
-6. Create new runtimes only under `~/runtimes/<engine>/versions/<runtime-name>/`.
+6. Create new runtimes only under `<runtime-root>/<engine>/versions/<runtime-name>/`.
 7. Write or update `manifest.json` during setup, not after the fact.
 8. Run a smoke test before promoting a runtime.
 9. Promote by updating `current` only after the smoke test passes.
@@ -259,8 +256,9 @@ executable:
 
 ```bash
 SAFE_INFERENCE_SHIMS='<absolute path to ../safe-inference-launch/scripts/install-shims.sh>'
+RUNTIME_ROOT='<approved runtime root>'
 "$SAFE_INFERENCE_SHIMS" \
-  --wrap ~/runtimes/vllm/current/.venv/bin/vllm
+  --wrap "$RUNTIME_ROOT/vllm/current/.venv/bin/vllm"
 ```
 
 This protects benchmark scripts that call the runtime by absolute path.
@@ -293,6 +291,6 @@ only on successful package installation or backend availability checks.
   launches. If those guards are unavailable, refuse the launch or ask before
   continuing.
 - Do not create system or user services unless the user explicitly asks for a service.
-- Do not treat `~/services` as a runtime location.
+- Do not use a service directory as a runtime location.
 - Do not mutate an existing working runtime in place. Create a new versioned runtime and promote it after testing.
 - Preserve old runtime manifests when cleaning up so results remain explainable.
