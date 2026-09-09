@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.9`
-- Source commit: `df70676fbdcda2c3cf0f6fcb0dd5d631cb05365b`
-- Package source: exact npm release `0.16.9`
+- Latest release at review: `v0.16.10`
+- Source commit: `2c603c620217cc49dc28c73532f17c60afc68346`
+- Package source: exact npm release `0.16.10`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -51,6 +51,9 @@ workflows as running while an agent or supervised runner is active, refreshes li
 activity changes, and recovers interrupted verification repairs without losing completed work. Patch
 `0.16.9` restores bounded workflow recovery after interrupted agent and runner work. It keeps
 submission reminders and terminal handoffs recoverable without creating duplicate continuation runs.
+Patch `0.16.10` gives package-internal composed workflows stable built-in identities. The server and
+runner can load the same package from different installation paths without a false source-change
+failure, while internal workflows stay hidden from normal discovery.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
