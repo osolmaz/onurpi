@@ -38,6 +38,18 @@ work directories, service directories, or project-local `.venv` directories
 unless the user explicitly approves a one-off exception. Keep model caches out
 of the runtime root and follow machine instructions for cache storage.
 
+## Model storage
+
+Identify the file system and device that hold the model before serving or
+benchmarking it. Prefer local SSD or NVMe storage for actively served weights.
+A capacity drive is suitable for archives and downloads, but it can make model
+startup and page-in much slower.
+
+If the cache is on slow or removable storage, report measured read speed and
+the expected load time. Use the machine's approved fast-model location when it
+has enough space. Keep the slower cache copy until the fast copy passes a real
+load test, unless the user explicitly asks for a move and cleanup.
+
 ## Version control
 
 Follow the repository instructions when the runtime root includes tracked
