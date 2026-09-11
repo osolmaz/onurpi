@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.16.10`
-- Source commit: `2c603c620217cc49dc28c73532f17c60afc68346`
-- Package source: exact npm release `0.16.10`
+- Latest release at review: `v0.17.0`
+- Source commit: `2d376c2f8949f9e41e23d033b154ed23bb78731b`
+- Package source: exact npm release `0.17.0`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -53,7 +53,12 @@ activity changes, and recovers interrupted verification repairs without losing c
 submission reminders and terminal handoffs recoverable without creating duplicate continuation runs.
 Patch `0.16.10` gives package-internal composed workflows stable built-in identities. The server and
 runner can load the same package from different installation paths without a false source-change
-failure, while internal workflows stay hidden from normal discovery.
+failure, while internal workflows stay hidden from normal discovery. Release `0.17.0` adds a
+reusable, typed control-loop helper and moves Autoimplement to a central observe-and-decide loop.
+Expected branch failures and timeouts can return to the controller for a bounded next decision. The
+release also accepts prepared and untested verification checks, shares command-safety rules between
+prompts and validation, reports all bounded plan errors together, identifies timeout races clearly,
+and names the new child run after restart.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
