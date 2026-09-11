@@ -28,9 +28,13 @@
     "../../repos/onurpi/packages/onur-theme"
   ],
   "lastChangelogVersion": "0.85.1",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
+  "defaultProvider": "huggingface",
+  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash",
   "defaultThinkingLevel": "xhigh",
+  "terminal": {
+    "showImages": false,
+    "images": false
+  },
   "outputPad": 0,
   "tuiMode": "fullscreen",
   "theme": "onur-dark",
