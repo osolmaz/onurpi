@@ -20,9 +20,9 @@ Do the following in the order that makes sense. Choose the most efficient order 
    - Do not put mutation testing on the critical path unless repository policy explicitly requires it; keep the mutation test scripts available.
 
 3. Push your latest commits before running review so the review is always against the current PR head.
-   - Run Pi Reviewer with its configured defaults against the base branch: `pi-reviewer --base <branch_name>`. The model and thinking level come from the reviewer's own config, not from this skill.
+   - Run Pi Reviewer against the base branch with the Hugging Face reviewer model: `pi-reviewer --model huggingface/deepseek-ai/DeepSeek-V4.1-Flash --base <branch_name>`. Name the model explicitly; do not rely on the reviewer's configured default model. The thinking level still comes from the reviewer's own config.
+   - If that model route fails, report the exact error and stop. Do not silently switch to another model or provider, and do not fall back to `codex review`.
    - Use a 10 minute timeout on the tool call available to the model, not the shell `timeout` program. If Pi Reviewer takes more than 10 minutes, kill it.
-   - Do not silently fall back to `codex review` when Pi Reviewer is unavailable; stop and report the missing command or configuration.
    - Run Pi Reviewer in a loop and address any P0 or P1 issues until there are none left. If a run reports only P2 or lower issues, move to the next stage.
    - Ignore issues about supporting legacy behavior unless the plan requires compatibility.
    - Look at CI only after Pi Reviewer passes, meaning the last completed run found no issues or only P2 or lower issues.
@@ -42,6 +42,7 @@ Do the following in the order that makes sense. Choose the most efficient order 
 6. Once CI/CD is green, or the relevant local checks have passed for a documentation-only change, and you think that the PR is ready to merge, merge opportunistically unless the user explicitly asked you not to merge.
    - Then finish and give a summary with the PR link.
    - Include the exact validation commands you ran and their outcomes.
+   - State the reviewer model ID and route next to the review findings.
    - Also comment a final report on the PR.
 
 7. Merge automatically unless the user explicitly asks you not to.
