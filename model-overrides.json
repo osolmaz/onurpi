@@ -1,0 +1,14 @@
+{
+  "providers": {
+    "huggingface": {
+      "modelOverrides": {
+        "deepseek-ai/DeepSeek-V4.1-Flash": {
+          "contextWindow": 272000
+        },
+        "deepseek-ai/DeepSeek-V4.1-Flash:novita": {
+          "contextWindow": 272000
+        }
+      }
+    }
+  }
+}

@@ -109,6 +109,7 @@ export default defineConfig({
         "packages/unified-exec/src/tool-helpers.ts",
         "packages/unified-exec/src/unescape.ts",
         "packages/unified-exec/src/write-stdin.ts",
+        "scripts/model-overrides.ts",
       ],
       provider: "v8",
       reporter: ["text", "json", "json-summary"],
@@ -119,6 +120,6 @@ export default defineConfig({
         statements: 85,
       },
     },
-    include: ["packages/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "scripts/**/*.test.ts"],
   },
 });

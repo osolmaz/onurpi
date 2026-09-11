@@ -103,13 +103,20 @@ The private repository is required for instruction installation. OnurPi does not
 state remain outside this repository. Review settings for credentials or machine-specific values
 before committing future changes.
 
-Two scripts keep the copies in agreement without ever leaking machine-local development state. Both
-derive the canonical package entries from the root Pi resource manifest, so the list never needs
-manual maintenance:
+[`model-overrides.json`](model-overrides.json) is the source-controlled copy of the reviewed
+per-model overrides from `~/.pi/agent/models.json`. Only `providers.<name>.modelOverrides` is
+copied. Endpoints, API keys, and model lists stay machine-local and are never written into this
+repository.
+
+These scripts keep the copies in agreement without ever leaking machine-local development state.
+Both derive the canonical package entries from the root Pi resource manifest, so the list never
+needs manual maintenance:
 
 ```bash
 npm run settings:sync   # live settings -> tracked settings.json, repo entries normalized
+                        # live models   -> tracked model-overrides.json
 npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
+                        # apply tracked model-overrides.json to the live models.json
 ```
 
 An entry counts as belonging to this repo when it points into the main checkout, into an

@@ -1,22 +1,35 @@
-// Normalize Pi package entries for this repo.
+// Keep the tracked copies of global Pi configuration in step with the live agent directory.
 //
 //   node scripts/sync-settings.ts sync    live settings -> tracked settings.json (normalized)
+//                                         live models   -> tracked model-overrides.json
 //   node scripts/sync-settings.ts reset   normalize the live settings in place
+//                                         apply tracked model-overrides.json to the live models.json
 //
 // Entries belonging to this repo (main checkout paths, worktree paths, or the git source) are
 // replaced with one canonical local-path entry per package referenced by the root Pi manifest. All
 // other entries and settings pass through untouched.
+//
+// Only `providers.<name>.modelOverrides` is copied out of `models.json`. Endpoints, API keys, and
+// model lists stay machine-local and are never written into this repository.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  applyModelOverrides,
+  extractModelOverrides,
+  isModelOverrides,
+  isRecord,
+} from "./model-overrides.ts";
 
 type Settings = { packages: string[] } & Record<string, unknown>;
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const liveSettingsPath = join(homedir(), ".pi", "agent", "settings.json");
 const trackedSettingsPath = join(repoRoot, "settings.json");
+const liveModelsPath = join(homedir(), ".pi", "agent", "models.json");
+const trackedOverridesPath = join(repoRoot, "model-overrides.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
 const REMOVED_OR_REPLACED_PACKAGE_SOURCES = [
@@ -43,16 +56,17 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+/** `models.json` is optional in Pi, so a missing file is a normal state, not an error. */
+function readJsonIfPresent(path: string): unknown {
+  return existsSync(path) ? readJson(path) : undefined;
+}
+
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function isSettings(value: unknown): value is Settings {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Array.isArray((value as { packages?: unknown }).packages)
-  );
+  return isRecord(value) && Array.isArray(value["packages"]);
 }
 
 function canonicalEntries(): string[] {
@@ -113,9 +127,22 @@ if (!isSettings(live)) throw new Error(`No packages array in ${liveSettingsPath}
 if (mode === "sync") {
   writeJson(trackedSettingsPath, normalize(live));
   console.log(`Wrote normalized settings to ${trackedSettingsPath}`);
+
+  const overrides = extractModelOverrides(readJsonIfPresent(liveModelsPath));
+  writeJson(trackedOverridesPath, overrides);
+  console.log(`Wrote model overrides to ${trackedOverridesPath}`);
 } else if (mode === "reset") {
   writeJson(liveSettingsPath, normalize(live));
   console.log(`Reset repo entries in ${liveSettingsPath}`);
+
+  const tracked: unknown = readJson(trackedOverridesPath);
+  if (!isModelOverrides(tracked))
+    throw new Error(`Invalid model overrides in ${trackedOverridesPath}`);
+  writeJson(
+    liveModelsPath,
+    applyModelOverrides(readJsonIfPresent(liveModelsPath) ?? {}, tracked, liveModelsPath),
+  );
+  console.log(`Applied model overrides to ${liveModelsPath}`);
 } else {
   console.error("Usage: sync-settings.ts <sync|reset>");
   process.exit(1);
