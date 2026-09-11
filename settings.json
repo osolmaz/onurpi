@@ -27,13 +27,16 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.85.0",
+  "lastChangelogVersion": "0.85.1",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-sol",
   "defaultThinkingLevel": "xhigh",
   "outputPad": 0,
   "tuiMode": "fullscreen",
   "theme": "onur-dark",
+  "markdown": {
+    "codeBlockIndent": ""
+  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 27200,
