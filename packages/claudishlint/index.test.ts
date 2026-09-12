@@ -87,7 +87,7 @@ describe("claudishlint extension", () => {
   it("marks the start of an interaction on user input", () => {
     const { appendEntry, handlers, pi } = harness();
     claudishlint(pi);
-    handler(handlers, "input")({ source: "user" } as unknown as InputEvent);
+    handler(handlers, "input")({ source: "interactive", text: "hi" } as InputEvent);
     expect(appendEntry).toHaveBeenCalledWith(RESET_TYPE, true);
   });
 
