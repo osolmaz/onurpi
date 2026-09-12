@@ -1,12 +1,10 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
-  getAgentDir,
   type AgentEndEvent,
   type ExtensionAPI,
   type InputEvent,
 } from "@earendil-works/pi-coding-agent";
 import { review } from "./claudishlint/index.ts";
+import { readConfig } from "./config.ts";
 
 const NUDGE_TYPE = "claudishlint.nudge";
 const RESET_TYPE = "claudishlint.reset";
@@ -38,16 +36,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    let config: Record<string, unknown> = {};
-    try {
-      config = JSON.parse(
-        readFileSync(join(getAgentDir(), ".claudishlint.json"), "utf8"),
-      ) as Record<string, unknown>;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
-        throw err;
-      }
-    }
+    const config = readConfig();
 
     const last = event.messages.findLast((m) => m.role === "assistant");
     if (!last) {
