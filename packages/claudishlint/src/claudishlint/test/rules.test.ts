@@ -134,6 +134,14 @@ const cases: Array<[string, string, number, number[]?]> = [
     1,
     [3],
   ],
+  ["emoji-heading", "## \u{1F680} Deploy notes", 1],
+  ["emoji-heading", "- \u{1F389} Ship it", 1],
+  ["emoji-heading", "1. \u{1F4E6} Package it", 1],
+  // The finder also fires on a plain line that opens with an emoji, which is
+  // wider than the rule description says. Pinned so the difference shows.
+  ["emoji-heading", "\u{1F680} Party time", 1],
+  ["emoji-heading", "## \u{1F680}", 0],
+  ["emoji-heading", "Ship it with \u{1F680} inside the line.", 0],
   [
     "colon-triple",
     "The fix needs three things: separate ports, separate processes, and separate state.",
