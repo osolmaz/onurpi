@@ -30,10 +30,6 @@ export function registerImageBudget(pi: ExtensionAPI, deps: ImageBudgetDeps): vo
 
   pi.on("context", (event, ctx) => session.onContext(event.messages, ctx));
 
-  pi.on("session_shutdown", (_event, ctx) => {
-    session.onShutdown(ctx);
-  });
-
   pi.registerCommand("image-budget", {
     description: "Show or reload the image byte budget",
     handler: (args, ctx) => {

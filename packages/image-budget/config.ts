@@ -22,7 +22,6 @@ const KNOWN_KEYS = [
   "imageBudgetBytes",
   "redactToBytes",
   "notify",
-  "status",
 ] as const;
 
 export type ConfigLoad = {
@@ -89,7 +88,6 @@ function buildConfig(source: Record<string, unknown>, errors: string[]): ImageBu
     ),
     redactToBytes: readNumber(source, "redactToBytes", DEFAULT_CONFIG.redactToBytes, errors),
     notify: readBoolean(source, "notify", DEFAULT_CONFIG.notify, errors),
-    status: readBoolean(source, "status", DEFAULT_CONFIG.status, errors),
   };
 }
 

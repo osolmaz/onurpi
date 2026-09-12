@@ -1,8 +1,8 @@
 /**
  * Stateful policy for one session.
  *
- * Keeps the config reload, the counters, the notification gating, and the footer status in one
- * place with narrow types, so `index.ts` stays a thin set of Pi hooks.
+ * Keeps the config reload, the counters, and the notification gating in one place with narrow
+ * types, so `index.ts` stays a thin set of Pi hooks.
  */
 
 import type { resizeImage } from "@earendil-works/pi-coding-agent";
@@ -11,7 +11,6 @@ import { handleImageBudgetCommand, type ImageBudgetSnapshot } from "./command.ts
 import { configPath, readConfig, type ConfigLoad } from "./config.ts";
 import { applyContextPolicy, type ContextMessages } from "./context-policy.ts";
 import {
-  formatStatus,
   redactionNotice,
   resultOutcomeNotice,
   type ImageBudgetConfig,
@@ -20,11 +19,9 @@ import {
 import { applyResultPolicy, type ToolResultContent } from "./result-policy.ts";
 
 export type UiContext = {
-  mode: string;
   hasUI: boolean;
   ui: {
     notify: (message: string, type?: "info" | "warning" | "error") => void;
-    setStatus: (key: string, text: string | undefined) => void;
   };
 };
 
@@ -32,8 +29,6 @@ export type SessionPolicyDeps = {
   agentDir: string;
   resize: typeof resizeImage;
 };
-
-export const STATUS_KEY = "image-budget";
 
 const NO_OUTCOME: ResultOutcome = { omitted: 0, resized: 0, dropped: 0, bytesSaved: 0 };
 
@@ -114,7 +109,6 @@ export class ImageBudgetSession {
     const outcome = applyContextPolicy(messages, this.config);
     this.lastBytes = outcome.bytesAfter;
     this.lastImageCount = outcome.imageCount - outcome.redactCount;
-    this.applyStatus(ctx);
     if (outcome.redactCount === 0) {
       this.redacting = false;
       return undefined;
@@ -123,10 +117,6 @@ export class ImageBudgetSession {
     if (!this.redacting) this.notify(ctx, redactionNotice(outcome), "warning");
     this.redacting = true;
     return { messages };
-  }
-
-  onShutdown(ctx: UiContext): void {
-    if (ctx.mode === "tui") ctx.ui.setStatus(STATUS_KEY, undefined);
   }
 
   command(args: string, ctx: UiContext): void {
@@ -141,14 +131,5 @@ export class ImageBudgetSession {
     if (!this.config.notify || !ctx.hasUI || this.notifiedThisTurn) return;
     ctx.ui.notify(message, type);
     this.notifiedThisTurn = true;
-  }
-
-  private applyStatus(ctx: UiContext): void {
-    if (ctx.mode !== "tui" || !this.config.status) return;
-    const text =
-      this.lastImageCount > 0
-        ? formatStatus(this.lastBytes, this.config.imageBudgetBytes)
-        : undefined;
-    ctx.ui.setStatus(STATUS_KEY, text);
   }
 }

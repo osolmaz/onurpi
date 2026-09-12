@@ -41,7 +41,6 @@ describe("parseConfig", () => {
       imageBudgetBytes: 4096,
       redactToBytes: 2048,
       notify: false,
-      status: false,
     });
     expect(errors).toEqual([]);
     expect(config).toEqual({
@@ -53,7 +52,6 @@ describe("parseConfig", () => {
       imageBudgetBytes: 4096,
       redactToBytes: 2048,
       notify: false,
-      status: false,
     });
   });
 

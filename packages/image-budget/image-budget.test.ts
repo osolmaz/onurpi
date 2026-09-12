@@ -6,7 +6,6 @@ import {
   type ImageRef,
   REDACTED_MARKER,
   formatBytes,
-  formatStatus,
   omittedNote,
   planRedactions,
   redactionNote,
@@ -74,10 +73,6 @@ describe("formatBytes", () => {
     expect(formatBytes(512)).toBe("512 B");
     expect(formatBytes(4096)).toBe("4 KB");
     expect(formatBytes(3.5 * 1024 * 1024)).toBe("3.5 MB");
-  });
-
-  it("formats the footer status", () => {
-    expect(formatStatus(3670016, 5242880)).toBe("images 3.5 MB/5.0 MB");
   });
 });
 

@@ -27,8 +27,6 @@ export type ImageBudgetConfig = {
   redactToBytes: number;
   /** Send a UI notification when images are resized or redacted. */
   notify: boolean;
-  /** Show current image bytes in the footer status area. */
-  status: boolean;
 };
 
 export const DEFAULT_CONFIG: ImageBudgetConfig = {
@@ -40,7 +38,6 @@ export const DEFAULT_CONFIG: ImageBudgetConfig = {
   imageBudgetBytes: 3.5 * 1024 * 1024,
   redactToBytes: 2.5 * 1024 * 1024,
   notify: true,
-  status: true,
 };
 
 export type ImageRef = {
@@ -163,8 +160,4 @@ export function resultOutcomeNotice(outcome: ResultOutcome): string | undefined 
 
 export function redactionNotice(summary: RedactionSummary): string {
   return `image-budget: redacted ${String(summary.redactCount)} old image${summary.redactCount === 1 ? "" : "s"}, ${formatBytes(summary.bytesBefore)} -> ${formatBytes(summary.bytesAfter)}`;
-}
-
-export function formatStatus(bytes: number, budgetBytes: number): string {
-  return `images ${formatBytes(bytes)}/${formatBytes(budgetBytes)}`;
 }

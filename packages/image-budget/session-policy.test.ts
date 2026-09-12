@@ -7,7 +7,7 @@ import { CONFIG_FILE_NAME } from "./config.ts";
 import type { ContextMessages } from "./context-policy.ts";
 import { DEFAULT_CONFIG } from "./image-budget.ts";
 import type { ResizeImage, ToolResultContent } from "./result-policy.ts";
-import { ImageBudgetSession, STATUS_KEY, type UiContext } from "./session-policy.ts";
+import { ImageBudgetSession, type UiContext } from "./session-policy.ts";
 
 const temporaryDirs: string[] = [];
 
@@ -24,22 +24,18 @@ afterEach(() => {
 type Recorded = {
   ctx: UiContext;
   notifications: { message: string; type: string | undefined }[];
-  statuses: (string | undefined)[];
 };
 
 function recorder(overrides: Partial<UiContext> = {}): Recorded {
   const notifications: { message: string; type: string | undefined }[] = [];
-  const statuses: (string | undefined)[] = [];
   const ctx: UiContext = {
-    mode: "tui",
     hasUI: true,
     ui: {
       notify: (message, type) => notifications.push({ message, type }),
-      setStatus: (_key, text) => statuses.push(text),
     },
     ...overrides,
   };
-  return { ctx, notifications, statuses };
+  return { ctx, notifications };
 }
 
 function tinyConfig(values: Record<string, number>): string {
@@ -137,27 +133,18 @@ describe("ImageBudgetSession", () => {
 
   it("ignores tool results and context while disabled", async () => {
     const current = session(tinyConfig({}));
-    const { ctx, statuses } = recorder();
+    const { ctx, notifications } = recorder();
     writeFileSync(join(current.path), JSON.stringify({ enabled: false }));
     current.onSessionStart(ctx);
     expect(await current.onToolResult([image(400)], ctx)).toBeUndefined();
     const messages: ContextMessages = [toolResult([image(400)])];
     expect(current.onContext(messages, ctx)).toBeUndefined();
-    expect(statuses).toEqual([]);
-  });
-
-  it("shows the footer status while a context holds images", () => {
-    const current = session(tinyConfig({}));
-    const { ctx, statuses } = recorder();
-    current.onSessionStart(ctx);
-    const messages: ContextMessages = [toolResult([image(100)])];
-    expect(current.onContext(messages, ctx)).toBeUndefined();
-    expect(statuses).toEqual(["images 100 B/500 B"]);
+    expect(notifications).toEqual([]);
   });
 
   it("redacts and warns when a context exceeds the budget", () => {
     const current = session(tinyConfig({}));
-    const { ctx, notifications, statuses } = recorder();
+    const { ctx, notifications } = recorder();
     current.onSessionStart(ctx);
     const messages: ContextMessages = [toolResult([image(400)]), toolResult([image(400)])];
     const result = current.onContext(messages, ctx);
@@ -165,35 +152,21 @@ describe("ImageBudgetSession", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.message).toContain("redacted 1 old image");
     expect(notifications[0]?.type).toBe("warning");
-    expect(statuses[0]).toBe("images 400 B/500 B");
     expect(current.snapshot().redactions).toBe(1);
     current.onContext(messages, ctx);
     expect(notifications).toHaveLength(1);
     expect(current.snapshot().redactions).toBe(1);
   });
 
-  it("keeps the footer status out of non-terminal modes and disabled status", () => {
-    const dir = tinyConfig({});
-    const current = session(dir);
-    const print = recorder({ mode: "print", hasUI: false });
-    current.onSessionStart(print.ctx);
-    current.onContext([toolResult([image(100)])], print.ctx);
-    expect(print.statuses).toEqual([]);
-
-    const silent = session(tinyConfig({}));
-    writeFileSync(join(dir, CONFIG_FILE_NAME), JSON.stringify({ status: false }));
-    silent.onSessionStart(print.ctx);
-    const messages: ContextMessages = [toolResult([image(100)])];
-    silent.onContext(messages, print.ctx);
-    expect(print.statuses).toEqual([]);
-  });
-
-  it("clears the footer status at shutdown", () => {
+  it("reports the load in the snapshot without touching the UI", () => {
     const current = session(tinyConfig({}));
-    const { ctx, statuses } = recorder();
-    current.onContext([toolResult([image(100)])], ctx);
-    current.onShutdown(ctx);
-    expect(statuses).toEqual(["images 100 B/500 B", undefined]);
+    const { ctx, notifications } = recorder({ hasUI: false });
+    current.onSessionStart(ctx);
+    const messages: ContextMessages = [toolResult([image(100)])];
+    expect(current.onContext(messages, ctx)).toBeUndefined();
+    expect(notifications).toEqual([]);
+    expect(current.snapshot().lastBytes).toBe(100);
+    expect(current.snapshot().lastImageCount).toBe(1);
   });
 
   it("serves the command and reloads the config", () => {
@@ -210,9 +183,5 @@ describe("ImageBudgetSession", () => {
       message: "Usage: /image-budget [status|reload]",
       type: "warning",
     });
-  });
-
-  it("exposes the status key used by the footer", () => {
-    expect(STATUS_KEY).toBe("image-budget");
   });
 });

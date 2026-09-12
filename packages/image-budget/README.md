@@ -19,7 +19,8 @@ and it replaces the oldest images with a text note when a request would otherwis
   invalidate the prompt cache again.
 - The model sees a note in place of every redacted image, with the byte size, the source tool, and
   the number of images kept.
-- The footer shows `images 3.2 MB/3.5 MB` while a session holds images.
+- The extension adds nothing to the Pi status line. It writes one line in the terminal when it
+  changes images, and `/image-budget` reports the current load on demand.
 
 Session files stay complete: request-time redaction happens on the copy Pi hands to the `context`
 hook and is never written to the transcript. Insert-time re-encoding does change the stored tool
@@ -39,8 +40,7 @@ session start or with `/image-budget reload`.
   "maxImagesPerResult": 4,
   "imageBudgetBytes": 3670016,
   "redactToBytes": 2621440,
-  "notify": true,
-  "status": true
+  "notify": true
 }
 ```
 
