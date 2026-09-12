@@ -84,7 +84,11 @@ export default tseslint.config(
   },
   {
     // Vendored upstream sources keep their audited style; relaxations mirror unified-exec.
-    files: ["packages/pi-tui-kit/**/*.ts", "packages/pi-usage/**/*.ts"],
+    files: [
+      "packages/pi-tui-kit/**/*.ts",
+      "packages/pi-usage/**/*.ts",
+      "packages/claudishlint/**/*.ts",
+    ],
     rules: {
       "@typescript-eslint/array-type": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
