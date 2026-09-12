@@ -50,6 +50,13 @@ The review covered every file in the pinned commit:
 - When the verdict is `rewrite`, it appends `claudishlint.nudge` and sends one follow-up with the
   findings and the style guide.
 
+## Known upstream behavior
+
+- The `emoji-heading` finder also fires on a plain line that opens with an emoji, and it misses a
+  header or bullet whose only content is the emoji. Its description scopes it to an emoji heading a
+  markdown header or list item. The vendored tests pin the current behavior. The decision to narrow
+  the rule belongs upstream.
+
 ## OnurPi adaptations
 
 - `src/index.ts` moved to `src/extension.ts` so the package root `index.ts` stays the Pi entry
