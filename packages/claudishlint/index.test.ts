@@ -151,6 +151,16 @@ describe("claudishlint extension", () => {
     expect(sendUserMessage).not.toHaveBeenCalled();
   });
 
+  it("never reads the config when the turn has no assistant message", () => {
+    const { handlers, pi } = harness();
+    claudishlint(pi);
+    writeFileSync(join(agentDir.path, ".claudishlint.json"), "not json");
+    const event = { messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }] };
+    expect(() =>
+      handler(handlers, "agent_end")(event as unknown as AgentEndEvent, agentEndContext([])),
+    ).not.toThrow();
+  });
+
   it("honours the strictness setting from the agent config file", () => {
     const { handlers, pi, sendUserMessage } = harness();
     claudishlint(pi);

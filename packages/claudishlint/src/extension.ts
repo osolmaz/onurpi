@@ -36,12 +36,14 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    const config = readConfig();
-
     const last = event.messages.findLast((m) => m.role === "assistant");
     if (!last) {
       return;
     }
+
+    // Read the gate settings only when there is prose to check, so a broken
+    // config does not raise on a turn with nothing to lint.
+    const config = readConfig();
 
     const { verdict, findings } = review(
       last.content
