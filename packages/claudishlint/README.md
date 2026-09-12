@@ -20,8 +20,9 @@ corrected one time. The first nudge carries the style guide. Later nudges point 
 
 ## Configuration
 
-The extension reads `~/.pi/agent/.claudishlint.json` on every check. A missing file means the
-defaults. The file maps onto the linter's options.
+The extension reads `~/.pi/agent/.claudishlint.json` on every check, through `src/config.ts`. A
+missing file means the defaults. The file maps onto the linter's options, and those two keys are the
+only ones it accepts.
 
 ```json
 {
@@ -38,7 +39,9 @@ defaults. The file maps onto the linter's options.
 - `rules` holds per-rule overrides. `0` removes a rule and its findings. `1` blocks on a single
   finding of that rule. Rules not listed use `strictness`.
 
-Invalid JSON in that file raises an error, so the file must parse.
+Invalid JSON in that file raises an error, and so does a value of the wrong shape, such as
+`strictness: false`, an unknown key, or a rule override other than `0` or `1`. A broken gate setting
+must not pass in silence.
 
 ## The linter
 

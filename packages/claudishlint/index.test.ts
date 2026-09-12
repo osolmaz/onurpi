@@ -165,6 +165,25 @@ describe("claudishlint extension", () => {
     writeFileSync(join(agentDir.path, ".claudishlint.json"), "not json");
     expect(() =>
       handler(handlers, "agent_end")(agentEndEvent(CLAUDISH_TEXT), agentEndContext([])),
-    ).toThrow();
+    ).toThrow(/is not valid JSON/);
+  });
+
+  it("fails on a config value of the wrong shape instead of dropping the gate", () => {
+    const { handlers, pi } = harness();
+    claudishlint(pi);
+    writeFileSync(join(agentDir.path, ".claudishlint.json"), '{"strictness": false}');
+    expect(() =>
+      handler(handlers, "agent_end")(agentEndEvent(CLAUDISH_TEXT), agentEndContext([])),
+    ).toThrow(/needs a strictness from 0 to 1/);
+  });
+
+  it("keeps the gate on when a config file holds null", () => {
+    const { handlers, pi, sendUserMessage } = harness();
+    claudishlint(pi);
+    writeFileSync(join(agentDir.path, ".claudishlint.json"), "null");
+    expect(() =>
+      handler(handlers, "agent_end")(agentEndEvent(CLAUDISH_TEXT), agentEndContext([])),
+    ).toThrow(/must hold a JSON object/);
+    expect(sendUserMessage).not.toHaveBeenCalled();
   });
 });

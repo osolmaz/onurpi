@@ -32,8 +32,8 @@ The review covered every file in the pinned commit:
 - Process execution: none. The extension starts no process and imports no child process module.
 - Shell behavior: none. It registers no tool and overrides no tool.
 - Filesystem: it reads, and never writes, one file: `.claudishlint.json` inside the Pi agent
-  directory. The read tolerates `ENOENT` and lets every other error, including a parse failure,
-  escape.
+  directory. The read tolerates `ENOENT` and lets every other error, including a parse failure or a
+  shape mismatch, escape.
 - Network: none.
 - Credentials and telemetry: none.
 - Provider interception: none. It does not touch models, providers, or request payloads.
@@ -66,6 +66,10 @@ The review covered every file in the pinned commit:
 - Three line-level ESLint suppressions carry a justification each: the complexity of the upstream
   sentence-run loop, `String#match` in place of `RegExp#exec`, and the upstream emoji character
   class that combines marks on purpose. The last one replaces the upstream Biome ignore comment.
+- `src/config.ts` is local. It reads and validates `.claudishlint.json`, because the upstream
+  extension passes the parsed value straight to `review()`. A file with `null`, an unknown key, a
+  non-numeric `strictness`, or a rule override other than `0` or `1` now raises a clear error
+  instead of crashing the handler or silently dropping the gate.
 - `index.test.ts` is local. It drives the extension factory through the Pi event contract.
 - The upstream `sanity.test.ts` is not vendored. It needs `fixtures/*.jsonl` built by an unpublished
   script from a GitHub corpus and the `adamrotmil/claudish-pairs` dataset, so it cannot run here.
