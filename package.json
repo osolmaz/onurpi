@@ -33,7 +33,6 @@
       "./packages/demo-mode/index.ts",
       "./packages/skill-slug/index.ts",
       "./packages/image-budget/index.ts",
-      "./packages/claudishlint/index.ts",
       "./packages/command-guard/index.ts"
     ],
     "skills": [
