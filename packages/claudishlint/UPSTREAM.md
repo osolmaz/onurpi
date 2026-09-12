@@ -57,6 +57,13 @@ The review covered every file in the pinned commit:
   markdown header or list item. The vendored tests pin the current behavior. The decision to narrow
   the rule belongs upstream.
 
+## Current state
+
+The package is vendored but switched off. The root Pi manifest does not list
+`./packages/claudishlint/index.ts`, so Pi does not load the extension. The source, the tests, and
+the CI checks stay in place. To switch it on, add that entry back to `pi.extensions` in the root
+`package.json`, then run `npm run settings:reset` and `npm run settings:sync`.
+
 ## OnurPi adaptations
 
 - `src/index.ts` moved to `src/extension.ts` so the package root `index.ts` stays the Pi entry

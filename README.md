@@ -10,38 +10,43 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 
 ## Contents
 
-| Package                                                                  | Purpose                                                          |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync      |
-| [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                  |
-| [`@onurpi/loop-guard`](packages/loop-guard/)                             | Opt-in bounded detection and interruption of repeated work       |
-| [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering Turkish working messages with live response metrics   |
-| [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                          |
-| [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                          |
-| [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager        |
-| [`@onurpi/restart`](packages/restart/)                                   | Full Pi process restart on the exact persisted session           |
-| [`@onurpi/codex-switcher`](packages/codex-switcher/)                     | Usage-aware Codex account profiles and fallback routing          |
-| [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                 |
-| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                   |
-| [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                 |
-| [`@onurpi/onur-openclaw-maintainer`](packages/onur-openclaw-maintainer/) | Read-only OpenClaw local-model issue workflow                    |
-| [`@onurpi/pi-usage`](packages/pi-usage/)                                 | Multi-provider usage reports and model-gated usage status        |
-| [`@onurpi/pi-session`](packages/pi-session/)                             | Bounded, read-only recovery views for Pi sessions                |
-| [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                  |
-| [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake |
-| [`@onurpi/command-guard`](packages/command-guard/)                       | Fail-closed checks for destructive shell commands                |
-| [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands             |
-| [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)               | Pinned Hugging Face OAuth and provider routes                    |
-| [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                      |
-| [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                         |
-| [`@onurpi/demo-mode`](packages/demo-mode/)                               | Opt-in self-driving demo mode                                    |
-| [`@onurpi/regrafter-driver`](packages/regrafter-driver/)                 | Regraft command and optional Regrafter delegation                |
-| [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                    |
-| [`@onurpi/image-budget`](packages/image-budget/)                         | Image re-encoding and eviction inside a request budget           |
-| [`@onurpi/claudishlint`](packages/claudishlint/)                         | One plain rewrite for dense, Claudish model prose (vendored)     |
+| Package                                                                  | Purpose                                                           |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync       |
+| [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                   |
+| [`@onurpi/loop-guard`](packages/loop-guard/)                             | Opt-in bounded detection and interruption of repeated work        |
+| [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering Turkish working messages with live response metrics    |
+| [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                           |
+| [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                           |
+| [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager         |
+| [`@onurpi/restart`](packages/restart/)                                   | Full Pi process restart on the exact persisted session            |
+| [`@onurpi/codex-switcher`](packages/codex-switcher/)                     | Usage-aware Codex account profiles and fallback routing           |
+| [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                  |
+| [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                    |
+| [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                  |
+| [`@onurpi/onur-openclaw-maintainer`](packages/onur-openclaw-maintainer/) | Read-only OpenClaw local-model issue workflow                     |
+| [`@onurpi/pi-usage`](packages/pi-usage/)                                 | Multi-provider usage reports and model-gated usage status         |
+| [`@onurpi/pi-session`](packages/pi-session/)                             | Bounded, read-only recovery views for Pi sessions                 |
+| [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                   |
+| [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake  |
+| [`@onurpi/command-guard`](packages/command-guard/)                       | Fail-closed checks for destructive shell commands                 |
+| [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands              |
+| [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)               | Pinned Hugging Face OAuth and provider routes                     |
+| [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                       |
+| [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                          |
+| [`@onurpi/demo-mode`](packages/demo-mode/)                               | Opt-in self-driving demo mode                                     |
+| [`@onurpi/regrafter-driver`](packages/regrafter-driver/)                 | Regraft command and optional Regrafter delegation                 |
+| [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                     |
+| [`@onurpi/image-budget`](packages/image-budget/)                         | Image re-encoding and eviction inside a request budget            |
+| [`@onurpi/claudishlint`](packages/claudishlint/)                         | One plain rewrite for dense, Claudish model prose (vendored, off) |
 
 [`@onurpi/pi-tui-kit`](packages/pi-tui-kit/) is a vendored library package (declarative Pi TUI
 menus), not a Pi extension; it backs `@onurpi/pi-usage` and is not loaded as a Pi resource.
+
+[`@onurpi/claudishlint`](packages/claudishlint/) is vendored and switched off. The package and its
+tests stay in the repository, and the root Pi manifest does not list its entry point, so Pi does not
+load it. To switch it on, add `./packages/claudishlint/index.ts` to `pi.extensions` in the root
+`package.json` and run `npm run settings:reset` followed by `npm run settings:sync`.
 
 ## Included external extensions
 
