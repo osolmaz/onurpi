@@ -32,6 +32,7 @@
       "./packages/onur-openclaw-maintainer/index.ts",
       "./packages/demo-mode/index.ts",
       "./packages/skill-slug/index.ts",
+      "./packages/image-budget/index.ts",
       "./packages/command-guard/index.ts"
     ],
     "skills": [
