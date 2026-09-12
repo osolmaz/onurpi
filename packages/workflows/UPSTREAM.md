@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.0`
-- Source commit: `2d376c2f8949f9e41e23d033b154ed23bb78731b`
-- Package source: exact npm release `0.17.0`
+- Latest release at review: `v0.17.1`
+- Source commit: `1d5d311dc5190cebfdf90aa8dd19ada437b16368`
+- Package source: exact npm release `0.17.1`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -58,7 +58,9 @@ reusable, typed control-loop helper and moves Autoimplement to a central observe
 Expected branch failures and timeouts can return to the controller for a bounded next decision. The
 release also accepts prepared and untested verification checks, shares command-safety rules between
 prompts and validation, reports all bounded plan errors together, identifies timeout races clearly,
-and names the new child run after restart.
+and names the new child run after restart. Patch `0.17.1` states in the step contract, the waiting
+reason, the workflow tool description, the start result, and both built-in skills that a delivered
+step starts a new model turn, so the model ends its turn instead of sleeping for the step.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
