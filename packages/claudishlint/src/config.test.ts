@@ -39,6 +39,12 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ rules: [] }, SOURCE)).toThrow(/needs rules as an object/);
   });
 
+  it("rejects an unknown rule id", () => {
+    expect(() => parseConfig({ rules: { "no-chian": 1 } }, SOURCE)).toThrow(
+      /unknown rule id "no-chian"/,
+    );
+  });
+
   it("rejects a rule override other than 0 or 1", () => {
     for (const override of [true, 0.5, "1", null]) {
       expect(() => parseConfig({ rules: { "no-chain": override } }, SOURCE)).toThrow(

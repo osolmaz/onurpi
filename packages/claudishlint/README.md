@@ -39,9 +39,9 @@ only ones it accepts.
 - `rules` holds per-rule overrides. `0` removes a rule and its findings. `1` blocks on a single
   finding of that rule. Rules not listed use `strictness`.
 
-Invalid JSON in that file raises an error, and so does a value of the wrong shape, such as
-`strictness: false`, an unknown key, or a rule override other than `0` or `1`. A broken gate setting
-must not pass in silence.
+Invalid JSON in that file raises an error, and so does a value of the wrong shape: an unknown key,
+an unknown rule id, a `strictness` outside 0 to 1, or a rule override other than `0` or `1`. A
+broken gate setting must not pass in silence.
 
 ## The linter
 
