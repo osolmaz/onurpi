@@ -123,6 +123,12 @@ jobs:
       - name: Check @onurpi/yarp package with Slophammer
         working-directory: packages/yarp
         run: npm run slophammer
+      - name: Check @onurpi/claudishlint package
+        working-directory: packages/claudishlint
+        run: npm run check
+      - name: Check @onurpi/claudishlint package with Slophammer
+        working-directory: packages/claudishlint
+        run: npm run slophammer
       - name: Check external extension wrappers
         run: |
           for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do

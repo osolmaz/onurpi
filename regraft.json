@@ -65,6 +65,20 @@
       "notes": [
         "Preserve the reviewed OnurPi adaptations documented in packages/unified-exec/UPSTREAM.md."
       ]
+    },
+    {
+      "name": "claudishlint",
+      "dest": "packages/claudishlint",
+      "source": {
+        "url": "https://github.com/blackbird-merula/claudishlint.git",
+        "ref": "main",
+        "subdir": "."
+      },
+      "commit": "79cd78621d5c99ffe6cc6aa0e8edc144a49ddd20",
+      "notes": [
+        "Preserve the reviewed OnurPi adaptations documented in packages/claudishlint/UPSTREAM.md.",
+        "Upstream states no license. The vendored copy stays private under the author's permission recorded in packages/claudishlint/UPSTREAM.md."
+      ]
     }
   ]
 }
