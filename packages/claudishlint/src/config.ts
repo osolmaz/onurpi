@@ -11,10 +11,12 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 import type { ReviewOptions } from "./claudishlint/types.ts";
+import { rules } from "./claudishlint/rules.ts";
 
 export const CONFIG_FILE_NAME = ".claudishlint.json";
 
 const KNOWN_KEYS = ["strictness", "rules"] as const;
+const KNOWN_RULE_IDS = new Set(rules.map((rule) => rule.id));
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,6 +45,9 @@ function readRules(value: unknown, source: string): Record<string, 0 | 1> | unde
   }
   const overrides: Record<string, 0 | 1> = {};
   for (const [ruleId, override] of Object.entries(value)) {
+    if (!KNOWN_RULE_IDS.has(ruleId)) {
+      throw new Error(`${source} has the unknown rule id "${ruleId}"`);
+    }
     if (override !== 0 && override !== 1) {
       throw new Error(`${source} needs rules["${ruleId}"] to be 0 or 1`);
     }

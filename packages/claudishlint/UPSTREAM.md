@@ -67,9 +67,9 @@ The review covered every file in the pinned commit:
   sentence-run loop, `String#match` in place of `RegExp#exec`, and the upstream emoji character
   class that combines marks on purpose. The last one replaces the upstream Biome ignore comment.
 - `src/config.ts` is local. It reads and validates `.claudishlint.json`, because the upstream
-  extension passes the parsed value straight to `review()`. A file with `null`, an unknown key, a
-  non-numeric `strictness`, or a rule override other than `0` or `1` now raises a clear error
-  instead of crashing the handler or silently dropping the gate.
+  extension passes the parsed value straight to `review()`. A file with `null`, an unknown key, an
+  unknown rule id, a non-numeric `strictness`, or a rule override other than `0` or `1` now raises a
+  clear error instead of crashing the handler or silently dropping the gate.
 - `index.test.ts` is local. It drives the extension factory through the Pi event contract.
 - The upstream `sanity.test.ts` is not vendored. It needs `fixtures/*.jsonl` built by an unpublished
   script from a GitHub corpus and the `adamrotmil/claudish-pairs` dataset, so it cannot run here.
