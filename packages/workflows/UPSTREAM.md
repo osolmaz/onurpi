@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.1`
-- Source commit: `1d5d311dc5190cebfdf90aa8dd19ada437b16368`
-- Package source: exact npm release `0.17.1`
+- Latest release at review: `v0.17.2`
+- Source commit: `59926846a051c341f6d0bb0154790370321dc83f`
+- Package source: exact npm release `0.17.2`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -60,7 +60,12 @@ release also accepts prepared and untested verification checks, shares command-s
 prompts and validation, reports all bounded plan errors together, identifies timeout races clearly,
 and names the new child run after restart. Patch `0.17.1` states in the step contract, the waiting
 reason, the workflow tool description, the start result, and both built-in skills that a delivered
-step starts a new model turn, so the model ends its turn instead of sleeping for the step.
+step starts a new model turn, so the model ends its turn instead of sleeping for the step. Patch
+`0.17.2` sends only the current workflow state to Pi. The engine selects one current message per
+session, bounds every free-form value at 4 KiB on a character boundary, leaves an identity that
+cannot fit one client frame out of a view instead of cutting it, and accepts a node ID of at most
+4096 bytes. The patch also renames the engine's components to one vocabulary, so state written by
+`0.17.1` needs the reset described below.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
