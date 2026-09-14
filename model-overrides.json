@@ -7,6 +7,12 @@
         },
         "deepseek-ai/DeepSeek-V4.1-Flash:novita": {
           "contextWindow": 272000
+        },
+        "deepseek-ai/DeepSeek-V4.1-Flash:baseten": {
+          "contextWindow": 272000
+        },
+        "deepseek-ai/DeepSeek-V4.1-Flash:fireworks-ai": {
+          "contextWindow": 272000
         }
       }
     }
