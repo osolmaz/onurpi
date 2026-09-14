@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.2`
-- Source commit: `59926846a051c341f6d0bb0154790370321dc83f`
-- Package source: exact npm release `0.17.2`
+- Latest release at review: `v0.17.3`
+- Source commit: `8b5a058667dadd33faa66b9b0fb8082f0759c414`
+- Package source: exact npm release `0.17.3`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -65,7 +65,10 @@ step starts a new model turn, so the model ends its turn instead of sleeping for
 session, bounds every free-form value at 4 KiB on a character boundary, leaves an identity that
 cannot fit one client frame out of a view instead of cutting it, and accepts a node ID of at most
 4096 bytes. The patch also renames the engine's components to one vocabulary, so state written by
-`0.17.1` needs the reset described below.
+`0.17.1` needs the reset described below. Patch `0.17.3` lets `pi-workflows server stop` and
+`pi-workflows server start` stop a running server process from another version through the server
+lock file, because that process answers no request from a different package version. The extension
+keeps its report-only behavior.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
