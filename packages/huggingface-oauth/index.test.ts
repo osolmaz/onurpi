@@ -26,6 +26,15 @@ describe("Hugging Face OAuth wrapper", () => {
     expect(registerHuggingFaceOAuth).toBeTypeOf("function");
   });
 
+  it("marks every appended route whose price the router does not publish", () => {
+    expect(extraRouteIds.length).toBeGreaterThan(0);
+    for (const route of EXTRA_ROUTE_MODELS) {
+      expect(route.name).toContain("price not published");
+      expect(route.cost.input).toBeGreaterThan(0);
+      expect(route.cost.output).toBeGreaterThan(0);
+    }
+  });
+
   it("appends the manual routes after the pinned route list", async () => {
     const config: ProviderConfig = { refreshModels: () => Promise.resolve([model("a/b")]) };
 
