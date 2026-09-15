@@ -192,6 +192,24 @@ For small CPU-only llama.cpp tests:
 Raise the floors when the desktop/session must stay responsive or when the
 machine has known background jobs.
 
+### Explicit guard-floor overrides
+
+The user can explicitly override these recommended floors for a named runtime
+or launch. The approval must give the exact memory and swap floors. It must also
+state whether the override applies to one launch or to a tracked serving
+profile.
+
+Before applying the override, report:
+
+- the recommended and requested floors;
+- the latest measured memory and swap pressure;
+- the risk of losing the model process, the interactive session, or the machine;
+- that `earlyoom` and the process-group guard will remain active.
+
+Record the approved values and observed results with the runtime evidence. Do
+not reuse the override for another runtime or launch. An override can lower the
+floors, but it cannot disable `earlyoom` or the process-group guard.
+
 ## Staged launch
 
 Use stages. Do not jump straight to a full benchmark.

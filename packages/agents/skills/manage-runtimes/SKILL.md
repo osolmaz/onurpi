@@ -295,7 +295,7 @@ only on successful package installation or backend availability checks.
 
 ## Safety
 
-- Do not lower memory guards just to get a smoke test to pass.
+- Do not lower memory guards only to make a smoke test pass. The user can explicitly approve lower floors for a named runtime or launch under the override rules in `$safe-inference-launch`.
 - Do not start local inference as a fallback when the intended target is a
   remote endpoint or hosted API. Verify the remote target first and report auth
   or availability failures.
