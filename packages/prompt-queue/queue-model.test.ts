@@ -63,6 +63,46 @@ describe("PromptQueue", () => {
     expect(queue.items().map((item) => item.id)).toEqual([second.id]);
   });
 
+  it("duplicates an item directly after its source with the same text and mode", () => {
+    const queue = new PromptQueue();
+    const source = queue.add("one", "steer");
+    const other = queue.add("two", "queue");
+    const copy = queue.duplicate(source.id);
+    expect(copy?.text).toBe("one");
+    expect(copy?.mode).toBe("steer");
+    expect(queue.items().map((item) => item.id)).toEqual([source.id, copy?.id, other.id]);
+    expect(queue.items()[0]).toEqual(source);
+  });
+
+  it("copies a queued mode and gives every duplicate its own id from the same counter", () => {
+    const queue = new PromptQueue();
+    const source = queue.add("one", "queue");
+    const first = queue.duplicate(source.id);
+    const second = queue.duplicate(source.id);
+    expect(first?.mode).toBe("queue");
+    expect(second?.mode).toBe("queue");
+    expect(first?.id).not.toBe(second?.id);
+    expect(queue.items().map((item) => item.text)).toEqual(["one", "one", "one"]);
+    expect(queue.add("next", "queue").id).toBe((second?.id ?? 0) + 1);
+  });
+
+  it("duplicates the last item at the end of the list", () => {
+    const queue = new PromptQueue();
+    queue.add("one", "queue");
+    const last = queue.add("two", "steer");
+    const copy = queue.duplicate(last.id);
+    expect(queue.items().map((item) => item.text)).toEqual(["one", "two", "two"]);
+    expect(queue.items()[2]).toEqual(copy);
+    expect(queue.items()[1]).toEqual(last);
+  });
+
+  it("rejects duplicates for unknown ids and leaves the list unchanged", () => {
+    const queue = new PromptQueue();
+    const source = queue.add("one", "queue");
+    expect(queue.duplicate(99)).toBeUndefined();
+    expect(queue.items()).toEqual([source]);
+  });
+
   it("moves items earlier and later", () => {
     const queue = new PromptQueue();
     const a = queue.add("a", "queue");

@@ -64,6 +64,74 @@ describe("ManagerWindowState tabs", () => {
   });
 });
 
+describe("ManagerWindowState duplicates", () => {
+  it("duplicates the selected queue item directly after its source and selects the copy", () => {
+    const state = makeState(["q1", "q2"], []);
+    const source = state.selection();
+    expect(state.duplicateSelected()).toBe(true);
+    const copy = state.selection();
+    expect(copy?.target).not.toEqual(source?.target);
+    expect(copy?.text).toBe("q1");
+    expect(copy?.mode).toBe("queue");
+    expect(state.entries().map((entry) => entry.text)).toEqual(["q1", "q1", "q2"]);
+    expect(state.entries()[0]?.target).toEqual(source?.target);
+  });
+
+  it("keeps the delivery mode of a duplicated steering item", () => {
+    const queue = new PromptQueue();
+    queue.add("q1", "steer");
+    const state = new ManagerWindowState(queue, new PromptHistory());
+    expect(state.duplicateSelected()).toBe(true);
+    expect(state.entries().map((entry) => entry.mode)).toEqual(["steer", "steer"]);
+    expect(state.selection()?.mode).toBe("steer");
+  });
+
+  it("duplicates the last queue item at the end and selects it", () => {
+    const state = makeState(["q1", "q2"], []);
+    state.moveCursor(1);
+    expect(state.duplicateSelected()).toBe(true);
+    expect(state.entries().map((entry) => entry.text)).toEqual(["q1", "q2", "q2"]);
+    expect(state.selection()?.text).toBe("q2");
+    expect(state.entries()[2]?.target).toEqual(state.selection()?.target);
+  });
+
+  it("duplicates a single-item queue and selects the copy", () => {
+    const state = makeState(["q1"], []);
+    expect(state.duplicateSelected()).toBe(true);
+    expect(state.queueCount()).toBe(2);
+    expect(state.entries()[1]?.target).toEqual(state.selection()?.target);
+  });
+
+  it("turns a duplicated history entry into a queued follow-up and shows the queue tab", () => {
+    const state = makeState(["q1"], ["h1", "h2"]);
+    state.setTab("history");
+    expect(state.selection()?.text).toBe("h2");
+    expect(state.duplicateSelected()).toBe(true);
+    expect(state.activeTab()).toBe("queue");
+    expect(state.queueCount()).toBe(2);
+    expect(state.historyCount()).toBe(2);
+    expect(state.entries().map((entry) => entry.text)).toEqual(["q1", "h2"]);
+    expect(state.selection()?.text).toBe("h2");
+    expect(state.selection()?.mode).toBe("queue");
+  });
+
+  it("duplicates a history entry when the queue is empty", () => {
+    const state = makeState([], ["h1"]);
+    expect(state.duplicateSelected()).toBe(true);
+    expect(state.activeTab()).toBe("queue");
+    expect(state.queueCount()).toBe(1);
+    expect(state.selection()?.text).toBe("h1");
+    expect(state.historyCount()).toBe(1);
+  });
+
+  it("does nothing when there is no selection", () => {
+    const state = makeState([], []);
+    expect(state.duplicateSelected()).toBe(false);
+    expect(state.queueCount()).toBe(0);
+    expect(state.historyCount()).toBe(0);
+  });
+});
+
 describe("ManagerWindowState", () => {
   it("lists only the active tab's entries", () => {
     const state = makeState(["q1"], ["h1"]);

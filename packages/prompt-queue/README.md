@@ -41,7 +41,7 @@ session prompt history. It opens on the queue tab when anything is pending, othe
 tab, and jumps to history when the last queue item is deleted.
 
 ```text
-↑↓ move · ⇥ switch tab · enter to editor · e edit · m mode · s send now · d delete · p/n reorder · r resume · esc close
+↑↓ move · ⇥ switch tab · enter to editor · e edit · m mode · s send now · d delete · c copy · p/n reorder · r resume · esc close
 ```
 
 - `Tab`, `Left`, or `Right` switches between the queue and history tabs.
@@ -50,6 +50,10 @@ tab, and jumps to history when the last queue item is deleted.
 - `m` toggles the selected queue item between queued and steering delivery.
 - `s` sends the selected queue or history prompt now, interrupting an active run before continuing.
 - `d` deletes the selected item.
+- `c` copies the selected row and puts the cursor on the copy. A queued item is copied directly
+  after its source and keeps its delivery mode. A history entry joins the queue as a queued
+  follow-up, and the window switches to the queue tab so the copy is visible. The copy is a real
+  queue item, so `d` deletes it and `m` retargets it.
 - `p` / `n` move a queue item earlier or later. History entries cannot be reordered.
 - `r` closes the window and resumes delivery after an interrupt.
 
