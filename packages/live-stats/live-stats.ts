@@ -9,6 +9,8 @@ export type EmojiSpinnerVariant = {
 };
 
 const EMOJI_SPINNER_VARIANTS = [
+  // Enabled by Onur's request on 2026-09-14: weather, moon, and earth. The other variants stay
+  // commented so they can return without being rewritten.
   {
     name: "weather",
     label: "Weather",
@@ -45,56 +47,56 @@ const EMOJI_SPINNER_VARIANTS = [
     intervalMs: 80,
     frames: ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"],
   },
-  {
-    name: "clock",
-    label: "Clock",
-    intervalMs: 100,
-    frames: ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"],
-  },
+  // {
+  //   name: "clock",
+  //   label: "Clock",
+  //   intervalMs: 100,
+  //   frames: ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"],
+  // },
   {
     name: "earth",
     label: "Rotating Earth",
     intervalMs: 180,
     frames: ["🌍", "🌎", "🌏"],
   },
-  {
-    name: "monkey",
-    label: "Monkeys",
-    intervalMs: 300,
-    frames: ["🙈", "🙈", "🙉", "🙊"],
-  },
-  {
-    name: "runner",
-    label: "Runner",
-    intervalMs: 140,
-    frames: ["🚶", "🏃"],
-  },
-  {
-    name: "finger-dance",
-    label: "Finger dance",
-    intervalMs: 160,
-    frames: ["🤘", "🤟", "🖖", "✋", "🤚", "👆"],
-  },
-  {
-    name: "speaker",
-    label: "Speaker volume",
-    intervalMs: 160,
-    frames: ["🔈", "🔉", "🔊", "🔉"],
-  },
-  {
-    name: "man-lifecycle",
-    label: "Man lifecycle",
-    intervalMs: 220,
-    frames: ["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"],
-    pickerFrame: "👨",
-  },
-  {
-    name: "woman-lifecycle",
-    label: "Woman lifecycle",
-    intervalMs: 220,
-    frames: ["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"],
-    pickerFrame: "👩",
-  },
+  // {
+  //   name: "monkey",
+  //   label: "Monkeys",
+  //   intervalMs: 300,
+  //   frames: ["🙈", "🙈", "🙉", "🙊"],
+  // },
+  // {
+  //   name: "runner",
+  //   label: "Runner",
+  //   intervalMs: 140,
+  //   frames: ["🚶", "🏃"],
+  // },
+  // {
+  //   name: "finger-dance",
+  //   label: "Finger dance",
+  //   intervalMs: 160,
+  //   frames: ["🤘", "🤟", "🖖", "✋", "🤚", "👆"],
+  // },
+  // {
+  //   name: "speaker",
+  //   label: "Speaker volume",
+  //   intervalMs: 160,
+  //   frames: ["🔈", "🔉", "🔊", "🔉"],
+  // },
+  // {
+  //   name: "man-lifecycle",
+  //   label: "Man lifecycle",
+  //   intervalMs: 220,
+  //   frames: ["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"],
+  //   pickerFrame: "👨",
+  // },
+  // {
+  //   name: "woman-lifecycle",
+  //   label: "Woman lifecycle",
+  //   intervalMs: 220,
+  //   frames: ["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"],
+  //   pickerFrame: "👩",
+  // },
 ] as const satisfies readonly EmojiSpinnerVariant[];
 
 type TokenSample = {
