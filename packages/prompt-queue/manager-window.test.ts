@@ -56,9 +56,27 @@ describe("ManagerWindow shortcuts", () => {
     expect(state.historyCount()).toBe(1);
   });
 
+  it("uses c to copy the selected row, keeping its mode, while x stays unbound", () => {
+    const { queue, requestRender, state, window } = setup(["one", "two"]);
+
+    window.handleInput("m");
+    window.handleInput("c");
+
+    expect(queue.items().map((item) => item.text)).toEqual(["one", "one", "two"]);
+    expect(queue.items().map((item) => item.mode)).toEqual(["steer", "steer", "queue"]);
+    expect(state.selection()?.text).toBe("one");
+
+    window.handleInput("x");
+    expect(queue.size).toBe(3);
+    expect(requestRender).toHaveBeenCalled();
+  });
+
   it("renders the updated shortcut hint", () => {
     const { window } = setup();
 
-    expect(window.render(180).join("\n")).toContain("m mode · s send now · d delete · p/n reorder");
+    const hint = window.render(180).join("\n");
+    expect(hint).toContain("↑↓ move · ⇥ switch tab · enter to editor · e edit");
+    expect(hint).toContain("m mode · s send now · d delete · c copy · p/n reorder");
+    expect(hint).toContain("r resume · esc close");
   });
 });

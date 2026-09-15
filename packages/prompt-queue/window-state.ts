@@ -130,6 +130,27 @@ export class ManagerWindowState {
     return true;
   }
 
+  /**
+   * Copy the selected row and move the cursor onto the copy. A queued item is
+   * copied directly after its source with the same delivery mode. A history
+   * entry joins the queue as a follow-up, and the window shows the queue tab
+   * so the new item is visible.
+   */
+  duplicateSelected(): boolean {
+    const entry = this.selection();
+    if (!entry) return false;
+    if (entry.target.kind === "history") {
+      const copy = this.queue.add(entry.text, "queue");
+      this.setTab("queue");
+      this.selectQueueItem(copy.id);
+      return true;
+    }
+    const copy = this.queue.duplicate(entry.target.id);
+    if (copy === undefined) return false;
+    this.selectQueueItem(copy.id);
+    return true;
+  }
+
   toggleSelectedMode(): boolean {
     const entry = this.selection();
     if (entry?.target.kind !== "queue") return false;
@@ -154,5 +175,13 @@ export class ManagerWindowState {
 
   private clampCursor(count: number): void {
     this.cursor = Math.max(0, Math.min(this.cursor, count - 1));
+  }
+
+  /** Put the cursor on a queued item, found by id rather than by position. */
+  private selectQueueItem(id: number): void {
+    const index = this.entries().findIndex(
+      (entry) => entry.target.kind === "queue" && entry.target.id === id,
+    );
+    this.cursor = Math.max(0, index);
   }
 }

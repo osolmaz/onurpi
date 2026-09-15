@@ -46,6 +46,16 @@ export class PromptQueue {
     return true;
   }
 
+  duplicate(id: number): QueueItem | undefined {
+    const index = this.indexOf(id);
+    const source = this.list[index];
+    if (!source) return undefined;
+    const copy: QueueItem = { id: this.nextId, mode: source.mode, text: source.text };
+    this.nextId += 1;
+    this.list.splice(index + 1, 0, copy);
+    return copy;
+  }
+
   remove(id: number): boolean {
     const index = this.indexOf(id);
     if (index === -1) return false;
