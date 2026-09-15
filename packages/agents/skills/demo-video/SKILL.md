@@ -56,7 +56,10 @@ Content:
   visual. Mention them at most in one sentence that explains what was left out and why.
 - Lead with the main point. The first card is a plain title of the form `X does Y against Z`. The
   second card states the main claim with the key number. Name the closest comparison early, and
-  give the position relative to the alternatives, for example "above A, level with B, below C".
+  give the position relative to the alternatives, for example "above A, close to B, below C".
+- Do not call a split record "level" or "even" when the wins are uneven across settings, for
+  example when the subject only won while the comparison ran at a setting where it struggled.
+  Say "close to" and show the per-setting split on the comparison card.
 - Order the rest as: how it works in one card, the main comparison with a real moment from the
   record, the other comparisons, a complete results table, a summary that repeats the claim, the
   repository link. Keep the last card free of new information.
