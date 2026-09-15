@@ -33,8 +33,8 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(53);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(53);
+    expect(skills).toHaveLength(54);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(54);
     expect(skills.map((skill) => skill.skillId)).toContain("3d-modeling");
     expect(skills.map((skill) => skill.skillId)).not.toContain("astra-3d-modeling");
     expect(skills.map((skill) => skill.skillId)).toContain("reverse-centaur-mode");
@@ -61,8 +61,26 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(53);
+    expect(topLevelSkillFiles).toHaveLength(54);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
+  });
+
+  it("pins the legacy reviewer to an explicit provider fallback order", () => {
+    const skill = readFileSync(
+      join(packageRoot, "skills", "autoimplement-legacy", "SKILL.md"),
+      "utf8",
+    );
+    const routes = [
+      "DeepSeek-V4.1-Flash:novita",
+      "DeepSeek-V4.1-Flash:baseten",
+      "DeepSeek-V4.1-Flash:fireworks-ai",
+      "DeepSeek-V4.1-Flash:deepinfra",
+    ];
+    const positions = routes.map((route) => skill.indexOf(route));
+
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+    expect(skill).toContain("Do not use the unqualified Hugging Face route");
   });
 
   it("keeps Pi workflow progress model-mediated", () => {

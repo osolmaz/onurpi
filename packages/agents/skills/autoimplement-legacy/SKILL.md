@@ -20,9 +20,10 @@ Do the following in the order that makes sense. Choose the most efficient order 
    - Do not put mutation testing on the critical path unless repository policy explicitly requires it; keep the mutation test scripts available.
 
 3. Push your latest commits before running review so the review is always against the current PR head.
-   - Run Pi Reviewer against the base branch with the Hugging Face reviewer model: `pi-reviewer --model huggingface/deepseek-ai/DeepSeek-V4.1-Flash --base <branch_name>`. Name the model explicitly; do not rely on the reviewer's configured default model. The thinking level still comes from the reviewer's own config.
-   - If that model route fails, report the exact error and stop. Do not silently switch to another model or provider, and do not fall back to `codex review`.
-   - Use a 10 minute timeout on the tool call available to the model, not the shell `timeout` program. If Pi Reviewer takes more than 10 minutes, kill it.
+   - Run Pi Reviewer first with DeepSeek V4.1 Flash through the explicit Novita route: `pi-reviewer --model huggingface/deepseek-ai/DeepSeek-V4.1-Flash:novita --base <branch_name>`. Name the model and provider route explicitly; do not rely on the reviewer's configured default model. The thinking level still comes from the reviewer's own config.
+   - If Novita fails, try the same model through these explicit routes in order: `huggingface/deepseek-ai/DeepSeek-V4.1-Flash:baseten`, `huggingface/deepseek-ai/DeepSeek-V4.1-Flash:fireworks-ai`, then `huggingface/deepseek-ai/DeepSeek-V4.1-Flash:deepinfra`.
+   - Use a 10 minute timeout on each tool call available to the model, not the shell `timeout` program. If Pi Reviewer takes more than 10 minutes, kill it, record the failure, and continue with the next route.
+   - Do not use the unqualified Hugging Face route, another model, or `codex review`. If all four explicit routes fail, report each exact error and stop.
    - Run Pi Reviewer in a loop and address any P0 or P1 issues until there are none left. If a run reports only P2 or lower issues, move to the next stage.
    - Ignore issues about supporting legacy behavior unless the plan requires compatibility.
    - Look at CI only after Pi Reviewer passes, meaning the last completed run found no issues or only P2 or lower issues.
