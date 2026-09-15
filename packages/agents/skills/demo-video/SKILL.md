@@ -60,6 +60,9 @@ Content:
 - Do not call a split record "level" or "even" when the wins are uneven across settings, for
   example when the subject only won while the comparison ran at a setting where it struggled.
   Say "close to" and show the per-setting split on the comparison card.
+- Score tables use one fixed column per side, for example a DeepSeek column and a Terra column,
+  plus a total row. Never write scores as "A 2–0", "1–1", "B 3–1" down one column, because the
+  orientation flips per row and the reader cannot add them up.
 - Order the rest as: how it works in one card, the main comparison with a real moment from the
   record, the other comparisons, a complete results table, a summary that repeats the claim, the
   repository link. Keep the last card free of new information.
