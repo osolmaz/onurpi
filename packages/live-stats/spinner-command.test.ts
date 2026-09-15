@@ -25,14 +25,15 @@ function commandContext(mode: "tui" | "print" = "tui", selected?: string) {
 
 describe("spinner command", () => {
   it("offers random, current, and named argument completions", () => {
-    expect(spinnerArgumentCompletions("")).toHaveLength(12);
-    expect(spinnerArgumentCompletions("man")).toEqual([
+    expect(spinnerArgumentCompletions("")).toHaveLength(5);
+    expect(spinnerArgumentCompletions("ea")).toEqual([
       {
-        value: "man-lifecycle",
-        label: "👨 Man lifecycle",
-        description: "220 ms per frame",
+        value: "earth",
+        label: "🌍 Rotating Earth",
+        description: "180 ms per frame",
       },
     ]);
+    expect(spinnerArgumentCompletions("man")).toBeNull();
     expect(spinnerArgumentCompletions("missing")).toBeNull();
   });
 
@@ -58,7 +59,7 @@ describe("spinner command", () => {
 
     expect(select).toHaveBeenCalledWith(
       "Spinner · Weather",
-      expect.arrayContaining(["🎲 Random", "🌍 Rotating Earth", "👩 Woman lifecycle"]),
+      expect.arrayContaining(["🎲 Random", "🌍 Rotating Earth", "🌑 Moon phases"]),
     );
     expect(state.current.name).toBe("earth");
   });
@@ -102,7 +103,7 @@ describe("spinner command", () => {
 
     await handleSpinnerCommand("random", ctx, state);
 
-    expect(state.current.name).toBe("woman-lifecycle");
+    expect(state.current.name).toBe("earth");
     random.mockRestore();
   });
 
