@@ -256,24 +256,21 @@ is insufficient, stop and request approval for a specific cleanup plan instead
 of deleting the incumbent or another restorable dependency.
 
 Before starting any local inference server, compiler-heavy model load, or
-benchmark traffic, also use `$safe-inference-launch`. Do not launch vLLM,
+benchmark traffic, also use `$memory-safe-launch`. Do not launch vLLM,
 llama.cpp, SGLang, TensorRT-LLM, FlashInfer/modelopt, Ollama, or similar local
 serving processes directly.
 
-When promoting a local runtime, install automatic guarded shims for the runtime
-entrypoint if possible. Resolve
-`../safe-inference-launch/scripts/install-shims.sh` relative to the directory
-that contains this `SKILL.md`. For vLLM this means wrapping the promoted
-executable:
+When promoting a local runtime, use oomwrap to protect its entrypoint when an
+existing benchmark or script calls that path directly. For vLLM:
 
 ```bash
-SAFE_INFERENCE_SHIMS='<absolute path to ../safe-inference-launch/scripts/install-shims.sh>'
 RUNTIME_ROOT='<approved runtime root>'
-"$SAFE_INFERENCE_SHIMS" \
-  --wrap "$RUNTIME_ROOT/vllm/current/.venv/bin/vllm"
+oomwrap wrap "$RUNTIME_ROOT/vllm/current/.venv/bin/vllm"
 ```
 
-This protects benchmark scripts that call the runtime by absolute path.
+Verify the wrapper with `oomwrap inspect`. Use `oomwrap unwrap` on that exact
+path to restore the original executable. This protects benchmark scripts that
+call the runtime by absolute path.
 
 ## Smoke Tests
 
@@ -295,7 +292,7 @@ only on successful package installation or backend availability checks.
 
 ## Safety
 
-- Do not lower memory guards only to make a smoke test pass. The user can explicitly approve lower floors for a named runtime or launch under the override rules in `$safe-inference-launch`.
+- Do not lower memory guards only to make a smoke test pass. The user can explicitly approve lower floors for a named runtime or launch under the override rules in `$memory-safe-launch`.
 - Do not start local inference as a fallback when the intended target is a
   remote endpoint or hosted API. Verify the remote target first and report auth
   or availability failures.

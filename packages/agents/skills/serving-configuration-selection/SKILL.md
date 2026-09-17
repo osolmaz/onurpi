@@ -186,6 +186,6 @@ tool supports it. Preserve normalized configuration, raw per-request data,
 telemetry, logs, timestamps, and software revisions so the selected setting can
 be reproduced.
 
-For local inference, also use `$safe-inference-launch`. For Hugging Face
+For local inference, also use `$memory-safe-launch`. For Hugging Face
 Inference Endpoints, also use `$hf-inference-endpoints` and pause the endpoint
 as soon as configuration testing finishes.

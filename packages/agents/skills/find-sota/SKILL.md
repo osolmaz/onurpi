@@ -151,7 +151,7 @@ on comparable hardware when it exists. Otherwise say that speed is unknown and
 propose a short local benchmark.
 
 Do not download, install, build, or run a model during a recommendation-only
-request. Follow `manage-runtimes`, `safe-inference-launch`, and the inference
+request. Follow `manage-runtimes`, `memory-safe-launch`, and the inference
 runtime provenance policy before a later local launch.
 
 ## Choose with practical significance

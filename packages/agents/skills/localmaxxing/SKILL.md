@@ -10,7 +10,7 @@ machine can produce. Be objective. Prefer a realistic result that survives
 scrutiny over a favorable result caused by a short prompt, repeated prefix,
 small sample, or ambiguous metric.
 
-For local model launches, also use `$safe-inference-launch`. When choosing
+For local model launches, also use `$memory-safe-launch`. When choosing
 context, concurrency, or server capacity, also use
 `$serving-configuration-selection`.
 
