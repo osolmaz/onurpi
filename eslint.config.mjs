@@ -43,6 +43,22 @@ export default tseslint.config(
     },
   },
   {
+    ...tseslint.configs.disableTypeChecked,
+    files: ["packages/agents/skills/design/scripts/demo-video/render.mjs"],
+    languageOptions: {
+      parserOptions: { project: false, projectService: false },
+      globals: {
+        AbortSignal: "readonly",
+        Buffer: "readonly",
+        WebSocket: "readonly",
+        clearTimeout: "readonly",
+        console: "readonly",
+        process: "readonly",
+        setTimeout: "readonly",
+      },
+    },
+  },
+  {
     files: ["packages/turn-fold/render-patches.ts"],
     rules: {
       "@typescript-eslint/unbound-method": "off",

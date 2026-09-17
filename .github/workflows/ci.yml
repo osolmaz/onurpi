@@ -27,6 +27,15 @@ jobs:
       - name: Check @onurpi/agents package with Slophammer
         working-directory: packages/agents
         run: npm run slophammer
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test design chart example
+        env:
+          MPLBACKEND: Agg
+        run: |
+          python -m pip install matplotlib==3.10.3
+          python -m unittest discover -s packages/agents -p '*_test.py'
       - name: Check @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run check

@@ -4,12 +4,11 @@
 Usage:
 
     python render_comparison_chart.py metrics.json --out chart.svg --png chart.png
-    python render_comparison_chart.py --background dark --out chart.svg --png chart.png
-    python render_comparison_chart.py --background '#0f1a30' --out chart.svg --png chart.png
+    python render_comparison_chart.py --example --background light --out chart.svg --png chart.png
 
-The --background option accepts "light", "dark", or a concrete hex color. If a
-user has not specified this, ask whether they want light, dark, or a specific
-target background color before rendering.
+Defaults follow references/THEME.md in the design skill: black dark mode,
+beige light mode, and Helvetica with a reported fallback. Sample data require
+--example. Supply --font-file for an authorized film font. Outputs are new files.
 """
 
 import argparse
@@ -18,15 +17,16 @@ import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from matplotlib.path import Path as MplPath
-from matplotlib.patches import PathPatch, Rectangle
+from matplotlib.patches import Patch, PathPatch, Rectangle
 
 
 DEFAULT_DATA = {
     "models": [
         {
             "id": "gemma",
-            "label": "Gemma",
+            "label": "Example A",
             "precision": 0.706,
             "recall": 0.904,
             "single_worker_output_tokens_per_second": 25.0,
@@ -37,7 +37,7 @@ DEFAULT_DATA = {
         },
         {
             "id": "qwen",
-            "label": "Qwen",
+            "label": "Example B",
             "precision": 0.834,
             "recall": 0.812,
             "single_worker_output_tokens_per_second": 50.0,
@@ -48,7 +48,7 @@ DEFAULT_DATA = {
         },
         {
             "id": "deepseek",
-            "label": "DeepSeek",
+            "label": "Example C",
             "precision": 0.938,
             "recall": 0.714,
             "single_worker_output_tokens_per_second": 13.0,
@@ -62,8 +62,8 @@ DEFAULT_DATA = {
 
 
 PANEL_METRICS = [
-    ("Precision", "precision", "higher is better", "{:.3f}"),
-    ("Recall", "recall", "higher is better", "{:.3f}"),
+    ("Precision", "precision", "higher is better", "{:g}"),
+    ("Recall", "recall", "higher is better", "{:g}"),
 ]
 
 GROUP_STEP = 0.8
@@ -98,33 +98,19 @@ def luminance(color):
 
 
 def resolve_style(background):
-    if background == "light":
-        return {
-            "rounded_block": False,
-            "figure_background": "#ffffff",
-            "panel_background": "#ffffff",
-            "panel_border": "#d8dee8",
-            "grid": "#e9edf3",
-            "text": "#111827",
-            "muted_text": "#4b5563",
-            "highlight": "#2563eb",
-            "secondary": "#93c5fd",
-            "neutral": "#aeb7c5",
-        }
-
-    figure_background = "#0f1a30" if background == "dark" else background
+    figure_background = {"dark": "#000000", "light": "#F5F0E6"}.get(background, background)
     is_dark = luminance(figure_background) < 0.35
     return {
-        "rounded_block": True,
+        "rounded_block": False,
         "figure_background": figure_background,
-        "panel_background": mix(figure_background, "#ffffff" if is_dark else "#000000", 0.08),
-        "panel_border": mix(figure_background, "#ffffff" if is_dark else "#000000", 0.22),
+        "panel_background": figure_background,
+        "panel_border": "#888888" if is_dark else "#666666",
         "grid": mix(figure_background, "#ffffff" if is_dark else "#000000", 0.16),
-        "text": "#e8eef8" if is_dark else "#111827",
-        "muted_text": "#b8c4d6" if is_dark else "#4b5563",
-        "highlight": "#60a5fa" if is_dark else "#2563eb",
-        "secondary": "#93c5fd",
-        "neutral": "#7c8aa2" if is_dark else "#aeb7c5",
+        "text": "#F5F5F5" if is_dark else "#111111",
+        "muted_text": "#BDBDBD" if is_dark else "#4A4A4A",
+        "highlight": "#BDBDBD" if is_dark else "#4A4A4A",
+        "secondary": "#888888" if is_dark else "#767676",
+        "neutral": "#BDBDBD" if is_dark else "#4A4A4A",
     }
 
 
@@ -165,7 +151,7 @@ def style_axis(ax, style):
     )
 
 
-def rounded_bar(ax, x, height, width, color, radius_px=7):
+def rounded_bar(ax, x, height, width, color, radius_px=0, hatch=None):
     left, bottom = ax.transData.transform((x - width / 2, 0))
     right, top = ax.transData.transform((x + width / 2, height))
     radius = min(radius_px, (right - left) / 2, (top - bottom) / 2)
@@ -191,7 +177,8 @@ def rounded_bar(ax, x, height, width, color, radius_px=7):
 
     data_points = inv.transform(points)
     codes = [MplPath.MOVETO] + [MplPath.LINETO] * (len(data_points) - 2) + [MplPath.CLOSEPOLY]
-    patch = PathPatch(MplPath(data_points, codes), linewidth=0, facecolor=color, edgecolor="none", clip_on=True)
+    patch = PathPatch(MplPath(data_points, codes), linewidth=0.7, facecolor=color,
+                      edgecolor=ax.get_facecolor(), hatch=hatch, clip_on=True)
     ax.add_patch(patch)
     return patch
 
@@ -242,7 +229,6 @@ def render_metric_panel(ax, models, names, title, key, direction_label, value_fo
     positions = model_positions(models)
     values = [model[key] for model in models]
     finite_values = [value for value in values if value is not None]
-    best = max(finite_values)
 
     set_model_axis(ax, positions, names)
     ax.set_title(title, loc="left", pad=10, color=style["text"])
@@ -257,9 +243,8 @@ def render_metric_panel(ax, models, names, title, key, direction_label, value_fo
         if value is None:
             annotate_value(ax, x, 0, "n/a", style)
             continue
-        color = style["highlight"] if value == best else style["neutral"]
-        rounded_bar(ax, x, value, SINGLE_BAR_WIDTH, color)
-        annotate_value(ax, x, value, value_format.format(value), style, is_best=value == best)
+        rounded_bar(ax, x, value, SINGLE_BAR_WIDTH, style["neutral"])
+        annotate_value(ax, x, value, value_format.format(value), style)
 
 
 def render_throughput_panel(ax, models, names, style):
@@ -280,23 +265,24 @@ def render_throughput_panel(ax, models, names, style):
     style_axis(ax, style)
 
     for x, value in zip(single_x, single_values):
-        rounded_bar(ax, x, value, width, style["secondary"], radius_px=6)
-        annotate_value(ax, x, value, f"{value:.0f}", style)
+        rounded_bar(ax, x, value, width, style["secondary"], hatch="///")
+        annotate_value(ax, x, value, f"{value:g}", style)
     for x, value in zip(aggregate_x, aggregate_values):
-        rounded_bar(ax, x, value, width, style["highlight"], radius_px=6)
-        annotate_value(ax, x, value, f"{value:.0f}", style, is_best=value == max(aggregate_values))
+        rounded_bar(ax, x, value, width, style["highlight"])
+        annotate_value(ax, x, value, f"{value:g}", style)
 
-    ax.bar([], [], width=width, color=style["secondary"], edgecolor="none", label="Per single worker")
-    ax.bar([], [], width=width, color=style["highlight"], edgecolor="none", label="Aggregate")
-    legend = ax.legend(loc="upper right", frameon=False, fontsize=7.2, ncols=1, handlelength=1.2)
+    handles = [
+        Patch(facecolor=style["secondary"], edgecolor=style["panel_background"], hatch="///", label="Per single worker"),
+        Patch(facecolor=style["highlight"], edgecolor=style["panel_background"], label="Aggregate"),
+    ]
+    legend = ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=7.2, ncols=1, handlelength=1.2)
     for text in legend.get_texts():
         text.set_color(style["muted_text"])
 
 
-def render_single_bar_panel(ax, models, names, title, key, style, value_format="{:.0f}"):
+def render_single_bar_panel(ax, models, names, title, key, style, value_format="{:g}"):
     positions = model_positions(models)
     values = [model[key] for model in models]
-    best = max(values)
     set_model_axis(ax, positions, names)
     ax.set_title(title, loc="left", pad=10, color=style["text"])
     ymax = max_axis_value(values)
@@ -306,9 +292,8 @@ def render_single_bar_panel(ax, models, names, title, key, style, value_format="
     style_axis(ax, style)
 
     for x, value in zip(positions, values):
-        color = style["highlight"] if value == best else style["neutral"]
-        rounded_bar(ax, x, value, SINGLE_BAR_WIDTH, color)
-        annotate_value(ax, x, value, value_format.format(value), style, is_best=value == best)
+        rounded_bar(ax, x, value, SINGLE_BAR_WIDTH, style["neutral"])
+        annotate_value(ax, x, value, value_format.format(value), style)
 
 
 def render_parameter_panel(ax, models, names, style):
@@ -328,15 +313,17 @@ def render_parameter_panel(ax, models, names, style):
     style_axis(ax, style)
 
     for x, value in zip(total_x, total_values):
-        rounded_bar(ax, x, value, width, style["highlight"], radius_px=6)
-        annotate_value(ax, x, value, f"{value:.0f}B", style, is_best=value == max(total_values + active_values))
+        rounded_bar(ax, x, value, width, style["highlight"])
+        annotate_value(ax, x, value, f"{value:g}B", style)
     for x, value in zip(active_x, active_values):
-        rounded_bar(ax, x, value, width, style["secondary"], radius_px=6)
-        annotate_value(ax, x, value, f"{value:.0f}B", style)
+        rounded_bar(ax, x, value, width, style["secondary"], hatch="///")
+        annotate_value(ax, x, value, f"{value:g}B", style)
 
-    ax.bar([], [], width=width, color=style["highlight"], edgecolor="none", label="Total")
-    ax.bar([], [], width=width, color=style["secondary"], edgecolor="none", label="Active")
-    legend = ax.legend(loc="upper left", frameon=False, fontsize=7.5, ncols=2, handlelength=1.2, columnspacing=0.8)
+    handles = [
+        Patch(facecolor=style["highlight"], edgecolor=style["panel_background"], label="Total"),
+        Patch(facecolor=style["secondary"], edgecolor=style["panel_background"], hatch="///", label="Active"),
+    ]
+    legend = ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=7.5, ncols=2, handlelength=1.2, columnspacing=0.8)
     for text in legend.get_texts():
         text.set_color(style["muted_text"])
 
@@ -367,14 +354,17 @@ def create_axes(fig):
     ]
 
 
-def render(data, out_path, png_path, background):
+def render(data, out_path, png_path, background, font_file=None, rounded=False, example=False):
     models = data["models"]
     names = [model["label"] for model in models]
+    validate_data(data)
     style = resolve_style(background)
+    style["rounded_block"] = rounded
+    font_name = select_font(font_file)
     plt.rcParams.update(
         {
             "font.family": "sans-serif",
-            "font.sans-serif": ["Inter", "Arial", "DejaVu Sans"],
+            "font.sans-serif": [font_name],
             "axes.titleweight": "bold",
             "axes.titlesize": 11,
             "xtick.labelsize": 7.5,
@@ -393,9 +383,12 @@ def render(data, out_path, png_path, background):
     fig_width = panel_width * 3 + panel_gap * 2 + side_margin * 2
     fig_height = bottom_margin + panel_height * 2 + row_gap + top_margin
     fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
-    fig.patch.set_alpha(0)
+    fig.patch.set_facecolor(style["figure_background"])
     if style["rounded_block"]:
+        fig.patch.set_alpha(0)
         add_rounded_figure_background(fig, style)
+    caption = "Illustrative data; not measured results. " if example else ""
+    fig.text(0.5, 0.01, caption + "Panels use different y-scales.", ha="center", color=style["text"])
     axes = create_axes(fig)
 
     for ax, metric in zip(axes[:2], PANEL_METRICS):
@@ -404,22 +397,70 @@ def render(data, out_path, png_path, background):
     render_single_bar_panel(axes[3], models, names, "Concurrency", "concurrency", style)
     render_throughput_panel(axes[4], models, names, style)
 
+    if out_path.resolve() == png_path.resolve() or out_path.exists() or png_path.exists():
+        raise ValueError("Output paths must be distinct new files")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, format="svg")
-    fig.savefig(png_path, format="png", dpi=180)
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("xb") as svg:
+        fig.savefig(svg, format="svg")
+    with png_path.open("xb") as png:
+        fig.savefig(png, format="png", dpi=180)
     return fig
+
+
+def select_font(font_file):
+    if font_file is not None:
+        font_manager.fontManager.addfont(str(font_file))
+        name = font_manager.FontProperties(fname=font_file).get_name()
+        # Put the authorized file first, including when another version is installed.
+        font_manager.fontManager.ttflist.insert(0, font_manager.fontManager.ttflist.pop())
+        print(f"Font: {name} ({font_file})")
+        return name
+    for name in ["Helvetica", "Arial", "Liberation Sans"]:
+        try:
+            selected = font_manager.findfont(name, fallback_to_default=False)
+        except ValueError:
+            continue
+        print(f"Font: {name} ({selected})" + ("; documented Helvetica fallback" if name != "Helvetica" else ""))
+        return name
+    raise ValueError("Helvetica and documented fallbacks are unavailable; provide --font-file")
+
+
+def validate_data(data):
+    models = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(models, list) or not models:
+        raise ValueError("Expected a nonempty models list")
+    keys = list(DEFAULT_DATA["models"][0].keys())
+    for model in models:
+        if not isinstance(model, dict) or not isinstance(model.get("label"), str) or not model["label"].strip():
+            raise ValueError("Each model needs a label")
+        for key in keys:
+            if key in ("id", "label"):
+                continue
+            value = model.get(key)
+            if value is None and key in ("precision", "recall"):
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError(f"This example needs a finite nonnegative {key}")
+            if key in ("precision", "recall") and value > 1:
+                raise ValueError(f"{key} must be between 0 and 1")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("data", nargs="?", type=Path, help="JSON data file. Uses embedded sample data if omitted.")
-    parser.add_argument("--background", default="light", help='Target background: "light", "dark", or a hex color such as "#0f1a30".')
+    parser.add_argument("data", nargs="?", type=Path, help="JSON data file")
+    parser.add_argument("--example", action="store_true", help="Use clearly marked illustrative data")
+    parser.add_argument("--font-file", type=Path, help="Authorized font file, for example for a film")
+    parser.add_argument("--rounded", action="store_true", help="Optional rounded container with transparent corners")
+    parser.add_argument("--background", default="dark", help='Target background: "light", "dark", or a six-digit hex color.')
     parser.add_argument("--out", type=Path, default=Path("comparison-chart.svg"))
     parser.add_argument("--png", type=Path, default=Path("comparison-chart.png"))
     args = parser.parse_args()
 
+    if (args.data is None) == (not args.example):
+        parser.error("Supply a data file or --example, but not both")
     data = json.loads(args.data.read_text()) if args.data else DEFAULT_DATA
-    fig = render(data, args.out, args.png, args.background)
+    fig = render(data, args.out, args.png, args.background, args.font_file, args.rounded, args.example)
 
     for i, ax in enumerate(fig.axes, start=1):
         bbox = ax.get_position()

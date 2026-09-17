@@ -1,4 +1,5 @@
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -127,6 +128,46 @@ describe("agent synchronization", () => {
     expect(existsSync(join(root, "installed", "agents", "skills", "private-skill"))).toBe(true);
     expect(existsSync(join(root, "installed", "agents", "skills", "public-skill"))).toBe(false);
     expect(existsSync(join(root, "installed", "pi", "skills", "public-skill"))).toBe(false);
+  });
+
+  it("replaces the managed design skills and keeps unrelated skills across harnesses", () => {
+    const root = temporaryDirectory();
+    const privateRoot = createSources(root);
+    const source = join(root, "public", "skills");
+    const retired = ["demo-video", "video-editing", "plot-graph", "3d-modeling"];
+    for (const name of retired) createSkill(source, name);
+    const args = syncArgs(root, privateRoot);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    run(root, "sync", args);
+    for (const harness of ["codex", "claude", "cursor"]) {
+      createSkill(join(root, "installed", harness, "skills"), "unmanaged");
+    }
+    for (const name of retired) rmSync(join(source, name), { recursive: true });
+    cpSync(join(import.meta.dirname, "skills", "design"), join(source, "design"), {
+      recursive: true,
+    });
+    run(root, "sync", args);
+    run(root, "check", args);
+    run(root, "sync", args);
+    run(root, "check", args);
+    for (const harness of ["codex", "claude", "cursor"]) {
+      const installed = join(root, "installed", harness, "skills");
+      for (const name of retired) expect(existsSync(join(installed, name))).toBe(false);
+      expect(existsSync(join(installed, "unmanaged", "SKILL.md"))).toBe(true);
+      for (const file of [
+        "SKILL.md",
+        "agents/openai.yaml",
+        "references/THEME.md",
+        "references/3d/QUALITY_REVIEW.md",
+        "scripts/demo-video/render.mjs",
+        "examples/graphs-figures/render_comparison_chart.py",
+      ]) {
+        expect(readFileSync(join(installed, "design", file))).toEqual(
+          readFileSync(join(source, "design", file)),
+        );
+      }
+    }
+    expect(existsSync(join(root, "installed", "pi", "skills", "design"))).toBe(false);
   });
 
   it("detects drift and repairs it", () => {

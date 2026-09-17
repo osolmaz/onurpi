@@ -37,6 +37,22 @@ export default tseslint.config(
     },
   },
   {
+    ...tseslint.configs.disableTypeChecked,
+    files: ["skills/design/scripts/demo-video/render.mjs"],
+    languageOptions: {
+      parserOptions: { project: false, projectService: false },
+      globals: {
+        AbortSignal: "readonly",
+        Buffer: "readonly",
+        WebSocket: "readonly",
+        clearTimeout: "readonly",
+        console: "readonly",
+        process: "readonly",
+        setTimeout: "readonly",
+      },
+    },
+  },
+  {
     files: ["*.test.ts"],
     rules: {
       "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],

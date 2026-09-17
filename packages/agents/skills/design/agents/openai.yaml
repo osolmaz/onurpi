@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design"
+  short_description: "Visual design, media production, and output inspection"
+  default_prompt: "Use $design for this visual deliverable. Read the shared theme and relevant domain guidance, preserve source fidelity, and inspect the final output."

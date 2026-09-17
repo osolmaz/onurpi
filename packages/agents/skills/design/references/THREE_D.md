@@ -1,15 +1,8 @@
----
-name: 3d-modeling
-description:
-  Create and refine detailed 3D models and scenes, primarily in Blender. Use for modeling, cutaways,
-  materials, cinematic rendering, or interactive 3D assets when visual quality matters. Requires
-  rendered inspection and correction before visual completion.
----
-
 # 3D modeling
 
-This skill guides 3D modeling with visual review. Deliver the requested level of finish in an
-editable scene, with images that show what was actually built.
+Deliver the requested level of finish in an editable scene, with images that show what was actually
+built. Apply the [shared theme](THEME.md) to new labels and surrounding presentation. Preserve the
+subject's materials, textures, and lighting; the monochrome defaults do not flatten the scene.
 
 Use image inspection throughout the work. Inspect the model after meaningful changes and identify
 specific visible defects. Edit the affected parts before continuing. A successful script or export
@@ -91,7 +84,7 @@ camera motion must not be the only reason an unfinished part looks acceptable.
 
 ## Visual review
 
-Read [quality-review.md](references/quality-review.md) before the first visual review. Use it to
+Read [the quality review](3d/QUALITY_REVIEW.md) before the first visual review. Use it to
 choose views and assess the result against the brief.
 
 After each meaningful construction or appearance change:
@@ -117,7 +110,7 @@ saved state.
 ## Delivery
 
 For games, browser scenes, or another destination renderer, read
-[interactive-delivery.md](references/interactive-delivery.md) before choosing materials or an export
+[interactive delivery](3d/INTERACTIVE_DELIVERY.md) before choosing materials or an export
 strategy. Test a representative export early enough to catch unsupported features before the full
 scene depends on them.
 
@@ -138,4 +131,4 @@ OpenAI's
 describes Blender Python modeling with render inspection and interactive export.
 [Building games with Astra](https://developers.openai.com/blog/how-to-build-games-with-astra)
 describes reference-driven visual development and browser testing. These are workflow examples. This
-skill's acceptance checks are project guidance and do not establish a measured quality guarantee.
+reference's acceptance checks are project guidance and do not establish a measured quality guarantee.
