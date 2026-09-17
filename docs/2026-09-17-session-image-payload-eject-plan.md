@@ -121,11 +121,14 @@ count, and the number of ejected images so far.
 
 ### Load order
 
-The package README must state that `session-policy` loads before `image-budget`. Pi has no per-hook
-priority; handler order is extension load order (`docs/extensions.md:849`). Because `session-policy`
-performs its own insert-time resize, `image-budget` sees markers instead of images at insert and
-does nothing there, while its request-time budget pass still runs after re-attach and still protects
-the provider request body.
+The package README must state that `session-policy` loads before `image-budget`. It must also state
+that the image cache is memory only, and that after `/resume`, `/reload`, or a crash a marker that
+is still live has no picture until a tool reads the source path again.
+
+Pi has no per-hook priority; handler order is extension load order (`docs/extensions.md:849`).
+Because `session-policy` performs its own insert-time resize, `image-budget` sees markers instead of
+images at insert and does nothing there, while its request-time budget pass still runs after
+re-attach and still protects the provider request body.
 
 ## Package layout
 
@@ -140,7 +143,7 @@ packages/session-policy/
 ├── cache.ts            # bounded hash-keyed image cache
 ├── policy.ts           # pure insert-time, re-attach, and prune functions
 ├── command.ts          # /session-policy
-├── README.md           # user behavior, config, load-order rule, limits
+├── README.md           # user behavior, config, limits, memory-only cache, load-order rule
 └── *.test.ts           # per-module tests
 ```
 
