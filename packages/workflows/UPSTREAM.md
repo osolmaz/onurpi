@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.3`
-- Source commit: `8b5a058667dadd33faa66b9b0fb8082f0759c414`
-- Package source: exact npm release `0.17.3`
+- Latest release at review: `v0.17.4`
+- Source commit: `63a8b740b6b6ce1819b06aeaa4e9fdeabb002839`
+- Package source: exact npm release `0.17.4`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -68,7 +68,16 @@ cannot fit one client frame out of a view instead of cutting it, and accepts a n
 `0.17.1` needs the reset described below. Patch `0.17.3` lets `pi-workflows server stop` and
 `pi-workflows server start` stop a running server process from another version through the server
 lock file, because that process answers no request from a different package version. The extension
-keeps its report-only behavior.
+keeps its report-only behavior. Patch `0.17.4` bounds the evidence that the Autoimplement controller
+prompt carries, because a step output can nest a whole included workflow result and that prompt had
+no limit. A result whose schema has a registered evidence view becomes that view's small result, and
+the generic rules bound every other result: a long string becomes a digest with an excerpt, a long
+array keeps its first items, a wide object keeps its first fields, and a deep value becomes a
+reference. The controller reserves the ledger floor first, then bounds the observation with what is
+left, and a prompt that still does not fit fails with the size of each part. The ledger also lists
+one entry per recorded result, so the include return step, the `observe` step, and the `dispatch`
+step never appear twice. Projection runs only when a prompt is built, so run state keeps the raw
+results and recorded runs stay readable and resumable.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
