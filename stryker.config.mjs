@@ -16,7 +16,7 @@ export default {
     "packages/turn-fold/history-viewport.ts",
     "packages/turn-fold/projection-plan.ts",
     "packages/turn-fold/restart-marker.ts",
-    "packages/turn-fold/transcript-window-adapter.ts",
+    "packages/turn-fold/replay-projection.ts",
     "packages/turn-fold/transcript-windows.ts",
     "packages/turn-fold/tool-padding.ts",
     "packages/turn-fold/turn-visibility.ts",
