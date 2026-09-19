@@ -65,6 +65,41 @@ describe("Turn Fold transcript replay projection", () => {
     }
   });
 
+  it("bounds the replay projection by the configured windows", async () => {
+    const recorder = replayRecorder();
+    try {
+      const extension = extensionHarness();
+      const branch = [
+        {
+          customType: "onurpi-turn-fold-config",
+          data: { preCompaction: "show", windows: 1 },
+          id: "config",
+          type: "custom",
+        },
+        { id: "u0", message: { role: "user" }, type: "message" },
+        { id: "c1", type: "compaction" },
+        { id: "u1", message: { role: "user" }, type: "message" },
+        { id: "c2", type: "compaction" },
+        { id: "u2", message: { role: "user" }, type: "message" },
+      ];
+      const ctx = context([{ id: "c2", type: "compaction" }, { id: "u2" }], branch);
+      turnFold(extension.pi);
+      await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
+
+      replayThroughPi([
+        { id: "c2", type: "compaction" },
+        { id: "u2", type: "message" },
+      ]);
+
+      const projectedIds = (recorder.entries.at(-1) ?? []).map(entryId);
+      expect(projectedIds).toContain("u2");
+      expect(projectedIds).not.toContain("u0");
+      expect(projectedIds).not.toContain("c1");
+    } finally {
+      recorder.restore();
+    }
+  });
+
   it("leaves the transcript replay entry point untouched outside TUI mode", async () => {
     const extension = extensionHarness();
     const entries = [{ id: "entry", type: "custom" }];

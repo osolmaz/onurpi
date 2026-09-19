@@ -39,6 +39,7 @@ import {
   compactionWindowCount,
   formatTranscriptWindowValue,
   resolveWindowArgument,
+  selectTranscriptEntries,
 } from "./transcript-windows.ts";
 import {
   canApplyProjectionInPlace,
@@ -461,7 +462,8 @@ function startSession(
   }
   const projectReplay: ReplayProjection = (entries) => {
     const branch = ctx.sessionManager.getBranch();
-    const displayEntries = applyTranscriptProjection(branch, state, runtime, ctx, registry);
+    const windowEntries = selectTranscriptEntries(branch, runtime.appliedConfiguration.windows);
+    const displayEntries = applyTranscriptProjection(windowEntries, state, runtime, ctx, registry);
     return projectedReplayEntries(entries, displayEntries, branch);
   };
   runtime.restoreReplayProjection = installReplayProjection(
