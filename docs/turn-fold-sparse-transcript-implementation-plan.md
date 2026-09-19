@@ -28,11 +28,11 @@ unchanged.
 
 ## Implementation status
 
-The sparse compact projection, atomic adapter, cached edit summaries, component budget, and paged
-history viewer are implemented. The previous budget code selected pass-through rows and compact runs
-in separate phases. That policy could leave gaps, omit a run prompt while keeping another row from
-the run, and shift user timestamps during replay. The chronological window correction in this plan
-replaces that policy.
+The sparse compact projection, atomic replay integration, cached edit summaries, component budget,
+and paged history viewer are implemented. The previous budget code selected pass-through rows and
+compact runs in separate phases. That policy could leave gaps, omit a run prompt while keeping
+another row from the run, and shift user timestamps during replay. The chronological window
+correction in this plan replaces that policy.
 
 The earlier 44 MB regression-session copy projected 3,684 selected entries to 33 entries and 18
 estimated components. A repeated PTY test measured 20.11 ms p95 and 21.08 ms p99 key-to-echo latency
@@ -100,17 +100,21 @@ entry point so one call selects and reduces the source, publishes the run state,
 projection. It receives a projection callback from [index.ts](../packages/turn-fold/index.ts). Turn
 Fold policy stays outside the integration.
 
-Capture Pi's original bound replay method during first installation. Preserve the symbol-owned
-idempotent state across `/reload`. Add a restore method and use it during `session_shutdown` when
-this adapter still owns the method.
+Capture the unbound prototype method during the first installation. A module-local `WeakMap` holds
+the installations per target, so a target carries one wrapper that always uses the newest
+projection, and each installation can be removed on its own. Reuse a wrapper only while the
+installed method is still that wrapper; otherwise install a fresh one and ignore the superseded
+restore. Restore the captured method during `session_shutdown`, and treat `/reload` as a new
+installation. Keep no state on Pi-owned objects.
 
-The current `loadVisibleHistory()` path separately calls the adapted method and then loads state.
-Remove that split. The projection callback publishes `TurnFoldState` before `buildEntries()`
-returns, which keeps component association on the same snapshot that Pi is about to render.
+History loading reads Pi's own `buildContextEntries()` unchanged, because the integration no longer
+replaces it. The projection callback publishes `TurnFoldState` before it returns the projected
+entries, which keeps component association on the same snapshot that Pi is about to render.
 
-Pending compaction omission remains a one-rebuild operation and runs before projection. A failed
-callback logs one warning and calls the captured Pi method without retaining partial Turn Fold
-state.
+Pending compaction omission remains a one-rebuild operation and runs before projection. Pi removes
+the completed compaction entry from the replay itself, so the integration never adds that entry
+back. A failed callback reports one warning per installation and returns Pi's own entry list
+unchanged without retaining partial Turn Fold state.
 
 ### Run snapshot cache
 
@@ -172,8 +176,8 @@ without adding a private component identity hook.
 
 The projection is recalculated through the existing replay and supported refresh paths. Live rows
 can remain after the last projection until Pi rebuilds the transcript. Do not add another private
-replay trigger. Keep compaction-first replay, adapter fallback, version checks, restart handling,
-history source, model context, branch behavior, and persisted schemas unchanged.
+replay trigger. Keep the projection selection, version checks, restart handling, history source,
+model context, branch behavior, and persisted schemas unchanged.
 
 Replace the old pass-through-first and run-core-first allocation code. This is one hard behavior
 replacement with no compatibility path, feature flag, migration, or second selector.
@@ -196,8 +200,8 @@ and a package-level Pi version range matching tested releases. The guard should 
 replay and leave Pi's original method in place when the check fails.
 
 Add an integration fixture that imports the installed Pi release, opens a temporary session,
-installs the adapter, verifies projected replay, simulates compaction rebuild, restores the adapter,
-and checks the original method again.
+installs the projection, verifies projected replay, simulates a compaction rebuild, restores the
+projection, and checks the original method again.
 
 ## Verification
 
@@ -212,7 +216,7 @@ hidden source entries.
 
 Test the timestamp queue with promptless-row regression cases, duplicate user text, replay
 reconstruction, active user creation, and the next live user row. Run existing compact transcript,
-timestamp, diffstat, interruption, failure, run-boundary, compaction, branch, adapter fallback,
+timestamp, diffstat, interruption, failure, run-boundary, compaction, branch, projection failure,
 restart and version tests, plus window-selection tests where their contract still applies.
 
 Add a generated fixture with hundreds of runs and about 200 user prompts. Include more than 600
