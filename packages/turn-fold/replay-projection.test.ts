@@ -176,6 +176,37 @@ describe("Turn Fold replay projection installation", () => {
     expect(calls.at(-1)?.[1]).toEqual(entries("hidden"));
   });
 
+  it("wraps again when the target method changed outside the installation", () => {
+    const { calls, target } = fakeTarget();
+    const first = installReplayProjection(
+      () => (given) => [...given, addedEntry],
+      () => undefined,
+      target,
+    );
+    const replacement = function (this: unknown, ...args: unknown[]): string {
+      calls.push([this, ...args]);
+      return "replaced";
+    };
+    Reflect.set(target, "renderSessionEntries", replacement);
+
+    const second = installReplayProjection(
+      () => (given) => given.filter((entry) => entry.id !== "hidden"),
+      () => undefined,
+      target,
+    );
+
+    expect(replayProjectionMethod(target)).not.toBe(replacement);
+    Reflect.apply(replayProjectionMethod(target) as () => string, {}, [
+      [...entries("hidden"), givenEntry],
+    ]);
+    expect(calls.at(-1)?.[1]).toEqual([givenEntry]);
+
+    second();
+    expect(replayProjectionMethod(target)).toBe(replacement);
+    first();
+    expect(replayProjectionMethod(target)).toBe(replacement);
+  });
+
   it("rejects a target without the replay entry point", () => {
     expect(() =>
       installReplayProjection(

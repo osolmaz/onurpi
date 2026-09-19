@@ -92,6 +92,9 @@ describe("Turn Fold transcript replay projection", () => {
       ]);
 
       const projectedIds = (recorder.entries.at(-1) ?? []).map(entryId);
+      // The projection adds the pre-compaction window entry that Pi never offered, so a recorder that
+      // only sees Pi's own list cannot satisfy this assertion.
+      expect(projectedIds).toContain("u1");
       expect(projectedIds).toContain("u2");
       expect(projectedIds).not.toContain("u0");
       expect(projectedIds).not.toContain("c1");

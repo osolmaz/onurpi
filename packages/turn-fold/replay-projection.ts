@@ -102,9 +102,11 @@ function removeInstallation(
 /**
  * Installs the compact projection on Pi's transcript replay entry point. A target carries at most one
  * wrapper, which always uses the newest installed projection. Each returned function removes its own
- * projection, and the last removal restores the exact method the first installation replaced. A
- * projection failure reports once per installation and replays Pi's own entry list unchanged, so the
- * transcript still renders and the session stays alive.
+ * projection, and the last removal restores the exact method the first installation replaced. An
+ * installation reuses a live wrapper only while it still owns the target method, so a method replaced
+ * from outside gets a fresh wrapper instead of a silent no-op. A projection failure reports once per
+ * installation and replays Pi's own entry list unchanged, so the transcript still renders and the
+ * session stays alive.
  */
 export function installReplayProjection(
   getProjection: () => ReplayProjection | undefined,
@@ -113,7 +115,7 @@ export function installReplayProjection(
 ): RestoreReplayProjection {
   const installation: Installation = { getProjection, onError, reported: false };
   const existing = targetStates.get(target);
-  if (existing) {
+  if (existing && Reflect.get(target, REPLAY_METHOD) === existing.patched) {
     existing.installations.push(installation);
     return () => {
       removeInstallation(target, existing, installation);
@@ -153,6 +155,7 @@ export function installReplayProjection(
   Reflect.set(target, REPLAY_METHOD, state.patched);
   targetStates.set(target, state);
   return () => {
+    if (targetStates.get(target) !== state) return;
     removeInstallation(target, state, installation);
   };
 }

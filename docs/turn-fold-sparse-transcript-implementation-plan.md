@@ -12,10 +12,11 @@ pass while normal session data and model context remain unchanged.
 
 ## Integration update
 
-The plan originally installed the sparse projection by replacing `SessionManager.buildContextEntries()`
-for the TUI replay instance. That replacement wrote to Pi's session state, and a second reader that
-called the method during `session_compact` consumed the one-shot completed-compaction flag and
-received a truncated display window. Pi's own later read then threw and ended the session.
+The plan originally installed the sparse projection by replacing
+`SessionManager.buildContextEntries()` for the TUI replay instance. That replacement wrote to Pi's
+session state, and a second reader that called the method during `session_compact` consumed the
+one-shot completed-compaction flag and received a truncated display window. Pi's own later read then
+threw and ended the session.
 
 The projection now lives on Pi's TUI transcript replay entry point
 `InteractiveMode.renderSessionEntries()` instead, in
@@ -96,8 +97,8 @@ custom entries, and stable source ordering.
 
 [replay-projection.ts](../packages/turn-fold/replay-projection.ts) wraps Pi's TUI transcript replay
 entry point so one call selects and reduces the source, publishes the run state, and returns the
-projection. It receives a projection callback from
-[index.ts](../packages/turn-fold/index.ts). Turn Fold policy stays outside the integration.
+projection. It receives a projection callback from [index.ts](../packages/turn-fold/index.ts). Turn
+Fold policy stays outside the integration.
 
 Capture Pi's original bound replay method during first installation. Preserve the symbol-owned
 idempotent state across `/reload`. Add a restore method and use it during `session_shutdown` when
@@ -190,9 +191,9 @@ records the replacement.
 
 ### Compatibility guard
 
-Keep the replay integration inside `replay-projection.ts`. Add a runtime check for the
-method shape and a package-level Pi version range matching tested releases. The guard should disable
-sparse replay and leave Pi's original method in place when the check fails.
+Keep the replay integration inside `replay-projection.ts`. Add a runtime check for the method shape
+and a package-level Pi version range matching tested releases. The guard should disable sparse
+replay and leave Pi's original method in place when the check fails.
 
 Add an integration fixture that imports the installed Pi release, opens a temporary session,
 installs the adapter, verifies projected replay, simulates compaction rebuild, restores the adapter,
@@ -277,11 +278,11 @@ their schema and behavior. Compact transcript configuration keeps the strict
 sessions use the chronological selector on their next replay and need no migration.
 
 The implementation changes no Pi source. It uses one version-gated replay entry point and adds no
-second private seam. Public APIs used by the later
-viewer are `ctx.ui.custom()`, lifecycle events, `ctx.reload()`, and the documented mode checks.
+second private seam. Public APIs used by the later viewer are `ctx.ui.custom()`, lifecycle events,
+`ctx.reload()`, and the documented mode checks.
 
 ## Removal condition
 
 When Pi exposes a public transcript projection or viewport provider, use that API and remove the
-replay entry point wrapper in the same change. The pure projection and run snapshots should remain usable. The same applies to the
-projection budget and paged-history tests.
+replay entry point wrapper in the same change. The pure projection and run snapshots should remain
+usable. The same applies to the projection budget and paged-history tests.
