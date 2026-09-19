@@ -10,6 +10,21 @@ The work is complete when the large-session regression meets the latency limits 
 [TRANSCRIPT-PROJECTION.md](../packages/turn-fold/TRANSCRIPT-PROJECTION.md). All supported modes must
 pass while normal session data and model context remain unchanged.
 
+## Integration update
+
+The plan originally installed the sparse projection by replacing `SessionManager.buildContextEntries()`
+for the TUI replay instance. That replacement wrote to Pi's session state, and a second reader that
+called the method during `session_compact` consumed the one-shot completed-compaction flag and
+received a truncated display window. Pi's own later read then threw and ended the session.
+
+The projection now lives on Pi's TUI transcript replay entry point
+`InteractiveMode.renderSessionEntries()` instead, in
+[replay-projection.ts](../packages/turn-fold/replay-projection.ts). Turn Fold keeps the projected
+entries Pi offers, adds older projected entries in front of them, and never writes to a Pi-owned
+session object. `buildContextEntries()` and `buildSessionContext()` keep their native results for
+every reader. Selection rules, the component budget, the explorer, and the latency limits below stay
+unchanged.
+
 ## Implementation status
 
 The sparse compact projection, atomic adapter, cached edit summaries, component budget, and paged
@@ -77,11 +92,12 @@ Tests cover final assistant output, terminal tool errors, tool-only completion, 
 active three-activity tail, attached and standalone compactions, repeated timestamps, unrelated
 custom entries, and stable source ordering.
 
-### Atomic adapter
+### Atomic replay integration
 
-Change `transcript-window-adapter.ts` so one `buildEntries()` call selects and reduces the source,
-then publishes and returns a projection. The adapter will receive a projection callback from
-`index.ts`. Turn Fold policy stays outside the adapter.
+[replay-projection.ts](../packages/turn-fold/replay-projection.ts) wraps Pi's TUI transcript replay
+entry point so one call selects and reduces the source, publishes the run state, and returns the
+projection. It receives a projection callback from
+[index.ts](../packages/turn-fold/index.ts). Turn Fold policy stays outside the integration.
 
 Capture Pi's original bound replay method during first installation. Preserve the symbol-owned
 idempotent state across `/reload`. Add a restore method and use it during `session_shutdown` when
@@ -174,9 +190,9 @@ records the replacement.
 
 ### Compatibility guard
 
-Keep private replay integration inside `transcript-window-adapter.ts`. Add runtime checks for the
+Keep the replay integration inside `replay-projection.ts`. Add a runtime check for the
 method shape and a package-level Pi version range matching tested releases. The guard should disable
-sparse replay and leave Pi's original method in place when checks fail.
+sparse replay and leave Pi's original method in place when the check fails.
 
 Add an integration fixture that imports the installed Pi release, opens a temporary session,
 installs the adapter, verifies projected replay, simulates compaction rebuild, restores the adapter,
@@ -260,13 +276,12 @@ their schema and behavior. Compact transcript configuration keeps the strict
 `{ preCompaction, windows }` shape. The explorer adds no sidecar file or settings field. Existing
 sessions use the chronological selector on their next replay and need no migration.
 
-The implementation changes no Pi source. It continues to use the existing private
-`buildContextEntries()` adapter and adds no second private seam. Public APIs used by the later
+The implementation changes no Pi source. It uses one version-gated replay entry point and adds no
+second private seam. Public APIs used by the later
 viewer are `ctx.ui.custom()`, lifecycle events, `ctx.reload()`, and the documented mode checks.
 
 ## Removal condition
 
-When Pi exposes a public transcript projection or viewport provider, replace
-`transcript-window-adapter.ts` with that API. Remove the private method replacement in the same
-change. The pure projection and run snapshots should remain usable. The same applies to the
+When Pi exposes a public transcript projection or viewport provider, use that API and remove the
+replay entry point wrapper in the same change. The pure projection and run snapshots should remain usable. The same applies to the
 projection budget and paged-history tests.
