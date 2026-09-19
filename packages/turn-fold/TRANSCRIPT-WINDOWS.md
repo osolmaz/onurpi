@@ -34,18 +34,17 @@ Turn Fold writes one marker during the first completed turn after a new run star
 
 Several compactions during one run naturally resolve to one anchor because the selector returns one continuous branch slice. Entry IDs and branch positions define boundaries. Timestamps are display metadata only. If no run or user anchor precedes a boundary, selection starts at the compaction.
 
-## TUI adapter
+## TUI replay integration
 
-Pi builds its main transcript through `SessionManager.buildContextEntries()`. `transcript-window-adapter.ts` replaces that TUI-only projection with the selected branch slice. The adapter has one idempotent owner and keeps its current value in session-manager-local memory so it survives extension reload.
+Pi builds its main transcript from the entries it offers to its TUI replay entry point `InteractiveMode.renderSessionEntries()`. `replay-projection.ts` wraps that method and returns the selected sparse display projection instead of the offered entries.
 
-The adapter never replaces `buildSessionContext()`, which remains Pi's source for model messages. Compaction therefore removes old messages from model context even when the selected transcript range still displays them.
+The integration never replaces `SessionManager.buildContextEntries()` or `buildSessionContext()`. Another extension that reads the session context therefore sees Pi's native list, because Turn Fold writes nothing to Pi's session state.
 
-During compaction, Pi 0.84.3 introduced a replay contract that requires the completed compaction as
-the first replay entry, excludes that entry from stored-row rendering, and then appends a synthetic
-live summary. The adapter preserves the entry at the front for exactly that rebuild and applies the
-same handling to later stable Pi releases. Later projections apply the normal sparse display policy.
+Pi's model context drops compacted history, and the projection still displays it. Turn Fold keeps the projected entries Pi offered and adds older projected entries in front of them, so an older compaction window stays visible while the model context stays compact.
 
-This method replacement is an undocumented compatibility boundary. Turn Fold isolates it in one module and adds no Pi source changes. A future public transcript-range API can replace the adapter while the remaining Turn Fold behavior stays unchanged.
+During compaction, Pi rebuilds the transcript from its context list without the newest compaction entry, and then appends a synthetic live summary. The integration keeps that entry out of the added older entries and applies the normal sparse display policy to the rest.
+
+This method replacement is an undocumented compatibility boundary. Turn Fold isolates it in one module and adds no Pi source changes. A future public transcript-entry API can replace the integration while the remaining Turn Fold behavior stays unchanged.
 
 ## Folding performance
 
@@ -65,12 +64,12 @@ A command appends one configuration entry. A change that requires omitted entrie
 
 ## Package replacement
 
-The former `pi-tui-history-replay` package replayed the complete active branch and patched the same TUI path independently. Turn Fold now owns the bounded adapter, so package load order cannot leave its state index out of sync with Pi's rendered entries.
+The former `pi-tui-history-replay` package replayed the complete active branch and patched the same TUI path independently. Turn Fold now owns the bounded replay integration, so package load order cannot leave its state index out of sync with Pi's rendered entries.
 
 The unlicensed vendored package has been removed. None of its source was copied into the replacement modules.
 
 ## Verification
 
-Unit tests cover exact and relative values, reset, `all`, pre-compaction scope, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, explorer range growth, anchor stability, and adapter reuse. Projection tests cover the chronological suffix, stopping at the first overflow, whole-run ownership, standalone rows, oversized-run fallback, component accounting, source identity, omission metadata, and the one-component limit. Integration tests verify strict configuration persistence, in-place subset changes, restart-required compact widening, and restart-free history access.
+Unit tests cover exact and relative values, reset, `all`, pre-compaction scope, user anchoring, repeated compactions, missing anchors, malformed values, pending compaction rows, explorer range growth, anchor stability, installation and restoration of the replay entry point, and replay selection of offered, added, and hidden entries. Projection tests cover the chronological suffix, stopping at the first overflow, whole-run ownership, standalone rows, oversized-run fallback, component accounting, source identity, omission metadata, and the one-component limit. Integration tests verify strict configuration persistence, in-place subset changes, restart-required compact widening, and restart-free history access.
 
 Turn-state tests verify that projected user rows keep their own timestamps and that unchanged renders do not sort activity or rescan assistant content. A generated workflow-heavy fixture and a read-only aggregate diagnostic cover long sessions. Workspace checks and the Pi extension-load smoke test cover the package alongside the rest of OnurPi.

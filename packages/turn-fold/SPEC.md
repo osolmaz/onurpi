@@ -191,7 +191,7 @@ The extension provides these commands:
 
 ## Compatibility boundary
 
-Turn Fold patches Pi's built-in transcript component renderers because supported Pi releases do not expose a whole-turn transcript renderer. It also replaces the TUI-only `SessionManager.buildContextEntries()` projection because Pi does not expose a transcript-range API. It MUST NOT replace `buildSessionContext()`. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
+Turn Fold patches Pi's built-in transcript component renderers because supported Pi releases do not expose a whole-turn transcript renderer. It also wraps Pi's TUI transcript replay entry point `InteractiveMode.renderSessionEntries()` because Pi does not expose a transcript-range API. It MUST NOT replace `SessionManager.buildContextEntries()` or `buildSessionContext()`, and it MUST NOT write to any Pi-owned session object. Each supported Pi release requires component-level integration testing. [TRANSCRIPT-WINDOWS.md](TRANSCRIPT-WINDOWS.md) records this design boundary.
 
 [TRANSCRIPT-PROJECTION.md](TRANSCRIPT-PROJECTION.md) specifies the compact transcript's sparse replay behavior. Hidden source entries contribute to summaries without becoming Pi components. The history explorer uses only documented overlay, component, key matching, theme, and session branch APIs.
 

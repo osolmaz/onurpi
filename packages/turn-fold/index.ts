@@ -20,9 +20,12 @@ import {
 } from "./ephemeral-compactions.ts";
 import { installRenderPatches } from "./render-patches.ts";
 import {
-  installTranscriptWindowAdapter,
-  type TranscriptWindowAdapter,
-} from "./transcript-window-adapter.ts";
+  installReplayProjection,
+  projectedReplayEntries,
+  supportsReplayProjection,
+  type ReplayProjection,
+  type RestoreReplayProjection,
+} from "./replay-projection.ts";
 import { showHistoryExplorer } from "./history-viewer.ts";
 import { isPreCompactionVisibility, nextPreCompactionVisibility } from "./history-scope.ts";
 import { HistoryShortcutController, installTurnFoldShortcutEditor } from "./shortcut-editor.ts";
@@ -318,7 +321,6 @@ function registerControls(
 }
 
 type TurnFoldRuntime = {
-  adapter: TranscriptWindowAdapter | undefined;
   appliedConfiguration: TurnFoldConfiguration;
   closeExplorer: (() => void) | undefined;
   configuration: TurnFoldConfiguration;
@@ -328,6 +330,7 @@ type TurnFoldRuntime = {
   loadedEntryIds: Set<string>;
   restartRequired: boolean;
   restoreEditor: () => void;
+  restoreReplayProjection: RestoreReplayProjection | undefined;
   runBoundaries: RunBoundaryRecorder;
 };
 
@@ -391,15 +394,6 @@ function applyTranscriptProjection(
   return plan.displayEntries;
 }
 
-function transcriptProjector(
-  state: TurnFoldState,
-  runtime: TurnFoldRuntime,
-  ctx: ExtensionContext,
-  registry: EphemeralCompactionRegistry,
-): (entries: BranchEntries) => BranchEntries {
-  return (entries) => applyTranscriptProjection(entries, state, runtime, ctx, registry);
-}
-
 function startSession(
   ctx: ExtensionContext,
   state: TurnFoldState,
@@ -421,6 +415,8 @@ function startSession(
     projectionOptions(state, associations),
   );
   applyProjectionPlanToState(plan, state, associations, ctx);
+  runtime.restoreReplayProjection?.();
+  runtime.restoreReplayProjection = undefined;
   runtime.knownEntryIds = entryIds(branch);
   runtime.loadedEntryIds = new Set(plan.requiredEntryIds);
   runtime.restartRequired =
@@ -428,12 +424,8 @@ function startSession(
   runtime.restoreEditor();
   runtime.ensureShrinkClearing = () => undefined;
   runtime.restoreEditor = () => undefined;
-  if (ctx.mode !== "tui") {
-    runtime.adapter = undefined;
-    return;
-  }
+  if (ctx.mode !== "tui") return;
   if (!supportsPiVersion(VERSION)) {
-    runtime.adapter = undefined;
     ctx.ui.notify(
       `Turn Fold compact transcript disabled: Pi ${VERSION} is outside the supported ${SUPPORTED_PI_RANGE} range. History remains available.`,
       "warning",
@@ -460,10 +452,20 @@ function startSession(
   });
   runtime.ensureShrinkClearing = shortcutInstallation.ensureShrinkClearing;
   runtime.restoreEditor = shortcutInstallation.restore;
-  runtime.adapter = installTranscriptWindowAdapter(
-    ctx.sessionManager,
-    runtime.appliedConfiguration.windows,
-    transcriptProjector(state, runtime, ctx, registry),
+  if (!supportsReplayProjection()) {
+    ctx.ui.notify(
+      "Turn Fold compact transcript disabled: Pi does not expose the transcript replay entry point. History remains available.",
+      "warning",
+    );
+    return;
+  }
+  const projectReplay: ReplayProjection = (entries) => {
+    const branch = ctx.sessionManager.getBranch();
+    const displayEntries = applyTranscriptProjection(branch, state, runtime, ctx, registry);
+    return projectedReplayEntries(entries, displayEntries, branch);
+  };
+  runtime.restoreReplayProjection = installReplayProjection(
+    () => projectReplay,
     (error) => {
       ctx.ui.notify(`Turn Fold projection disabled: ${error.message}`, "warning");
     },
@@ -485,7 +487,6 @@ function registerSessionEvents(
   });
   pi.on("session_compact", (event, ctx) => {
     runtime.currentTheme = ctx.ui.theme;
-    runtime.adapter?.prepareCompletedCompactionReplay(event.compactionEntry.id);
     const branch = ctx.sessionManager.getBranch();
     const association = state.registerCompaction(
       event.compactionEntry,
@@ -503,8 +504,8 @@ function registerSessionEvents(
     runtime.closeExplorer?.();
     runtime.closeExplorer = undefined;
     runtime.runBoundaries.reset();
-    runtime.adapter?.restore();
-    runtime.adapter = undefined;
+    runtime.restoreReplayProjection?.();
+    runtime.restoreReplayProjection = undefined;
     runtime.restoreEditor();
     runtime.ensureShrinkClearing = () => undefined;
     runtime.restoreEditor = () => undefined;
@@ -593,7 +594,6 @@ export default function turnFold(pi: ExtensionAPI): void {
   const shortcut = new HistoryShortcutController();
   const registry = processCompactionRegistry();
   const runtime: TurnFoldRuntime = {
-    adapter: undefined,
     appliedConfiguration: DEFAULT_TURN_FOLD_CONFIGURATION,
     closeExplorer: undefined,
     configuration: DEFAULT_TURN_FOLD_CONFIGURATION,
@@ -603,6 +603,7 @@ export default function turnFold(pi: ExtensionAPI): void {
     loadedEntryIds: new Set(),
     restartRequired: false,
     restoreEditor: () => undefined,
+    restoreReplayProjection: undefined,
     runBoundaries: new RunBoundaryRecorder((customType, data) => {
       pi.appendEntry(customType, data);
     }),
@@ -640,7 +641,6 @@ export default function turnFold(pi: ExtensionAPI): void {
 
     runtime.appliedConfiguration = next;
     clearRestartMarker(sessionRegistryKey(ctx));
-    runtime.adapter?.setValue(next.windows);
     runtime.restartRequired = false;
     runtime.ensureShrinkClearing();
     state.applyDisplayProjection(
