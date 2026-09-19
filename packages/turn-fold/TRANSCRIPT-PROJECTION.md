@@ -71,11 +71,11 @@ An attached compaction contributes to its run summary and stays out of the compa
 
 The process-local compaction registry remains the authority for this distinction. Projection MUST NOT infer attachment from timestamps, neighboring messages, or entry order.
 
-Pi performs a transcript rebuild after every successful compaction. Pi 0.84.3 introduced a replay
-contract that requires the completed compaction as the first replay entry, removes it from the replay
-slice, and appends its live summary once at the chronological position. Turn Fold applies that
-handling to later stable Pi releases and forces the entry to the front for this one rebuild even when
-compact display policy normally hides it. Later projections use the normal sparse display.
+Pi performs a transcript rebuild after every successful compaction. Pi requires the completed
+compaction as the first entry of its own context read, then removes that entry from the entries it
+replays and appends its live summary once at the chronological position. Both steps happen before
+Turn Fold sees the replay, so the replay integration MUST keep that entry out of any entries it adds
+and MUST NOT add it back. Later projections use the normal sparse display.
 
 ## User and custom entries
 

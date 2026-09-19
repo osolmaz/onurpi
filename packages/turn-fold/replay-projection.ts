@@ -71,45 +71,88 @@ export function supportsReplayProjection(target: object = InteractiveMode.protot
   return typeof replayProjectionMethod(target) === "function";
 }
 
+type Installation = {
+  getProjection: () => ReplayProjection | undefined;
+  onError: (error: Error) => void;
+  reported: boolean;
+};
+
+type ReplayTargetState = {
+  installations: Installation[];
+  original: (this: unknown, ...args: readonly unknown[]) => unknown;
+  patched: (this: unknown, ...args: readonly unknown[]) => unknown;
+};
+
+const targetStates = new WeakMap<object, ReplayTargetState>();
+
+function removeInstallation(
+  target: object,
+  state: ReplayTargetState,
+  installation: Installation,
+): void {
+  const index = state.installations.indexOf(installation);
+  if (index >= 0) state.installations.splice(index, 1);
+  if (state.installations.length > 0) return;
+  if (Reflect.get(target, REPLAY_METHOD) === state.patched) {
+    Reflect.set(target, REPLAY_METHOD, state.original);
+  }
+  targetStates.delete(target);
+}
+
 /**
- * Installs the compact projection on Pi's transcript replay entry point. The returned function
- * restores the exact method it replaced. A projection failure reports once and replays Pi's own
- * entry list unchanged, so the transcript still renders and the session stays alive.
+ * Installs the compact projection on Pi's transcript replay entry point. A target carries at most one
+ * wrapper, which always uses the newest installed projection. Each returned function removes its own
+ * projection, and the last removal restores the exact method the first installation replaced. A
+ * projection failure reports once per installation and replays Pi's own entry list unchanged, so the
+ * transcript still renders and the session stays alive.
  */
 export function installReplayProjection(
   getProjection: () => ReplayProjection | undefined,
   onError: (error: Error) => void,
   target: object = InteractiveMode.prototype,
 ): RestoreReplayProjection {
+  const installation: Installation = { getProjection, onError, reported: false };
+  const existing = targetStates.get(target);
+  if (existing) {
+    existing.installations.push(installation);
+    return () => {
+      removeInstallation(target, existing, installation);
+    };
+  }
+
   const original = replayProjectionMethod(target);
   if (typeof original !== "function") {
     throw new Error("Pi does not expose the transcript replay entry point");
   }
-  let reported = false;
-  const patched = function (
-    this: unknown,
-    entries: BranchEntries,
-    ...rest: readonly unknown[]
-  ): unknown {
+  const callable = original as (this: unknown, ...args: readonly unknown[]) => unknown;
+  const state: ReplayTargetState = {
+    installations: [installation],
+    original: callable,
+    patched: () => undefined,
+  };
+  state.patched = function (this: unknown, ...args: readonly unknown[]): unknown {
+    const entries = args[0] as BranchEntries;
+    const rest = args.slice(1);
+    const active = state.installations.at(-1);
     let selected = entries;
-    const projection = getProjection();
-    if (projection) {
+    if (active) {
       try {
-        selected = projection(entries);
+        const projection = active.getProjection();
+        if (projection) selected = projection(entries);
       } catch (error) {
-        if (!reported) {
-          reported = true;
-          onError(error instanceof Error ? error : new Error(String(error)));
+        if (!active.reported) {
+          active.reported = true;
+          active.onError(error instanceof Error ? error : new Error(String(error)));
         }
         selected = entries;
       }
     }
-    return Reflect.apply(original, this, [selected, ...rest]);
+    return Reflect.apply(state.original, this, [selected, ...rest]);
   };
 
-  Reflect.set(target, REPLAY_METHOD, patched);
+  Reflect.set(target, REPLAY_METHOD, state.patched);
+  targetStates.set(target, state);
   return () => {
-    if (Reflect.get(target, REPLAY_METHOD) === patched)
-      Reflect.set(target, REPLAY_METHOD, original);
+    removeInstallation(target, state, installation);
   };
 }
