@@ -1,7 +1,7 @@
 # @onurpi/turn-fold
 
-- Preserve Pi's underlying normal messages and model context. The only folding metadata written to session state is the reviewed configuration and one strict `onurpi-turn-fold-run` custom entry per new settled run.
-- Keep folding policy and turn state separate from Pi component patching.
+- Preserve Pi's underlying normal messages and model context. The only folding metadata written to session state is the reviewed configuration and one strict `onurpi-turn-fold-run` custom entry per new settled run. Never assign to `ctx.sessionManager` or to any other Pi-owned session object, because another extension or Pi itself can read those members at any time.
+- Keep folding policy and turn state separate from Pi component patching. Project the transcript through the one version-gated replay entry point in `replay-projection.ts`, keep that integration free of folding policy, and restore the exact method it replaced on shutdown.
 - Keep the main transcript compact and sparse. Render detailed history through documented Pi overlay and TUI APIs without adding private component imports.
 - Index history without reading message bodies, render only viewport-near entries, and keep explorer caches bounded.
 - Keep history search incremental and bounded. Search, filters, jump history, help state, and entry controls remain ephemeral and must not enter Pi's session.

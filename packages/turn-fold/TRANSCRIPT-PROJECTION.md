@@ -28,24 +28,24 @@ The **live tail** contains components that Pi adds after the latest replay. Pi c
 
 ## Projection boundary
 
-The projection MUST be installed only on the TUI replay instance method `SessionManager.buildContextEntries()`. It MUST NOT replace the exported context builder or `buildSessionContext()`. JSON, RPC, print, and model execution paths MUST remain unchanged.
+The projection MUST be installed only on Pi's TUI transcript replay entry point `InteractiveMode.renderSessionEntries()`. Turn Fold MUST NOT write to any Pi-owned session object, MUST NOT replace `SessionManager.buildContextEntries()`, and MUST NOT replace the exported context builder or `buildSessionContext()`. JSON, RPC, print, and model execution paths MUST remain unchanged.
 
-The private adapter MUST live in `transcript-window-adapter.ts`. Folding policy, source reduction, and display selection MUST remain in pure modules that do not import Pi component classes.
+The replay integration MUST live in `replay-projection.ts`. Folding policy, source reduction, and display selection MUST remain in pure modules that do not import Pi component classes. The replay integration MUST import only the public `InteractiveMode` class and reach its method through reflection.
 
-The adapter MUST capture the original method before installation. Shutdown MUST restore that method when the adapter still owns it. A second installation MUST reuse the existing owner and MUST NOT wrap the method again.
+The integration MUST capture the original method before installation. Shutdown MUST restore that method when Turn Fold still owns it. A second installation MUST NOT wrap the method again.
 
 ## Atomic replay
 
-Each replay MUST use one root-to-leaf branch snapshot. The adapter performs these steps in order:
+Each replay MUST use one root-to-leaf branch snapshot. The replay integration performs these steps in order:
 
 1. Read the branch once.
 2. Select the configured compaction windows from that branch.
-3. For the first replay after successful compaction, preserve that compaction as the first entry required by Pi.
-4. Reduce the selected entries into Turn Fold run state.
-5. Build the display projection from the same selected entries and run state.
-6. Publish the new state and return the projected entries.
+3. Reduce the selected entries into Turn Fold run state.
+4. Build the display projection from the same selected entries and run state.
+5. Keep the entries Pi offered that the projection displays, in Pi's order.
+6. Add projected entries Pi did not offer in front of them, so older compaction windows stay visible.
 
-Turn Fold MUST NOT load state from one branch snapshot while returning entries from another. If reduction or projection fails, the adapter restores or calls Pi's original replay method and reports one warning. It MUST NOT return a partial projection.
+Turn Fold MUST NOT load state from one branch snapshot while returning entries from another. If reduction or projection fails, the integration MUST replay Pi's own entry list unchanged and report one warning. It MUST NOT return a partial projection. Pi renders the newest compaction entry itself when it rebuilds the transcript after a compaction, so the integration MUST NOT add that entry when Pi omits it from the entries it offers.
 
 ## Compact settled runs
 
@@ -126,7 +126,9 @@ The main transcript MUST remain sparse. Turn Fold MUST NOT retain full hidden tr
 
 ## Compatibility checks
 
-The adapter uses one undocumented Pi method and therefore requires a tested Pi version range. Startup MUST verify that the method exists, is callable, and returns a branch-entry array for a smoke fixture. An unsupported shape disables sparse projection and leaves Pi's original method installed.
+The replay integration uses one undocumented Pi method and therefore requires a tested Pi version range. Startup MUST verify that the method exists and is callable. An unsupported shape disables sparse projection and leaves Pi's original replay method installed.
+
+Pi exposes no public transcript view seam. Turn Fold records this limitation as an upstream capability request, and the replay integration is deleted when such a seam exists. No Pi source is modified here.
 
 The package MUST include integration tests against every supported Pi release. A Pi dependency update cannot ship until replay, compaction rebuild, explorer open and close, shutdown restoration, and non-TUI isolation pass.
 

@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import turnFold, { supportsPiVersion } from "./index.ts";
 import { clearRestartMarker } from "./restart-marker.ts";
 import { parseRunBoundary, TURN_FOLD_RUN_ENTRY } from "./run-boundary.ts";
+import { context, emit, entryId, extensionHarness, runTurnFoldCommand } from "./test-support.ts";
 import { TurnFoldState } from "./turn-state.ts";
 
 const renderPatchMock = vi.hoisted(() => ({ states: [] as unknown[] }));
@@ -44,105 +44,6 @@ vi.mock("./render-patches.ts", () => ({
     return () => undefined;
   },
 }));
-
-type Handler = (...arguments_: unknown[]) => unknown;
-
-function entryId(entry: unknown): unknown {
-  return typeof entry === "object" && entry !== null ? Reflect.get(entry, "id") : undefined;
-}
-
-function extensionHarness(): {
-  appendEntry: ReturnType<typeof vi.fn>;
-  commands: ReadonlyMap<string, Handler>;
-  completions: ReadonlyMap<string, (prefix: string) => unknown>;
-  handlers: ReadonlyMap<string, Handler>;
-  pi: ExtensionAPI;
-} {
-  const commands = new Map<string, Handler>();
-  const completions = new Map<string, (prefix: string) => unknown>();
-  const eventHandlers = new Map<string, (data: unknown) => void>();
-  const handlers = new Map<string, Handler>();
-  const appendEntry = vi.fn();
-  const emitEvent = (channel: string, data: unknown) => {
-    eventHandlers.get(channel)?.(data);
-  };
-  const pi = {
-    appendEntry,
-    events: {
-      emit: emitEvent,
-      on: (channel: string, handler: (data: unknown) => void) => {
-        eventHandlers.set(channel, handler);
-        return () => eventHandlers.delete(channel);
-      },
-    },
-    on: (event: string, handler: Handler) => handlers.set(event, handler),
-    registerCommand: (
-      name: string,
-      definition: { getArgumentCompletions?: (prefix: string) => unknown; handler: Handler },
-    ) => {
-      commands.set(name, definition.handler);
-      if (definition.getArgumentCompletions) {
-        completions.set(name, definition.getArgumentCompletions);
-      }
-    },
-    registerShortcut: () => undefined,
-  } as unknown as ExtensionAPI;
-  return { appendEntry, commands, completions, handlers, pi };
-}
-
-function context(
-  entries: readonly unknown[] = [],
-  branch: readonly unknown[] = entries,
-  sessionFile: string | null = "/tmp/turn-fold-session.jsonl",
-) {
-  let editorFactory: unknown;
-  return {
-    cwd: "/workspace/project",
-    hasPendingMessages: vi.fn(() => false),
-    hasUI: true,
-    isIdle: vi.fn(() => true),
-    mode: "tui",
-    reload: vi.fn(() => Promise.resolve()),
-    switchSession: vi.fn(() => Promise.resolve({ cancelled: false })),
-    sessionManager: {
-      buildContextEntries: () => entries,
-      getBranch: () => branch,
-      getSessionFile: () => sessionFile ?? undefined,
-      getSessionId: () => "session-id",
-    },
-    ui: {
-      confirm: vi.fn(() => Promise.resolve(true)),
-      getEditorComponent: vi.fn(() => editorFactory),
-      notify: vi.fn(),
-      select: vi.fn(() => Promise.resolve(undefined)),
-      setEditorComponent: vi.fn((factory: unknown) => {
-        editorFactory = factory;
-      }),
-      setStatus: vi.fn(),
-      theme: undefined,
-    },
-    waitForIdle: vi.fn(() => Promise.resolve()),
-  };
-}
-
-async function emit(
-  handlers: ReadonlyMap<string, Handler>,
-  event: string,
-  payload: object,
-  ctx: object,
-): Promise<void> {
-  await handlers.get(event)?.(payload, ctx);
-}
-
-async function runTurnFoldCommand(
-  commands: ReadonlyMap<string, Handler>,
-  argument: string,
-  ctx: object,
-): Promise<void> {
-  const handler = commands.get("turn-fold");
-  if (!handler) throw new Error("Turn Fold command was not registered");
-  await handler(argument, ctx);
-}
 
 afterEach(() => {
   clearRestartMarker();
@@ -428,20 +329,6 @@ describe("Turn Fold TUI isolation", () => {
     );
     expect(ctx.ui.getEditorComponent()).toBeUndefined();
   });
-
-  it("leaves session replay untouched outside TUI mode", async () => {
-    const extension = extensionHarness();
-    const entries = [{ id: "entry", type: "custom" }];
-    const ctx = context(entries);
-    ctx.mode = "rpc";
-    const originalReplay = ctx.sessionManager.buildContextEntries;
-    turnFold(extension.pi);
-
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    expect(ctx.sessionManager.buildContextEntries).toBe(originalReplay);
-    expect(ctx.sessionManager.buildContextEntries()).toBe(entries);
-  });
 });
 
 describe("Turn Fold configuration commands", () => {
@@ -710,25 +597,6 @@ describe("Turn Fold configuration reporting", () => {
       label: "all",
       value: "windows all",
     });
-  });
-
-  it("loads all windows by default while keeping compact projection sparse", async () => {
-    const extension = extensionHarness();
-    const branch = [
-      { id: "u0", message: { role: "user" }, type: "message" },
-      { id: "c1", type: "compaction" },
-      { id: "u1", message: { role: "user" }, type: "message" },
-      { id: "c2", type: "compaction" },
-      { id: "u2", message: { role: "user" }, type: "message" },
-      { id: "now", type: "custom" },
-    ];
-    const ctx = context([], branch);
-    turnFold(extension.pi);
-    await emit(extension.handlers, "session_start", { type: "session_start" }, ctx);
-
-    const projectedIds = ctx.sessionManager.buildContextEntries().map(entryId);
-    expect(projectedIds).toContain("u0");
-    expect(projectedIds).toContain("u2");
   });
 });
 
