@@ -15,7 +15,7 @@ export default {
     "projection-plan.ts",
     "restart-marker.ts",
     "run-boundary.ts",
-    "transcript-window-adapter.ts",
+    "replay-projection.ts",
     "transcript-windows.ts",
     "tool-padding.ts",
     "turn-visibility.ts",
