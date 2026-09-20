@@ -29,9 +29,9 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.86.0",
   "defaultProvider": "huggingface",
-  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
+  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:baseten",
   "defaultThinkingLevel": "xhigh",
   "terminal": {
     "showImages": false,
