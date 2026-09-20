@@ -15,7 +15,7 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync       |
 | [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                   |
 | [`@onurpi/loop-guard`](packages/loop-guard/)                             | Opt-in bounded detection and interruption of repeated work        |
-| [`@onurpi/live-stats`](packages/live-stats/)                             | Shimmering dots5 indicator with live response metrics             |
+| [`@onurpi/live-stats`](packages/live-stats/)                             | Braille spinner, shimmering working line, and live response metrics |
 | [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                           |
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                           |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager         |

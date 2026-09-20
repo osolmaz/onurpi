@@ -10,10 +10,10 @@ import {
   parseAnsi256Foreground,
   parseTruecolorForeground,
   SHIMMER_SWEEP_FRACTION,
-  WORKING_SPINNER,
   type ColorStyler,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
+import { pickSpinner, type BrailleSpinner } from "./spinners.ts";
 
 const REFRESH_INTERVAL_MS = 50;
 const SHIMMER_SWEEP_MS = 4_200;
@@ -44,23 +44,31 @@ function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   };
 }
 
-// Pi has no theme-change event, so the frames are re-applied whenever the theme's warning escape
-// changes. Without this check the spinner would keep the old theme's colors after a theme switch
-// while the message used the new ones.
+// One spinner is picked per session, so a conversation keeps the same animation from start to
+// finish. Pi has no theme-change event, so the frames are re-applied whenever the spinner or the
+// theme's warning escape changes. Without this check the spinner would keep the old theme's colors
+// after a theme switch while the message used the new ones.
+let sessionSpinner: BrailleSpinner | undefined;
 let appliedSpinnerKey: string | undefined;
+
+function activeSpinner(): BrailleSpinner {
+  sessionSpinner ??= pickSpinner();
+  return sessionSpinner;
+}
 
 function spinnerKey(ctx: ExtensionContext): string {
   const theme = ctx.ui.theme;
-  return `${theme.getColorMode()} ${theme.getFgAnsi("warning")}`;
+  return `${activeSpinner().id} ${theme.getColorMode()} ${theme.getFgAnsi("warning")}`;
 }
 
 function syncWorkingSpinner(ctx: ExtensionContext): void {
   if (ctx.mode !== "tui") return;
   const key = spinnerKey(ctx);
   if (key === appliedSpinnerKey) return;
+  const spinner = activeSpinner();
   ctx.ui.setWorkingIndicator({
-    frames: formatStyledSpinnerFrames(WORKING_SPINNER.frames, workingMessageStyles(ctx)),
-    intervalMs: WORKING_SPINNER.intervalMs,
+    frames: formatStyledSpinnerFrames(spinner.frames, workingMessageStyles(ctx)),
+    intervalMs: spinner.intervalMs,
   });
   appliedSpinnerKey = key;
 }
@@ -95,6 +103,7 @@ export default function liveStats(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    sessionSpinner = pickSpinner();
     syncWorkingSpinner(ctx);
   });
 
@@ -147,6 +156,7 @@ export default function liveStats(pi: ExtensionAPI): void {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    sessionSpinner = undefined;
     reset(ctx);
   });
 }

@@ -1,22 +1,6 @@
 const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
 
-export type WorkingSpinner = {
-  name: string;
-  label: string;
-  intervalMs: number;
-  frames: readonly string[];
-};
-
-// Frames are the dots5 spinner from sindresorhus/cli-spinners, which the referenced CodePen
-// renders. Every frame is one terminal column wide, so the working line never shifts.
-export const WORKING_SPINNER: WorkingSpinner = {
-  name: "dots5",
-  label: "Dots 5",
-  intervalMs: 80,
-  frames: ["⠋", "⠙", "⠚", "⠒", "⠂", "⠂", "⠒", "⠲", "⠴", "⠦", "⠖", "⠒", "⠐", "⠐", "⠒", "⠓", "⠋"],
-};
-
 export const WORKING_LABEL = "Working";
 
 type TokenSample = {
@@ -37,6 +21,12 @@ export type WorkingMessageStyles = {
   bold: (text: string) => string;
   /** Color stylers ordered from the base color to the brightest shimmer highlight. */
   ramp: readonly ColorStyler[];
+};
+
+export type WorkingMessageSegment = {
+  text: string;
+  /** The label is bold. The statistics stay in the normal weight, parentheses included. */
+  bold: boolean;
 };
 
 export type Rgb = { red: number; green: number; blue: number };
@@ -358,7 +348,17 @@ export function formatRate(rate: number | undefined): string {
 }
 
 export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
-  return `${WORKING_LABEL}… (${formatWorkingStats(snapshot)})`;
+  return workingMessageSegments(snapshot)
+    .map((segment) => segment.text)
+    .join("");
+}
+
+/** The working line in order: the bold label, then the statistics in plain parentheses. */
+export function workingMessageSegments(snapshot: LiveStatsSnapshot): WorkingMessageSegment[] {
+  return [
+    { text: WORKING_LABEL, bold: true },
+    { text: ` (${formatWorkingStats(snapshot)})`, bold: false },
+  ];
 }
 
 /** Share of the line covered by the traveling shimmer band. */
@@ -372,36 +372,49 @@ export const SHIMMER_SWEEP_FRACTION = 0.75;
  * edge, travels left across the line, and leaves through the left edge, so the line starts and ends
  * each sweep in the base color. `cycle` is the progress through one full cycle: the band crosses
  * during the first SHIMMER_SWEEP_FRACTION of the cycle, and the line rests in the base color for the
- * remainder.
+ * remainder. Only the label is bold, so the statistics keep the normal weight.
  */
 export function formatShimmeredWorkingMessage(
   snapshot: LiveStatsSnapshot,
   styles: WorkingMessageStyles,
   cycle: number,
 ): string {
-  const characters = toGraphemes(formatWorkingMessage(snapshot));
+  const segments = workingMessageSegments(snapshot);
   const base = baseColor(styles);
-  const length = characters.length;
-  if (length === 0) return styles.bold("");
+  const colors = shimmerColors(
+    segments.flatMap((segment) => toGraphemes(segment.text)).length,
+    styles,
+    cycle,
+  );
 
-  const progress = normalizePhase(cycle);
-  if (progress >= SHIMMER_SWEEP_FRACTION) {
-    return styles.bold(characters.map((character) => base(character)).join(""));
+  let offset = 0;
+  let output = "";
+  for (const segment of segments) {
+    const characters = toGraphemes(segment.text);
+    const colored = characters
+      .map((character, position) => (colors[offset + position] ?? base)(character))
+      .join("");
+    offset += characters.length;
+    output += segment.bold ? styles.bold(colored) : colored;
   }
+  return output;
+}
+
+/** Picks the color styler of every character of the line at one point in the shimmer cycle. */
+function shimmerColors(length: number, styles: WorkingMessageStyles, cycle: number): ColorStyler[] {
+  const base = baseColor(styles);
+  const progress = normalizePhase(cycle);
+  if (progress >= SHIMMER_SWEEP_FRACTION) return Array.from({ length }, () => base);
 
   const peak = styles.ramp.length - 1;
   const halfBand = Math.max(1, (length * SHIMMER_BAND_FRACTION) / 2);
   const traveled = (progress / SHIMMER_SWEEP_FRACTION) * (length + 2 * halfBand);
   const center = length + halfBand - traveled;
-
-  let output = "";
-  for (const [index, character] of characters.entries()) {
+  return Array.from({ length }, (_, index) => {
     const distance = Math.abs(index + 0.5 - center);
     const intensity = Math.max(0, 1 - distance / halfBand);
-    const styler = styles.ramp[Math.round(intensity * peak)] ?? base;
-    output += styler(character);
-  }
-  return styles.bold(output);
+    return styles.ramp[Math.round(intensity * peak)] ?? base;
+  });
 }
 
 function normalizePhase(cycle: number): number {

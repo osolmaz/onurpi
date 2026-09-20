@@ -1,17 +1,22 @@
 # @onurpi/live-stats
 
-`@onurpi/live-stats` is a Pi extension for live response metrics. It replaces Pi's default
-spinner with the dots5 animation and shows the metrics for the current run in the theme's bold
-warning color, with a lighter band that travels through the text from right to left.
+`@onurpi/live-stats` is a Pi extension for live response metrics. It replaces Pi's default spinner
+with a two-cell braille animation and shows the metrics for the current run in the theme's warning
+color, with a lighter band that travels through the text from right to left.
 
 ```text
-⠋ Working… (12s · ~438 out · 21.7 tok/s)
+⡇⠀ Working (12s · ~438 out · 21.7 tok/s)
 ```
 
-The frames are the `dots5` spinner from
-[sindresorhus/cli-spinners](https://github.com/sindresorhus/cli-spinners), at 80 ms per frame. Each
-frame is one terminal column wide, so the working line does not shift. The line holds no emoji and
-no Turkish phrase. Pi supplies the single separating space after the indicator.
+Only the label is bold. The statistics in parentheses keep the normal weight, parentheses included.
+The line holds no emoji and no Turkish phrase. Pi supplies the single separating space after the
+indicator.
+
+Pi picks one spinner at random when a session starts and keeps it for that whole session, so a
+conversation always shows the same animation. The set holds twenty animations, each with its own
+frame count and timing. Every frame is exactly two code points from the braille block
+(U+2800..U+28FF), so a frame covers two terminal columns and the line never changes width. The
+animations are defined in [`spinners.ts`](spinners.ts).
 
 The shimmer enters from the right edge, crosses the line to the left, and leaves through the left
 edge, so the line starts and ends each sweep in the plain warning color. The sweep takes 4.2
@@ -38,6 +43,19 @@ Most providers report exact output usage only after a response finishes. While a
 streaming, the extension estimates tokens with Pi's four-characters-per-token heuristic and prefixes
 the count with `~`. The count is reconciled with the provider's reported usage when the response
 ends.
+
+## Spinner viewer
+
+[`viewer.html`](viewer.html) is a self-contained page that runs every animation side by side, shows
+the selected spinner large with its dot grid, and copies the frames as Pi indicator options. It
+opens straight from the file system. Rebuild it after a change to the spinner set:
+
+```bash
+npm run viewer --workspace @onurpi/live-stats
+```
+
+A test compares the committed page with the current spinner set, so rebuild the page in the same
+change. The page carries its own frame data and its own braille decoder.
 
 ## Install
 

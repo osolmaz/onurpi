@@ -19,7 +19,8 @@ import {
   rgbToAnsi256,
   SHIMMER_SWEEP_FRACTION,
   toGraphemes,
-  WORKING_SPINNER,
+  WORKING_LABEL,
+  workingMessageSegments,
   type ColorStyler,
   type LiveStatsSnapshot,
   type WorkingMessageStyles,
@@ -46,9 +47,10 @@ function rampStyles(levels = 4): WorkingMessageStyles {
 }
 
 function shimmerSegments(cycle: number, levels = 4): string[] {
-  const styled = formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(levels), cycle);
-  const body = styled.slice("<b>".length, -"</b>".length);
-  const segments = body.split("</>");
+  const styled = formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(levels), cycle)
+    .replaceAll("<b>", "")
+    .replaceAll("</b>", "");
+  const segments = styled.split("</>");
   segments.pop();
   return segments;
 }
@@ -306,27 +308,12 @@ describe("formatRate", () => {
   });
 });
 
-describe("working spinner", () => {
-  it("uses the dots5 frames from cli-spinners", () => {
-    expect(WORKING_SPINNER).toEqual({
-      name: "dots5",
-      label: "Dots 5",
-      intervalMs: 80,
-      frames: ["⠋", "⠙", "⠚", "⠒", "⠂", "⠂", "⠒", "⠲", "⠴", "⠦", "⠖", "⠒", "⠐", "⠐", "⠒", "⠓", "⠋"],
-    });
-  });
-
-  it("keeps every frame at one terminal column with no padding", () => {
-    expect(new Set(WORKING_SPINNER.frames.map((frame) => visibleWidth(frame)))).toEqual(
-      new Set([1]),
-    );
-    expect(WORKING_SPINNER.frames.every((frame) => frame.trimEnd() === frame)).toBe(true);
-  });
-
+describe("formatStyledSpinnerFrames", () => {
   it("renders every frame in bold base color", () => {
-    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, rampStyles())).toEqual(
-      WORKING_SPINNER.frames.map((frame) => `<b><0>${frame}</></b>`),
-    );
+    expect(formatStyledSpinnerFrames(["⠁⠁", "⠂⠂"], rampStyles())).toEqual([
+      "<b><0>⠁⠁</></b>",
+      "<b><0>⠂⠂</></b>",
+    ]);
   });
 });
 
@@ -339,7 +326,7 @@ describe("formatWorkingMessage", () => {
   };
 
   it("labels the line as working and shows estimated output and a sampled rate", () => {
-    expect(formatWorkingMessage(snapshot)).toBe("Working… (12s · ~438 out · 21.7 tok/s)");
+    expect(formatWorkingMessage(snapshot)).toBe("Working (12s · ~438 out · 21.7 tok/s)");
   });
 
   it("shows unavailable throughput before sampling begins", () => {
@@ -350,13 +337,17 @@ describe("formatWorkingMessage", () => {
         outputApproximate: false,
         tokensPerSecond: undefined,
       }),
-    ).toBe("Working… (0s · 0 out · — tok/s)");
+    ).toBe("Working (0s · 0 out · — tok/s)");
   });
 
   it("drops the decimal at 100 tok/s and above", () => {
     expect(formatWorkingMessage({ ...snapshot, tokensPerSecond: 123.4 })).toBe(
-      "Working… (12s · ~438 out · 123 tok/s)",
+      "Working (12s · ~438 out · 123 tok/s)",
     );
+  });
+
+  it("keeps an ellipsis out of the working line", () => {
+    expect(formatWorkingMessage(snapshot)).not.toContain("…");
   });
 
   it("keeps emoji and Turkish text out of the working line", () => {
@@ -364,18 +355,32 @@ describe("formatWorkingMessage", () => {
     expect(formatWorkingMessage(snapshot)).not.toMatch(/[ıİşŞğĞüÜöÖçÇ]/u);
   });
 
-  it("renders the complete working line in bold base color", () => {
-    const snapshot = {
+  it("marks the label as bold and the statistics as plain", () => {
+    expect(workingMessageSegments(snapshot)).toEqual([
+      { text: WORKING_LABEL, bold: true },
+      { text: " (12s · ~438 out · 21.7 tok/s)", bold: false },
+    ]);
+  });
+
+  it("bolds the label only and keeps the parentheses plain", () => {
+    const plain = {
       elapsedMs: 1_000,
       outputTokens: 12,
       outputApproximate: false,
       tokensPerSecond: 4,
     };
-    const expected = `<b>${toGraphemes(formatWorkingMessage(snapshot))
-      .map((character) => `<0>${character}</>`)
-      .join("")}</b>`;
+    const colored = (text: string): string =>
+      toGraphemes(text)
+        .map((character) => `<0>${character}</>`)
+        .join("");
+    const expected = workingMessageSegments(plain)
+      .map((segment) => (segment.bold ? `<b>${colored(segment.text)}</b>` : colored(segment.text)))
+      .join("");
 
-    expect(formatShimmeredWorkingMessage(snapshot, rampStyles(1), 0)).toBe(expected);
+    expect(formatShimmeredWorkingMessage(plain, rampStyles(1), 0)).toBe(expected);
+    expect(formatShimmeredWorkingMessage(plain, rampStyles(1), 0).split("</b>").at(-1)).toBe(
+      colored(" (1s · 12 out · 4.0 tok/s)"),
+    );
   });
 });
 
