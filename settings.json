@@ -31,7 +31,7 @@
   ],
   "lastChangelogVersion": "0.86.0",
   "defaultProvider": "huggingface",
-  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:baseten",
+  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
   "defaultThinkingLevel": "xhigh",
   "terminal": {
     "showImages": false,
