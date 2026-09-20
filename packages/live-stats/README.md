@@ -15,7 +15,8 @@ no Turkish phrase. Pi supplies the single separating space after the indicator.
 
 The timer covers one agent run, including model responses and tool calls. Output tokens accumulate
 across the model responses in that run. Throughput is the estimated output generated during the
-last five seconds, so it falls toward zero while Pi waits for a tool.
+last five seconds, so it falls toward zero while Pi waits for a tool. Throughput shows one decimal
+below 100 tok/s and a whole number at 100 tok/s and above.
 
 Most providers report exact output usage only after a response finishes. While a response is
 streaming, the extension estimates tokens with Pi's four-characters-per-token heuristic and prefixes

@@ -192,6 +192,14 @@ export function formatTokenCount(tokens: number): string {
   return formatCompact(value / 1_000_000, "M");
 }
 
+// One decimal below 100 tok/s, a whole number at 100 tok/s and above. The comparison uses the
+// rounded value, so 99.96 prints as 100 instead of 100.0.
+export function formatRate(rate: number | undefined): string {
+  if (rate === undefined) return "—";
+  const oneDecimal = Number(rate.toFixed(1));
+  return oneDecimal < 100 ? oneDecimal.toFixed(1) : String(Math.round(oneDecimal));
+}
+
 export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
   return `${WORKING_LABEL}… (${formatWorkingStats(snapshot)})`;
 }
@@ -205,7 +213,7 @@ export function formatStyledWorkingMessage(
 
 function formatWorkingStats(snapshot: LiveStatsSnapshot): string {
   const approximate = snapshot.outputApproximate ? "~" : "";
-  const rate = snapshot.tokensPerSecond?.toFixed(1) ?? "—";
+  const rate = formatRate(snapshot.tokensPerSecond);
   return `${formatElapsed(snapshot.elapsedMs)} · ${approximate}${formatTokenCount(snapshot.outputTokens)} out · ${rate} tok/s`;
 }
 

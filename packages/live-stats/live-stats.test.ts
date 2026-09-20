@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   countOutputContentChars,
   formatElapsed,
+  formatRate,
   formatStyledSpinnerFrames,
   formatStyledWorkingMessage,
   formatTokenCount,
@@ -229,6 +230,25 @@ describe("formatTokenCount", () => {
   });
 });
 
+describe("formatRate", () => {
+  it.each([
+    [0, "0.0"],
+    [4, "4.0"],
+    [21.74, "21.7"],
+    [99.9, "99.9"],
+    [99.95, "100"],
+    [100, "100"],
+    [123.4, "123"],
+    [999.5, "1000"],
+  ])("formats %s tok/s as %s", (rate, expected) => {
+    expect(formatRate(rate)).toBe(expected);
+  });
+
+  it("shows an em dash before sampling begins", () => {
+    expect(formatRate(undefined)).toBe("—");
+  });
+});
+
 describe("working spinner", () => {
   it("uses the dots5 frames from cli-spinners", () => {
     expect(WORKING_SPINNER).toEqual({
@@ -280,6 +300,12 @@ describe("formatWorkingMessage", () => {
         tokensPerSecond: undefined,
       }),
     ).toBe("Working… (0s · 0 out · — tok/s)");
+  });
+
+  it("drops the decimal at 100 tok/s and above", () => {
+    expect(formatWorkingMessage({ ...snapshot, tokensPerSecond: 123.4 })).toBe(
+      "Working… (12s · ~438 out · 123 tok/s)",
+    );
   });
 
   it("keeps emoji and Turkish text out of the working line", () => {
