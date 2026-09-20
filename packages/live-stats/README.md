@@ -13,9 +13,10 @@ The frames are the `dots5` spinner from
 frame is one terminal column wide, so the working line does not shift. The line holds no emoji and
 no Turkish phrase. Pi supplies the single separating space after the indicator.
 
-The shimmer sweeps a band of lighter color from left to right once every 1.4 seconds. The colors
-are stops between the theme's warning color and white, so the sweep keeps the theme's hue. A theme
-in 256-color mode falls back to two theme colors, because those escapes cannot be blended.
+The shimmer sweeps a band of lighter color from left to right once every 4.2 seconds. The colors
+are stops between the theme's warning color and a lighter tint of it, so the sweep keeps the theme's
+hue and stays orange instead of turning white. A theme in 256-color mode falls back to two theme
+colors, because those escapes cannot be blended.
 
 The timer covers one agent run, including model responses and tool calls. Output tokens accumulate
 across the model responses in that run. Throughput is the estimated output generated during the

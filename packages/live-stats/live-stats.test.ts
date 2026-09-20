@@ -390,13 +390,13 @@ describe("parseTruecolorForeground", () => {
 describe("lightenRamp", () => {
   const base = { red: 250, green: 179, blue: 135 };
 
-  it("blends from the base color toward white", () => {
+  it("blends from the base color to a lighter tint", () => {
     const ramp = lightenRamp(base, 4);
     const ansi = ramp.map((styler) => stylerAnsi(styler));
 
     expect(ansi).toHaveLength(4);
     expect(ansi[0]).toBe("\x1b[38;2;250;179;135m");
-    expect(ansi[3]).toBe("\x1b[38;2;255;247;243m");
+    expect(ansi[3]).toBe("\x1b[38;2;253;217;195m");
   });
 
   it("keeps the base color when only one stop is requested", () => {
@@ -410,9 +410,9 @@ describe("lightenRamp", () => {
       parseTruecolorForeground(stylerAnsi(styler)),
     );
 
-    expect(channels.map((rgb) => rgb?.red)).toEqual([250, 252, 253, 255]);
-    expect(channels.map((rgb) => rgb?.green)).toEqual([179, 202, 225, 247]);
-    expect(channels.map((rgb) => rgb?.blue)).toEqual([135, 171, 207, 243]);
+    expect(channels.map((rgb) => rgb?.red)).toEqual([250, 251, 252, 253]);
+    expect(channels.map((rgb) => rgb?.green)).toEqual([179, 192, 204, 217]);
+    expect(channels.map((rgb) => rgb?.blue)).toEqual([135, 155, 175, 195]);
   });
 
   it("rejects an empty ramp", () => {

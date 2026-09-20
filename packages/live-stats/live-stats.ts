@@ -59,8 +59,11 @@ export function parseTruecolorForeground(ansi: string): Rgb | undefined {
   return { red, green, blue };
 }
 
-/** Builds color stylers from a base color to a lighter highlight, keeping the theme's hue. */
-export function lightenRamp(base: Rgb, stops: number, maxBlend = 0.9): ColorStyler[] {
+/**
+ * Builds color stylers from a base color to a lighter highlight. The ramp keeps the theme's hue and
+ * stops short of white, so the highlight reads as a lighter tint instead of a white sweep.
+ */
+export function lightenRamp(base: Rgb, stops: number, maxBlend = 0.5): ColorStyler[] {
   if (stops < 1) throw new RangeError("stops must be at least 1");
   return Array.from({ length: stops }, (_, index) => {
     const blend = stops === 1 ? 0 : (index / (stops - 1)) * maxBlend;

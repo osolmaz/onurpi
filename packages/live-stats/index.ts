@@ -13,11 +13,11 @@ import {
 } from "./live-stats.ts";
 
 const REFRESH_INTERVAL_MS = 50;
-const SHIMMER_PERIOD_MS = 1_400;
+const SHIMMER_PERIOD_MS = 4_200;
 const SHIMMER_STOPS = 4;
 
-// Truecolor themes get a ramp of the theme's own hue blended toward white. Other color modes fall
-// back to two theme colors, because 256-color escapes cannot be blended.
+// Truecolor themes get a ramp of the theme's own hue, lightened toward a tint rather than white.
+// Other color modes fall back to two theme colors, because 256-color escapes cannot be blended.
 function colorRamp(ctx: ExtensionContext): ColorStyler[] {
   const theme = ctx.ui.theme;
   const base = parseTruecolorForeground(theme.getFgAnsi("warning"));
