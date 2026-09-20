@@ -7,14 +7,16 @@ import {
   lightenRamp,
   LiveStatsTracker,
   parseTruecolorForeground,
+  SHIMMER_SWEEP_FRACTION,
   WORKING_SPINNER,
   type ColorStyler,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
 
 const REFRESH_INTERVAL_MS = 50;
-const SHIMMER_PERIOD_MS = 4_200;
+const SHIMMER_SWEEP_MS = 4_200;
 const SHIMMER_STOPS = 4;
+const SHIMMER_CYCLE_MS = SHIMMER_SWEEP_MS / SHIMMER_SWEEP_FRACTION;
 
 // Truecolor themes get a ramp of the theme's own hue, lightened toward a tint rather than white.
 // Other color modes fall back to two theme colors, because 256-color escapes cannot be blended.
@@ -59,7 +61,7 @@ export default function liveStats(pi: ExtensionAPI): void {
       formatShimmeredWorkingMessage(
         snapshot,
         workingMessageStyles(ctx),
-        snapshot.elapsedMs / SHIMMER_PERIOD_MS,
+        snapshot.elapsedMs / SHIMMER_CYCLE_MS,
       ),
     );
   };

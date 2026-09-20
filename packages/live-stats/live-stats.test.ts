@@ -12,6 +12,7 @@ import {
   lightenRamp,
   LiveStatsTracker,
   parseTruecolorForeground,
+  SHIMMER_SWEEP_FRACTION,
   toGraphemes,
   WORKING_SPINNER,
   type ColorStyler,
@@ -39,12 +40,17 @@ function rampStyles(levels = 4): WorkingMessageStyles {
   };
 }
 
-function shimmerSegments(phase: number, levels = 4): string[] {
-  const styled = formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(levels), phase);
+function shimmerSegments(cycle: number, levels = 4): string[] {
+  const styled = formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(levels), cycle);
   const body = styled.slice("<b>".length, -"</b>".length);
   const segments = body.split("</>");
   segments.pop();
   return segments;
+}
+
+/** Index of the leftmost character that carries the brightest ramp stop. */
+function peakIndex(cycle: number): number {
+  return shimmerSegments(cycle).findIndex((segment) => segment.startsWith("<3>"));
 }
 
 function stylerAnsi(styler: ColorStyler): string {
@@ -423,6 +429,7 @@ describe("lightenRamp", () => {
 describe("formatShimmeredWorkingMessage", () => {
   const text = formatWorkingMessage(SNAPSHOT);
   const characters = toGraphemes(text);
+  const middle = Math.floor(characters.length / 2);
 
   it("keeps the visible text unchanged", () => {
     const restored = shimmerSegments(0.4)
@@ -432,33 +439,46 @@ describe("formatShimmeredWorkingMessage", () => {
     expect(restored).toBe(text);
   });
 
-  it("puts the brightest stop at the phase position", () => {
-    const middle = Math.floor(characters.length / 2);
+  it("starts free of shimmer", () => {
+    expect(shimmerSegments(0).every((segment) => segment.startsWith("<0>"))).toBe(true);
+  });
 
-    expect(shimmerSegments(0.5)[middle]).toBe(`<3>${characters[middle] ?? ""}`);
+  it("rests in the base color after the sweep finishes", () => {
+    for (const cycle of [SHIMMER_SWEEP_FRACTION, 0.9, 0.999]) {
+      expect(shimmerSegments(cycle).every((segment) => segment.startsWith("<0>"))).toBe(true);
+    }
+  });
+
+  it("enters from the right edge", () => {
+    expect(peakIndex(0.25)).toBeGreaterThan(middle);
+  });
+
+  it("crosses the line from right to left", () => {
+    expect(peakIndex(0.25)).toBeGreaterThan(peakIndex(0.375));
+    expect(peakIndex(0.375)).toBeGreaterThan(peakIndex(0.5));
+  });
+
+  it("puts the brightest stop near the middle at the midpoint of the sweep", () => {
+    expect(Math.abs(peakIndex(0.375) - middle)).toBeLessThanOrEqual(1);
   });
 
   it("leaves the rest of the line in the base color", () => {
-    expect(shimmerSegments(0.5)[0]).toBe(`<0>${characters[0] ?? ""}`);
-  });
+    const segments = shimmerSegments(0.375);
 
-  it("wraps the band around the end of the line", () => {
-    const segments = shimmerSegments(0);
-
-    expect(segments[0]).toBe(`<3>${characters[0] ?? ""}`);
-    expect(segments.at(-1)).toBe(`<3>${characters.at(-1) ?? ""}`);
+    expect(segments[0]).toBe(`<0>${characters[0] ?? ""}`);
+    expect(segments.at(-1)).toBe(`<0>${characters.at(-1) ?? ""}`);
   });
 
   it("uses only the base stop when the ramp has one color", () => {
-    expect(shimmerSegments(0.5, 1).every((segment) => segment.startsWith("<0>"))).toBe(true);
+    expect(shimmerSegments(0.375, 1).every((segment) => segment.startsWith("<0>"))).toBe(true);
   });
 
-  it("normalizes the phase and treats a bad phase as zero", () => {
-    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 1.5)).toBe(
-      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.5),
+  it("normalizes the cycle and treats a bad cycle as zero", () => {
+    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 1.4)).toBe(
+      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.4),
     );
-    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), -0.5)).toBe(
-      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.5),
+    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), -0.6)).toBe(
+      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.4),
     );
     expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), Number.NaN)).toBe(
       formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0),

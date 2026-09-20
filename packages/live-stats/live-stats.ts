@@ -257,29 +257,39 @@ export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
 /** Share of the line covered by the traveling shimmer band. */
 const SHIMMER_BAND_FRACTION = 0.35;
 
+/** Share of each shimmer cycle spent crossing the line. The rest is a rest in the base color. */
+export const SHIMMER_SWEEP_FRACTION = 0.75;
+
 /**
- * Colors the working line character by character. A band of lighter stops travels through the text
- * as `phase` advances. A phase of 0 places the band center at the start of the line, and the phase
- * wraps, so the band leaves one edge and returns through the other.
+ * Colors the working line character by character. A band of lighter stops enters from the right
+ * edge, travels left across the line, and leaves through the left edge, so the line starts and ends
+ * each sweep in the base color. `cycle` is the progress through one full cycle: the band crosses
+ * during the first SHIMMER_SWEEP_FRACTION of the cycle, and the line rests in the base color for the
+ * remainder.
  */
 export function formatShimmeredWorkingMessage(
   snapshot: LiveStatsSnapshot,
   styles: WorkingMessageStyles,
-  phase: number,
+  cycle: number,
 ): string {
-  const text = formatWorkingMessage(snapshot);
-  const characters = toGraphemes(text);
-  const length = characters.length;
+  const characters = toGraphemes(formatWorkingMessage(snapshot));
   const base = baseColor(styles);
+  const length = characters.length;
   if (length === 0) return styles.bold("");
 
+  const progress = normalizePhase(cycle);
+  if (progress >= SHIMMER_SWEEP_FRACTION) {
+    return styles.bold(characters.map((character) => base(character)).join(""));
+  }
+
   const peak = styles.ramp.length - 1;
-  const center = normalizePhase(phase) * length;
   const halfBand = Math.max(1, (length * SHIMMER_BAND_FRACTION) / 2);
+  const traveled = (progress / SHIMMER_SWEEP_FRACTION) * (length + 2 * halfBand);
+  const center = length + halfBand - traveled;
 
   let output = "";
   for (const [index, character] of characters.entries()) {
-    const distance = circularDistance(index + 0.5, center, length);
+    const distance = Math.abs(index + 0.5 - center);
     const intensity = Math.max(0, 1 - distance / halfBand);
     const styler = styles.ramp[Math.round(intensity * peak)] ?? base;
     output += styler(character);
@@ -287,14 +297,9 @@ export function formatShimmeredWorkingMessage(
   return styles.bold(output);
 }
 
-function normalizePhase(phase: number): number {
-  if (!Number.isFinite(phase)) return 0;
-  return ((phase % 1) + 1) % 1;
-}
-
-function circularDistance(left: number, right: number, length: number): number {
-  const direct = Math.abs(left - right);
-  return Math.min(direct, length - direct);
+function normalizePhase(cycle: number): number {
+  if (!Number.isFinite(cycle)) return 0;
+  return ((cycle % 1) + 1) % 1;
 }
 
 function formatWorkingStats(snapshot: LiveStatsSnapshot): string {
