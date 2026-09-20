@@ -25,7 +25,7 @@ will retain only a notice that points to the new source.
 - Replace the old source in place. Do not keep a second skill source or a fallback reader.
 - Leave a short move notice at `tools/agents/README.md`.
 - Keep external skills, including Hugging Face-managed skills under `.agents`, unchanged.
-- Remove the redundant `plain-language` skill and keep `amk` as the single plain-explanation skill.
+- Remove the redundant `plain-language` skill and keep `bro` as the single plain-explanation skill.
 
 ## Assumptions
 

@@ -25,7 +25,7 @@ That means the summary should:
 - stand on its own without the rest of the PR
 - state that context and those implementation steps plainly
 
-Write the top summary in the same style as the `amk` skill:
+Write the top summary in the same style as the `bro` skill:
 
 - short full sentences
 - main point first

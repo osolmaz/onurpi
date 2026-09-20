@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bro"
+  short_description: "Explain technical ideas plainly and directly"
+  default_prompt: "Use $bro to explain this more simply and directly."

@@ -44,7 +44,7 @@ describe("@onurpi/agents package", () => {
     expect(skills.map((skill) => skill.skillId)).not.toContain("plain-language");
     expect(skills.map((skill) => skill.skillId)).not.toContain("paid-compute-launch");
     expect(skills.map((skill) => skill.skillId)).not.toContain("browse-x-posts");
-    expect(skills.map((skill) => skill.skillId)).toContain("amk");
+    expect(skills.map((skill) => skill.skillId)).toContain("bro");
     expect(skills.map((skill) => skill.skillId)).toContain("find-sota");
     expect(skills.map((skill) => skill.skillId)).toEqual(
       expect.arrayContaining(["autodoc-legacy", "autoimplement-legacy"]),

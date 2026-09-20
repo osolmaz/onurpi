@@ -3,33 +3,33 @@ import { describe, expect, it, vi } from "vitest";
 
 import skillSlug, { skillNamesFromSystemPrompt, skillSlugCommand } from "./index.ts";
 
-const PROMPT_WITH_AMK = [
+const PROMPT_WITH_BRO = [
   "System prompt text.",
   "",
   "<available_skills>",
   "  <skill>",
-  "    <name>amk</name>",
+  "    <name>bro</name>",
   "    <description>plain language</description>",
-  "    <location>/skills/amk/SKILL.md</location>",
+  "    <location>/skills/bro/SKILL.md</location>",
   "  </skill>",
   "</available_skills>",
 ].join("\n");
 
 describe("skillSlugCommand", () => {
-  const hasSlug = (slug: string) => slug === "amk";
+  const hasSlug = (slug: string) => slug === "bro";
 
   it("rewrites an exact slug to its skill command", () => {
-    expect(skillSlugCommand("amk", hasSlug)).toBe("/skill:amk");
-    expect(skillSlugCommand("  amk\n", hasSlug)).toBe("/skill:amk");
+    expect(skillSlugCommand("bro", hasSlug)).toBe("/skill:bro");
+    expect(skillSlugCommand("  bro\n", hasSlug)).toBe("/skill:bro");
   });
 
   it("passes through anything else", () => {
     expect(skillSlugCommand("unknown", hasSlug)).toBeUndefined();
-    expect(skillSlugCommand("amk please rewrite this", hasSlug)).toBeUndefined();
-    expect(skillSlugCommand("AMK", hasSlug)).toBeUndefined();
+    expect(skillSlugCommand("bro please rewrite this", hasSlug)).toBeUndefined();
+    expect(skillSlugCommand("BRO", hasSlug)).toBeUndefined();
     expect(skillSlugCommand("", hasSlug)).toBeUndefined();
     expect(skillSlugCommand("   ", hasSlug)).toBeUndefined();
-    expect(skillSlugCommand("/skill:amk", hasSlug)).toBeUndefined();
+    expect(skillSlugCommand("/skill:bro", hasSlug)).toBeUndefined();
   });
 });
 
@@ -38,7 +38,7 @@ describe("skillNamesFromSystemPrompt", () => {
     const prompt = [
       "<available_skills>",
       "  <skill>",
-      "    <name>amk</name>",
+      "    <name>bro</name>",
       "    <description>plain</description>",
       "  </skill>",
       "  <skill>",
@@ -47,7 +47,7 @@ describe("skillNamesFromSystemPrompt", () => {
       "  </skill>",
       "</available_skills>",
     ].join("\n");
-    expect(skillNamesFromSystemPrompt(prompt)).toEqual(["amk", "a&b"]);
+    expect(skillNamesFromSystemPrompt(prompt)).toEqual(["bro", "a&b"]);
   });
 
   it("returns an empty list without a block or without names", () => {
@@ -87,9 +87,9 @@ describe("skillSlug extension", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
 
-    expect(input(handlers, { text: "amk", source: "interactive" }, PROMPT_WITH_AMK)).toEqual({
+    expect(input(handlers, { text: "bro", source: "interactive" }, PROMPT_WITH_BRO)).toEqual({
       action: "transform",
-      text: "/skill:amk",
+      text: "/skill:bro",
     });
     expect(input(handlers, { text: "hello", source: "interactive" })).toEqual({
       action: "continue",
@@ -99,22 +99,22 @@ describe("skillSlug extension", () => {
   it("prefers the structured skills list and keeps it when a later list is empty", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
-    expect(input(handlers, { text: "amk", source: "interactive" }, "no skills here")).toEqual({
+    expect(input(handlers, { text: "bro", source: "interactive" }, "no skills here")).toEqual({
       action: "continue",
     });
-    primeStructured(handlers, { skills: [{ name: "amk" }] });
+    primeStructured(handlers, { skills: [{ name: "bro" }] });
 
-    expect(input(handlers, { text: "amk", source: "interactive" })).toMatchObject({
+    expect(input(handlers, { text: "bro", source: "interactive" })).toMatchObject({
       action: "transform",
     });
 
     primeStructured(handlers, { skills: [] });
-    expect(input(handlers, { text: "amk", source: "interactive" })).toMatchObject({
+    expect(input(handlers, { text: "bro", source: "interactive" })).toMatchObject({
       action: "transform",
     });
 
     primeStructured(handlers, {});
-    expect(input(handlers, { text: "amk", source: "interactive" })).toMatchObject({
+    expect(input(handlers, { text: "bro", source: "interactive" })).toMatchObject({
       action: "transform",
     });
   });
@@ -124,10 +124,10 @@ describe("skillSlug extension", () => {
     skillSlug(pi);
     const images = [{ type: "image", data: "...", mimeType: "image/png" }];
     expect(
-      input(handlers, { text: "amk", source: "interactive", images }, PROMPT_WITH_AMK),
+      input(handlers, { text: "bro", source: "interactive", images }, PROMPT_WITH_BRO),
     ).toEqual({
       action: "transform",
-      text: "/skill:amk",
+      text: "/skill:bro",
       images,
     });
   });
@@ -136,18 +136,18 @@ describe("skillSlug extension", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
 
-    expect(input(handlers, { text: "amk", source: "extension" }, PROMPT_WITH_AMK)).toEqual({
+    expect(input(handlers, { text: "bro", source: "extension" }, PROMPT_WITH_BRO)).toEqual({
       action: "continue",
     });
     primeStructured(handlers, { skills: [{ name: "hidden-skill" }] });
 
     expect(
-      input(handlers, { text: "hidden-skill", source: "interactive" }, PROMPT_WITH_AMK),
+      input(handlers, { text: "hidden-skill", source: "interactive" }, PROMPT_WITH_BRO),
     ).toEqual({
       action: "transform",
       text: "/skill:hidden-skill",
     });
-    expect(input(handlers, { text: "amk", source: "interactive" })).toEqual({
+    expect(input(handlers, { text: "bro", source: "interactive" })).toEqual({
       action: "continue",
     });
   });
@@ -156,10 +156,10 @@ describe("skillSlug extension", () => {
     const { pi, handlers } = createMockPi();
     skillSlug(pi);
 
-    expect(input(handlers, { text: "amk", source: "extension" }, PROMPT_WITH_AMK)).toEqual({
+    expect(input(handlers, { text: "bro", source: "extension" }, PROMPT_WITH_BRO)).toEqual({
       action: "continue",
     });
-    expect(input(handlers, { text: "amk", source: "rpc" }, PROMPT_WITH_AMK)).toMatchObject({
+    expect(input(handlers, { text: "bro", source: "rpc" }, PROMPT_WITH_BRO)).toMatchObject({
       action: "transform",
     });
   });

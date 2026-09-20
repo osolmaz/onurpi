@@ -7,7 +7,7 @@ description: Use when writing or editing prose for readers, including blog posts
 
 When this skill is invoked, write with plain words.
 
-This skill is the document-length counterpart of `amk`. That skill
+This skill is the document-length counterpart of `bro`. That skill
 shapes short chat answers. This one governs word choice in anything written
 for readers, at any length. The single rule is that every word should be the
 plainest word that says the thing correctly. Jargon is allowed only when it

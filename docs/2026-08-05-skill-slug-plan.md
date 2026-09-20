@@ -9,8 +9,8 @@ date: 2026-08-05
 ## Purpose
 
 Typing a skill's slug alone and pressing enter should be equivalent to calling that skill. "if i
-just type a skills slug and enter, it should be equivalent to calling that skill. like in amk."
-Today that requires the slash form `/skill:amk`.
+just type a skills slug and enter, it should be equivalent to calling that skill. like in bro."
+Today that requires the slash form `/skill:bro`.
 
 ## Design
 
@@ -26,8 +26,8 @@ re-implementation:
 
 Deliberate choices:
 
-- **Exact match only.** First-word matching (`amk bu nedir`) would hijack natural-language messages,
-  and slugs like `amk` are real words. Arguments stay available as `/skill:slug args`.
+- **Exact match only.** First-word matching (`bro bu nedir`) would hijack natural-language messages,
+  and slugs like `bro` are real words. Arguments stay available as `/skill:slug args`.
 - **Prime from the system prompt.** The slug set is built at `session_start` (and lazily on the
   first input) by extracting `<name>` entries from the `<available_skills>` block of
   `ctx.getSystemPrompt()`, then refreshed from the structured `systemPromptOptions.skills` list at
@@ -55,7 +55,7 @@ discovery and expansion, drifts from Pi).
 
 ## Acceptance criteria
 
-- `amk` + enter expands through Pi's skill expansion exactly like `/skill:amk`.
+- `bro` + enter expands through Pi's skill expansion exactly like `/skill:bro`.
 - Non-slug input, empty input, and multi-word input pass through unchanged.
 - Package checks pass with the standard thresholds; root checks pass.
 
@@ -68,5 +68,5 @@ discovery and expansion, drifts from Pi).
 ## Implementation status
 
 Merged in PR #65 and follow-up. Live verification: a fresh Pi session in a scratch directory loaded
-the extension, and its first message `amk` was expanded by Pi into the full skill content
-(`<skill name="amk" location="...">` in the session file), identical to `/skill:amk`.
+the extension, and its first message `bro` was expanded by Pi into the full skill content
+(`<skill name="bro" location="...">` in the session file), identical to `/skill:bro`.

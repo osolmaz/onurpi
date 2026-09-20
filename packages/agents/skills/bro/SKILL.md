@@ -1,11 +1,11 @@
 ---
-name: amk
+name: bro
 description: Use when the user asks for a plainer, simpler, shorter, or more direct explanation. Produces concrete, full-sentence explanations that lead with the main point, avoid jargon, and use exact numbers when they matter.
 ---
 
-# AMK
+# Bro
 
-> *A human will read this, AMK evladı*
+> *A human will read this, bro*
 
 When this skill is invoked, explain the idea in the simplest correct way you can.
 

@@ -26,7 +26,7 @@ positional arguments for a selective update.
 
 ```sh
 npm run agents:sync -- --dry-run
-npm run agents:sync -- amk plain-writing
+npm run agents:sync -- bro plain-writing
 ```
 
 A full sync prunes only skills recorded as managed by this installer. A selective sync keeps other
