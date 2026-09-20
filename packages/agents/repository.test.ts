@@ -74,8 +74,8 @@ describe("@onurpi/agents package", () => {
       "utf8",
     );
     const routes = [
-      "DeepSeek-V4.1-Flash:novita",
       "DeepSeek-V4.1-Flash:baseten",
+      "DeepSeek-V4.1-Flash:novita",
       "DeepSeek-V4.1-Flash:fireworks-ai",
       "DeepSeek-V4.1-Flash:deepinfra",
     ];
