@@ -2,7 +2,9 @@ import { ModelRuntime, VERSION } from "@earendil-works/pi-coding-agent";
 
 const ADAPTER_STATE_KEY = Symbol.for("@onurpi/codex-switcher/startup-auth-adapter.v1");
 const PROVIDER_ID = "openai-codex";
+const MINIMUM_MINOR = 84;
 const MINIMUM_PATCH = 2;
+const MAXIMUM_MINOR = 87;
 
 type AuthCheck = (this: object, providerId: string) => boolean;
 
@@ -45,14 +47,21 @@ function isAdapterState(value: unknown): value is AdapterState {
   );
 }
 
+function supportedPiVersion(version: string): boolean {
+  const match = /^0\.(\d+)\.(\d+)$/u.exec(version);
+  if (!match) return false;
+  const minor = Number(match[1]);
+  const patch = Number(match[2]);
+  if (!Number.isSafeInteger(minor) || !Number.isSafeInteger(patch)) return false;
+  if (minor === MINIMUM_MINOR) return patch >= MINIMUM_PATCH;
+  return minor > MINIMUM_MINOR && minor < MAXIMUM_MINOR;
+}
+
 function assertSupportedPiVersion(version: string): void {
-  const supported =
-    /^0\.84\.(?:[2-9]|[1-9]\d+)$/u.test(version) || /^0\.85\.(?:0|[1-9]\d*)$/u.test(version);
-  if (!supported) {
-    throw new Error(
-      `Codex switcher session restore supports Pi >=0.84.${String(MINIMUM_PATCH)} <0.86.0; found ${version}.`,
-    );
-  }
+  if (supportedPiVersion(version)) return;
+  throw new Error(
+    `Codex switcher session restore supports Pi >=0.84.${String(MINIMUM_PATCH)} <0.${String(MAXIMUM_MINOR)}.0; found ${version}.`,
+  );
 }
 
 function stateFor(prototype: AuthRuntimePrototype): AdapterState {

@@ -125,7 +125,7 @@ and close functions cover tools, retries, compaction, finalization, cancellation
 
 ## Session restore
 
-Pi 0.84.x and 0.85.x check saved-session authentication before they apply provider registrations
+Pi 0.84.x through 0.86.x check saved-session authentication before they apply provider registrations
 from extensions. The switcher installs a short-lived, version-locked startup adapter so this early
 check can recognize a configured account in the existing switcher vault.
 
@@ -140,7 +140,7 @@ The readiness check returns only a boolean. It does not return, copy, refresh, l
 credential. The adapter does not choose a model, read session entries, or append a model change.
 Missing or invalid switcher state keeps Pi's normal fallback behavior.
 
-This adapter supports Pi 0.84.2 through 0.85.x only. The extension validates the adapter and
+This adapter supports Pi 0.84.2 through 0.86.x only. The extension validates the adapter and
 lifecycle cleanup before it queues its provider. If startup rejects the Pi version or lifecycle
 setup, Pi keeps the built-in provider or another extension's queued provider unchanged. The adapter
 will be removed when Pi releases provider registration before saved-model restoration.
@@ -160,7 +160,7 @@ credential values. The extension adds no custom session entries.
 
 ## Limits
 
-- The extension supports Pi versions from 0.84.2 through 0.85.x. The startup adapter rejects an
+- The extension supports Pi versions from 0.84.2 through 0.86.x. The startup adapter rejects an
   unsupported runtime version.
 - Pi currently stores one credential for each provider ID. The switcher therefore owns its account
   vault until Pi exposes public named credential profiles.
