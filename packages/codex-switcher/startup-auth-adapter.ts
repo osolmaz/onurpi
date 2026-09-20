@@ -4,7 +4,8 @@ const ADAPTER_STATE_KEY = Symbol.for("@onurpi/codex-switcher/startup-auth-adapte
 const PROVIDER_ID = "openai-codex";
 const MINIMUM_MINOR = 84;
 const MINIMUM_PATCH = 2;
-const MAXIMUM_MINOR = 87;
+const MINIMUM_VERSION = [0, MINIMUM_MINOR, MINIMUM_PATCH];
+const SUPPORTED_PI_RANGE = `>=${MINIMUM_VERSION.join(".")}`;
 
 type AuthCheck = (this: object, providerId: string) => boolean;
 
@@ -47,20 +48,25 @@ function isAdapterState(value: unknown): value is AdapterState {
   );
 }
 
+function compareVersions(left: readonly number[], right: readonly number[]): number {
+  for (let index = 0; index < left.length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
 function supportedPiVersion(version: string): boolean {
-  const match = /^0\.(\d+)\.(\d+)$/u.exec(version);
+  const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version);
   if (!match) return false;
-  const minor = Number(match[1]);
-  const patch = Number(match[2]);
-  if (!Number.isSafeInteger(minor) || !Number.isSafeInteger(patch)) return false;
-  if (minor === MINIMUM_MINOR) return patch >= MINIMUM_PATCH;
-  return minor > MINIMUM_MINOR && minor < MAXIMUM_MINOR;
+  const parts = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return parts.every(Number.isSafeInteger) && compareVersions(parts, MINIMUM_VERSION) >= 0;
 }
 
 function assertSupportedPiVersion(version: string): void {
   if (supportedPiVersion(version)) return;
   throw new Error(
-    `Codex switcher session restore supports Pi >=0.84.${String(MINIMUM_PATCH)} <0.${String(MAXIMUM_MINOR)}.0; found ${version}.`,
+    `Codex switcher session restore supports Pi ${SUPPORTED_PI_RANGE}; found ${version}.`,
   );
 }
 

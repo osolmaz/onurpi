@@ -9,10 +9,11 @@
 - Never fall back after text, thinking, or a tool call starts.
 - Keep the committed account fixed through the complete agent run.
 - Use documented Pi provider, auth, model, command, event, and status APIs except for the reviewed
-  Pi 0.84.x through 0.86.x startup adapter. That adapter may wrap only the public exported
+  Pi 0.84.2-and-later startup adapter. That adapter may wrap only the public exported
   `ModelRuntime.prototype.hasConfiguredAuth` method during saved-model restoration. It must be
-  version-locked, reversible, guarded against duplicate installation, and removed when Pi registers
-  providers before model restoration.
+  reversible, guarded against duplicate installation, and removed when Pi registers providers before
+  model restoration. It must reject an unparseable or too-old Pi version before it patches, so a
+  later Pi release that renames or removes the method keeps Pi's original behavior.
 - The startup adapter may report `openai-codex` readiness only when valid switcher configuration has
   a matching account in the existing protected vault. It must delegate all other providers and
   states, return no credential data, make no session or model change, and restore Pi's exact
