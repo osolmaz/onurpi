@@ -72,14 +72,14 @@ function context(overrides: Record<string, unknown> = {}) {
 describe("/restart command", () => {
   it("shuts down exactly once after launcher acceptance", async () => {
     const ctx = context();
-    await runRestartCommand("", ctx.value, launcher());
+    await runRestartCommand("", ctx.value, launcher(), () => true);
     expect(ctx.shutdown).toHaveBeenCalledTimes(1);
     expect(ctx.notify).toHaveBeenCalledWith("Restarting Pi...", "info");
   });
 
   it("keeps Pi running after launcher rejection", async () => {
     const ctx = context();
-    await runRestartCommand("", ctx.value, launcher("reject"));
+    await runRestartCommand("", ctx.value, launcher("reject"), () => true);
     expect(ctx.shutdown).not.toHaveBeenCalled();
     expect(ctx.notify.mock.calls.at(-1)?.[0]).toContain("preflight failed");
   });
@@ -88,9 +88,19 @@ describe("/restart command", () => {
     const ctx = context();
     const direct = launcher();
     direct.env[RESTART_PROTOCOL_ENV] = undefined;
-    await runRestartCommand("", ctx.value, direct);
+    await runRestartCommand("", ctx.value, direct, () => true);
     expect(ctx.shutdown).not.toHaveBeenCalled();
     expect(ctx.notify.mock.calls.at(-1)?.[0]).toContain("pi --session '/sessions/one.jsonl'");
+  });
+
+  it("fails closed with a clear message when the session has no saved messages", async () => {
+    const ctx = context();
+    await runRestartCommand("", ctx.value, launcher(), () => false);
+    expect(ctx.shutdown).not.toHaveBeenCalled();
+    expect(ctx.notify).toHaveBeenCalledWith(
+      expect.stringContaining("no saved messages yet"),
+      "error",
+    );
   });
 
   it("fails closed for unsupported command states", async () => {
@@ -118,7 +128,7 @@ describe("/restart command", () => {
     ];
     for (const setup of cases) {
       const ctx = context(setup.overrides);
-      await runRestartCommand(setup.rawArgs ?? "", ctx.value, launcher());
+      await runRestartCommand(setup.rawArgs ?? "", ctx.value, launcher(), () => true);
       expect(ctx.shutdown).not.toHaveBeenCalled();
       expect(ctx.notify).toHaveBeenCalled();
     }

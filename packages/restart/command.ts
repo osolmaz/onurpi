@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
@@ -24,6 +25,16 @@ type RestartCommandContext = Pick<
 
 type CommandError = { message: string; level: "error" | "warning" };
 
+export type SessionFileCheck = (path: string) => boolean;
+
+export function defaultSessionFileCheck(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function commandStateError(rawArgs: string, ctx: RestartCommandContext): CommandError | undefined {
   if (rawArgs.trim()) return { message: "Usage: /restart", level: "error" };
   if (ctx.mode !== "tui") {
@@ -41,6 +52,19 @@ function restartIdentity(ctx: RestartCommandContext): RestartIdentity | undefine
   return { sessionFile, sessionId: ctx.sessionManager.getSessionId(), cwd: ctx.cwd };
 }
 
+function sessionFileError(
+  identity: RestartIdentity,
+  isSessionFile: SessionFileCheck,
+): CommandError | undefined {
+  if (isSessionFile(identity.sessionFile)) return undefined;
+  return {
+    message:
+      "This session has no saved messages yet, so restart cannot resume it.\n" +
+      "Send a message, then run /restart again.",
+    level: "error",
+  };
+}
+
 function notifyError(ctx: RestartCommandContext, error: CommandError): void {
   ctx.ui.notify(error.message, error.level);
 }
@@ -49,6 +73,7 @@ export async function runRestartCommand(
   rawArgs: string,
   ctx: RestartCommandContext,
   transport: IpcTransport = nodeIpcTransport(),
+  isSessionFile: SessionFileCheck = defaultSessionFileCheck,
 ): Promise<void> {
   const stateError = commandStateError(rawArgs, ctx);
   if (stateError) {
@@ -58,6 +83,11 @@ export async function runRestartCommand(
   const identity = restartIdentity(ctx);
   if (!identity) {
     ctx.ui.notify("/restart requires a persisted session with an absolute file path.", "error");
+    return;
+  }
+  const fileError = sessionFileError(identity, isSessionFile);
+  if (fileError) {
+    notifyError(ctx, fileError);
     return;
   }
   const manual = manualRestartCommand(identity.sessionFile);

@@ -162,6 +162,20 @@ describe("restart launcher", () => {
     expect(test.specs).toHaveLength(1);
   });
 
+  it("rejects a session that has no saved messages yet", async () => {
+    const test = harness([{ request: identity }]);
+    test.deps.stat = (path) => {
+      if (path === identity.sessionFile) throw new Error("ENOENT: no such file or directory");
+      return { isFile: () => path !== identity.cwd, isDirectory: () => path === identity.cwd };
+    };
+    await expect(runLauncher([], test.deps)).resolves.toBe(0);
+    expect(test.workers[0]?.sent[0]).toMatchObject({
+      type: "restartRejected",
+      reason: "The session has no saved messages yet, so there is nothing to resume.",
+    });
+    expect(test.specs).toHaveLength(1);
+  });
+
   it("rejects unsupported startup arguments", async () => {
     const test = harness([{ request: identity }]);
     await expect(runLauncher(["--no-session"], test.deps)).resolves.toBe(0);

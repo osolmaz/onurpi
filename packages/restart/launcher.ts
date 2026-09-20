@@ -85,18 +85,57 @@ function requestShapeError(
   return undefined;
 }
 
+function statOrUndefined(
+  deps: LauncherDependencies,
+  path: string,
+): ReturnType<LauncherDependencies["stat"]> | undefined {
+  try {
+    return deps.stat(path);
+  } catch {
+    return undefined;
+  }
+}
+
+function sessionFileError(deps: LauncherDependencies, path: string): string | undefined {
+  const stats = statOrUndefined(deps, path);
+  if (!stats) return "The session has no saved messages yet, so there is nothing to resume.";
+  if (!stats.isFile()) return "Session path is not a regular file.";
+  return undefined;
+}
+
+function requireDirectory(
+  deps: LauncherDependencies,
+  path: string,
+  reason: string,
+): string | undefined {
+  return statOrUndefined(deps, path)?.isDirectory() ? undefined : reason;
+}
+
+function requireFile(deps: LauncherDependencies, path: string, reason: string): string | undefined {
+  return statOrUndefined(deps, path)?.isFile() ? undefined : reason;
+}
+
+function sessionIdentityError(
+  request: RestartRequest,
+  deps: LauncherDependencies,
+): string | undefined {
+  const header = deps.readHeader(request.sessionFile);
+  if (header.id !== request.sessionId) return "Session ID does not match the session file.";
+  if (header.cwd !== request.cwd) return "Session working directory does not match the request.";
+  return undefined;
+}
+
 function requestResourceError(
   request: RestartRequest,
   context: GenerationContext,
   deps: LauncherDependencies,
 ): string | undefined {
-  if (!deps.stat(request.sessionFile).isFile()) return "Session path is not a regular file.";
-  if (!deps.stat(request.cwd).isDirectory()) return "Working directory is not a directory.";
-  if (!deps.stat(context.entrypoint).isFile()) return "Pi entrypoint is no longer available.";
-  const header = deps.readHeader(request.sessionFile);
-  if (header.id !== request.sessionId) return "Session ID does not match the session file.";
-  if (header.cwd !== request.cwd) return "Session working directory does not match the request.";
-  return undefined;
+  return (
+    sessionFileError(deps, request.sessionFile) ??
+    requireDirectory(deps, request.cwd, "Working directory is not a directory.") ??
+    requireFile(deps, context.entrypoint, "Pi entrypoint is no longer available.") ??
+    sessionIdentityError(request, deps)
+  );
 }
 
 function validateRequest(
