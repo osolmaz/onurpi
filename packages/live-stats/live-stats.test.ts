@@ -2,6 +2,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
+  ansi256ToRgb,
   countOutputContentChars,
   formatElapsed,
   formatRate,
@@ -10,8 +11,12 @@ import {
   formatTokenCount,
   formatWorkingMessage,
   lightenRamp,
+  lightenRamp256,
+  lightenStops,
   LiveStatsTracker,
+  parseAnsi256Foreground,
   parseTruecolorForeground,
+  rgbToAnsi256,
   SHIMMER_SWEEP_FRACTION,
   toGraphemes,
   WORKING_SPINNER,
@@ -55,6 +60,14 @@ function peakIndex(cycle: number): number {
 
 function stylerAnsi(styler: ColorStyler): string {
   return styler("").replace(/\x1b\[39m$/u, "");
+}
+
+/** Relative luminance of the palette color that a 256-color escape names. */
+function paletteLuminance(escape: string): number {
+  const index = parseAnsi256Foreground(escape);
+  if (index === undefined) throw new Error(`not a palette escape: ${escape}`);
+  const { red, green, blue } = ansi256ToRgb(index);
+  return 0.299 * red + 0.587 * green + 0.114 * blue;
 }
 
 describe("LiveStatsTracker", () => {
@@ -423,6 +436,95 @@ describe("lightenRamp", () => {
 
   it("rejects an empty ramp", () => {
     expect(() => lightenRamp(base, 0)).toThrow("stops must be at least 1");
+  });
+});
+
+describe("lightenStops", () => {
+  const base = { red: 250, green: 179, blue: 135 };
+
+  it("starts at the base color and ends at the lighter tint", () => {
+    expect(lightenStops(base, 4)).toEqual([
+      { red: 250, green: 179, blue: 135 },
+      { red: 251, green: 192, blue: 155 },
+      { red: 252, green: 204, blue: 175 },
+      { red: 253, green: 217, blue: 195 },
+    ]);
+  });
+
+  it("keeps the base color when only one stop is requested", () => {
+    expect(lightenStops(base, 1)).toEqual([base]);
+  });
+});
+
+describe("parseAnsi256Foreground", () => {
+  it("reads the palette index", () => {
+    expect(parseAnsi256Foreground("\x1b[38;5;216m")).toBe(216);
+    expect(parseAnsi256Foreground("\x1b[38;5;7m")).toBe(7);
+  });
+
+  it("rejects other escape forms and an index outside the palette", () => {
+    expect(parseAnsi256Foreground("\x1b[38;2;250;179;135m")).toBeUndefined();
+    expect(parseAnsi256Foreground("\x1b[38;5;256m")).toBeUndefined();
+    expect(parseAnsi256Foreground("")).toBeUndefined();
+  });
+});
+
+describe("ansi256ToRgb", () => {
+  it("reads the standard colors, the color cube, and the grayscale ramp", () => {
+    expect(ansi256ToRgb(1)).toEqual({ red: 128, green: 0, blue: 0 });
+    expect(ansi256ToRgb(16)).toEqual({ red: 0, green: 0, blue: 0 });
+    expect(ansi256ToRgb(216)).toEqual({ red: 255, green: 175, blue: 135 });
+    expect(ansi256ToRgb(232)).toEqual({ red: 8, green: 8, blue: 8 });
+    expect(ansi256ToRgb(255)).toEqual({ red: 238, green: 238, blue: 238 });
+  });
+
+  it("rejects an index outside the palette", () => {
+    expect(() => ansi256ToRgb(256)).toThrow("palette index must be an integer from 0 to 255");
+    expect(() => ansi256ToRgb(1.5)).toThrow(RangeError);
+  });
+});
+
+describe("rgbToAnsi256", () => {
+  it("finds the palette index of a palette color", () => {
+    expect(rgbToAnsi256({ red: 255, green: 175, blue: 135 })).toBe(216);
+    expect(rgbToAnsi256({ red: 8, green: 8, blue: 8 })).toBe(232);
+  });
+
+  it("keeps a saturated color in the color cube", () => {
+    const index = rgbToAnsi256({ red: 250, green: 179, blue: 135 });
+
+    expect(index).toBeGreaterThanOrEqual(16);
+    expect(index).toBeLessThan(232);
+  });
+});
+
+describe("lightenRamp256", () => {
+  it("keeps the theme palette index in the base stop", () => {
+    expect(lightenRamp256(216, 4).map(stylerAnsi)[0]).toBe("\x1b[38;5;216m");
+  });
+
+  it("emits 256-color escapes for every stop", () => {
+    for (const styler of lightenRamp256(216, 4)) {
+      expect(stylerAnsi(styler)).toMatch(/^\x1b\[38;5;\d{1,3}m$/u);
+    }
+  });
+
+  it("moves toward a lighter color", () => {
+    const luminance = lightenRamp256(216, 4).map((styler) => paletteLuminance(stylerAnsi(styler)));
+
+    expect(luminance).toHaveLength(4);
+    expect(luminance.at(-1) ?? 0).toBeGreaterThan(luminance[0] ?? 0);
+    for (const [index, value] of luminance.entries()) {
+      if (index > 0) expect(value).toBeGreaterThanOrEqual(luminance[index - 1] ?? 0);
+    }
+  });
+
+  it("keeps the base color when only one stop is requested", () => {
+    expect(lightenRamp256(216, 1).map(stylerAnsi)).toEqual(["\x1b[38;5;216m"]);
+  });
+
+  it("rejects an empty ramp", () => {
+    expect(() => lightenRamp256(216, 0)).toThrow("stops must be at least 1");
   });
 });
 

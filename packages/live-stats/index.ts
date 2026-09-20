@@ -5,7 +5,9 @@ import {
   formatShimmeredWorkingMessage,
   formatStyledSpinnerFrames,
   lightenRamp,
+  lightenRamp256,
   LiveStatsTracker,
+  parseAnsi256Foreground,
   parseTruecolorForeground,
   SHIMMER_SWEEP_FRACTION,
   WORKING_SPINNER,
@@ -18,15 +20,21 @@ const SHIMMER_SWEEP_MS = 4_200;
 const SHIMMER_STOPS = 4;
 const SHIMMER_CYCLE_MS = SHIMMER_SWEEP_MS / SHIMMER_SWEEP_FRACTION;
 
-// Truecolor themes get a ramp of the theme's own hue, lightened toward a tint rather than white.
-// Other color modes fall back to two theme colors, because 256-color escapes cannot be blended.
+// The ramp keeps the theme's own warning color. A truecolor theme is blended toward a lighter tint
+// of the same hue. A 256-color theme is blended in RGB, and only the lighter stops are mapped back
+// to palette indices. A theme with no usable warning escape keeps the whole line in warning color.
 function colorRamp(ctx: ExtensionContext): ColorStyler[] {
   const theme = ctx.ui.theme;
-  const base = parseTruecolorForeground(theme.getFgAnsi("warning"));
-  if (theme.getColorMode() === "truecolor" && base !== undefined) {
-    return lightenRamp(base, SHIMMER_STOPS);
+  const mode = theme.getColorMode();
+  if (mode === "truecolor") {
+    const base = parseTruecolorForeground(theme.getFgAnsi("warning"));
+    if (base !== undefined) return lightenRamp(base, SHIMMER_STOPS);
   }
-  return [(text) => theme.fg("warning", text), (text) => theme.fg("text", text)];
+  if (mode === "256color") {
+    const index = parseAnsi256Foreground(theme.getFgAnsi("warning"));
+    if (index !== undefined) return lightenRamp256(index, SHIMMER_STOPS);
+  }
+  return [(text) => theme.fg("warning", text)];
 }
 
 function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
@@ -36,12 +44,25 @@ function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   };
 }
 
-function applyWorkingSpinner(ctx: ExtensionContext): void {
+// Pi has no theme-change event, so the frames are re-applied whenever the theme's warning escape
+// changes. Without this check the spinner would keep the old theme's colors after a theme switch
+// while the message used the new ones.
+let appliedSpinnerKey: string | undefined;
+
+function spinnerKey(ctx: ExtensionContext): string {
+  const theme = ctx.ui.theme;
+  return `${theme.getColorMode()} ${theme.getFgAnsi("warning")}`;
+}
+
+function syncWorkingSpinner(ctx: ExtensionContext): void {
   if (ctx.mode !== "tui") return;
+  const key = spinnerKey(ctx);
+  if (key === appliedSpinnerKey) return;
   ctx.ui.setWorkingIndicator({
     frames: formatStyledSpinnerFrames(WORKING_SPINNER.frames, workingMessageStyles(ctx)),
     intervalMs: WORKING_SPINNER.intervalMs,
   });
+  appliedSpinnerKey = key;
 }
 
 export default function liveStats(pi: ExtensionAPI): void {
@@ -56,6 +77,7 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   const render = (ctx: ExtensionContext): void => {
     if (ctx.mode !== "tui" || !tracker.active) return;
+    syncWorkingSpinner(ctx);
     const snapshot = tracker.snapshot(Date.now());
     ctx.ui.setWorkingMessage(
       formatShimmeredWorkingMessage(
@@ -73,7 +95,7 @@ export default function liveStats(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", (_event, ctx) => {
-    applyWorkingSpinner(ctx);
+    syncWorkingSpinner(ctx);
   });
 
   pi.on("agent_start", (_event, ctx) => {
@@ -90,6 +112,7 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   pi.on("message_start", (event, ctx) => {
     if (ctx.mode !== "tui" || event.message.role !== "assistant") return;
+    syncWorkingSpinner(ctx);
     tracker.startMessage();
   });
 

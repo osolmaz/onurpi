@@ -64,15 +64,122 @@ export function parseTruecolorForeground(ansi: string): Rgb | undefined {
  * stops short of white, so the highlight reads as a lighter tint instead of a white sweep.
  */
 export function lightenRamp(base: Rgb, stops: number, maxBlend = 0.5): ColorStyler[] {
+  return lightenStops(base, stops, maxBlend).map((color) =>
+    styler(`\x1b[38;2;${String(color.red)};${String(color.green)};${String(color.blue)}m`),
+  );
+}
+
+/**
+ * Builds ramp stylers that emit 256-color escapes. The base stop keeps the theme's own palette
+ * index, so the line starts in the exact color the theme names. Only the lighter stops are mapped
+ * back to a palette index.
+ */
+export function lightenRamp256(index: number, stops: number, maxBlend = 0.5): ColorStyler[] {
+  return lightenStops(ansi256ToRgb(index), stops, maxBlend).map((color, position) =>
+    styler(`\x1b[38;5;${String(position === 0 ? index : rgbToAnsi256(color))}m`),
+  );
+}
+
+/** Builds the ramp stops from a base color to a lighter tint of it. */
+export function lightenStops(base: Rgb, stops: number, maxBlend = 0.5): Rgb[] {
   if (stops < 1) throw new RangeError("stops must be at least 1");
   return Array.from({ length: stops }, (_, index) => {
     const blend = stops === 1 ? 0 : (index / (stops - 1)) * maxBlend;
-    const red = lightenChannel(base.red, blend);
-    const green = lightenChannel(base.green, blend);
-    const blue = lightenChannel(base.blue, blend);
-    const ansi = `\x1b[38;2;${String(red)};${String(green)};${String(blue)}m`;
-    return (text: string): string => `${ansi}${text}\x1b[39m`;
+    return {
+      red: lightenChannel(base.red, blend),
+      green: lightenChannel(base.green, blend),
+      blue: lightenChannel(base.blue, blend),
+    };
   });
+}
+
+function styler(ansi: string): ColorStyler {
+  return (text: string): string => `${ansi}${text}\x1b[39m`;
+}
+
+/** Reads the palette index from a 256-color foreground escape such as "\x1b[38;5;216m". */
+export function parseAnsi256Foreground(ansi: string): number | undefined {
+  const match = /^\x1b\[38;5;(\d{1,3})m$/u.exec(ansi);
+  if (match === null) return undefined;
+  const index = Number(match[1]);
+  return index > 255 ? undefined : index;
+}
+
+// Standard xterm values for the first 16 palette indices. A terminal may remap these colors, so
+// rgbToAnsi256 never chooses them.
+const ANSI_16_RGB: readonly Rgb[] = [
+  { red: 0, green: 0, blue: 0 },
+  { red: 128, green: 0, blue: 0 },
+  { red: 0, green: 128, blue: 0 },
+  { red: 128, green: 128, blue: 0 },
+  { red: 0, green: 0, blue: 128 },
+  { red: 128, green: 0, blue: 128 },
+  { red: 0, green: 128, blue: 128 },
+  { red: 192, green: 192, blue: 192 },
+  { red: 128, green: 128, blue: 128 },
+  { red: 255, green: 0, blue: 0 },
+  { red: 0, green: 255, blue: 0 },
+  { red: 255, green: 255, blue: 0 },
+  { red: 0, green: 0, blue: 255 },
+  { red: 255, green: 0, blue: 255 },
+  { red: 0, green: 255, blue: 255 },
+  { red: 255, green: 255, blue: 255 },
+];
+
+const CUBE_CHANNELS: readonly number[] = [0, 95, 135, 175, 215, 255];
+
+/** The xterm 256-color palette, built once from the standard colors, the cube, and the grays. */
+const PALETTE: readonly Rgb[] = buildPalette();
+
+function buildPalette(): Rgb[] {
+  const palette: Rgb[] = [...ANSI_16_RGB];
+  for (let index = 16; index <= 231; index += 1) {
+    const cube = index - 16;
+    palette.push({
+      red: cubeChannel(Math.floor(cube / 36)),
+      green: cubeChannel(Math.floor((cube % 36) / 6)),
+      blue: cubeChannel(cube % 6),
+    });
+  }
+  for (let index = 232; index <= 255; index += 1) {
+    const level = 8 + (index - 232) * 10;
+    palette.push({ red: level, green: level, blue: level });
+  }
+  return palette;
+}
+
+function cubeChannel(position: number): number {
+  return CUBE_CHANNELS[position] ?? 0;
+}
+
+/** Converts an xterm 256-color palette index to RGB. */
+export function ansi256ToRgb(index: number): Rgb {
+  if (!Number.isInteger(index) || index < 0 || index > 255) {
+    throw new RangeError("palette index must be an integer from 0 to 255");
+  }
+  return PALETTE[index] ?? { red: 0, green: 0, blue: 0 };
+}
+
+/** Finds the palette index closest to a color, among the cube and the grayscale ramp. */
+export function rgbToAnsi256(color: Rgb): number {
+  let closest = 16;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 16; index <= 255; index += 1) {
+    const distance = colorDistance(color, ansi256ToRgb(index));
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = index;
+    }
+  }
+  return closest;
+}
+
+function colorDistance(left: Rgb, right: Rgb): number {
+  const red = left.red - right.red;
+  const green = left.green - right.green;
+  const blue = left.blue - right.blue;
+  // The weights follow human sensitivity, the same way Pi maps a hex color to a palette index.
+  return red * red * 0.299 + green * green * 0.587 + blue * blue * 0.114;
 }
 
 function lightenChannel(channel: number, blend: number): number {
