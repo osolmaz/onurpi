@@ -59,6 +59,12 @@ const SPIRAL: readonly Cell[] = [
   [2, 1],
 ];
 
+/** The inward spiral plus its outward return, so one lap reaches the middle and comes back. */
+const SPIRAL_RUN: readonly Cell[] = [...SPIRAL, ...SPIRAL.slice(1, -1).reverse()];
+
+/** The same lap wound the other way around. */
+const SPIRAL_RUN_REVERSED: readonly Cell[] = mirrorPath(SPIRAL_RUN);
+
 /** Right lobe of the infinity sign: the ring of the right two columns, clockwise. */
 const RIGHT_LOBE: readonly Cell[] = [
   [1, 2],
@@ -238,6 +244,11 @@ const SHAPES: Record<ShapeName, readonly Cell[]> = {
 /** Turns a path through a quarter turn, so the two lobes of the infinity stand on top of each other. */
 function rotatePath(path: readonly Cell[]): Cell[] {
   return path.map(([row, col]) => [col, ROWS - 1 - row]);
+}
+
+/** Flips a path across the middle column, which reverses the way it winds. */
+function mirrorPath(path: readonly Cell[]): Cell[] {
+  return path.map(([row, col]) => [row, COLS - 1 - col]);
 }
 
 function createGrid(): Grid {
@@ -442,12 +453,24 @@ export const BRAILLE_SPINNERS: readonly BrailleSpinner[] = [
   defineSpinner(
     "spiral",
     "Spiral",
-    "A dot walks the inward spiral and leaves a trail.",
-    16,
-    90,
+    "A dot runs to the middle of the spiral and back out to the edge in one motion.",
+    30,
+    70,
     (step) => {
       const grid = createGrid();
-      drawTrail(grid, SPIRAL, step, 4);
+      drawTrail(grid, SPIRAL_RUN, step, 5);
+      return grid;
+    },
+  ),
+  defineSpinner(
+    "eddy",
+    "Eddy",
+    "The same run to the middle and back out, wound the other way around.",
+    30,
+    70,
+    (step) => {
+      const grid = createGrid();
+      drawTrail(grid, SPIRAL_RUN_REVERSED, step, 5);
       return grid;
     },
   ),

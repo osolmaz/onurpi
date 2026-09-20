@@ -13,7 +13,7 @@ The line holds no emoji and no Turkish phrase. Pi supplies the single separating
 indicator.
 
 Pi picks one spinner at random when a session starts and keeps it for that whole session, so a
-conversation always shows the same animation. The set holds twenty animations, each with its own
+conversation always shows the same animation. The set holds twenty-one animations, each with its own
 frame count and timing. Every frame is exactly two code points from the braille block
 (U+2800..U+28FF), so a frame covers two terminal columns and the line never changes width. The
 animations are defined in [`spinners.ts`](spinners.ts).
