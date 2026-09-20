@@ -230,12 +230,12 @@ describe("formatTokenCount", () => {
 });
 
 describe("working spinner", () => {
-  it("uses the circle-halves frames from cli-spinners", () => {
+  it("uses the dots5 frames from cli-spinners", () => {
     expect(WORKING_SPINNER).toEqual({
-      name: "circle-halves",
-      label: "Circle halves",
-      intervalMs: 50,
-      frames: ["◐", "◓", "◑", "◒"],
+      name: "dots5",
+      label: "Dots 5",
+      intervalMs: 80,
+      frames: ["⠋", "⠙", "⠚", "⠒", "⠂", "⠂", "⠒", "⠲", "⠴", "⠦", "⠖", "⠒", "⠐", "⠐", "⠒", "⠓", "⠋"],
     });
   });
 
@@ -252,12 +252,10 @@ describe("working spinner", () => {
       warning: (text: string) => `<warning>${text}</warning>`,
     };
 
-    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, styles)).toEqual([
-      "<b><warning>◐</warning></b>",
-      "<b><warning>◓</warning></b>",
-      "<b><warning>◑</warning></b>",
-      "<b><warning>◒</warning></b>",
-    ]);
+    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, styles)).toEqual(
+      WORKING_SPINNER.frames.map((frame) => `<b><warning>${frame}</warning></b>`),
+    );
+    expect(formatStyledSpinnerFrames(["⠋"], styles)).toEqual(["<b><warning>⠋</warning></b>"]);
   });
 });
 
@@ -269,8 +267,8 @@ describe("formatWorkingMessage", () => {
     tokensPerSecond: 21.74,
   };
 
-  it("shows estimated output and a sampled rate without a phrase", () => {
-    expect(formatWorkingMessage(snapshot)).toBe("(12s · ~438 out · 21.7 tok/s)");
+  it("labels the line as working and shows estimated output and a sampled rate", () => {
+    expect(formatWorkingMessage(snapshot)).toBe("Working… (12s · ~438 out · 21.7 tok/s)");
   });
 
   it("shows unavailable throughput before sampling begins", () => {
@@ -281,7 +279,7 @@ describe("formatWorkingMessage", () => {
         outputApproximate: false,
         tokensPerSecond: undefined,
       }),
-    ).toBe("(0s · 0 out · — tok/s)");
+    ).toBe("Working… (0s · 0 out · — tok/s)");
   });
 
   it("keeps emoji and Turkish text out of the working line", () => {
@@ -300,6 +298,6 @@ describe("formatWorkingMessage", () => {
         { elapsedMs: 1_000, outputTokens: 12, outputApproximate: false, tokensPerSecond: 4 },
         styles,
       ),
-    ).toBe("<b><warning>(1s · 12 out · 4.0 tok/s)</warning></b>");
+    ).toBe("<b><warning>Working… (1s · 12 out · 4.0 tok/s)</warning></b>");
   });
 });

@@ -1,17 +1,17 @@
 # @onurpi/live-stats
 
 `@onurpi/live-stats` is a Pi extension for live response metrics. It replaces Pi's default
-spinner with the circle-halves animation and shows the metrics for the current run in the theme's
-bold warning color.
+spinner with the dots5 animation and shows the metrics for the current run in the theme's bold
+warning color.
 
 ```text
-◐ (12s · ~438 out · 21.7 tok/s)
+⠋ Working… (12s · ~438 out · 21.7 tok/s)
 ```
 
-The frames are `◐ ◓ ◑ ◒`, the `circleHalves` spinner from
-[sindresorhus/cli-spinners](https://github.com/sindresorhus/cli-spinners), at 50 ms per frame. Each
+The frames are the `dots5` spinner from
+[sindresorhus/cli-spinners](https://github.com/sindresorhus/cli-spinners), at 80 ms per frame. Each
 frame is one terminal column wide, so the working line does not shift. The line holds no emoji and
-no phrase. Pi supplies the single separating space after the indicator.
+no Turkish phrase. Pi supplies the single separating space after the indicator.
 
 The timer covers one agent run, including model responses and tool calls. Output tokens accumulate
 across the model responses in that run. Throughput is the estimated output generated during the

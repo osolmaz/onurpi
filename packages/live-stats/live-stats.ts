@@ -8,14 +8,16 @@ export type WorkingSpinner = {
   frames: readonly string[];
 };
 
-// Frames are the circle-halves spinner from sindresorhus/cli-spinners, which the referenced
-// CodePen renders. Every frame is one terminal column wide, so the working line never shifts.
+// Frames are the dots5 spinner from sindresorhus/cli-spinners, which the referenced CodePen
+// renders. Every frame is one terminal column wide, so the working line never shifts.
 export const WORKING_SPINNER: WorkingSpinner = {
-  name: "circle-halves",
-  label: "Circle halves",
-  intervalMs: 50,
-  frames: ["◐", "◓", "◑", "◒"],
+  name: "dots5",
+  label: "Dots 5",
+  intervalMs: 80,
+  frames: ["⠋", "⠙", "⠚", "⠒", "⠂", "⠂", "⠒", "⠲", "⠴", "⠦", "⠖", "⠒", "⠐", "⠐", "⠒", "⠓", "⠋"],
 };
+
+export const WORKING_LABEL = "Working";
 
 type TokenSample = {
   atMs: number;
@@ -191,7 +193,7 @@ export function formatTokenCount(tokens: number): string {
 }
 
 export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
-  return `(${formatWorkingStats(snapshot)})`;
+  return `${WORKING_LABEL}… (${formatWorkingStats(snapshot)})`;
 }
 
 export function formatStyledWorkingMessage(
