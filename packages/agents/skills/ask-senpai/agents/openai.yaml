@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ask Senpai"
+  short_description: "Explicitly requested, costly Claude Fable or GPT-6 Astra calls"
+  default_prompt: "Use Claude Fable or GPT-6 Astra only because the human explicitly requested it. These models are very expensive, so make the fewest narrowly scoped calls needed. Default to ACPX's local Claude adapter for Claude Fable, use ACPX's Cursor adapter when the human explicitly requests Cursor, and use ACPX's Codex adapter for GPT-6 Astra. Select the model explicitly, use an appropriately long timeout, never switch adapters or models silently, and verify the result locally."
