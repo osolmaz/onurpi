@@ -31,16 +31,63 @@ export type LiveStatsSnapshot = {
   tokensPerSecond: number | undefined;
 };
 
+export type ColorStyler = (text: string) => string;
+
 export type WorkingMessageStyles = {
   bold: (text: string) => string;
-  warning: (text: string) => string;
+  /** Color stylers ordered from the base color to the brightest shimmer highlight. */
+  ramp: readonly ColorStyler[];
 };
+
+export type Rgb = { red: number; green: number; blue: number };
+
+const GRAPHEME_SEGMENTER = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+/** Splits text into user-perceived characters, so a styler never breaks a combined glyph. */
+export function toGraphemes(text: string): string[] {
+  return [...GRAPHEME_SEGMENTER.segment(text)].map((entry) => entry.segment);
+}
+
+/** Reads the RGB triple from a truecolor foreground escape such as "\x1b[38;2;250;179;135m". */
+export function parseTruecolorForeground(ansi: string): Rgb | undefined {
+  const match = /^\x1b\[38;2;(\d{1,3});(\d{1,3});(\d{1,3})m$/u.exec(ansi);
+  if (match === null) return undefined;
+  const channels = match.slice(1).map(Number);
+  if (channels.some((channel) => channel > 255)) return undefined;
+  const [red, green, blue] = channels;
+  if (red === undefined || green === undefined || blue === undefined) return undefined;
+  return { red, green, blue };
+}
+
+/** Builds color stylers from a base color to a lighter highlight, keeping the theme's hue. */
+export function lightenRamp(base: Rgb, stops: number, maxBlend = 0.9): ColorStyler[] {
+  if (stops < 1) throw new RangeError("stops must be at least 1");
+  return Array.from({ length: stops }, (_, index) => {
+    const blend = stops === 1 ? 0 : (index / (stops - 1)) * maxBlend;
+    const red = lightenChannel(base.red, blend);
+    const green = lightenChannel(base.green, blend);
+    const blue = lightenChannel(base.blue, blend);
+    const ansi = `\x1b[38;2;${String(red)};${String(green)};${String(blue)}m`;
+    return (text: string): string => `${ansi}${text}\x1b[39m`;
+  });
+}
+
+function lightenChannel(channel: number, blend: number): number {
+  return Math.round(channel + (255 - channel) * blend);
+}
+
+function baseColor(styles: WorkingMessageStyles): ColorStyler {
+  const base = styles.ramp[0];
+  if (base === undefined) throw new Error("missing working message color ramp");
+  return base;
+}
 
 export function formatStyledSpinnerFrames(
   frames: readonly string[],
   styles: WorkingMessageStyles,
 ): string[] {
-  return frames.map((frame) => styles.bold(styles.warning(frame)));
+  const color = baseColor(styles);
+  return frames.map((frame) => styles.bold(color(frame)));
 }
 
 type OutputContent =
@@ -204,11 +251,47 @@ export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
   return `${WORKING_LABEL}… (${formatWorkingStats(snapshot)})`;
 }
 
-export function formatStyledWorkingMessage(
+/** Share of the line covered by the traveling shimmer band. */
+const SHIMMER_BAND_FRACTION = 0.35;
+
+/**
+ * Colors the working line character by character. A band of lighter stops travels through the text
+ * as `phase` advances. A phase of 0 places the band center at the start of the line, and the phase
+ * wraps, so the band leaves one edge and returns through the other.
+ */
+export function formatShimmeredWorkingMessage(
   snapshot: LiveStatsSnapshot,
   styles: WorkingMessageStyles,
+  phase: number,
 ): string {
-  return styles.bold(styles.warning(formatWorkingMessage(snapshot)));
+  const text = formatWorkingMessage(snapshot);
+  const characters = toGraphemes(text);
+  const length = characters.length;
+  const base = baseColor(styles);
+  if (length === 0) return styles.bold("");
+
+  const peak = styles.ramp.length - 1;
+  const center = normalizePhase(phase) * length;
+  const halfBand = Math.max(1, (length * SHIMMER_BAND_FRACTION) / 2);
+
+  let output = "";
+  for (const [index, character] of characters.entries()) {
+    const distance = circularDistance(index + 0.5, center, length);
+    const intensity = Math.max(0, 1 - distance / halfBand);
+    const styler = styles.ramp[Math.round(intensity * peak)] ?? base;
+    output += styler(character);
+  }
+  return styles.bold(output);
+}
+
+function normalizePhase(phase: number): number {
+  if (!Number.isFinite(phase)) return 0;
+  return ((phase % 1) + 1) % 1;
+}
+
+function circularDistance(left: number, right: number, length: number): number {
+  const direct = Math.abs(left - right);
+  return Math.min(direct, length - direct);
 }
 
 function formatWorkingStats(snapshot: LiveStatsSnapshot): string {

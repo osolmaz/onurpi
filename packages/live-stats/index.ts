@@ -2,19 +2,35 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 import {
   countOutputContentChars,
+  formatShimmeredWorkingMessage,
   formatStyledSpinnerFrames,
-  formatStyledWorkingMessage,
+  lightenRamp,
   LiveStatsTracker,
+  parseTruecolorForeground,
   WORKING_SPINNER,
+  type ColorStyler,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
 
 const REFRESH_INTERVAL_MS = 50;
+const SHIMMER_PERIOD_MS = 1_400;
+const SHIMMER_STOPS = 4;
+
+// Truecolor themes get a ramp of the theme's own hue blended toward white. Other color modes fall
+// back to two theme colors, because 256-color escapes cannot be blended.
+function colorRamp(ctx: ExtensionContext): ColorStyler[] {
+  const theme = ctx.ui.theme;
+  const base = parseTruecolorForeground(theme.getFgAnsi("warning"));
+  if (theme.getColorMode() === "truecolor" && base !== undefined) {
+    return lightenRamp(base, SHIMMER_STOPS);
+  }
+  return [(text) => theme.fg("warning", text), (text) => theme.fg("text", text)];
+}
 
 function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   return {
     bold: (text) => ctx.ui.theme.bold(text),
-    warning: (text) => ctx.ui.theme.fg("warning", text),
+    ramp: colorRamp(ctx),
   };
 }
 
@@ -38,8 +54,13 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   const render = (ctx: ExtensionContext): void => {
     if (ctx.mode !== "tui" || !tracker.active) return;
+    const snapshot = tracker.snapshot(Date.now());
     ctx.ui.setWorkingMessage(
-      formatStyledWorkingMessage(tracker.snapshot(Date.now()), workingMessageStyles(ctx)),
+      formatShimmeredWorkingMessage(
+        snapshot,
+        workingMessageStyles(ctx),
+        snapshot.elapsedMs / SHIMMER_PERIOD_MS,
+      ),
     );
   };
 

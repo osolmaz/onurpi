@@ -5,13 +5,51 @@ import {
   countOutputContentChars,
   formatElapsed,
   formatRate,
+  formatShimmeredWorkingMessage,
   formatStyledSpinnerFrames,
-  formatStyledWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
+  lightenRamp,
   LiveStatsTracker,
+  parseTruecolorForeground,
+  toGraphemes,
   WORKING_SPINNER,
+  type ColorStyler,
+  type LiveStatsSnapshot,
+  type WorkingMessageStyles,
 } from "./live-stats.ts";
+
+const SNAPSHOT: LiveStatsSnapshot = {
+  elapsedMs: 12_400,
+  outputTokens: 438,
+  outputApproximate: true,
+  tokensPerSecond: 21.74,
+};
+
+/** Marker stylers, so a test can see which ramp stop colored each character. */
+function rampStyles(levels = 4): WorkingMessageStyles {
+  return {
+    bold: (text: string) => `<b>${text}</b>`,
+    ramp: Array.from(
+      { length: levels },
+      (_, level) =>
+        (text: string): string =>
+          `<${String(level)}>${text}</>`,
+    ),
+  };
+}
+
+function shimmerSegments(phase: number, levels = 4): string[] {
+  const styled = formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(levels), phase);
+  const body = styled.slice("<b>".length, -"</b>".length);
+  const segments = body.split("</>");
+  segments.pop();
+  return segments;
+}
+
+function stylerAnsi(styler: ColorStyler): string {
+  return styler("").replace(/\x1b\[39m$/u, "");
+}
 
 describe("LiveStatsTracker", () => {
   it("rejects invalid estimation settings", () => {
@@ -266,16 +304,10 @@ describe("working spinner", () => {
     expect(WORKING_SPINNER.frames.every((frame) => frame.trimEnd() === frame)).toBe(true);
   });
 
-  it("renders every frame in bold warning color", () => {
-    const styles = {
-      bold: (text: string) => `<b>${text}</b>`,
-      warning: (text: string) => `<warning>${text}</warning>`,
-    };
-
-    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, styles)).toEqual(
-      WORKING_SPINNER.frames.map((frame) => `<b><warning>${frame}</warning></b>`),
+  it("renders every frame in bold base color", () => {
+    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, rampStyles())).toEqual(
+      WORKING_SPINNER.frames.map((frame) => `<b><0>${frame}</></b>`),
     );
-    expect(formatStyledSpinnerFrames(["⠋"], styles)).toEqual(["<b><warning>⠋</warning></b>"]);
   });
 });
 
@@ -313,17 +345,140 @@ describe("formatWorkingMessage", () => {
     expect(formatWorkingMessage(snapshot)).not.toMatch(/[ıİşŞğĞüÜöÖçÇ]/u);
   });
 
-  it("renders the complete working line in bold warning color", () => {
-    const styles = {
-      bold: (text: string) => `<b>${text}</b>`,
-      warning: (text: string) => `<warning>${text}</warning>`,
+  it("renders the complete working line in bold base color", () => {
+    const snapshot = {
+      elapsedMs: 1_000,
+      outputTokens: 12,
+      outputApproximate: false,
+      tokensPerSecond: 4,
+    };
+    const expected = `<b>${toGraphemes(formatWorkingMessage(snapshot))
+      .map((character) => `<0>${character}</>`)
+      .join("")}</b>`;
+
+    expect(formatShimmeredWorkingMessage(snapshot, rampStyles(1), 0)).toBe(expected);
+  });
+});
+
+describe("toGraphemes", () => {
+  it("keeps combined glyphs together", () => {
+    expect(toGraphemes("a\u0301b")).toEqual(["a\u0301", "b"]);
+    expect(toGraphemes("👍🏽!")).toEqual(["👍🏽", "!"]);
+  });
+});
+
+describe("parseTruecolorForeground", () => {
+  it("reads a truecolor foreground escape", () => {
+    expect(parseTruecolorForeground("\x1b[38;2;250;179;135m")).toEqual({
+      red: 250,
+      green: 179,
+      blue: 135,
+    });
+  });
+
+  it("rejects other escape forms", () => {
+    expect(parseTruecolorForeground("\x1b[38;5;216m")).toBeUndefined();
+    expect(parseTruecolorForeground("\x1b[38;2;250;179;135m\x1b[39m")).toBeUndefined();
+    expect(parseTruecolorForeground("")).toBeUndefined();
+  });
+
+  it("rejects an out-of-range channel", () => {
+    expect(parseTruecolorForeground("\x1b[38;2;250;179;999m")).toBeUndefined();
+  });
+});
+
+describe("lightenRamp", () => {
+  const base = { red: 250, green: 179, blue: 135 };
+
+  it("blends from the base color toward white", () => {
+    const ramp = lightenRamp(base, 4);
+    const ansi = ramp.map((styler) => stylerAnsi(styler));
+
+    expect(ansi).toHaveLength(4);
+    expect(ansi[0]).toBe("\x1b[38;2;250;179;135m");
+    expect(ansi[3]).toBe("\x1b[38;2;255;247;243m");
+  });
+
+  it("keeps the base color when only one stop is requested", () => {
+    expect(lightenRamp(base, 1).map((styler) => stylerAnsi(styler))).toEqual([
+      "\x1b[38;2;250;179;135m",
+    ]);
+  });
+
+  it("lightens every channel step by step", () => {
+    const channels = lightenRamp(base, 4).map((styler) =>
+      parseTruecolorForeground(stylerAnsi(styler)),
+    );
+
+    expect(channels.map((rgb) => rgb?.red)).toEqual([250, 252, 253, 255]);
+    expect(channels.map((rgb) => rgb?.green)).toEqual([179, 202, 225, 247]);
+    expect(channels.map((rgb) => rgb?.blue)).toEqual([135, 171, 207, 243]);
+  });
+
+  it("rejects an empty ramp", () => {
+    expect(() => lightenRamp(base, 0)).toThrow("stops must be at least 1");
+  });
+});
+
+describe("formatShimmeredWorkingMessage", () => {
+  const text = formatWorkingMessage(SNAPSHOT);
+  const characters = toGraphemes(text);
+
+  it("keeps the visible text unchanged", () => {
+    const restored = shimmerSegments(0.4)
+      .map((segment) => segment.slice(3))
+      .join("");
+
+    expect(restored).toBe(text);
+  });
+
+  it("puts the brightest stop at the phase position", () => {
+    const middle = Math.floor(characters.length / 2);
+
+    expect(shimmerSegments(0.5)[middle]).toBe(`<3>${characters[middle] ?? ""}`);
+  });
+
+  it("leaves the rest of the line in the base color", () => {
+    expect(shimmerSegments(0.5)[0]).toBe(`<0>${characters[0] ?? ""}`);
+  });
+
+  it("wraps the band around the end of the line", () => {
+    const segments = shimmerSegments(0);
+
+    expect(segments[0]).toBe(`<3>${characters[0] ?? ""}`);
+    expect(segments.at(-1)).toBe(`<3>${characters.at(-1) ?? ""}`);
+  });
+
+  it("uses only the base stop when the ramp has one color", () => {
+    expect(shimmerSegments(0.5, 1).every((segment) => segment.startsWith("<0>"))).toBe(true);
+  });
+
+  it("normalizes the phase and treats a bad phase as zero", () => {
+    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 1.5)).toBe(
+      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.5),
+    );
+    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), -0.5)).toBe(
+      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0.5),
+    );
+    expect(formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), Number.NaN)).toBe(
+      formatShimmeredWorkingMessage(SNAPSHOT, rampStyles(), 0),
+    );
+  });
+
+  it("keeps the rendered width equal to the plain line", () => {
+    const styles: WorkingMessageStyles = {
+      bold: (value: string) => `\x1b[1m${value}\x1b[22m`,
+      ramp: lightenRamp({ red: 250, green: 179, blue: 135 }, 4),
     };
 
-    expect(
-      formatStyledWorkingMessage(
-        { elapsedMs: 1_000, outputTokens: 12, outputApproximate: false, tokensPerSecond: 4 },
-        styles,
-      ),
-    ).toBe("<b><warning>Working… (1s · 12 out · 4.0 tok/s)</warning></b>");
+    expect(visibleWidth(formatShimmeredWorkingMessage(SNAPSHOT, styles, 0.3))).toBe(
+      visibleWidth(text),
+    );
+  });
+
+  it("rejects a missing color ramp", () => {
+    expect(() =>
+      formatShimmeredWorkingMessage(SNAPSHOT, { bold: (value) => value, ramp: [] }, 0),
+    ).toThrow("missing working message color ramp");
   });
 });

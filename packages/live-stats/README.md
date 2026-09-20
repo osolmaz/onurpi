@@ -2,7 +2,7 @@
 
 `@onurpi/live-stats` is a Pi extension for live response metrics. It replaces Pi's default
 spinner with the dots5 animation and shows the metrics for the current run in the theme's bold
-warning color.
+warning color, with a lighter band that travels through the text.
 
 ```text
 ⠋ Working… (12s · ~438 out · 21.7 tok/s)
@@ -12,6 +12,10 @@ The frames are the `dots5` spinner from
 [sindresorhus/cli-spinners](https://github.com/sindresorhus/cli-spinners), at 80 ms per frame. Each
 frame is one terminal column wide, so the working line does not shift. The line holds no emoji and
 no Turkish phrase. Pi supplies the single separating space after the indicator.
+
+The shimmer sweeps a band of lighter color from left to right once every 1.4 seconds. The colors
+are stops between the theme's warning color and white, so the sweep keeps the theme's hue. A theme
+in 256-color mode falls back to two theme colors, because those escapes cannot be blended.
 
 The timer covers one agent run, including model responses and tool calls. Output tokens accumulate
 across the model responses in that run. Throughput is the estimated output generated during the

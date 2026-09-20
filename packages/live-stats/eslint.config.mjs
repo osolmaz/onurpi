@@ -31,6 +31,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "error",
       "@typescript-eslint/no-unsafe-return": "error",
       "@typescript-eslint/switch-exhaustiveness-check": "error",
+      // The shimmer reads and writes ANSI foreground escapes.
+      "no-control-regex": "off",
       complexity: ["error", 8],
       "max-lines": ["error", { max: 800, skipBlankLines: true, skipComments: true }],
       "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
