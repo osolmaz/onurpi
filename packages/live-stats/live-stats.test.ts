@@ -3,22 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   countOutputContentChars,
-  EmojiSpinnerState,
-  findEmojiSpinnerVariant,
   formatElapsed,
-  formatStyledEmojiSpinnerFrames,
+  formatStyledSpinnerFrames,
   formatStyledWorkingMessage,
   formatTokenCount,
   formatWorkingMessage,
-  getEmojiSpinnerVariants,
   LiveStatsTracker,
-  pickEmojiSpinnerVariant,
+  WORKING_SPINNER,
 } from "./live-stats.ts";
-import {
-  pickWorkingPhrase,
-  TURKISH_WORKING_PHRASES,
-  WorkingPhraseState,
-} from "./working-phrases.ts";
 
 describe("LiveStatsTracker", () => {
   it("rejects invalid estimation settings", () => {
@@ -237,106 +229,21 @@ describe("formatTokenCount", () => {
   });
 });
 
-describe("emoji spinners", () => {
-  it("includes the curated single-emoji variants", () => {
-    expect(
-      getEmojiSpinnerVariants().map(({ name, label, intervalMs }) => ({
-        name,
-        label,
-        intervalMs,
-      })),
-    ).toEqual([
-      { name: "weather", label: "Weather", intervalMs: 100 },
-      { name: "moon", label: "Moon phases", intervalMs: 80 },
-      { name: "earth", label: "Rotating Earth", intervalMs: 180 },
-    ]);
+describe("working spinner", () => {
+  it("uses the circle-halves frames from cli-spinners", () => {
+    expect(WORKING_SPINNER).toEqual({
+      name: "circle-halves",
+      label: "Circle halves",
+      intervalMs: 50,
+      frames: ["◐", "◓", "◑", "◒"],
+    });
   });
 
-  it("keeps every frame to one emoji and the same terminal width", () => {
-    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-
-    for (const variant of getEmojiSpinnerVariants()) {
-      expect(variant.frames.every((frame) => [...segmenter.segment(frame)].length === 1)).toBe(
-        true,
-      );
-      expect(new Set(variant.frames.map((frame) => visibleWidth(frame)))).toEqual(new Set([2]));
-      expect(variant.frames.every((frame) => frame.trimEnd() === frame)).toBe(true);
-    }
-  });
-
-  it("preserves the full weather progression", () => {
-    expect(getEmojiSpinnerVariants()[0]?.frames).toEqual([
-      "☀️",
-      "☀️",
-      "☀️",
-      "🌤️",
-      "⛅️",
-      "🌥️",
-      "☁️",
-      "🌧️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "⛈️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "☁️",
-      "🌥️",
-      "⛅️",
-      "🌤️",
-      "☀️",
-      "☀️",
-    ]);
-  });
-
-  // The lifecycle variants are commented out in live-stats.ts, so their progression test is too.
-  // it("ages from baby to senior and reverses without modifier sequences", () => {
-  //   const variants = getEmojiSpinnerVariants();
-  //   const manFrames = variants.find(({ name }) => name === "man-lifecycle")?.frames;
-  //   const womanFrames = variants.find(({ name }) => name === "woman-lifecycle")?.frames;
-  //
-  //   expect(manFrames).toEqual(["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"]);
-  //   expect(womanFrames).toEqual(["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"]);
-  // });
-
-  it("finds command names with user-friendly normalization", () => {
-    expect(findEmojiSpinnerVariant("  Moon  ")?.name).toBe("moon");
-    expect(findEmojiSpinnerVariant("WEATHER")?.name).toBe("weather");
-    expect(findEmojiSpinnerVariant("missing")).toBeUndefined();
-  });
-
-  it("tracks explicit and random selections without exposing mutable frames", () => {
-    const state = new EmojiSpinnerState(() => 0);
-
-    expect(state.current.name).toBe("weather");
-    expect(state.select("earth")).toBe(true);
-    expect(state.current.name).toBe("earth");
-    expect(state.current.frames).not.toBe(state.current.frames);
-    expect(state.select("missing")).toBe(false);
-    expect(state.current.name).toBe("earth");
-
-    state.randomize(() => 0.999_999);
-    expect(state.current.name).toBe("earth");
-
-    state.randomize(() => 0);
-    expect(state.current.name).toBe("weather");
-  });
-
-  it("picks across the collection and falls back safely", () => {
-    expect(pickEmojiSpinnerVariant(() => 0).name).toBe("weather");
-    expect(pickEmojiSpinnerVariant(() => 0.999_999).name).toBe("earth");
-    expect(pickEmojiSpinnerVariant(() => 1).name).toBe("weather");
-  });
-
-  it("returns independent frame arrays", () => {
-    const first = getEmojiSpinnerVariants();
-    const second = getEmojiSpinnerVariants();
-
-    expect(first[0]?.frames).not.toBe(second[0]?.frames);
-    expect(second[0]?.frames).toHaveLength(23);
+  it("keeps every frame at one terminal column with no padding", () => {
+    expect(new Set(WORKING_SPINNER.frames.map((frame) => visibleWidth(frame)))).toEqual(
+      new Set([1]),
+    );
+    expect(WORKING_SPINNER.frames.every((frame) => frame.trimEnd() === frame)).toBe(true);
   });
 
   it("renders every frame in bold warning color", () => {
@@ -344,82 +251,55 @@ describe("emoji spinners", () => {
       bold: (text: string) => `<b>${text}</b>`,
       warning: (text: string) => `<warning>${text}</warning>`,
     };
-    const spinner = pickEmojiSpinnerVariant(() => 0.5);
 
-    expect(formatStyledEmojiSpinnerFrames(spinner, styles)).toEqual(
-      spinner.frames.map((frame) => `<b><warning>${frame}</warning></b>`),
-    );
+    expect(formatStyledSpinnerFrames(WORKING_SPINNER.frames, styles)).toEqual([
+      "<b><warning>◐</warning></b>",
+      "<b><warning>◓</warning></b>",
+      "<b><warning>◑</warning></b>",
+      "<b><warning>◒</warning></b>",
+    ]);
   });
 });
 
 describe("formatWorkingMessage", () => {
-  it("shows a Turkish phrase, estimated output, and a sampled rate", () => {
-    expect(
-      formatWorkingMessage(
-        {
-          elapsedMs: 12_400,
-          outputTokens: 438,
-          outputApproximate: true,
-          tokensPerSecond: 21.74,
-        },
-        "Yardırıyorum",
-      ),
-    ).toBe("Yardırıyorum… (12s · ~438 out · 21.7 tok/s)");
+  const snapshot = {
+    elapsedMs: 12_400,
+    outputTokens: 438,
+    outputApproximate: true,
+    tokensPerSecond: 21.74,
+  };
+
+  it("shows estimated output and a sampled rate without a phrase", () => {
+    expect(formatWorkingMessage(snapshot)).toBe("(12s · ~438 out · 21.7 tok/s)");
   });
 
   it("shows unavailable throughput before sampling begins", () => {
     expect(
-      formatWorkingMessage(
-        {
-          elapsedMs: 0,
-          outputTokens: 0,
-          outputApproximate: false,
-          tokensPerSecond: undefined,
-        },
-        "Piston aşağı indi",
-      ),
-    ).toBe("Piston aşağı indi… (0s · 0 out · — tok/s)");
+      formatWorkingMessage({
+        elapsedMs: 0,
+        outputTokens: 0,
+        outputApproximate: false,
+        tokensPerSecond: undefined,
+      }),
+    ).toBe("(0s · 0 out · — tok/s)");
+  });
+
+  it("keeps emoji and Turkish text out of the working line", () => {
+    expect(formatWorkingMessage(snapshot)).not.toMatch(/\p{Emoji_Presentation}/u);
+    expect(formatWorkingMessage(snapshot)).not.toMatch(/[ıİşŞğĞüÜöÖçÇ]/u);
   });
 
   it("renders the complete working line in bold warning color", () => {
-    const snapshot = {
-      elapsedMs: 1_000,
-      outputTokens: 12,
-      outputApproximate: false,
-      tokensPerSecond: 4,
-    };
     const styles = {
       bold: (text: string) => `<b>${text}</b>`,
       warning: (text: string) => `<warning>${text}</warning>`,
     };
 
-    expect(formatStyledWorkingMessage(snapshot, "AB", styles)).toBe(
-      "<b><warning>AB… (1s · 12 out · 4.0 tok/s)</warning></b>",
-    );
-  });
-});
-
-describe("pickWorkingPhrase", () => {
-  it("selects across the Turkish phrase list", () => {
-    expect(pickWorkingPhrase(() => 0)).toBe("Yardırıyorum");
-    expect(pickWorkingPhrase(() => 0.999_999)).toBe("Sıçtın mavisini izliyorum");
-  });
-
-  it("falls back to the first phrase if the random source is out of range", () => {
-    expect(pickWorkingPhrase(() => 1)).toBe(TURKISH_WORKING_PHRASES[0]);
-  });
-});
-
-describe("WorkingPhraseState", () => {
-  it("keeps one phrase until the agent settles", () => {
-    const state = new WorkingPhraseState();
-
-    expect(state.current).toBeUndefined();
-    expect(state.start(() => 0)).toBe("Yardırıyorum");
-    expect(state.start(() => 0.999_999)).toBe("Yardırıyorum");
-
-    state.reset();
-    expect(state.current).toBeUndefined();
-    expect(state.start(() => 0.999_999)).toBe("Sıçtın mavisini izliyorum");
+    expect(
+      formatStyledWorkingMessage(
+        { elapsedMs: 1_000, outputTokens: 12, outputApproximate: false, tokensPerSecond: 4 },
+        styles,
+      ),
+    ).toBe("<b><warning>(1s · 12 out · 4.0 tok/s)</warning></b>");
   });
 });

@@ -2,13 +2,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 import {
   countOutputContentChars,
-  EmojiSpinnerState,
+  formatStyledSpinnerFrames,
   formatStyledWorkingMessage,
   LiveStatsTracker,
+  WORKING_SPINNER,
   type WorkingMessageStyles,
 } from "./live-stats.ts";
-import { applySpinner, registerSpinnerCommand } from "./spinner-command.ts";
-import { WorkingPhraseState } from "./working-phrases.ts";
 
 const REFRESH_INTERVAL_MS = 50;
 
@@ -19,11 +18,17 @@ function workingMessageStyles(ctx: ExtensionContext): WorkingMessageStyles {
   };
 }
 
+function applyWorkingSpinner(ctx: ExtensionContext): void {
+  if (ctx.mode !== "tui") return;
+  ctx.ui.setWorkingIndicator({
+    frames: formatStyledSpinnerFrames(WORKING_SPINNER.frames, workingMessageStyles(ctx)),
+    intervalMs: WORKING_SPINNER.intervalMs,
+  });
+}
+
 export default function liveStats(pi: ExtensionAPI): void {
   const tracker = new LiveStatsTracker();
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
-  const workingPhrase = new WorkingPhraseState();
-  const spinnerState = new EmojiSpinnerState();
 
   const stopTimer = (): void => {
     if (refreshTimer === undefined) return;
@@ -33,35 +38,26 @@ export default function liveStats(pi: ExtensionAPI): void {
 
   const render = (ctx: ExtensionContext): void => {
     if (ctx.mode !== "tui" || !tracker.active) return;
-    const phrase = workingPhrase.current;
-    if (phrase === undefined) return;
-    const message = formatStyledWorkingMessage(
-      tracker.snapshot(Date.now()),
-      phrase,
-      workingMessageStyles(ctx),
+    ctx.ui.setWorkingMessage(
+      formatStyledWorkingMessage(tracker.snapshot(Date.now()), workingMessageStyles(ctx)),
     );
-    ctx.ui.setWorkingMessage(message);
   };
 
   const reset = (ctx: ExtensionContext): void => {
     stopTimer();
     tracker.reset();
-    workingPhrase.reset();
     if (ctx.mode === "tui") ctx.ui.setWorkingMessage();
   };
 
   pi.on("session_start", (_event, ctx) => {
-    applySpinner(ctx, spinnerState);
+    applyWorkingSpinner(ctx);
   });
-
-  registerSpinnerCommand(pi, spinnerState);
 
   pi.on("agent_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
 
     stopTimer();
     const now = Date.now();
-    if (workingPhrase.current === undefined) workingPhrase.start();
     tracker.start(now);
     render(ctx);
     refreshTimer = setInterval(() => {

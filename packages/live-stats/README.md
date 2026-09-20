@@ -1,27 +1,26 @@
 # @onurpi/live-stats
 
-`@onurpi/live-stats` is a Pi extension for live response metrics and Turkish working messages. It picks a phrase when Pi starts working and shows the complete line in the theme's bold warning color. Pi's default spinner is replaced by a randomly selected single-emoji animation. The enabled animations are the weather progression, the moon phases, and the rotating earth.
+`@onurpi/live-stats` is a Pi extension for live response metrics. It replaces Pi's default
+spinner with the circle-halves animation and shows the metrics for the current run in the theme's
+bold warning color.
 
 ```text
-🌤️ Yardırıyorum… (12s · ~438 out · 21.7 tok/s)
+◐ (12s · ~438 out · 21.7 tok/s)
 ```
 
-The enabled collection holds the weather progression, the moon phases, and the rotating earth. The clock, monkey, runner, hand gesture, speaker, and man and woman lifecycle animations stay in the source as commented entries, so they can return without being rewritten. One variant is selected when the session starts and keeps its configured animation interval. Every frame contains one emoji at the same two-column terminal width with no embedded spacing, so the working message does not shift. Pi supplies the single separating space after the spinner. The phrase stays fixed while Pi works, including automatic retries. The phrase changes after the agent settles. The timer covers one agent run, including model responses and tool calls. Output tokens accumulate across the model responses in that run. Throughput is the estimated output generated during the last five seconds, so it falls toward zero while Pi waits for a tool.
+The frames are `◐ ◓ ◑ ◒`, the `circleHalves` spinner from
+[sindresorhus/cli-spinners](https://github.com/sindresorhus/cli-spinners), at 50 ms per frame. Each
+frame is one terminal column wide, so the working line does not shift. The line holds no emoji and
+no phrase. Pi supplies the single separating space after the indicator.
 
-## Choose a spinner
+The timer covers one agent run, including model responses and tool calls. Output tokens accumulate
+across the model responses in that run. Throughput is the estimated output generated during the
+last five seconds, so it falls toward zero while Pi waits for a tool.
 
-Run `/spinner` to open an interactive picker with emoji previews. You can also select one directly, inspect the current choice, or return to random selection:
-
-```text
-/spinner moon
-/spinner man-lifecycle
-/spinner current
-/spinner random
-```
-
-The choice applies immediately and lasts for the current Pi session. A new session or `/reload` starts with a new random choice. The extension keeps this preference in memory only; it does not modify Pi session history or write a settings file.
-
-Most providers report exact output usage only after a response finishes. While a response is streaming, the extension estimates tokens with Pi's four-characters-per-token heuristic and prefixes the count with `~`. The count is reconciled with the provider's reported usage when the response ends.
+Most providers report exact output usage only after a response finishes. While a response is
+streaming, the extension estimates tokens with Pi's four-characters-per-token heuristic and prefixes
+the count with `~`. The count is reconciled with the provider's reported usage when the response
+ends.
 
 ## Install
 
@@ -35,4 +34,5 @@ pi install ./packages/live-stats
 /reload
 ```
 
-The extension applies automatically in interactive Pi sessions. It keeps Pi's existing interrupt behavior.
+The extension applies automatically in interactive Pi sessions. It keeps Pi's existing interrupt
+behavior.

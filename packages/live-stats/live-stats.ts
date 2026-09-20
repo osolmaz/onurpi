@@ -1,103 +1,21 @@
 const DEFAULT_CHARS_PER_TOKEN = 4;
 export const DEFAULT_SAMPLE_WINDOW_MS = 5_000;
-export type EmojiSpinnerVariant = {
+
+export type WorkingSpinner = {
   name: string;
   label: string;
   intervalMs: number;
   frames: readonly string[];
-  pickerFrame?: string;
 };
 
-const EMOJI_SPINNER_VARIANTS = [
-  // Enabled by Onur's request on 2026-09-14: weather, moon, and earth. The other variants stay
-  // commented so they can return without being rewritten.
-  {
-    name: "weather",
-    label: "Weather",
-    intervalMs: 100,
-    frames: [
-      "☀️",
-      "☀️",
-      "☀️",
-      "🌤️",
-      "⛅️",
-      "🌥️",
-      "☁️",
-      "🌧️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "⛈️",
-      "🌨️",
-      "🌧️",
-      "🌨️",
-      "☁️",
-      "🌥️",
-      "⛅️",
-      "🌤️",
-      "☀️",
-      "☀️",
-    ],
-  },
-  {
-    name: "moon",
-    label: "Moon phases",
-    intervalMs: 80,
-    frames: ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"],
-  },
-  // {
-  //   name: "clock",
-  //   label: "Clock",
-  //   intervalMs: 100,
-  //   frames: ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"],
-  // },
-  {
-    name: "earth",
-    label: "Rotating Earth",
-    intervalMs: 180,
-    frames: ["🌍", "🌎", "🌏"],
-  },
-  // {
-  //   name: "monkey",
-  //   label: "Monkeys",
-  //   intervalMs: 300,
-  //   frames: ["🙈", "🙈", "🙉", "🙊"],
-  // },
-  // {
-  //   name: "runner",
-  //   label: "Runner",
-  //   intervalMs: 140,
-  //   frames: ["🚶", "🏃"],
-  // },
-  // {
-  //   name: "finger-dance",
-  //   label: "Finger dance",
-  //   intervalMs: 160,
-  //   frames: ["🤘", "🤟", "🖖", "✋", "🤚", "👆"],
-  // },
-  // {
-  //   name: "speaker",
-  //   label: "Speaker volume",
-  //   intervalMs: 160,
-  //   frames: ["🔈", "🔉", "🔊", "🔉"],
-  // },
-  // {
-  //   name: "man-lifecycle",
-  //   label: "Man lifecycle",
-  //   intervalMs: 220,
-  //   frames: ["👶", "👶", "👶", "👦", "👨", "👴", "👴", "👴", "👨", "👦"],
-  //   pickerFrame: "👨",
-  // },
-  // {
-  //   name: "woman-lifecycle",
-  //   label: "Woman lifecycle",
-  //   intervalMs: 220,
-  //   frames: ["👶", "👶", "👶", "👧", "👩", "👵", "👵", "👵", "👩", "👧"],
-  //   pickerFrame: "👩",
-  // },
-] as const satisfies readonly EmojiSpinnerVariant[];
+// Frames are the circle-halves spinner from sindresorhus/cli-spinners, which the referenced
+// CodePen renders. Every frame is one terminal column wide, so the working line never shifts.
+export const WORKING_SPINNER: WorkingSpinner = {
+  name: "circle-halves",
+  label: "Circle halves",
+  intervalMs: 50,
+  frames: ["◐", "◓", "◑", "◒"],
+};
 
 type TokenSample = {
   atMs: number;
@@ -116,57 +34,11 @@ export type WorkingMessageStyles = {
   warning: (text: string) => string;
 };
 
-function cloneEmojiSpinnerVariant(variant: EmojiSpinnerVariant): EmojiSpinnerVariant {
-  return { ...variant, frames: [...variant.frames] };
-}
-
-export function getEmojiSpinnerVariants(): EmojiSpinnerVariant[] {
-  return EMOJI_SPINNER_VARIANTS.map(cloneEmojiSpinnerVariant);
-}
-
-export function findEmojiSpinnerVariant(name: string): EmojiSpinnerVariant | undefined {
-  const normalizedName = name
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_]+/g, "-");
-  return getEmojiSpinnerVariants().find((variant) => variant.name === normalizedName);
-}
-
-export function pickEmojiSpinnerVariant(random: () => number = Math.random): EmojiSpinnerVariant {
-  const variants = getEmojiSpinnerVariants();
-  const fallback = variants[0];
-  if (fallback === undefined) throw new Error("missing emoji spinner variants");
-  return variants[Math.floor(random() * variants.length)] ?? fallback;
-}
-
-export class EmojiSpinnerState {
-  private selected: EmojiSpinnerVariant;
-
-  public constructor(random: () => number = Math.random) {
-    this.selected = pickEmojiSpinnerVariant(random);
-  }
-
-  public get current(): EmojiSpinnerVariant {
-    return cloneEmojiSpinnerVariant(this.selected);
-  }
-
-  public select(name: string): boolean {
-    const spinner = findEmojiSpinnerVariant(name);
-    if (spinner === undefined) return false;
-    this.selected = spinner;
-    return true;
-  }
-
-  public randomize(random: () => number = Math.random): void {
-    this.selected = pickEmojiSpinnerVariant(random);
-  }
-}
-
-export function formatStyledEmojiSpinnerFrames(
-  variant: EmojiSpinnerVariant,
+export function formatStyledSpinnerFrames(
+  frames: readonly string[],
   styles: WorkingMessageStyles,
 ): string[] {
-  return variant.frames.map((frame) => styles.bold(styles.warning(frame)));
+  return frames.map((frame) => styles.bold(styles.warning(frame)));
 }
 
 type OutputContent =
@@ -318,16 +190,15 @@ export function formatTokenCount(tokens: number): string {
   return formatCompact(value / 1_000_000, "M");
 }
 
-export function formatWorkingMessage(snapshot: LiveStatsSnapshot, workingPhrase: string): string {
-  return `${workingPhrase}… (${formatWorkingStats(snapshot)})`;
+export function formatWorkingMessage(snapshot: LiveStatsSnapshot): string {
+  return `(${formatWorkingStats(snapshot)})`;
 }
 
 export function formatStyledWorkingMessage(
   snapshot: LiveStatsSnapshot,
-  workingPhrase: string,
   styles: WorkingMessageStyles,
 ): string {
-  return styles.bold(styles.warning(formatWorkingMessage(snapshot, workingPhrase)));
+  return styles.bold(styles.warning(formatWorkingMessage(snapshot)));
 }
 
 function formatWorkingStats(snapshot: LiveStatsSnapshot): string {
