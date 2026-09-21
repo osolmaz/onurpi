@@ -110,6 +110,9 @@ The `input` handler runs before a turn begins, and `before_agent_start`, `turn_s
 4. At the cap the handler rejects: it restores the text with `ctx.ui.setEditorText`, notifies, sets
    the footer status, and returns `{ action: "handled" }`. The model never runs, the transcript
    gains no entry, and the package never re-sends that text.
+5. A claim made by rule 3 is provisional for five seconds. Pi can refuse the prompt after the
+   `input` event, before any run starts, and then no settle event arrives. `before_agent_start` and
+   `agent_start` confirm the claim, and a claim that no turn follows goes back after that window.
 
 ### Convergence over the cap
 
@@ -223,13 +226,14 @@ and the command guard blocks scripted keystrokes, so a person runs it.
 
 ## Failure handling and rollout
 
-| Failure               | Behaviour                                                            |
-| --------------------- | -------------------------------------------------------------------- |
-| Config file malformed | One notification, defaults in effect, the gate keeps working         |
-| Lease write fails     | The prompt passes, and the sweep removes the failed lease            |
-| Handler throws        | The prompt passes with one notification, so the feature fails open   |
-| Pi process dies       | The next sweep removes the lease by pid liveness, or after `staleMs` |
-| A session hangs       | Its heartbeat goes stale and the sweep frees the slot                |
+| Failure                             | Behaviour                                                            |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| Config file malformed               | One notification, defaults in effect, the gate keeps working         |
+| Lease write fails                   | The prompt passes, and the sweep removes the failed lease            |
+| Handler throws                      | The prompt passes with one notification, so the feature fails open   |
+| Pi process dies                     | The next sweep removes the lease by pid liveness, or after `staleMs` |
+| A session hangs                     | Its heartbeat goes stale and the sweep frees the slot                |
+| Pi refuses the prompt after `input` | No turn starts, so the claim goes back after 5 seconds               |
 
 Rollout: install with `pi install ./packages/focus-mode`, then start new sessions so the package
 loads. Removal deletes the package plus `~/.pi/agent/focus-mode` and `~/.pi/agent/focus-mode.json`.
