@@ -585,12 +585,12 @@ export const BRAILLE_SPINNERS: readonly BrailleSpinner[] = [
   defineSpinner(
     "fill",
     "Fill",
-    "Dots fill both cells in reading order and drain away.",
+    "Dots fill both cells in reading order, then drain away to nothing.",
     16,
     70,
     (step) => {
       const grid = createGrid();
-      const filled = step < 8 ? 2 + step * 2 : Math.max(2, 16 - (step - 7) * 2);
+      const filled = step < 8 ? 2 + step * 2 : 16 - (step - 7) * 2;
       for (let index = 0; index < filled; index += 1) {
         setDot(grid, Math.floor(index / COLS), index % COLS);
       }
