@@ -2,5 +2,6 @@ coverage/
 **/coverage/
 **/dist/
 packages/agents/skills/
+packages/live-stats/viewer.html
 node_modules/
 **/.stryker-tmp/
