@@ -30,7 +30,7 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.86.0",
+  "lastChangelogVersion": "0.86.1",
   "defaultProvider": "huggingface",
   "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
   "defaultThinkingLevel": "xhigh",
