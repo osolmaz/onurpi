@@ -52,6 +52,13 @@ import {
 const STATUS_KEY = "focus-mode";
 const FLAG_NAME = "focus-max";
 
+/**
+ * How long a claim waits for a turn to start. Pi can refuse a prompt after the `input` event but
+ * before any run starts, for example when no model is selected or credentials fail, and then no
+ * settle event ever arrives. The claim is released when no turn follows inside this window.
+ */
+const CLAIM_CONFIRM_MS = 5000;
+
 /** Keys the flag exposes as `focus-max`, so one session can run with another cap. */
 const FLAG_DESCRIPTION = "Per-session focus mode cap, for example --focus-max 1";
 
@@ -67,6 +74,7 @@ type SessionState = {
   ctx: ExtensionContext | undefined;
   heartbeat: NodeJS.Timeout | undefined;
   stopPoll: NodeJS.Timeout | undefined;
+  awaitingStart: NodeJS.Timeout | undefined;
 };
 
 type Prepared = {
@@ -109,6 +117,9 @@ class FocusModeSession {
     this.pi.on("tool_call", (_event, ctx) => {
       this.revalidate(ctx);
     });
+    this.pi.on("agent_start", () => {
+      this.confirmLease();
+    });
     this.pi.on("agent_settled", (_event, ctx) => {
       this.settle(ctx);
     });
@@ -141,6 +152,7 @@ class FocusModeSession {
         ctx,
         heartbeat: undefined,
         stopPoll: undefined,
+        awaitingStart: undefined,
       };
       // A reload of the same session can leave its own lease behind. The agent is not working yet.
       try {
@@ -149,7 +161,6 @@ class FocusModeSession {
         // A lease path that cannot be used must not stop the session.
       }
       this.startTimers();
-      this.reportConfigErrors(ctx);
       const prepared = this.prepare();
       if (prepared !== undefined) this.publishStatus(ctx, prepared);
     } catch (error) {
@@ -175,7 +186,7 @@ class FocusModeSession {
         source,
       });
       if (decision.action === "continue") {
-        if (decision.claim) this.tryClaim();
+        if (decision.claim) this.tryClaim(true);
         const refreshed = decision.claim ? this.prepare() : prepared;
         if (refreshed !== undefined) this.publishStatus(ctx, refreshed);
         return { action: "continue" };
@@ -199,6 +210,8 @@ class FocusModeSession {
     try {
       let prepared = this.prepare();
       if (!prepared?.config.enabled) return;
+      // A turn is starting, so the claim that `input` made is real.
+      this.confirmLease();
       if (isStopRequested(readOwnLease(prepared.state.dir, prepared.state.sessionId))) {
         this.stopSelf(ctx, prepared);
         return;
@@ -247,6 +260,7 @@ class FocusModeSession {
     try {
       const state = this.state;
       if (state === undefined) return;
+      this.cancelClaimConfirmation(state);
       release(state.dir, state.sessionId);
       state.holds = false;
       this.clearStatus(ctx);
@@ -261,6 +275,7 @@ class FocusModeSession {
     if (state === undefined) return;
     if (state.heartbeat !== undefined) clearInterval(state.heartbeat);
     if (state.stopPoll !== undefined) clearInterval(state.stopPoll);
+    this.cancelClaimConfirmation(state);
     release(state.dir, state.sessionId);
     this.clearStatus(ctx);
   }
@@ -285,7 +300,8 @@ class FocusModeSession {
       return;
     }
     const loaded = writeMaxAgents(state.configPath, parsed);
-    state.capOverride = parsed;
+    // Use the clamped value, so `/focus max 99` cannot lift this session above the limit.
+    state.capOverride = loaded.config.maxAgents;
     if (loaded.errors.length > 0) ctx.ui.notify(configErrorNotice(loaded.errors), "warning");
     ctx.ui.notify(capChanged(loaded.config.maxAgents), "info");
   }
@@ -340,7 +356,7 @@ class FocusModeSession {
     return this.state?.capOverride ?? config.maxAgents;
   }
 
-  private tryClaim(): boolean {
+  private tryClaim(confirm = false): boolean {
     const state = this.state;
     if (state === undefined) return false;
     const result = claim(state.dir, {
@@ -352,7 +368,39 @@ class FocusModeSession {
     });
     if (result.status === "taken") return false;
     state.holds = true;
+    if (confirm) this.armClaimConfirmation(state);
     return true;
+  }
+
+  /** A claim from `input` must be followed by a turn, or the slot goes back. */
+  private armClaimConfirmation(state: SessionState): void {
+    this.cancelClaimConfirmation(state);
+    state.awaitingStart = setTimeout(() => {
+      this.releaseUnconfirmedClaim();
+    }, CLAIM_CONFIRM_MS);
+    state.awaitingStart.unref();
+  }
+
+  private cancelClaimConfirmation(state: SessionState): void {
+    if (state.awaitingStart === undefined) return;
+    clearTimeout(state.awaitingStart);
+    state.awaitingStart = undefined;
+  }
+
+  /** Called when a turn is known to be starting. */
+  private confirmLease(): void {
+    const state = this.state;
+    if (state === undefined) return;
+    this.cancelClaimConfirmation(state);
+  }
+
+  private releaseUnconfirmedClaim(): void {
+    const state = this.state;
+    if (state === undefined || !state.holds || state.awaitingStart === undefined) return;
+    state.awaitingStart = undefined;
+    release(state.dir, state.sessionId);
+    state.holds = false;
+    if (state.ctx !== undefined) this.clearStatus(state.ctx);
   }
 
   private startTimers(): void {
@@ -392,16 +440,6 @@ class FocusModeSession {
       return;
     }
     this.stopSelf(state.ctx, prepared);
-  }
-
-  private reportConfigErrors(ctx: ExtensionContext): void {
-    const state = this.state;
-    if (state === undefined) return;
-    const loaded = loadConfig(state.configPath);
-    if (loaded.errors.length > 0) {
-      state.notifiedError = true;
-      ctx.ui.notify(configErrorNotice(loaded.errors), "warning");
-    }
   }
 
   private publishStatus(ctx: ExtensionContext, prepared: Prepared): void {

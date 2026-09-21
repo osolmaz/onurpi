@@ -273,3 +273,57 @@ describe("focus mode wiring", () => {
     expect(harness.notes.at(-1)).toContain("use /focus max <number>");
   });
 });
+
+describe("focus mode claim confirmation", () => {
+  let dir: string;
+  let configPath: string;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    dir = mkdtempSync(join(tmpdir(), "focus-mode-confirm-"));
+    configPath = join(dir, "focus-mode.json");
+    process.env[CONFIG_PATH_ENV] = configPath;
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(process.env, CONFIG_PATH_ENV);
+    vi.useRealTimers();
+  });
+
+  it("releases a claim when no turn starts", async () => {
+    const harness = makeHarness(SESSION_A);
+    await start(harness);
+    await prompt(harness, "hello");
+    expect(listLeases(leaseDir(configPath)).leases).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(listLeases(leaseDir(configPath)).leases).toHaveLength(0);
+    expect(harness.statuses.at(-1)).toBeUndefined();
+  });
+
+  it("keeps the claim once a turn starts", async () => {
+    const harness = makeHarness(SESSION_A);
+    await start(harness);
+    await prompt(harness, "hello");
+    await harness.emit("before_agent_start", { type: "before_agent_start" });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(listLeases(leaseDir(configPath)).leases).toHaveLength(1);
+  });
+
+  it("clamps the cap for this session too", async () => {
+    const harness = makeHarness(SESSION_A);
+    await start(harness);
+    await prompt(harness, "work");
+    await harness.command("max 99");
+    await harness.command("status");
+    expect(harness.notes.at(-1)).toBe("focus 1/16 · held");
+  });
+
+  it("reports a config error once per session", async () => {
+    writeFileSync(configPath, "{ broken");
+    const harness = makeHarness(SESSION_A);
+    await start(harness);
+    await prompt(harness, "hello");
+    const configNotes = harness.notes.filter((note) => note.startsWith("Focus mode config:"));
+    expect(configNotes).toHaveLength(1);
+  });
+});

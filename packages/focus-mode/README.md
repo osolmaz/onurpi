@@ -9,12 +9,13 @@ this package, on this machine.
 
 ## What it does
 
-| Moment                                  | Behaviour                                                             |
-| --------------------------------------- | --------------------------------------------------------------------- |
-| A prompt arrives (`input`)              | Claim a slot, or refuse the prompt at the cap                         |
-| Before a turn and before each tool call | Re-check the slot and converge when the count is over the cap         |
-| A session settles or shuts down         | Release the slot                                                      |
-| Two sessions claim at the same instant  | The session that started last yields, so the count returns to the cap |
+| Moment                                  | Behaviour                                                              |
+| --------------------------------------- | ---------------------------------------------------------------------- |
+| A prompt arrives (`input`)              | Claim a slot, or refuse the prompt at the cap                          |
+| Before a turn and before each tool call | Re-check the slot and converge when the count is over the cap          |
+| A session settles or shuts down         | Release the slot                                                       |
+| A claim sees no turn for 5 seconds      | Release the slot, because Pi refused the prompt before the run started |
+| Two sessions claim at the same instant  | The session that started last yields, so the count returns to the cap  |
 
 A refused prompt never reaches the model and adds nothing to the session transcript. The one visible
 trace is the notification and the footer status.
@@ -98,6 +99,9 @@ Start new sessions afterwards, because the package loads at session start.
 - `newest` can stop a long task that just started. Use `victimPolicy: "oldest"` for the opposite
   preference.
 - A session that hangs while its process lives can be swept from the table after `staleMs`.
+- A claim whose turn does not start within 5 seconds goes back. Pi can refuse a prompt after the
+  input handler, for example when no model is selected or credentials fail, and then no settle event
+  arrives. A slow preflight past those 5 seconds can let one run start without a lease.
 
 ## Verification
 
