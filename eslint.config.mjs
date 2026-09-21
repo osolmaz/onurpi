@@ -99,6 +99,13 @@ export default tseslint.config(
     },
   },
   {
+    // ANSI escape sequences are the subject matter here, so control characters are expected.
+    files: ["packages/live-stats/**/*.ts"],
+    rules: {
+      "no-control-regex": "off",
+    },
+  },
+  {
     // Vendored upstream sources keep their audited style; relaxations mirror unified-exec.
     files: [
       "packages/pi-tui-kit/**/*.ts",
