@@ -34,6 +34,7 @@
       "./packages/skill-slug/index.ts",
       "./packages/session-policy/index.ts",
       "./packages/image-budget/index.ts",
+      "./packages/focus-mode/index.ts",
       "./packages/command-guard/index.ts"
     ],
     "skills": [

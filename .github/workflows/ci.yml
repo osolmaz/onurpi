@@ -78,6 +78,12 @@ jobs:
       - name: Check @onurpi/prompt-queue package with Slophammer
         working-directory: packages/prompt-queue
         run: npm run slophammer
+      - name: Check @onurpi/focus-mode package
+        working-directory: packages/focus-mode
+        run: npm run check
+      - name: Check @onurpi/focus-mode package with Slophammer
+        working-directory: packages/focus-mode
+        run: npm run slophammer
       - name: Check @onurpi/reliable-compaction package
         working-directory: packages/reliable-compaction
         run: npm run check
