@@ -16,9 +16,16 @@ npm run agents:check
 ```
 
 The first command validates both skill sources and the private instruction file before it writes
-anything. It installs the private instruction file unchanged for Pi, Codex, Claude Code, and Cursor.
-It installs the combined public and private skill set for Codex, Claude Code, and Cursor. Pi loads
+anything. It installs the private instruction file unchanged for Pi, Codex, and Claude Code. It
+installs the combined public and private skill set for Codex, Claude Code, and Cursor. Pi loads
 public skills from OnurPi and private skills from `~/.agents/skills`.
+
+Cursor reads instructions from the open workspace and user rules from `~/.cursor/rules`, so the
+installer writes no instruction copy into the home directory. A `~/AGENTS.md` file is picked up by
+every agent that walks parent directories, which loads the same instructions twice and doubles their
+context cost. Ask for a Cursor instruction copy with `--cursor-agents-dest`, `CURSOR_AGENTS_DEST`,
+or `CURSOR_WORKSPACE_ROOT`. A sync removes a home-directory copy that still holds the source bytes
+and leaves an edited file in place.
 
 Use `--dry-run` to run preflight checks without changing installed files. Use `--skip-codex`,
 `--skip-claude`, `--skip-cursor`, or `--skip-pi` to limit destinations. Skill names can be passed as

@@ -38,7 +38,8 @@ export type Skill = {
 export type CopyDestination = {
   name: string;
   skillsRoot: string;
-  agentsDest: string;
+  agentsDest?: string;
+  legacyAgentsDest?: string;
   restartHint: string;
 };
 
@@ -77,7 +78,7 @@ export type CliOptions = {
   codexDest: string;
   claudeDest: string;
   cursorDest: string;
-  cursorAgentsDest: string;
+  cursorAgentsDest: string | undefined;
   piDest: string;
   selectors: string[];
   skipCodex: boolean;
@@ -431,12 +432,45 @@ function syncCopyDestination(
     persistSyncState(destination.skillsRoot, options.sourceRoot, state);
     removePath(statePath(destination.skillsRoot, LEGACY_STATE_FILE_NAME), false);
   }
-  log(`Syncing instructions -> ${destination.agentsDest}`);
-  syncFile(options.agentsSource, destination.agentsDest, options.dryRun);
+  if (destination.agentsDest === undefined) {
+    removeMigratedInstructions(destination, options, log);
+  } else {
+    log(`Syncing instructions -> ${destination.agentsDest}`);
+    syncFile(options.agentsSource, destination.agentsDest, options.dryRun);
+  }
   removeStaleSkills(destination.skillsRoot, staleManagedIds, state, options, log);
   releaseStalePendingSkills(destination.skillsRoot, stalePendingIds, state, options, log);
   copySelectedSkills(destination.skillsRoot, selected, state, options, log);
   if (!options.dryRun) log(destination.restartHint);
+}
+
+function filesMatch(left: string, right: string): boolean {
+  try {
+    return readFileSync(left).equals(readFileSync(right));
+  } catch {
+    return false;
+  }
+}
+
+// Older installs wrote the Cursor instruction copy into the home directory, where every agent
+// that walks parent directories picks it up as a second copy of the same instructions. Remove
+// that copy only while it still holds the source bytes, and leave edited files to their owner.
+function removeMigratedInstructions(
+  destination: CopyDestination,
+  options: CopySyncOptions,
+  log: Logger,
+): void {
+  const path = destination.legacyAgentsDest;
+  if (path === undefined || !existsSync(path)) {
+    log("Skipping instructions: this client has no instruction destination");
+    return;
+  }
+  if (!filesMatch(options.agentsSource, path)) {
+    log(`Leaving an unrecognized instruction file in place: ${path}`);
+    return;
+  }
+  log(`Removing the home-directory instruction copy ${path}`);
+  removePath(path, options.dryRun);
 }
 
 function syncPiDestination(
@@ -493,13 +527,15 @@ function envPath(name: string, fallback: string): string {
   return resolve(value === undefined ? fallback : value.replace(/^~/u, homedir()));
 }
 
-function defaultCursorAgentsDest(): string {
+// Cursor reads instruction files from the open workspace and user rules from its own
+// configuration directory, so the installer writes no default copy into the home directory:
+// a home-directory `AGENTS.md` is picked up by every agent that walks parent directories,
+// which duplicates the per-client instruction files and their context cost.
+function defaultCursorAgentsDest(): string | undefined {
   const explicit = process.env["CURSOR_AGENTS_DEST"];
   if (explicit !== undefined) return resolve(explicit.replace(/^~/u, homedir()));
   const workspace = process.env["CURSOR_WORKSPACE_ROOT"];
-  return resolve(
-    workspace === undefined ? join(homedir(), "AGENTS.md") : join(workspace, "AGENTS.md"),
-  );
+  return workspace === undefined ? undefined : resolve(join(workspace, "AGENTS.md"));
 }
 
 function takeValue(args: string[], index: number, option: string): string {
@@ -512,6 +548,16 @@ function takeValue(args: string[], index: number, option: string): string {
 function extractValue(args: string[], option: string, fallback: string): string {
   const index = args.indexOf(option);
   return index < 0 ? fallback : resolve(takeValue(args, index, option).replace(/^~/u, homedir()));
+}
+
+function extractOptionalValue(
+  args: string[],
+  option: string,
+  fallback: string | undefined,
+): string | undefined {
+  const index = args.indexOf(option);
+  if (index < 0) return fallback;
+  return resolve(takeValue(args, index, option).replace(/^~/u, homedir()));
 }
 
 function extractFlag(args: string[], option: string): boolean {
@@ -535,7 +581,11 @@ export function parseCli(
   const codexDest = extractValue(args, "--dest", join(codexHome, "skills"));
   const claudeDest = extractValue(args, "--claude-dest", join(claudeHome, "skills"));
   const cursorDest = extractValue(args, "--cursor-dest", join(cursorHome, "skills"));
-  const cursorAgentsDest = extractValue(args, "--cursor-agents-dest", defaultCursorAgentsDest());
+  const cursorAgentsDest = extractOptionalValue(
+    args,
+    "--cursor-agents-dest",
+    defaultCursorAgentsDest(),
+  );
   const piDest = extractValue(args, "--pi-dest", join(piHome, "skills"));
   const skipCodex = extractFlag(args, "--skip-codex");
   const skipClaude = extractFlag(args, "--skip-claude");
@@ -587,7 +637,9 @@ export function buildDestinations(options: CliOptions): CopyDestination[] {
     destinations.push({
       name: "Cursor",
       skillsRoot: options.cursorDest,
-      agentsDest: options.cursorAgentsDest,
+      ...(options.cursorAgentsDest === undefined
+        ? { legacyAgentsDest: join(homedir(), "AGENTS.md") }
+        : { agentsDest: options.cursorAgentsDest }),
       restartHint: "Restart Cursor to load synchronized personal skills.",
     });
   }

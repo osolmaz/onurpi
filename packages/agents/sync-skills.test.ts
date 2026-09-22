@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildDestinations,
   discoverSkills,
   LEGACY_STATE_FILE_NAME,
   parseCli,
@@ -177,7 +178,7 @@ describe("cross-harness synchronization", () => {
       log: () => undefined,
     });
 
-    expect(readFileSync(target.agentsDest, "utf8")).toBe("# Instructions\n");
+    expect(readFileSync(join(root, "target", "AGENTS.md"), "utf8")).toBe("# Instructions\n");
     expect(readFileSync(join(target.skillsRoot, "alpha", "helper.txt"), "utf8")).toBe("helper\n");
     expect(existsSync(join(target.skillsRoot, "alpha", "sandbox", "SKILL.md"))).toBe(false);
     expect(existsSync(join(target.skillsRoot, "plain-language"))).toBe(false);
@@ -346,7 +347,7 @@ describe("synchronization ownership", () => {
     expect(readFileSync(join(target.skillsRoot, "alpha", "SKILL.md"), "utf8")).toContain(
       "Test skill alpha",
     );
-    expect(existsSync(target.agentsDest)).toBe(false);
+    expect(existsSync(join(root, "target", "AGENTS.md"))).toBe(false);
   });
 
   it("preflights every destination before writing any destination", () => {
@@ -370,7 +371,7 @@ describe("synchronization ownership", () => {
         log: () => undefined,
       });
     }).toThrow(/Refusing to replace unowned skill/u);
-    expect(existsSync(first.agentsDest)).toBe(false);
+    expect(existsSync(join(root, "first", "AGENTS.md"))).toBe(false);
     expect(existsSync(first.skillsRoot)).toBe(false);
   });
 
@@ -392,7 +393,7 @@ describe("synchronization ownership", () => {
       log: () => undefined,
     });
 
-    expect(existsSync(target.agentsDest)).toBe(false);
+    expect(existsSync(join(root, "target", "AGENTS.md"))).toBe(false);
     expect(existsSync(target.skillsRoot)).toBe(false);
   });
 });
@@ -472,12 +473,100 @@ describe("command-line interface", () => {
       expect(existsSync(join(cursor, "alpha", "SKILL.md"))).toBe(true);
       expect(readFileSync(cursorAgents, "utf8")).toBe("instructions\n");
       expect(readFileSync(join(root, "pi", "AGENTS.md"), "utf8")).toBe("instructions\n");
+      expect(existsSync(join(root, "codex", "AGENTS.md"))).toBe(true);
       expect(existsSync(join(pi, "alpha"))).toBe(false);
       expect(() => {
         runCli(["--skip-codex", "--skip-claude", "--skip-cursor", "--skip-pi"]);
       }).toThrow(/every destination was skipped/u);
     } finally {
       consoleLog.mockRestore();
+    }
+  });
+});
+
+describe("home-directory instruction copies", () => {
+  it("keeps the Cursor instruction copy out of the home directory by default", () => {
+    const root = temporaryDirectory();
+    const home = join(root, "home");
+    mkdirSync(home, { recursive: true });
+    const previous = process.env["HOME"];
+    process.env["HOME"] = home;
+    try {
+      const parsed = parseCli(["--cursor-dest", join(root, "cursor", "skills")], root);
+      expect(parsed.cursorAgentsDest).toBeUndefined();
+      expect(buildDestinations(parsed)).toContainEqual({
+        name: "Cursor",
+        skillsRoot: join(root, "cursor", "skills"),
+        legacyAgentsDest: join(home, "AGENTS.md"),
+        restartHint: "Restart Cursor to load synchronized personal skills.",
+      });
+    } finally {
+      process.env["HOME"] = previous;
+    }
+  });
+
+  it("honors an explicit Cursor destination from the environment", () => {
+    const root = temporaryDirectory();
+    const previousDest = process.env["CURSOR_AGENTS_DEST"];
+    const previousWorkspace = process.env["CURSOR_WORKSPACE_ROOT"];
+    process.env["CURSOR_AGENTS_DEST"] = join(root, "home", "AGENTS.md");
+    delete process.env["CURSOR_WORKSPACE_ROOT"];
+    try {
+      const parsed = parseCli(["--cursor-dest", join(root, "cursor", "skills")], root);
+      expect(parsed.cursorAgentsDest).toBe(join(root, "home", "AGENTS.md"));
+    } finally {
+      if (previousDest === undefined) delete process.env["CURSOR_AGENTS_DEST"];
+      else process.env["CURSOR_AGENTS_DEST"] = previousDest;
+      if (previousWorkspace === undefined) delete process.env["CURSOR_WORKSPACE_ROOT"];
+      else process.env["CURSOR_WORKSPACE_ROOT"] = previousWorkspace;
+    }
+  });
+
+  it("removes an unedited home copy and keeps an edited one", () => {
+    const root = temporaryDirectory();
+    const sourceRoot = join(root, "source", "skills");
+    createSkill(sourceRoot, "alpha");
+    const agentsSource = join(root, "source", "AGENTS.md");
+    write(agentsSource, "instructions\n");
+    const home = join(root, "home");
+    const stale = join(home, "AGENTS.md");
+    write(stale, "instructions\n");
+    const previous = process.env["HOME"];
+    process.env["HOME"] = home;
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      runCli([
+        "--source-root",
+        sourceRoot,
+        "--agents-source",
+        agentsSource,
+        "--dest",
+        join(root, "codex", "skills"),
+        "--skip-claude",
+        "--cursor-dest",
+        join(root, "cursor", "skills"),
+        "--skip-pi",
+      ]);
+      expect(existsSync(stale)).toBe(false);
+      expect(existsSync(join(root, "cursor", "skills", "alpha", "SKILL.md"))).toBe(true);
+
+      write(stale, "hand-written\n");
+      runCli([
+        "--source-root",
+        sourceRoot,
+        "--agents-source",
+        agentsSource,
+        "--dest",
+        join(root, "codex", "skills"),
+        "--skip-claude",
+        "--cursor-dest",
+        join(root, "cursor", "skills"),
+        "--skip-pi",
+      ]);
+      expect(readFileSync(stale, "utf8")).toBe("hand-written\n");
+    } finally {
+      consoleLog.mockRestore();
+      process.env["HOME"] = previous;
     }
   });
 });

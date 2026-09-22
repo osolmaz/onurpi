@@ -305,7 +305,9 @@ function checkInstalled(
   const fullCheck =
     (parsed.prune ?? parsed.selectors.length === 0) && parsed.selectors.length === 0;
   for (const destination of destinations) {
-    assertFileMatches(sources.agentsSource, destination.agentsDest);
+    if (destination.agentsDest !== undefined) {
+      assertFileMatches(sources.agentsSource, destination.agentsDest);
+    }
     assertSkillCopies(selected, destination.skillsRoot);
     if (fullCheck)
       assertManagedState(
