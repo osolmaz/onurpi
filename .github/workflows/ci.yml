@@ -144,6 +144,12 @@ jobs:
       - name: Check @onurpi/claudishlint package with Slophammer
         working-directory: packages/claudishlint
         run: npm run slophammer
+      - name: Check @onurpi/context-budget package
+        working-directory: packages/context-budget
+        run: npm run check
+      - name: Check @onurpi/context-budget package with Slophammer
+        working-directory: packages/context-budget
+        run: npm run slophammer
       - name: Check external extension wrappers
         run: |
           for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do

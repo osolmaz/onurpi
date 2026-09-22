@@ -84,6 +84,10 @@ typescript:
       - packages/unified-exec/src/time.ts
       - packages/unified-exec/src/unescape.ts
       - packages/yarp/index.ts
+      - packages/context-budget/context-budget.ts
+      - packages/context-budget/config.ts
+      - packages/context-budget/session-policy.ts
+      - packages/context-budget/command.ts
   dependency_boundaries:
     - from: packages/agents
       allow:
@@ -138,3 +142,6 @@ typescript:
     - from: packages/skill-slug
       allow:
         - packages/skill-slug
+    - from: packages/context-budget
+      allow:
+        - packages/context-budget
