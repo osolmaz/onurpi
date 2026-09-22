@@ -367,8 +367,9 @@ describe("Turn Fold history viewport controls", () => {
     viewport.render(80, 8);
 
     viewport.toggleAllToolOutput();
-    expect(viewport.render(80, 8).join("\n")).toContain("more lines, press o to expand");
-    expect(viewport.render(80, 8).join("\n")).not.toContain("```");
+    // Code blocks soft-wrap long argument lines, so the notice needs a taller window.
+    expect(viewport.render(80, 12).join("\n")).toContain("more lines, press o to expand");
+    expect(viewport.render(80, 12).join("\n")).not.toContain("```");
 
     viewport.jumpToEntry(0);
     viewport.toggleToolOutput();

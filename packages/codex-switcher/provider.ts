@@ -1,4 +1,4 @@
-import type { Provider } from "@earendil-works/pi-ai";
+import { normalizeContext, type Provider } from "@earendil-works/pi-ai";
 
 import type { ConfigController } from "./account-manager.ts";
 import {
@@ -54,12 +54,12 @@ function switcherTransports(
     stream: createCodexSwitcherStream({
       ...routerOptions,
       transport: (model, context, streamOptions) =>
-        nativeProvider.stream(model, context, streamOptions),
+        nativeProvider.stream(model, normalizeContext(context), streamOptions),
     }),
     streamSimple: createCodexSwitcherStream({
       ...routerOptions,
       transport: (model, context, streamOptions) =>
-        nativeProvider.streamSimple(model, context, streamOptions),
+        nativeProvider.streamSimple(model, normalizeContext(context), streamOptions),
     }),
   };
 }

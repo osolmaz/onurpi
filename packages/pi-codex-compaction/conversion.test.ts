@@ -62,7 +62,6 @@ function toolResultEntry(
   id: string,
   toolCallId: string,
   content: ToolResultMessage["content"],
-  addedToolNames?: string[],
 ): SessionMessageEntry {
   return {
     type: "message",
@@ -75,7 +74,25 @@ function toolResultEntry(
       toolName: "read",
       content,
       isError: false,
-      ...(addedToolNames ? { addedToolNames } : {}),
+      timestamp: Date.now(),
+    },
+  };
+}
+
+function systemToolsEntry(id: string, toolsAdded: ToolInfo[]): SessionMessageEntry {
+  return {
+    type: "message",
+    id,
+    parentId: null,
+    timestamp: new Date().toISOString(),
+    message: {
+      role: "system",
+      content: "",
+      toolsAdded: toolsAdded.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      })),
       timestamp: Date.now(),
     },
   };
@@ -197,7 +214,8 @@ describe("Responses conversion", () => {
       assistantEntry("a1", [
         { type: "toolCall", id: "call_1", name: "tool_search", arguments: {} },
       ]),
-      toolResultEntry("t1", "call_1", [{ type: "text", text: "ok" }], ["deferred_tool"]),
+      toolResultEntry("t1", "call_1", [{ type: "text", text: "ok" }]),
+      systemToolsEntry("s1", [tool]),
     );
     const input = effectiveInputForBranch({ branch, model: model(), tools: [tool] });
 

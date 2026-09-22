@@ -5,6 +5,7 @@ import type {
   AssistantMessage,
   Message,
   Model,
+  SystemMessage,
   TextContent,
   ThinkingContent,
   ToolCall,
@@ -91,7 +92,10 @@ function contentTextOf(message: ToolResultMessage): string {
   return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 }
 
-function responseTool(tool: ToolInfo, deferLoading = false): ResponseItem {
+function responseTool(
+  tool: Pick<ToolInfo, "name" | "description" | "parameters">,
+  deferLoading = false,
+): ResponseItem {
   return {
     type: "function",
     name: tool.name,
@@ -220,33 +224,26 @@ function appendAssistantMessage(
   }
 }
 
-function toolSearchItems(
-  message: ToolResultMessage,
-  toolsByName: Map<string, ToolInfo>,
-): ResponseItem[] {
-  const addedTools = (message.addedToolNames ?? []).flatMap((name) => {
-    const tool = toolsByName.get(name);
-    return tool ? [tool] : [];
-  });
-  if (addedTools.length === 0) return [];
-  const searchCallId = `pi_tool_load_${shortHash(
-    `${message.toolCallId}:${addedTools.map((tool) => tool.name).join(",")}`,
-  )}`;
-  const query = addedTools.map((tool) => tool.name).join(" ");
+function toolSearchItems(message: SystemMessage, messageIndex: number): ResponseItem[] {
+  const tools = message.toolsAdded ?? [];
+  if (tools.length === 0) return [];
+  const names = tools.map((tool) => tool.name);
+  const searchCallId = `pi_tool_load_${shortHash(`system:${String(messageIndex)}:${names.join(",")}`)}`;
+  const query = names.join(" ");
   return [
     {
       type: "tool_search_call",
       call_id: searchCallId,
       execution: "client",
       status: "completed",
-      arguments: { query, limit: addedTools.length },
+      arguments: { query, limit: tools.length },
     },
     {
       type: "tool_search_output",
       call_id: searchCallId,
       execution: "client",
       status: "completed",
-      tools: addedTools.map((tool) => responseTool(tool, true)),
+      tools: tools.map((tool) => responseTool(tool, true)),
     },
   ];
 }
@@ -263,7 +260,6 @@ function appendToolResultMessage(
     call_id: callId ?? message.toolCallId,
     output: toolResultOutput(message, model),
   });
-  state.items.push(...toolSearchItems(message, state.toolsByName));
 }
 
 function convertMessage(state: ConversionState, message: Message, model: AnyModel): void {
@@ -271,6 +267,10 @@ function convertMessage(state: ConversionState, message: Message, model: AnyMode
     appendUserMessage(state, message);
   } else if (message.role === "assistant") {
     appendAssistantMessage(state, message, model);
+  } else if (message.role === "system") {
+    // The leading system message's tool set rides in the request `tools` payload; only
+    // mid-conversation additions need synthetic tool_search items for deferred loading.
+    if (state.messageIndex > 0) state.items.push(...toolSearchItems(message, state.messageIndex));
   } else {
     appendToolResultMessage(state, message, model);
   }

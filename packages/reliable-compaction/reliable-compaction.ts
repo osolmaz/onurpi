@@ -2,9 +2,9 @@ import { lazyStream } from "@earendil-works/pi-ai";
 import type {
   Api,
   AssistantMessageEventStream,
-  Context,
   Model,
   SimpleStreamOptions,
+  TranscriptContext,
   Transport,
 } from "@earendil-works/pi-ai";
 import type { ProviderConfig, SessionBeforeCompactEvent } from "@earendil-works/pi-coding-agent";
@@ -13,7 +13,7 @@ const MAX_ATTEMPTS = 2;
 
 type ApiStreamSimpleFunction = (
   model: Model<Api>,
-  context: Context,
+  context: TranscriptContext,
   options?: SimpleStreamOptions,
 ) => AssistantMessageEventStream;
 
@@ -83,7 +83,7 @@ function isAborted(options: SimpleStreamOptions | undefined): boolean {
 async function selectCompactionStream(
   streamSimple: ApiStreamSimpleFunction,
   model: Model<Api>,
-  context: Context,
+  context: TranscriptContext,
   options: SimpleStreamOptions | undefined,
   policy: CompactionPolicy,
 ): Promise<AssistantMessageEventStream> {

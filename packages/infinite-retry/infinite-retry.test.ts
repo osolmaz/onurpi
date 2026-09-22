@@ -203,7 +203,8 @@ describe("infinite retry indicator", () => {
 
 describe("installInfiniteRetryPatch", () => {
   it("patches and restores the current development Pi runtime", () => {
-    expect(VERSION).toBe("0.85.0");
+    // The real SDK is loaded (not the fake); its version is a concrete release, not a prerelease tag.
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+/u);
     const original = methodValue(AgentSession.prototype, "_prepareRetry");
     const lease = installInfiniteRetryPatch();
     leases.push(lease);

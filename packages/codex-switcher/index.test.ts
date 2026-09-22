@@ -1,5 +1,6 @@
 import {
   createAssistantMessageEventStream,
+  normalizeContext,
   type AssistantMessage,
   type AssistantMessageEvent,
   type Model,
@@ -171,7 +172,9 @@ describe("installCodexSwitcher", () => {
     const context = { model, ui: { notify: vi.fn(), setStatus } };
     await test.emit("session_start", {}, context);
     await test.emit("before_agent_start", {}, context);
-    expect((await provider.stream(model, { messages: [] }).result()).provider).toBe("openai-codex");
+    expect(
+      (await provider.stream(model, normalizeContext({ messages: [] })).result()).provider,
+    ).toBe("openai-codex");
     expect(requests).toEqual(["token-primary"]);
     expect(setStatus).toHaveBeenCalledOnce();
     expect(setStatus).toHaveBeenCalledWith("codex-switcher", undefined);
@@ -345,7 +348,7 @@ describe("installCodexSwitcher", () => {
     const context = { model, ui: { notify: vi.fn(), setStatus: vi.fn() } };
 
     await test.emit("agent_start", {}, context);
-    await provider.stream(model, { messages: [] }).result();
+    await provider.stream(model, normalizeContext({ messages: [] })).result();
     const confirm = vi.fn(() => Promise.resolve(true));
     const notify = vi.fn();
     await test.commands.get("codex-switcher")?.handler("remove primary", {
@@ -379,7 +382,7 @@ describe("installCodexSwitcher", () => {
     });
     const provider = test.providers[0] as CodexProvider;
     const model = provider.getModels()[0] as CodexModel;
-    await provider.stream(model, { messages: [] }).result();
+    await provider.stream(model, normalizeContext({ messages: [] })).result();
     expect(requests).toEqual(["token-backup"]);
     expect(test.providers.map((value) => value.id)).toEqual(["openai-codex"]);
     await expect(
@@ -404,7 +407,9 @@ describe("installCodexSwitcher", () => {
     const provider = test.providers[0] as CodexProvider;
     expect(provider.auth.oauth).toBeDefined();
     const model = provider.getModels()[0] as CodexModel;
-    await provider.stream(model, { messages: [] }, { apiKey: "canonical-token" }).result();
+    await provider
+      .stream(model, normalizeContext({ messages: [] }), { apiKey: "canonical-token" })
+      .result();
     expect(requests).toEqual(["canonical-token"]);
     const notify = vi.fn();
     await test.commands.get("codex-switcher")?.handler("status", {

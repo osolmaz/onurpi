@@ -1,9 +1,11 @@
 import {
   createAssistantMessageEventStream,
+  normalizeContext,
   type Api,
   type AssistantMessage,
   type Model,
   type SimpleStreamOptions,
+  type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
@@ -20,6 +22,10 @@ import {
 
 type HookEvent = Parameters<SessionBeforeCompactHandler>[0];
 type HookContext = Parameters<SessionBeforeCompactHandler>[1];
+
+function transcript(): TranscriptContext {
+  return normalizeContext({ messages: [] });
+}
 
 function model(api: Api = "openai-codex-responses", provider = "custom-codex"): Model<Api> {
   return {
@@ -168,18 +174,14 @@ describe("provider stream policy", () => {
       (failed) => failures.push(failed),
     );
 
-    const returned = stream(
-      model(),
-      { messages: [] },
-      {
-        apiKey: "token",
-        headers: { trace: "kept" },
-        maxTokens: 4_096,
-        maxRetries: 9,
-        timeoutMs: 123,
-        transport: "websocket",
-      },
-    );
+    const returned = stream(model(), transcript(), {
+      apiKey: "token",
+      headers: { trace: "kept" },
+      maxTokens: 4_096,
+      maxRetries: 9,
+      timeoutMs: 123,
+      transport: "websocket",
+    });
     expect(returned).not.toBe(source);
     expect(observed).toMatchObject({
       apiKey: "token",
@@ -209,7 +211,7 @@ describe("provider stream policy", () => {
         { maxAttempts: 2, transport: "sse" },
         (failed) => failures.push(failed),
       );
-      const returned = stream(model(), { messages: [] });
+      const returned = stream(model(), transcript());
       source.end(assistant(reason));
       await returned.result();
       await Promise.resolve();
@@ -234,7 +236,7 @@ describe("provider stream policy", () => {
       () => undefined,
     );
 
-    const returned = stream(model(), { messages: [] });
+    const returned = stream(model(), transcript());
     sources[0]?.end(assistant("error"));
     await sources[0]?.result();
     await Promise.resolve();
@@ -259,7 +261,7 @@ describe("provider stream policy", () => {
       (failed) => failures.push(failed),
     );
 
-    const result = await stream(model(), { messages: [] }).result();
+    const result = await stream(model(), transcript()).result();
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toContain("offline");
     expect(calls).toBe(2);
@@ -301,7 +303,7 @@ describe("session_before_compact handler", () => {
     expect(handler(event(), context())).toBeUndefined();
     const config = state.registered();
     expect(config?.api).toBe("openai-codex-responses");
-    const returned = requireStream(config)(model(), { messages: [] });
+    const returned = requireStream(config)(model(), transcript());
     source.end(assistant());
     await returned.result();
     await Promise.resolve();
@@ -323,13 +325,13 @@ describe("session_before_compact handler", () => {
 
     await handler(event({ split: true, history: true }), context());
     const stream = requireStream(state.registered());
-    const first = stream(model(), { messages: [] });
+    const first = stream(model(), transcript());
     sources[0]?.end(assistant());
     await first.result();
     await Promise.resolve();
     expect(state.unregistered).toEqual([]);
 
-    const second = stream(model(), { messages: [] });
+    const second = stream(model(), transcript());
     sources[1]?.end(assistant());
     await second.result();
     await Promise.resolve();
@@ -344,7 +346,7 @@ describe("session_before_compact handler", () => {
     });
 
     await handler(event({ split: true, history: true }), context());
-    const returned = requireStream(state.registered())(model(), { messages: [] });
+    const returned = requireStream(state.registered())(model(), transcript());
     source.end(assistant("error"));
     await returned.result();
     await Promise.resolve();
@@ -366,7 +368,7 @@ describe("session_before_compact handler", () => {
     const config = state.registered();
     if (!config) throw new Error("Expected a provider override");
     registryState.current = { ...config };
-    const returned = requireStream(config)(model(), { messages: [] });
+    const returned = requireStream(config)(model(), transcript());
     source.end(assistant());
     await returned.result();
     await Promise.resolve();
@@ -386,7 +388,7 @@ describe("session_before_compact handler", () => {
       context(model(), undefined, () => registryState.current),
     );
     registryState.current = { streamSimple: "replacement" };
-    const returned = requireStream(state.registered())(model(), { messages: [] });
+    const returned = requireStream(state.registered())(model(), transcript());
     source.end(assistant());
     await returned.result();
     await Promise.resolve();

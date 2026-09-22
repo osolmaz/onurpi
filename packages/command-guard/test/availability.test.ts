@@ -22,6 +22,7 @@ describe("shell availability", () => {
       },
       on: (event) => {
         events.push(event);
+        return () => undefined;
       },
     };
     registerShellGuards(pi, new ExecutionCheckStore());

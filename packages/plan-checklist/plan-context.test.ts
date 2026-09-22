@@ -1,4 +1,5 @@
 import type { ContextEvent } from "@earendil-works/pi-coding-agent";
+import type { JsonValue } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 
 import { addPlanContextBridge, contextContainsPlan, formatPlanContext } from "./plan-context.ts";
@@ -49,7 +50,7 @@ function assistantCall(toolCallId: string, status = "in_progress"): ContextMessa
 function toolResult(
   toolCallId: string,
   status = "in_progress",
-  options: { error?: boolean; details?: unknown } = {},
+  options: { error?: boolean; details?: JsonValue } = {},
 ): ContextMessage {
   return {
     role: "toolResult",

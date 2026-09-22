@@ -1,11 +1,12 @@
 import { SessionManager, type SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { JsonValue } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 
 import { replayPlanSnapshot } from "./plan-replay.ts";
 
 function toolResult(
   id: string,
-  details: unknown,
+  details: JsonValue,
   options: { error?: boolean; toolName?: string; timestamp?: number } = {},
 ): SessionEntry {
   return {

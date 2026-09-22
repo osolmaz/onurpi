@@ -64,9 +64,9 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.85.0",
-    "@earendil-works/pi-coding-agent": "0.85.0",
-    "@earendil-works/pi-tui": "0.85.0",
+    "@earendil-works/pi-ai": "0.87.0",
+    "@earendil-works/pi-coding-agent": "0.87.0",
+    "@earendil-works/pi-tui": "0.87.0",
     "@eslint/js": "9.39.2",
     "@osolmaz/pi-workflows": "0.17.4",
     "@stryker-mutator/core": "9.6.1",
