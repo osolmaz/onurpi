@@ -35,6 +35,10 @@ export type SizedItem = {
   chars: number;
 };
 
+/** The one-line warning names only the biggest few parts, and ignores small ones. */
+export const WARNING_ITEM_LIMIT = 4;
+const WARNING_ITEM_MIN_CHARS = 1_000;
+
 export type ContextFileSize = {
   path: string;
   chars: number;
@@ -236,6 +240,28 @@ export function formatCount(value: number): string {
   return `${(value / 1_000_000).toFixed(1)}M`;
 }
 
+/**
+ * Rank the prompt sections and the serialized tool declarations together, largest first, so the
+ * warning shows where the beginning context actually goes.
+ */
+export function largestContributors(measurement: ContextMeasurement): SizedItem[] {
+  const items: SizedItem[] = [
+    ...measurement.sections,
+    { name: "tool declarations", chars: measurement.toolChars },
+  ];
+  return items
+    .filter((item) => item.chars >= WARNING_ITEM_MIN_CHARS)
+    .sort((left, right) => right.chars - left.chars)
+    .slice(0, WARNING_ITEM_LIMIT);
+}
+
+function contributorPhrase(measurement: ContextMeasurement): string {
+  const items = largestContributors(measurement);
+  if (items.length === 0) return "";
+  const parts = items.map((item) => `${item.name} ${formatCount(item.chars)}`);
+  return `Largest: ${parts.join(", ")}. `;
+}
+
 export function budgetWarning(
   measurement: ContextMeasurement,
   config: ContextBudgetConfig,
@@ -247,7 +273,7 @@ export function budgetWarning(
   return [
     `context-budget: beginning context is ${formatCount(measurement.totalChars)} chars`,
     `(~${formatCount(tokens)} tokens), ${reasons.join(" and ")}.`,
-    "Run /context-budget for the breakdown.",
+    `${contributorPhrase(measurement)}Run /context-budget for the details.`,
   ].join(" ");
 }
 

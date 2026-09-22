@@ -10,6 +10,7 @@ import {
   measureContextFiles,
   measurePrompt,
   parseContextFiles,
+  largestContributors,
   measureRequestTools,
   measureTools,
   overBudget,
@@ -223,6 +224,31 @@ describe("budget checks", () => {
     expect(message).toContain("/context-budget");
   });
 
+  it("names the largest contributors in the warning", () => {
+    const message = budgetWarning(
+      measurement({
+        totalChars: 118_443,
+        toolChars: 19_588,
+        sections: [
+          { name: "project_context", chars: 34_800 },
+          { name: "skills", chars: 8_200 },
+          { name: "preamble", chars: 169 },
+        ],
+      }),
+      config(),
+    );
+    expect(message).toContain(
+      "Largest: project_context 34.8K, tool declarations 19.6K, skills 8.2K.",
+    );
+    expect(message).toContain("Run /context-budget for the details.");
+  });
+
+  it("omits the contributor list when every part is small", () => {
+    const message = budgetWarning(measurement({ totalChars: 118_443 }), config());
+    expect(message).not.toContain("Largest:");
+    expect(message).toContain("Run /context-budget for the details.");
+  });
+
   it("renders a status line only when it applies", () => {
     const over = measurement({ totalChars: 118_443 });
     expect(statusText(over, config())).toBe("context! 118.4Kch ~29.6Ktok");
@@ -230,6 +256,47 @@ describe("budget checks", () => {
     expect(statusText(undefined, config())).toBeUndefined();
     expect(statusText(over, config({ status: false }))).toBeUndefined();
     expect(statusText(over, config({ enabled: false }))).toBeUndefined();
+  });
+});
+
+describe("largestContributors", () => {
+  it("ranks prompt sections and tool declarations together", () => {
+    const contributors = largestContributors(
+      measurement({
+        toolChars: 19_588,
+        sections: [
+          { name: "skills", chars: 8_200 },
+          { name: "project_context", chars: 34_800 },
+          { name: "rules", chars: 1_900 },
+        ],
+      }),
+    );
+    expect(contributors).toEqual([
+      { name: "project_context", chars: 34_800 },
+      { name: "tool declarations", chars: 19_588 },
+      { name: "skills", chars: 8_200 },
+      { name: "rules", chars: 1_900 },
+    ]);
+  });
+
+  it("drops small parts and the long tail", () => {
+    const contributors = largestContributors(
+      measurement({
+        sections: [
+          { name: "d", chars: 4_000 },
+          { name: "e", chars: 5_000 },
+          { name: "c", chars: 3_000 },
+          { name: "b", chars: 2_000 },
+          { name: "a", chars: 1_000 },
+          { name: "preamble", chars: 999 },
+        ],
+      }),
+    );
+    expect(contributors.map((item) => item.name)).toEqual(["e", "d", "c", "b"]);
+  });
+
+  it("returns nothing when the beginning context holds no large part", () => {
+    expect(largestContributors(measurement({ sections: [{ name: "a", chars: 999 }] }))).toEqual([]);
   });
 });
 

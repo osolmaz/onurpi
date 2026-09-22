@@ -23,7 +23,9 @@ cost.
   with its size.
 - At the first provider request it replaces the tool estimate with the real declarations from the
   outgoing payload.
-- It warns once per session when the total crosses `warnChars` or `warnTokens`.
+- It warns once per session when the total crosses `warnChars` or `warnTokens`. The warning names the
+  largest contributors, for example `Largest: project_context 34.8K, tool declarations 19.6K,
+  skills 8.2K.`, and skips parts under 1000 characters.
 - The footer shows a live line, `context 118.4Kch ~29.6Ktok`, with a `!` when the budget is crossed.
 - `/context-budget` prints the full breakdown: sections, context files (with duplicate content
   groups), the largest tool declarations, the config path, and current conversation use.
