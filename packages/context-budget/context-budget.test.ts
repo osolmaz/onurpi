@@ -12,6 +12,7 @@ import {
   parseContextFiles,
   largestContributors,
   measureRequestTools,
+  warningRows,
   measureTools,
   overBudget,
   overBudgetReasons,
@@ -224,10 +225,10 @@ describe("budget checks", () => {
     expect(message).toContain("/context-budget");
   });
 
-  it("names the largest contributors in the warning", () => {
+  it("shows the largest contributors as a borderless table", () => {
     const message = budgetWarning(
       measurement({
-        totalChars: 118_443,
+        totalChars: 67_391,
         toolChars: 19_588,
         sections: [
           { name: "project_context", chars: 34_800 },
@@ -235,18 +236,24 @@ describe("budget checks", () => {
           { name: "preamble", chars: 169 },
         ],
       }),
-      config(),
+      config({ warnChars: 40_000, warnTokens: 10_000 }),
     );
-    expect(message).toContain(
-      "Largest: project_context 34.8K, tool declarations 19.6K, skills 8.2K.",
-    );
-    expect(message).toContain("Run /context-budget for the details.");
+    expect(message?.split("\n")).toEqual([
+      "context-budget: beginning context is 67.4K chars (~16.8K tokens), over 40.0K characters and over 10.0K tokens.",
+      "  project_context    34.8K  51.6%",
+      "  tool declarations  19.6K  29.1%",
+      "  skills              8.2K  12.2%",
+      "  other               4.8K   7.1%",
+      "  run /context-budget for the full breakdown",
+    ]);
   });
 
-  it("omits the contributor list when every part is small", () => {
+  it("shows only the header and the command hint when no part is large", () => {
     const message = budgetWarning(measurement({ totalChars: 118_443 }), config());
-    expect(message).not.toContain("Largest:");
-    expect(message).toContain("Run /context-budget for the details.");
+    expect(message?.split("\n")).toEqual([
+      "context-budget: beginning context is 118.4K chars (~29.6K tokens), over 100.0K characters and over 24.0K tokens.",
+      "  run /context-budget for the full breakdown",
+    ]);
   });
 
   it("renders a status line only when it applies", () => {
@@ -297,6 +304,41 @@ describe("largestContributors", () => {
 
   it("returns nothing when the beginning context holds no large part", () => {
     expect(largestContributors(measurement({ sections: [{ name: "a", chars: 999 }] }))).toEqual([]);
+  });
+});
+
+describe("warningRows", () => {
+  it("adds one row for everything the named parts do not cover", () => {
+    const rows = warningRows(
+      measurement({
+        totalChars: 10_000,
+        toolChars: 7_000,
+        sections: [{ name: "skills", chars: 2_000 }],
+      }),
+    );
+    expect(rows).toEqual([
+      { name: "tool declarations", chars: 7_000 },
+      { name: "skills", chars: 2_000 },
+      { name: "other", chars: 1_000 },
+    ]);
+  });
+
+  it("returns nothing when no part is large", () => {
+    expect(warningRows(measurement({ totalChars: 118_443 }))).toEqual([]);
+  });
+
+  it("adds no remainder row when the named parts cover the total", () => {
+    const rows = warningRows(
+      measurement({
+        totalChars: 9_000,
+        toolChars: 7_000,
+        sections: [{ name: "skills", chars: 2_000 }],
+      }),
+    );
+    expect(rows).toEqual([
+      { name: "tool declarations", chars: 7_000 },
+      { name: "skills", chars: 2_000 },
+    ]);
   });
 });
 

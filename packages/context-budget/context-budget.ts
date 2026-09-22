@@ -255,26 +255,62 @@ export function largestContributors(measurement: ContextMeasurement): SizedItem[
     .slice(0, WARNING_ITEM_LIMIT);
 }
 
-function contributorPhrase(measurement: ContextMeasurement): string {
+function share(chars: number, total: number): string {
+  if (total <= 0) return "0.0%";
+  return `${((chars / total) * 100).toFixed(1)}%`;
+}
+
+/** The warning rows: the named parts plus one row for everything they do not cover. */
+export function warningRows(measurement: ContextMeasurement): SizedItem[] {
   const items = largestContributors(measurement);
-  if (items.length === 0) return "";
-  const parts = items.map((item) => `${item.name} ${formatCount(item.chars)}`);
-  return `Largest: ${parts.join(", ")}. `;
+  if (items.length === 0) return [];
+  const named = items.reduce((total, item) => total + item.chars, 0);
+  const remaining = measurement.totalChars - named;
+  return remaining > 0 ? [...items, { name: "other", chars: remaining }] : items;
+}
+
+/**
+ * Rows as a borderless table: name, size, and share of the beginning context, all aligned so the
+ * columns read down the page.
+ */
+function warningTable(measurement: ContextMeasurement, rows: readonly SizedItem[]): string[] {
+  const counts = rows.map((row) => formatCount(row.chars));
+  const shares = rows.map((row) => share(row.chars, measurement.totalChars));
+  const nameWidth = Math.max(...rows.map((row) => row.name.length));
+  const countWidth = Math.max(...counts.map((count) => count.length));
+  const shareWidth = Math.max(...shares.map((value) => value.length));
+  return rows.map((row, index) => {
+    const name = row.name.padEnd(nameWidth);
+    const count = (counts[index] ?? "").padStart(countWidth);
+    const percent = (shares[index] ?? "").padStart(shareWidth);
+    return `  ${name}  ${count}  ${percent}`;
+  });
+}
+
+export function warningLines(
+  measurement: ContextMeasurement,
+  config: ContextBudgetConfig,
+): string[] {
+  const reasons = overBudgetReasons(measurement, config);
+  if (!config.enabled || !config.notify || reasons.length === 0) return [];
+  const tokens = estimateTokens(measurement.totalChars, config.charsPerToken);
+  const header = [
+    `context-budget: beginning context is ${formatCount(measurement.totalChars)} chars`,
+    `(~${formatCount(tokens)} tokens), ${reasons.join(" and ")}.`,
+  ].join(" ");
+  return [
+    header,
+    ...warningTable(measurement, warningRows(measurement)),
+    "  run /context-budget for the full breakdown",
+  ];
 }
 
 export function budgetWarning(
   measurement: ContextMeasurement,
   config: ContextBudgetConfig,
 ): string | undefined {
-  if (!config.enabled || !config.notify) return undefined;
-  const reasons = overBudgetReasons(measurement, config);
-  if (reasons.length === 0) return undefined;
-  const tokens = estimateTokens(measurement.totalChars, config.charsPerToken);
-  return [
-    `context-budget: beginning context is ${formatCount(measurement.totalChars)} chars`,
-    `(~${formatCount(tokens)} tokens), ${reasons.join(" and ")}.`,
-    `${contributorPhrase(measurement)}Run /context-budget for the details.`,
-  ].join(" ");
+  const lines = warningLines(measurement, config);
+  return lines.length === 0 ? undefined : lines.join("\n");
 }
 
 export function statusText(
