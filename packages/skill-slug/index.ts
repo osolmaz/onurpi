@@ -43,8 +43,10 @@ export default function skillSlug(pi: ExtensionAPI): void {
   let structuredPrimed = false;
 
   pi.on("before_agent_start", (event) => {
-    const skills = event.systemPromptOptions.skills ?? [];
-    if (skills.length > 0) {
+    // The field is required in the current Pi types, but extensions can still see a
+    // caller that omits it, so validate the shape before reading it.
+    const { skills } = event.systemPromptOptions;
+    if (Array.isArray(skills) && skills.length > 0) {
       slugs = new Set(skills.map((skill) => skill.name));
       structuredPrimed = true;
     }
