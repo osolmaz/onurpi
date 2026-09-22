@@ -4,7 +4,6 @@
   "lastChangelogVersion": "0.87.0",
   "theme": "onur-dark",
   "packages": [
-    "npm:@narumitw/pi-btw@0.25.0",
     "npm:pi-web-access@0.29.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",

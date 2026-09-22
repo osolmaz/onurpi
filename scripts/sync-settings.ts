@@ -37,6 +37,7 @@ const REMOVED_OR_REPLACED_PACKAGE_SOURCES = [
   /^git:github\.com\/Michaelliv\/pi-goal(?:@.*)?$/,
   /^npm:pi-goal(?:@.*)?$/,
   /^npm:pi-unified-exec(?:@.*)?$/,
+  /^npm:@narumitw\/pi-btw(?:@.*)?$/,
   /^npm:@narumitw\/pi-usage(?:@.*)?$/,
   /^npm:@narumitw\/pi-tui-kit(?:@.*)?$/,
   /^npm:pi-huggingface-oauth(?:@.*)?$/,
