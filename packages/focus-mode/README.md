@@ -17,8 +17,8 @@ this package, on this machine.
 | A claim sees no turn for 5 seconds      | Release the slot, because Pi refused the prompt before the run started |
 | Two sessions claim at the same instant  | The session that started last yields, so the count returns to the cap  |
 
-A refused prompt never reaches the model and adds nothing to the session transcript. The one visible
-trace is the notification and the footer status.
+A refused prompt never reaches the model and adds nothing to the session transcript. The only
+visible trace is the notification.
 
 ## Refusal and stop messages
 
@@ -69,8 +69,8 @@ reports one message and keeps working.
 | `/focus max N`  | Write a new cap for future sessions and this session              |
 | `--focus-max N` | Run one session with another cap                                  |
 
-The footer shows `focus 1/2 · held`, `focus 1/2 · ready`, or `focus 2/2 · full` under the
-`focus-mode` status key.
+The package writes nothing to the footer or the status bar. The count is visible only through
+`/focus status` and `/focus list`.
 
 ## User state
 

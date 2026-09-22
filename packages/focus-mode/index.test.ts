@@ -119,13 +119,13 @@ describe("focus mode wiring", () => {
     vi.useRealTimers();
   });
 
-  it("claims a slot for the first prompt and shows the count", async () => {
+  it("claims a slot for the first prompt and leaves the status bar alone", async () => {
     const harness = makeHarness(SESSION_A);
     await start(harness);
     await expect(prompt(harness, "hello")).resolves.toEqual({ action: "continue" });
     const leases = leaseDir(configPath);
     expect(listLeases(leases).leases).toHaveLength(1);
-    expect(harness.statuses.at(-1)).toBe("focus 1/2 · held");
+    expect(harness.statuses).toEqual([]);
   });
 
   it("refuses a prompt at the cap, keeps the text, and writes no entry", async () => {
@@ -141,7 +141,7 @@ describe("focus mode wiring", () => {
     await expect(prompt(third, "keep me")).resolves.toEqual({ action: "handled" });
     expect(third.editor()).toBe("keep me");
     expect(third.notes.at(-1)).toContain("Focus mode: 2 of 2 agents are working");
-    expect(third.statuses.at(-1)).toBe("focus 2/2 · full");
+    expect(third.statuses).toEqual([]);
     expect(listLeases(leaseDir(configPath)).leases).toHaveLength(2);
   });
 
@@ -237,7 +237,7 @@ describe("focus mode wiring", () => {
     await start(harness);
     await expect(prompt(harness, "one")).resolves.toEqual({ action: "continue" });
     expect(listLeases(leaseDir(offPath)).leases).toHaveLength(0);
-    expect(harness.statuses.at(-1)).toBeUndefined();
+    expect(harness.statuses).toEqual([]);
   });
 
   it("releases the lease on shutdown", async () => {
@@ -252,7 +252,7 @@ describe("focus mode wiring", () => {
     const harness = makeHarness(SESSION_A, { "focus-max": "1" });
     await start(harness);
     await prompt(harness, "only one");
-    expect(harness.statuses.at(-1)).toBe("focus 1/1 · held");
+    expect(harness.statuses).toEqual([]);
   });
 
   it("reports status, lists holders, and writes a new cap", async () => {
@@ -297,7 +297,7 @@ describe("focus mode claim confirmation", () => {
     expect(listLeases(leaseDir(configPath)).leases).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(6000);
     expect(listLeases(leaseDir(configPath)).leases).toHaveLength(0);
-    expect(harness.statuses.at(-1)).toBeUndefined();
+    expect(harness.statuses).toEqual([]);
   });
 
   it("keeps the claim once a turn starts", async () => {

@@ -49,7 +49,6 @@ import {
   type Lease,
 } from "./store.ts";
 
-const STATUS_KEY = "focus-mode";
 const FLAG_NAME = "focus-max";
 
 /**
@@ -123,8 +122,8 @@ class FocusModeSession {
     this.pi.on("agent_settled", (_event, ctx) => {
       this.settle(ctx);
     });
-    this.pi.on("session_shutdown", (_event, ctx) => {
-      this.shutdown(ctx);
+    this.pi.on("session_shutdown", () => {
+      this.shutdown();
     });
     this.pi.registerCommand("focus", {
       description: "Show or change the focus mode cap",
@@ -161,8 +160,6 @@ class FocusModeSession {
         // A lease path that cannot be used must not stop the session.
       }
       this.startTimers();
-      const prepared = this.prepare();
-      if (prepared !== undefined) this.publishStatus(ctx, prepared);
     } catch (error) {
       this.fail(ctx, error);
     }
@@ -187,8 +184,6 @@ class FocusModeSession {
       });
       if (decision.action === "continue") {
         if (decision.claim) this.tryClaim(true);
-        const refreshed = decision.claim ? this.prepare() : prepared;
-        if (refreshed !== undefined) this.publishStatus(ctx, refreshed);
         return { action: "continue" };
       }
       const preserved = preserveRejectedPrompt(ctx.ui, text, images);
@@ -198,7 +193,6 @@ class FocusModeSession {
           "warning",
         );
       }
-      ctx.ui.setStatus(STATUS_KEY, statusText(decision.count, decision.max, "full"));
       return { action: "handled" };
     } catch (error) {
       this.fail(ctx, error);
@@ -232,7 +226,6 @@ class FocusModeSession {
     const max = this.cap(prepared.config);
     if (prepared.config.notify) ctx.ui.notify(stopNotice(prepared.live.length, max), "warning");
     prepared.state.holds = false;
-    this.clearStatus(ctx);
     ctx.abort();
   }
 
@@ -245,10 +238,7 @@ class FocusModeSession {
       maxAgents: max,
       policy: config.victimPolicy,
     });
-    if (decision.action === "keep") {
-      this.publishStatus(ctx, prepared);
-      return;
-    }
+    if (decision.action === "keep") return;
     if (decision.action === "request-stop") {
       requestStop(state.dir, decision.victim.sessionId, nowIso());
       return;
@@ -263,13 +253,12 @@ class FocusModeSession {
       this.cancelClaimConfirmation(state);
       release(state.dir, state.sessionId);
       state.holds = false;
-      this.clearStatus(ctx);
     } catch (error) {
       this.fail(ctx, error);
     }
   }
 
-  private shutdown(ctx: ExtensionContext): void {
+  private shutdown(): void {
     const state = this.state;
     this.state = undefined;
     if (state === undefined) return;
@@ -277,7 +266,6 @@ class FocusModeSession {
     if (state.stopPoll !== undefined) clearInterval(state.stopPoll);
     this.cancelClaimConfirmation(state);
     release(state.dir, state.sessionId);
-    this.clearStatus(ctx);
   }
 
   private command(args: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -400,7 +388,6 @@ class FocusModeSession {
     state.awaitingStart = undefined;
     release(state.dir, state.sessionId);
     state.holds = false;
-    if (state.ctx !== undefined) this.clearStatus(state.ctx);
   }
 
   private startTimers(): void {
@@ -440,26 +427,6 @@ class FocusModeSession {
       return;
     }
     this.stopSelf(state.ctx, prepared);
-  }
-
-  private publishStatus(ctx: ExtensionContext, prepared: Prepared): void {
-    if (!ctx.hasUI) return;
-    if (!prepared.config.enabled) {
-      this.clearStatus(ctx);
-      return;
-    }
-    const max = this.cap(prepared.config);
-    const label: FocusState = prepared.state.holds
-      ? "held"
-      : prepared.live.length < max
-        ? "ready"
-        : "full";
-    ctx.ui.setStatus(STATUS_KEY, statusText(prepared.live.length, max, label));
-  }
-
-  private clearStatus(ctx: ExtensionContext): void {
-    if (!ctx.hasUI) return;
-    ctx.ui.setStatus(STATUS_KEY, undefined);
   }
 
   private fail(ctx: ExtensionContext, error: unknown): void {
