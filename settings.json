@@ -1,7 +1,11 @@
 {
+  "defaultProvider": "huggingface",
+  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
+  "lastChangelogVersion": "0.87.0",
+  "theme": "onur-dark",
   "packages": [
-    "npm:pi-web-access@0.29.0",
     "npm:@narumitw/pi-btw@0.25.0",
+    "npm:pi-web-access@0.29.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
     "../../repos/onurpi/packages/turn-fold",
@@ -30,23 +34,19 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "lastChangelogVersion": "0.86.1",
-  "defaultProvider": "huggingface",
-  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
   "defaultThinkingLevel": "xhigh",
-  "terminal": {
-    "showImages": false,
-    "images": false
-  },
-  "outputPad": 0,
-  "tuiMode": "fullscreen",
-  "theme": "onur-dark",
-  "markdown": {
-    "codeBlockIndent": ""
-  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 27200,
     "keepRecentTokens": 20000
-  }
+  },
+  "markdown": {
+    "codeBlockIndent": ""
+  },
+  "outputPad": 0,
+  "terminal": {
+    "showImages": false,
+    "images": false
+  },
+  "tuiMode": "fullscreen"
 }
