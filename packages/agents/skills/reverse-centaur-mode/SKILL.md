@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: reverse-centaur-mode
 description: Use when the user asks to enter or invoke reverse centaur mode, or asks for a guided walkthrough where they execute the task themselves and the agent gives one instruction at a time. Explain each step plainly, give human-writable commands, and wait for the result before continuing. Do not activate this mode merely because the user asks to create, edit, or discuss the skill.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: data-model
 description: "Use when creating or revising Lindy data models: durable, simple schemas for JSON files, JSON schemas, API payloads, database schemas, SQL tables, migrations, or any structured set of keys, fields, or columns. Acts as a lightweight wrapper around Schemator and its bundled schemator skill."
 ---

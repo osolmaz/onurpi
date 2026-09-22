@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: go-defaults
 description: Use when selecting, reviewing, or standardizing libraries and infrastructure for a Go project, including HTTP servers, databases, ORMs, migrations, configuration, validation, CLIs, authentication, logging, observability, testing, WebSockets, OpenAPI, and embedded storage. Provides production-oriented default choices while preserving deliberate existing project decisions.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: name-claim
 description: Use when checking whether a project, product, organization, package, domain, or social handle name is free, taken, reserved, claimable, or missing across code hosts, package registries, domains, app stores, AI platforms, developer platforms, and social networks.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: autoresearch-loop
 description: Run an iterative feature-search loop in the style of karpathy/autoresearch, with a frozen evaluation harness, one editable feature file, and a journal of every experiment. Use when searching for a discriminating metric, feature, heuristic, or scoring function against a fixed dataset, or when the user mentions autoresearch, a research loop, or iterating on features until a clear separation appears.
 ---

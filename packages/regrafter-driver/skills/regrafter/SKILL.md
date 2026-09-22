@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: regrafter
 description:
   Delegate maintenance of Regraft-managed vendored code to the dedicated Regrafter agent, including

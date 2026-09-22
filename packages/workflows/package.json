@@ -13,7 +13,13 @@
       "./index.ts"
     ],
     "skills": [
-      "../../node_modules/@osolmaz/pi-workflows/skills"
+      "../../node_modules/@osolmaz/pi-workflows/skills",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/autodoc",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/autoimplement",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/autoplan",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/monitor",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/pi-workflows",
+      "!../../node_modules/@osolmaz/pi-workflows/skills/sanity-check"
     ]
   },
   "peerDependencies": {

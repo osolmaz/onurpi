@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: sanitize-png-metadata
 description: Inspect PNG files for C2PA, EXIF, text, timestamp, and trailing metadata, then write sanitized copies without changing compressed image data. Use when Codex needs to check PNG provenance or privacy metadata, remove embedded PNG metadata, sanitize generated wallpapers or screenshots, or verify that PNG pixels remained unchanged.
 ---

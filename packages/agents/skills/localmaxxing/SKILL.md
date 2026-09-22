@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: localmaxxing
 description: Use when running, reviewing, preparing, validating, replacing, or submitting Localmaxxing LLM benchmarks. Enforces objective, representative measurements with adequate output length, uncached fresh-prefill testing, multiple distinct prompts, honest metric labels, complete raw evidence, guarded local inference, and public verification.
 ---

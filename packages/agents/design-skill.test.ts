@@ -20,7 +20,8 @@ function content(relative: string): string {
 describe("design skill", () => {
   it("has one concise entrypoint and ordinary references", () => {
     const source = content("SKILL.md");
-    expect(source).toMatch(/^---\nname: design\ndescription: >-/u);
+    expect(source.startsWith("---\n")).toBe(true);
+    expect(source).toContain("name: design\ndescription: >-");
     const description = source.split("description: >-\n")[1]?.split("\n---")[0];
     expect(description).toBeDefined();
     expect(description?.length).toBeLessThanOrEqual(1024);

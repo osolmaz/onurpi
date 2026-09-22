@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: pr-description
 description: Use when opening a pull request, or when asked to write or improve a pull request description. Produces a plain summary up top, then structured technical sections with paired plain-language explanations.
 ---

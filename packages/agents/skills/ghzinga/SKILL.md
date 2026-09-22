@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ghzinga
 description: Use when an agent should open, inspect, or monitor a single GitHub issue or pull request with the ghzinga terminal UI.
 ---

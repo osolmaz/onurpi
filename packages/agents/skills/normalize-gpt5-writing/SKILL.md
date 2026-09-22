@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: normalize-gpt5-writing
 description: Use when gpt5 or GPT-5 should write or rewrite text in a more normal, natural, direct voice. Trigger for requests to sound less awkward, less stiff, less "spec-like", less defensive, less over-structured, less obviously AI-written, or more human; for public docs, landing pages, product copy, PR text, explanations, emails, comments, and any prose where tone and readability matter.
 ---

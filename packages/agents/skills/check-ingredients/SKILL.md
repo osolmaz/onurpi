@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: check-ingredients
 description: Use when evaluating a product ingredient list or safety claim for source-backed health, toxicity, pregnancy/child, regulatory, environmental, allergy, irritation, and finished-product risk context. Trigger for cosmetics, sunscreens, supplements, foods, cleaners, baby products, and similar consumer products.
 ---

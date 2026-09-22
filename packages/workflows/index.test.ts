@@ -14,13 +14,22 @@ describe("Pi Workflows wrapper", () => {
     expect(extension).toBeTypeOf("function");
   });
 
-  it("exposes both skills from the pinned dependency", () => {
-    expect(manifest.pi?.skills).toEqual(["../../node_modules/@osolmaz/pi-workflows/skills"]);
+  it("exposes the pinned skills except the hidden workflow entry points", () => {
+    const skills = manifest.pi?.skills ?? [];
+    const root = "../../node_modules/@osolmaz/pi-workflows/skills";
+    expect(skills[0]).toBe(root);
 
-    const skillsPath = manifest.pi?.skills?.[0];
-    if (skillsPath === undefined) throw new Error("Pi Workflows skill path is missing.");
-    const skillsDir = path.resolve(packageDir, skillsPath);
-    expect(fs.existsSync(path.join(skillsDir, "monitor", "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(skillsDir, "pi-workflows", "SKILL.md"))).toBe(true);
+    const hidden = [
+      "autodoc",
+      "autoimplement",
+      "autoplan",
+      "monitor",
+      "pi-workflows",
+      "sanity-check",
+    ];
+    for (const name of hidden) {
+      expect(skills).toContain(`!${root}/${name}`);
+      expect(fs.existsSync(path.join(packageDir, root, name, "SKILL.md"))).toBe(true);
+    }
   });
 });

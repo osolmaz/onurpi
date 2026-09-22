@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: parallel-agent-kickoff
 description: Use as a top-level orchestrator when clustering issues/PRs that look similar and creating a real interactive/resumable agent session for each group. Triggers include requests to kick off, start, create, launch, or run parallel Codex/Claude/Pi sessions; run sequential Socratic prompts with plainerization; drive no-mutation auto-triage in each child session without editing or writing on the PR; or keep prompting child sessions until they are ready for human takeover with mostly maintainer decision making left.
 ---

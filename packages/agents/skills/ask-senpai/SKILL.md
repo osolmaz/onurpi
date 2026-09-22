@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ask-senpai
 description: Use only when the human explicitly asks to call or use a senior expert model, specifically Claude Fable or GPT-6 Astra through Codex, for review, research, planning, or implementation. These models are very expensive to run, so use them sparingly even when authorized. Default to ACPX's local Claude adapter for Claude Fable, use ACPX's Cursor adapter when the human explicitly requests Cursor, and use ACPX's Codex adapter for GPT-6 Astra. Always select the model explicitly, use long timeouts and suitable permissions, preserve substantial work in persistent sessions, and verify results locally.
 ---

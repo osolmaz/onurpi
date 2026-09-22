@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: hf-job-control
 description: Operate and integrate cooperative lifecycle control for detached Hugging Face Jobs with the hf-job-control Python package and CLI, including durable chunked outputs, audits, and incident recovery. Use when creating logical runs, registering immutable launch specifications, launching or monitoring physical Jobs, requesting pause/stop/abort, resuming from verified checkpoints, implementing CheckpointAdapter and Controller boundaries, making batch generation recoverable, running the remote canary, investigating control or checkpoint failures, or proving receipts and provenance for a completed run.
 license: MIT

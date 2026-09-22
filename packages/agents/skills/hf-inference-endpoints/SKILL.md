@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: hf-inference-endpoints
 description: Use when creating, updating, resuming, pausing, deleting, inspecting, smoke-testing, profiling, or benchmarking Hugging Face Inference Endpoints. Enforces remote-only execution, reproducible endpoint configuration, cost-aware lifecycle management, and mandatory pause-and-verify cleanup whenever an endpoint is no longer actively being used.
 ---

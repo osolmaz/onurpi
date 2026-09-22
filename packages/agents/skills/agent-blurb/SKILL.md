@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: agent-blurb
 description: Write README prompts that tell coding agents how to adopt a tool.
 ---

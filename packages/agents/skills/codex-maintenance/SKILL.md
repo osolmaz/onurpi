@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: codex-maintenance
 description: Use when maintaining local Codex state, including changing or repairing session cwd/title/metadata, inspecting rollout JSONL files, extracting transcripts, transferring Codex sessions between machines, editing trusted project config, or using the tools repo codex-tools CLI. Prefer this skill for work involving ~/.codex/state_5.sqlite, ~/.codex/sessions, ~/.codex/config.toml, local Codex session repair, and Codex session transfer.
 ---

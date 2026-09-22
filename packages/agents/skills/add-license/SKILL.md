@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: add-license
 description: Use when adding or standardizing project license files and README license sections. Defaults to MIT unless the user or repository explicitly asks for another license, creates/updates a root LICENSE from the bundled template, and appends a bottom-of-README Markdown link such as [MIT](LICENSE).
 ---

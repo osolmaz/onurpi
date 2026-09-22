@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: serving-configuration-selection
 description: Use when choosing, tuning, validating, or recommending an LLM serving configuration, especially context limits, concurrency, sequence capacity, batching, and KV-cache settings. Uses engine-agnostic powers-of-two candidate testing, distinguishes active context from server capacity, separates prefill and decode workloads, and selects throughput or goodput winners with explicit safety, verification, and reproducibility rules.
 ---

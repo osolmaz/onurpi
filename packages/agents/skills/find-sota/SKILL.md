@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: find-sota
 description: Find current state-of-the-art or recent AI models from live Hugging Face Hub data. Use when the user asks for the newest, latest, recent, best, top, SOTA, recommended, or most practical model, including a named family such as Qwen. Checks release age, task evidence, and Hub usage. Also checks licensing, runtime support, model size, and device fit before making a recommendation.
 ---

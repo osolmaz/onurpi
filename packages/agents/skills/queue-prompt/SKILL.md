@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: queue-prompt
 description: Use when a prompt appears to be a queued, repeated, resumed, scheduled, or reminder-style instruction and Codex must decide whether to continue unfinished work or ignore it because the requested work is already complete. Implementation-agnostic queue handling for any task type.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: acpx
 description: Use when calling, reviewing with, or delegating work to another coding agent through the ACPX CLI, including explicitly human-requested Claude Fable through the default local Claude adapter or an explicitly requested Cursor adapter, one-shot and persistent sessions, model selection, permissions, timeouts, output collection, and recovery after interrupted calls.
 ---

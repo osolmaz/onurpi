@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: write-monograph
 description: Use when planning, drafting, revising, or reviewing a mathematical or technical monograph, lecture-note sequence, long-form tutorial, or textbook chapter. Helps build exposition from motivation to formal definitions, propositions, proofs, examples, applications, questions, exercises, and solutions without dumping unexplained formulas or inventing facts to fit a template.
 ---

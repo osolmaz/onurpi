@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: design
 description: >-
   Use when creating, revising, or visually reviewing web pages and interfaces,

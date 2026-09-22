@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: online-shopping
 description: Use when researching products to buy online, comparing listings, checking price history, verifying discounts, normalizing unit prices, evaluating sale timing, and deciding whether to buy now or wait across Amazon, Shopee, Woot, manufacturer stores, and other retailers.
 ---

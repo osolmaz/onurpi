@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: consistent-notation
 description: Keep mathematical notation consistent with a source document when extending, formulating, reviewing, or porting derivations that build on an existing paper, blog post, spec, or codebase. Trigger on requests to extend a derivation, add a bound or counterpart, formalize a new phase or case of an existing formulation, or check whether new math matches the source notation.
 ---

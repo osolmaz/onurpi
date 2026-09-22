@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: experiment-results-reporting
 description: Convert experiment metrics into public-facing updates with concrete numbers and plain language. Use when asked for tweets, announcements, changelog notes, PR summaries, or TLDRs about accuracy, precision, recall, false positive rate, model size, and dataset growth.
 ---

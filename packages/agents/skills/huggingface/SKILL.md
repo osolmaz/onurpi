@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: huggingface
 description: Onur Solmaz's personal Hugging Face tips and tricks. Use for any Hugging Face task alongside the relevant official Hugging Face marketplace skills, especially when personal operating conventions, deployment lessons, or recovery notes may apply. This skill supplements rather than replaces Hugging Face's published skills.
 ---

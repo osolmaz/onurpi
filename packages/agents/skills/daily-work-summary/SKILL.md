@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: daily-work-summary
 description: Use when asked to summarize what one person or a small set of GitHub identities did over a recent time window, especially daily work reports across org repos. Produces a plain-language activity summary grouped by shipped, closed/replaced, in progress, and planning work, with source links appended to each item.
 ---

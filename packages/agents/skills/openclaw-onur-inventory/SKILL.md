@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: openclaw-onur-inventory
 description: Use when maintaining the OpenClaw Onur inventory repository, including periodic roughly every-2-hour refreshes, auditing OpenClaw local model and open-weight model issue/PR inventories, deciding whether a thread belongs in that file, sorting the inventory, updating the reviewed-through issue/PR watermark, or explaining why an item was included or excluded.
 ---

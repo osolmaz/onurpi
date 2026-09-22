@@ -33,8 +33,8 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(51);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(51);
+    expect(skills).toHaveLength(49);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(49);
     expect(skills.map((skill) => skill.skillId)).toContain("design");
     for (const removed of ["3d-modeling", "demo-video", "video-editing", "plot-graph"]) {
       expect(skills.map((skill) => skill.skillId)).not.toContain(removed);
@@ -46,9 +46,37 @@ describe("@onurpi/agents package", () => {
     expect(skills.map((skill) => skill.skillId)).not.toContain("browse-x-posts");
     expect(skills.map((skill) => skill.skillId)).toContain("bro");
     expect(skills.map((skill) => skill.skillId)).toContain("find-sota");
-    expect(skills.map((skill) => skill.skillId)).toEqual(
-      expect.arrayContaining(["autodoc-legacy", "autoimplement-legacy"]),
-    );
+    expect(skills.map((skill) => skill.skillId)).not.toContain("autodoc-legacy");
+    expect(skills.map((skill) => skill.skillId)).not.toContain("autoimplement-legacy");
+  });
+
+  it("hides the long tail from the model prompt and keeps the visible core", () => {
+    const skills = discoverSkills(join(packageRoot, "skills"));
+    const hidden = (skillId: string): boolean =>
+      readFileSync(join(packageRoot, "skills", skillId, "SKILL.md"), "utf8").includes(
+        "disable-model-invocation: true",
+      );
+
+    const alwaysVisible = [
+      "bro",
+      "extending-pi",
+      "herdr",
+      "kill-ai-smell",
+      "manage-repos",
+      "manage-runtimes",
+      "memory-safe-launch",
+      "ml-experiment-design",
+      "pi-coding-agent",
+      "plain-writing",
+      "practical-significance",
+      "semver",
+      "simpledoc",
+      "write-readme",
+    ];
+    expect(alwaysVisible.filter((skillId) => hidden(skillId))).toEqual([]);
+
+    const visibleCount = skills.filter((skill) => !hidden(skill.skillId)).length;
+    expect(visibleCount).toBe(alwaysVisible.length);
   });
 
   it("keeps the sandbox skill as data without registering it at the package top level", () => {
@@ -64,26 +92,8 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(51);
+    expect(topLevelSkillFiles).toHaveLength(49);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
-  });
-
-  it("pins the legacy reviewer to an explicit provider fallback order", () => {
-    const skill = readFileSync(
-      join(packageRoot, "skills", "autoimplement-legacy", "SKILL.md"),
-      "utf8",
-    );
-    const routes = [
-      "DeepSeek-V4.1-Flash:novita",
-      "DeepSeek-V4.1-Flash:baseten",
-      "DeepSeek-V4.1-Flash:fireworks-ai",
-      "DeepSeek-V4.1-Flash:deepinfra",
-    ];
-    const positions = routes.map((route) => skill.indexOf(route));
-
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((left, right) => left - right));
-    expect(skill).toContain("Do not use the unqualified Hugging Face route");
   });
 
   it("keeps Pi workflow progress model-mediated", () => {

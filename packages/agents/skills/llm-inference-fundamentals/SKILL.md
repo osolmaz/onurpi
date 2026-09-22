@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: llm-inference-fundamentals
 description: Unified domain knowledge and a reasoning workflow for LLM inference performance, benchmarking, capacity planning, and production serving. Use for TTFT, ITL, TPOT, throughput, goodput, prefill and decode, KV cache, batching, PagedAttention, prefix caching, speculative decoding, quantization, parallelism, GPU memory sizing, routing, autoscaling, observability, or inference infrastructure. Merges the current Modular handbook revision with useful guidance retained from its earlier BentoML edition.
 license: See UPSTREAM.md

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: conventional-commit
 description: Use when the user asks to draft, rewrite, validate, or standardize a commit message or pull request title using Conventional Commits, semantic PR title rules, or conventional commit wording.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: write-format-spec
 description: Use when writing, reviewing, or rewriting a specification for a portable file, folder, resource, package, manifest, profile, schema, or other structured format. Helps produce clear, author-friendly specs with concrete examples, field rules, validation behavior, extension points, runtime loading semantics, and boundaries.
 ---

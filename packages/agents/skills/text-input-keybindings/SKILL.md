@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: text-input-keybindings
 description: Use when implementing, reviewing, or designing any text input surface, including TUI composers and editor widgets, REPL or shell prompts, chat input boxes, and single-line form fields. Provides the readline/Emacs keybindings users expect by muscle memory, tiered by how strongly they are expected, plus terminal key-equivalence caveats and conflict guidance for submit/cancel chords.
 ---

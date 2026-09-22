@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: classifier-comparison
 description: Format classifier comparisons as aligned plain text with alternatives as columns, metrics as rows, decimal-point alignment, and inline winner-impact stars.
 ---
