@@ -296,9 +296,11 @@ only on successful package installation or backend availability checks.
 - Do not start local inference as a fallback when the intended target is a
   remote endpoint or hosted API. Verify the remote target first and report auth
   or availability failures.
-- Use a process-group watchdog plus active earlyoom for local large-model
-  launches. If those guards are unavailable, refuse the launch or ask before
-  continuing.
+- On Linux, use a process-group watchdog plus active earlyoom for local
+  large-model launches. If those guards are unavailable, refuse the launch or
+  ask before continuing. On macOS, neither applies: follow the macOS platform
+  path in `$memory-safe-launch` instead (no `oomwrap` or `earlyoom`
+  requirement).
 - Do not create system or user services unless the user explicitly asks for a service.
 - Do not use a service directory as a runtime location.
 - Do not mutate an existing working runtime in place. Create a new versioned runtime and promote it after testing.
