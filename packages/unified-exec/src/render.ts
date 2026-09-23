@@ -505,6 +505,10 @@ export function renderListSessionsResult(
   return container;
 }
 
+function heldPipeMarker(session: SessionListing, theme: Theme): string {
+  return session.note ? theme.fg("warning", " (shell exited, pipe held)") : "";
+}
+
 function renderSessionLine(session: SessionListing, theme: Theme): string {
   const state = session.running
     ? theme.fg("success", "running")
@@ -515,8 +519,9 @@ function renderSessionLine(session: SessionListing, theme: Theme): string {
           : `signal=${safeOneLine(session.signal ?? "?")}`,
       );
   const wake = session.wake_armed ? theme.fg("warning", " [wake]") : "";
+  const held = heldPipeMarker(session, theme);
   const command = safeOneLine(session.command, 100);
-  return `#${String(session.session_id)} pid=${String(session.pid ?? "?")} ${session.tty ? "tty" : "pipe"} ${(session.elapsed_ms / 1000).toFixed(1)}s ${state}${wake} ${command}`;
+  return `#${String(session.session_id)} pid=${String(session.pid ?? "?")} ${session.tty ? "tty" : "pipe"} ${(session.elapsed_ms / 1000).toFixed(1)}s ${state}${wake} ${command}${held}`;
 }
 
 function getContentText(result: AgentToolResult<unknown>): string {

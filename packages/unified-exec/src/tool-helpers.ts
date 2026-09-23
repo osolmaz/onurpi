@@ -1,7 +1,6 @@
 import { constants as osConstants } from "node:os";
 
 import {
-  DEFAULT_MAX_BACKGROUND_POLL_MS,
   DEFAULT_WRITE_STDIN_YIELD_MS,
   MAX_EMPTY_POLL_ENV_VAR,
   MAX_YIELD_TIME_MS,
@@ -21,25 +20,45 @@ export function clampYield(value: number | undefined, defaultValue: number): num
   return clamp(Math.floor(selected), MIN_YIELD_TIME_MS, MAX_YIELD_TIME_MS);
 }
 
-export function resolveMaxEmptyPollMs(env: NodeJS.ProcessEnv = process.env): number {
+export function resolveMaxEmptyPollMs(env: NodeJS.ProcessEnv = process.env): number | undefined {
   const raw = env[MAX_EMPTY_POLL_ENV_VAR]?.trim();
-  if (!raw) return DEFAULT_MAX_BACKGROUND_POLL_MS;
+  if (!raw) return undefined;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_MAX_BACKGROUND_POLL_MS;
-  return clamp(Math.floor(parsed), MIN_EMPTY_YIELD_TIME_MS, DEFAULT_MAX_BACKGROUND_POLL_MS);
-}
-
-export function resolveEmptyPollYield(value: number | undefined): number {
-  const cap = resolveMaxEmptyPollMs();
-  if (typeof value === "number" && Math.floor(value) > cap) {
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > Number.MAX_SAFE_INTEGER) {
     throw new Error(
-      `write_stdin: yield_time_ms ${String(Math.floor(value))} exceeds the empty-poll cap of ${String(cap)} ms. ` +
-        "Use repeated polls, or use yield_until only when the human explicitly requested a long attached wait. " +
-        `tool_time_utc: ${nowUtcIso()}`,
+      `${MAX_EMPTY_POLL_ENV_VAR} must be a positive finite duration no greater than Number.MAX_SAFE_INTEGER.`,
     );
   }
-  const selected = typeof value === "number" && value > 0 ? value : DEFAULT_WRITE_STDIN_YIELD_MS;
-  return clamp(Math.floor(selected), MIN_EMPTY_YIELD_TIME_MS, cap);
+  return Math.max(MIN_EMPTY_YIELD_TIME_MS, Math.floor(parsed));
+}
+
+function invalidDuration(value: number | undefined): boolean {
+  return (
+    value !== undefined && (!Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER)
+  );
+}
+
+export function resolveEmptyPollYield(
+  value: number | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  if (invalidDuration(value)) {
+    throw new Error(
+      "write_stdin: yield_time_ms must be a non-negative finite duration no greater than Number.MAX_SAFE_INTEGER.",
+    );
+  }
+  const duration = Math.max(
+    MIN_EMPTY_YIELD_TIME_MS,
+    Math.floor(value ?? DEFAULT_WRITE_STDIN_YIELD_MS),
+  );
+  const cap = resolveMaxEmptyPollMs(env);
+  if (cap !== undefined && duration > cap) {
+    throw new Error(
+      `write_stdin: yield_time_ms ${String(duration)} exceeds the configured empty-poll cap of ${String(cap)} ms ` +
+        `(${MAX_EMPTY_POLL_ENV_VAR}). Request a shorter wait. tool_time_utc: ${nowUtcIso()}`,
+    );
+  }
+  return duration;
 }
 
 function isSignalName(name: string): name is NodeJS.Signals {

@@ -62,6 +62,8 @@ export interface OutputResultDetails {
   omitted_bytes?: number;
   /** Cumulative bytes this session has produced since spawn. */
   output_bytes_total?: number;
+  /** Explanation of a running session whose shell has already exited. */
+  note?: string;
 }
 
 export interface ProcessResultDetails extends OutputResultDetails {
@@ -110,6 +112,7 @@ export type ProcessResultExtra = Readonly<{
   completion_delivery?: "direct" | undefined;
   on_exit_wake?: "consumed" | undefined;
   tool_time_utc?: string | undefined;
+  note?: string | undefined;
 }>;
 
 /**
@@ -262,6 +265,7 @@ export function finalizeProcessResult(input: FinalizeProcessInput): ProcessResul
     ...(extra?.completion_delivery ? { completion_delivery: extra.completion_delivery } : {}),
     ...(extra?.on_exit_wake ? { on_exit_wake: extra.on_exit_wake } : {}),
     ...(extra?.tool_time_utc ? { tool_time_utc: extra.tool_time_utc } : {}),
+    ...(extra?.note ? { note: extra.note } : {}),
   };
 }
 
@@ -323,6 +327,7 @@ export function renderProcessResultText(shape: ProcessResultDetails): string {
   if (shape.exit_code !== undefined) lines.push(`exit_code: ${String(shape.exit_code)}`);
   if (shape.signal) lines.push(`signal: ${safeMeta(shape.signal)}`);
   if (shape.failure_message) lines.push(`failure: ${safeMeta(shape.failure_message)}`);
+  if (shape.note) lines.push(`note: ${safeMeta(shape.note)}`);
   if (shape.wait_mode) lines.push(`wait_mode: ${safeMeta(shape.wait_mode)}`);
   if (shape.wait_status) lines.push(`wait_status: ${safeMeta(shape.wait_status)}`);
   if (shape.yield_until) lines.push(`yield_until: ${safeMeta(shape.yield_until)}`);

@@ -3,14 +3,14 @@
 `@onurpi/unified-exec` is based on
 [`iamwrm/pi-unified-exec`](https://github.com/iamwrm/pi-unified-exec).
 
-- Release: `v0.9.0`
-- Commit: `7c8c1d809ef80d25fb60b5129248b2077b2422e9`
-- Retrieved: August 6, 2026
+- Release: `v0.11.0`
+- Commit: `e94a93f060ff8b27eaa185ca05640695158c4cfb`
+- Retrieved: September 23, 2026
 - License: MIT, preserved in [`LICENSE`](LICENSE)
 
 ## Reviewed material
 
-The review covered every production source file from the release:
+The initial review covered every production source file from v0.9.0:
 
 - `src/collect.ts`
 - `src/completion.ts`
@@ -29,9 +29,15 @@ The review covered every production source file from the release:
 - `src/tool-result.ts`
 - `src/unescape.ts`
 
-It also covered all upstream test files, `README.md`, `Changelog.md`, `AGENTS.md`, `to_improve.md`,
-the files under `docs/` (including `IV-0002-output-lifecycle-and-rendering.md`), `package.json`,
+It also covered all v0.9.0 tests, `README.md`, `Changelog.md`, `AGENTS.md`, `to_improve.md`, the
+files under `docs/` (including `IV-0002-output-lifecycle-and-rendering.md`), `package.json`,
 `package-lock.json`, `tsconfig.json`, and the GitHub Actions test and publishing workflows.
+
+For the v0.11.0 update, the review compared all four intervening commits and all changed production
+files (`src/index.ts`, `long-wait.ts`, `pty.ts`, `session.ts`, `time.ts`, and `tool-result.ts`). It
+also covered changed tests, the changelog, README, long-wait design notes, and dependency manifests.
+No new runtime dependency, credential access, network request, or telemetry was added. The Pi and
+TUI peer minimum is now 0.86.1; OnurPi uses 0.87.0 for development.
 
 ## Runtime audit
 
@@ -93,7 +99,7 @@ native module cannot load.
 - Ported the upstream unit suites to Vitest, including the v0.8.0–v0.9.0 `output-safety`,
   `tool-result`, and renderer suites. The upstream extension-API harness suites used unchecked `any`
   stubs, so their applicable process, byte-input, PTY, waiting, kill, and wake scenarios were
-  consolidated into a strict typed runtime integration suite. The package currently runs 223 tests,
+  consolidated into a strict typed runtime integration suite. The package runs 237 tests on Linux,
   plus a platform skip when PTY is unavailable.
 - Retained strict TypeScript, unsafe-operation linting, and the repository's complexity limit.
   Audited upstream lifecycle, scanning, and rendering routines use narrow, justified line-level
@@ -133,3 +139,19 @@ native module cannot load.
   local patches are now subsumed by the upstream implementations.
 - Removed upstream publishing and repository-maintenance machinery from the vendored package,
   including the changelog, design docs, issue/interaction-limit workflows, and npm lockfile.
+
+## Updates from v0.9.1 through v0.11.0
+
+- Track shell exit separately from output-pipe close. Running results, `list_sessions`, and the
+  session UI explain when background processes keep a pipe open after the shell exits. Do not end
+  the process or close its pipe automatically.
+- Use Pi's current `agent_settled` and flag APIs, with a peer minimum of 0.86.1. OnurPi already
+  delayed completion wakes until `agent_settled` and used Pi's typed tool callbacks.
+- Use the bounded, event-driven wait for both absolute deadlines and empty relative polls. The
+  relative poll no longer has a built-in 290-second maximum, but OnurPi's model-facing instructions
+  still advise polls of at most 290 seconds unless the human asks for a longer wait. An optional
+  operator limit may exceed 290 seconds, and invalid explicit limits fail closed. Cancellation
+  leaves buffered output and the process intact. Pi, not this extension, manages provider caches.
+- Keep OnurPi's command-policy events, final spawn/input guards, private logs, bounded collection,
+  and opt-in completion wakes. No source files were replaced wholesale. The upstream change does not
+  add the active model ID to child process environments.

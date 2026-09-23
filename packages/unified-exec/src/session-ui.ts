@@ -24,7 +24,8 @@ function oneLineCommand(command: string, max = 120): string {
 
 function sessionLine(runtime: ExtensionRuntime, session: ExecSession, now: number): string {
   const wake = runtime.coordinator.isArmed(session.id) ? " [wake]" : "";
-  return `  #${String(session.id)} ${formatElapsed(now - session.startedAt)}${wake} ${oneLineCommand(session.displayCommand, 72)} (${session.cwd})`;
+  const held = session.heldOpenNote ? " (shell exited, pipe held)" : "";
+  return `  #${String(session.id)} ${formatElapsed(now - session.startedAt)}${wake} ${oneLineCommand(session.displayCommand, 72)} (${session.cwd})${held}`;
 }
 
 function widgetLines(runtime: ExtensionRuntime, sessions: readonly ExecSession[]): string[] {
@@ -95,5 +96,6 @@ export function formatSessionChoice(
   now: number,
 ): string {
   const wake = runtime.coordinator.isArmed(session.id) ? " [wake]" : "";
-  return `#${String(session.id)} ${formatElapsed(now - session.startedAt)}${wake} ${oneLineCommand(session.displayCommand, 60)}`;
+  const held = session.heldOpenNote ? " (shell exited, pipe held)" : "";
+  return `#${String(session.id)} ${formatElapsed(now - session.startedAt)}${wake} ${oneLineCommand(session.displayCommand, 60)}${held}`;
 }

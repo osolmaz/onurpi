@@ -4,7 +4,6 @@ import { Type, type Static } from "typebox";
 import {
   DEFAULT_EXEC_YIELD_MS,
   DEFAULT_MAX_BACKGROUND_POLL_MS,
-  DEFAULT_WRITE_STDIN_YIELD_MS,
   MAX_PTY_COLS,
   MAX_PTY_ROWS,
   MAX_YIELD_TIME_MS,
@@ -62,7 +61,7 @@ export const WriteStdinParameters = Type.Object({
   ),
   yield_time_ms: Type.Optional(
     Type.Number({
-      description: `Attachment window in milliseconds. Empty polls use ${String(MIN_EMPTY_YIELD_TIME_MS)}-${String(DEFAULT_MAX_BACKGROUND_POLL_MS)}; input writes use ${String(MIN_YIELD_TIME_MS)}-${String(MAX_YIELD_TIME_MS)}. Default ${String(DEFAULT_WRITE_STDIN_YIELD_MS)} before clamping.`,
+      description: `Attachment window in milliseconds. Empty polls have a ${String(MIN_EMPTY_YIELD_TIME_MS)} ms minimum and no built-in maximum; input writes use ${String(MIN_YIELD_TIME_MS)}-${String(MAX_YIELD_TIME_MS)}. Ordinary empty polls should use at most ${String(DEFAULT_MAX_BACKGROUND_POLL_MS)} ms. An operator can set PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS.`,
     }),
   ),
   yield_until: Type.Optional(

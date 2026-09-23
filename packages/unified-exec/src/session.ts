@@ -324,6 +324,18 @@ export class ExecSession {
     return this.state.hasExited;
   }
 
+  /** Shell exit can precede session close when descendants retain output pipes. */
+  get shellExited(): boolean {
+    return this.child?.processExited ?? this.state.hasExited;
+  }
+
+  get heldOpenNote(): string | undefined {
+    return this.shellExited && !this.hasExited
+      ? "shell has exited, but background processes still hold the output pipe open. " +
+          "This session stays open until they close it; redirect job output to detach it."
+      : undefined;
+  }
+
   get exitCode(): number | null {
     return this.state.exitCode;
   }

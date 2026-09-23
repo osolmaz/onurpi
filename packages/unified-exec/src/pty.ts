@@ -39,6 +39,8 @@ export type ExitCallback = (
 export interface SpawnedChild {
   readonly pid: number | undefined;
   readonly tty: boolean;
+  /** The shell has exited, even if descendants still hold its output pipe open. */
+  readonly processExited: boolean;
   /** Write raw bytes to the child's stdin (or PTY input side). */
   write(data: Uint8Array): boolean;
   /** Subscribe to data chunks (combined stdout+stderr). Returns unsubscribe. */
@@ -291,6 +293,9 @@ function spawnPty(mod: PtyModule, opts: SpawnOptions): SpawnedChild {
   return {
     pid: child.pid,
     tty: true,
+    get processExited() {
+      return exited;
+    },
     write(data) {
       if (exited) return false;
       try {
@@ -363,6 +368,11 @@ function spawnPipes(opts: SpawnOptions): SpawnedChild {
   const dataHandlers = new Set<(chunk: Uint8Array) => void>();
   const exitHandlers = new Set<ExitCallback>();
   let exited = false;
+  let processExited = false;
+  // `exit` reports shell termination; descendants can still hold its pipes.
+  child.once("exit", () => {
+    processExited = true;
+  });
 
   const onChunk = (chunk: Buffer) => {
     const view = new Uint8Array(chunk);
@@ -417,6 +427,9 @@ function spawnPipes(opts: SpawnOptions): SpawnedChild {
   return {
     pid: child.pid,
     tty: false,
+    get processExited() {
+      return processExited;
+    },
     write(data) {
       const stdin = child.stdin;
       if (exited || !stdin || stdin.destroyed || stdin.writableEnded) return false;

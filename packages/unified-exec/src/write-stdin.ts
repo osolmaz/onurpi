@@ -1,11 +1,12 @@
-import {
-  type CollectedOutput,
-  collectedOutputFromBytes,
-  collectOutputUntilDeadline,
-} from "./collect.ts";
+import { type CollectedOutput, collectOutputUntilDeadline } from "./collect.ts";
 import { commandInputEvent, throwIfCommandInputRejected } from "./command-input.ts";
 import { runFinalInputPolicies } from "./command-policy.ts";
-import { DEFAULT_WRITE_STDIN_YIELD_MS, LONG_WAIT_UPDATE_INTERVAL_MS } from "./constants.ts";
+import {
+  DEFAULT_WRITE_STDIN_YIELD_MS,
+  LONG_WAIT_UPDATE_INTERVAL_MS,
+  MAX_YIELD_TIME_MS,
+  OUTPUT_POLL_INTERVAL_MS,
+} from "./constants.ts";
 import {
   type LongWaitOutcome,
   startRateLimitedStream,
@@ -21,7 +22,7 @@ import { nowUtcIso, parseYieldUntil } from "./time.ts";
 import { clampYield, resolveEmptyPollYield, resolveWriteInput } from "./tool-helpers.ts";
 import { finalizeProcessResult } from "./tool-result.ts";
 import type { WriteStdinArgs } from "./tool-schema.ts";
-import type { ProcessResultDetails } from "./tool-result.ts";
+import type { ProcessResultDetails, ProcessResultExtra } from "./tool-result.ts";
 import type { ExtensionRuntime, ToolUpdate, UnifiedExecDetails, WaitMode } from "./tool-types.ts";
 
 function validateWaitArguments(args: WriteStdinArgs, isEmptyPoll: boolean): void {
@@ -109,7 +110,7 @@ async function writeInput(
   return undefined;
 }
 
-async function runRelativeWait(
+async function runInputWait(
   runtime: ExtensionRuntime,
   session: ExecSession,
   args: WriteStdinArgs,
@@ -118,10 +119,7 @@ async function runRelativeWait(
   onUpdate: ToolUpdate | undefined,
   toolCallId: string,
 ): Promise<ProcessResultDetails> {
-  const isEmptyPoll = !bytes?.length;
-  const yieldTimeMs = isEmptyPoll
-    ? resolveEmptyPollYield(args.yield_time_ms)
-    : clampYield(args.yield_time_ms, DEFAULT_WRITE_STDIN_YIELD_MS);
+  const yieldTimeMs = clampYield(args.yield_time_ms, DEFAULT_WRITE_STDIN_YIELD_MS);
   const startedAt = Date.now();
   session.touch();
   runtime.coordinator.beginObservation(session.id, toolCallId);
@@ -147,14 +145,11 @@ async function runRelativeWait(
     stream.stop();
     if (session.hasExited) {
       return finalizeTerminal(runtime, session, toolCallId, startedAt, collected, {
-        waitMode: isEmptyPoll ? "relative" : undefined,
         writeFailure,
         yieldTimeMs,
       });
     }
-    return finalizeRelativeRunning(runtime, session, toolCallId, startedAt, collected, {
-      isEmptyPoll,
-      signal,
+    return finalizeInputRunning(runtime, session, toolCallId, startedAt, collected, {
       writeFailure,
       yieldTimeMs,
     });
@@ -164,15 +159,13 @@ async function runRelativeWait(
   }
 }
 
-function finalizeRelativeRunning(
+function finalizeInputRunning(
   runtime: ExtensionRuntime,
   session: ExecSession,
   toolCallId: string,
   startedAt: number,
   collected: CollectedOutput,
   options: Readonly<{
-    isEmptyPoll: boolean;
-    signal: AbortSignal | undefined;
     writeFailure: string | undefined;
     yieldTimeMs: number;
   }>,
@@ -194,22 +187,18 @@ function finalizeRelativeRunning(
     command: session.displayCommand,
     yieldTimeMs: options.yieldTimeMs,
     extra: {
-      ...(options.isEmptyPoll
-        ? {
-            wait_mode: "relative" as const,
-            wait_status: options.signal?.aborted
-              ? ("cancelled" as const)
-              : ("relative_deadline_reached" as const),
-          }
-        : {}),
       tool_time_utc: nowUtcIso(),
+      note: session.heldOpenNote,
       ...(armed ? { on_exit: "wake" as const, completion_notification: "armed" as const } : {}),
     },
   });
 }
 
-function absoluteUpdate(session: ExecSession, yieldUntil: string): UnifiedExecDetails {
-  const output = sanitizeOutputText(decode(session.snapshotStreamTail()));
+type EmptyWait =
+  | { mode: "relative"; durationMs: number }
+  | { mode: "absolute"; durationMs: number; yieldUntil: string };
+
+function emptyPollUpdate(session: ExecSession, wait: EmptyWait): UnifiedExecDetails {
   return {
     session_id: session.id,
     pid: session.pid,
@@ -219,72 +208,99 @@ function absoluteUpdate(session: ExecSession, yieldUntil: string): UnifiedExecDe
     command: session.displayCommand,
     cwd: session.cwd,
     log_path: session.logPath,
-    yield_until: yieldUntil,
-    output,
+    ...(wait.mode === "absolute"
+      ? { yield_until: wait.yieldUntil }
+      : { yield_time_ms: wait.durationMs }),
+    output: sanitizeOutputText(decode(session.snapshotStreamTail())),
   };
 }
 
-function startAbsoluteStream(
+function startEmptyPollStream(
   session: ExecSession,
-  yieldUntil: string,
+  wait: EmptyWait,
   onUpdate: ToolUpdate | undefined,
 ): { stop: () => void } | undefined {
   if (!onUpdate) return undefined;
   return startRateLimitedStream({
     outputNotify: session.outputNotify,
-    minIntervalMs: LONG_WAIT_UPDATE_INTERVAL_MS,
+    minIntervalMs:
+      wait.mode === "relative" && wait.durationMs <= MAX_YIELD_TIME_MS
+        ? OUTPUT_POLL_INTERVAL_MS
+        : LONG_WAIT_UPDATE_INTERVAL_MS,
     emit: () => {
-      const details = absoluteUpdate(session, yieldUntil);
+      const details = emptyPollUpdate(session, wait);
       onUpdate({ content: [{ type: "text", text: details.output ?? "" }], details });
     },
   });
 }
 
-async function waitAbsolute(
-  runtime: ExtensionRuntime,
-  session: ExecSession,
-  durationMs: number,
-  signal: AbortSignal | undefined,
-  toolCallId: string,
-): Promise<LongWaitOutcome> {
-  try {
-    return await waitForExitOrDeadline({
-      exited: session.exited,
-      externalAbort: signal,
-      durationMs,
-    });
-  } catch (error: unknown) {
-    runtime.coordinator.releaseObservation(session.id, toolCallId);
-    throw error;
-  }
+function waitResultFields(wait: EmptyWait): {
+  yieldTimeMs?: number;
+  yieldUntil?: string;
+} {
+  return wait.mode === "relative"
+    ? { yieldTimeMs: wait.durationMs }
+    : { yieldUntil: wait.yieldUntil };
 }
 
-async function finalizeAbsoluteNonExit(
+function attachedResultExtra(
+  wait: EmptyWait,
+  outcome: Exclude<LongWaitOutcome, "exit">,
+  armed: boolean,
+  note: string | undefined,
+  elapsedMs: number,
+): ProcessResultExtra {
+  return {
+    wait_mode: wait.mode,
+    wait_status:
+      outcome === "cancelled"
+        ? "cancelled"
+        : wait.mode === "relative"
+          ? "relative_deadline_reached"
+          : "absolute_deadline_reached",
+    yield_until: wait.mode === "absolute" ? wait.yieldUntil : undefined,
+    effective_wait_ms: outcome === "cancelled" ? undefined : elapsedMs,
+    tool_time_utc: nowUtcIso(),
+    note,
+    ...(armed ? { on_exit: "wake", completion_notification: "armed" } : {}),
+  };
+}
+
+async function finalizeAttachedNonExit(
   runtime: ExtensionRuntime,
   session: ExecSession,
   toolCallId: string,
   startedAt: number,
-  yieldUntil: string,
+  wait: EmptyWait,
   outcome: Exclude<LongWaitOutcome, "exit">,
-  signal: AbortSignal | undefined,
 ): Promise<ProcessResultDetails> {
+  // Pi can discard a cancelled result. Do not drain output on cancellation.
+  const collected =
+    outcome === "cancelled"
+      ? undefined
+      : await collectOutputUntilDeadline({
+          buffer: session.outputBuffer,
+          outputNotify: session.outputNotify,
+          outputClosed: session.outputClosed,
+          exited: session.exited,
+          deadlineMs: Date.now(),
+        });
+  if (session.hasExited) {
+    return finalizeTerminal(
+      runtime,
+      session,
+      toolCallId,
+      startedAt,
+      collected ?? (await collectTerminalOutput(session)),
+      { waitMode: wait.mode, ...waitResultFields(wait) },
+    );
+  }
   const armed = runtime.coordinator.isArmed(session.id);
   runtime.coordinator.releaseObservation(session.id, toolCallId);
-  const cancelled = outcome === "cancelled";
-  const collected = cancelled
-    ? collectedOutputFromBytes(new Uint8Array())
-    : await collectOutputUntilDeadline({
-        buffer: session.outputBuffer,
-        outputNotify: session.outputNotify,
-        outputClosed: session.outputClosed,
-        exited: session.exited,
-        deadlineMs: Date.now(),
-        externalAbort: signal,
-      });
   return finalizeProcessResult({
     operation: "write_stdin",
     wallTimeSec: (Date.now() - startedAt) / 1000,
-    ...envelopeFromCollected(collected),
+    ...(collected ? envelopeFromCollected(collected) : { collected: new Uint8Array() }),
     totalBytes: session.totalBytesSeen,
     sessionId: session.id,
     exitCode: undefined,
@@ -294,49 +310,44 @@ async function finalizeAbsoluteNonExit(
     logPath: session.logPath,
     cwd: session.cwd,
     command: session.displayCommand,
-    extra: {
-      wait_mode: "absolute",
-      wait_status: cancelled ? "cancelled" : "absolute_deadline_reached",
-      yield_until: yieldUntil,
-      ...(!cancelled ? { effective_wait_ms: Date.now() - startedAt } : {}),
-      tool_time_utc: nowUtcIso(),
-      ...(armed ? { on_exit: "wake", completion_notification: "armed" } : {}),
-    },
+    yieldTimeMs: wait.mode === "relative" ? wait.durationMs : undefined,
+    extra: attachedResultExtra(wait, outcome, armed, session.heldOpenNote, Date.now() - startedAt),
   });
 }
 
-async function runAbsoluteWait(
+/** Empty polls wait without draining output; the session retains a bounded head and tail. */
+async function runAttachedWait(
   runtime: ExtensionRuntime,
   session: ExecSession,
-  yieldUntilRaw: string,
+  wait: EmptyWait,
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   toolCallId: string,
 ): Promise<ProcessResultDetails> {
   const startedAt = Date.now();
-  const parsed = parseYieldUntil(yieldUntilRaw, startedAt);
   session.touch();
   runtime.coordinator.beginObservation(session.id, toolCallId);
-  const stream = startAbsoluteStream(session, parsed.normalized, onUpdate);
-  let outcome = await waitAbsolute(runtime, session, parsed.remainingMs, signal, toolCallId);
-  stream?.stop();
-  if (session.hasExited) outcome = "exit";
-  if (outcome === "exit") {
-    const collected = await collectTerminalOutput(session);
-    return finalizeTerminal(runtime, session, toolCallId, startedAt, collected, {
-      waitMode: "absolute",
-      yieldUntil: parsed.normalized,
+  const stream = startEmptyPollStream(session, wait, onUpdate);
+  try {
+    const outcome = await waitForExitOrDeadline({
+      exited: session.exited,
+      externalAbort: signal,
+      durationMs: wait.durationMs,
     });
+    if (outcome === "exit" || session.hasExited) {
+      const collected = await collectTerminalOutput(session);
+      return finalizeTerminal(runtime, session, toolCallId, startedAt, collected, {
+        waitMode: wait.mode,
+        ...waitResultFields(wait),
+      });
+    }
+    return await finalizeAttachedNonExit(runtime, session, toolCallId, startedAt, wait, outcome);
+  } catch (error: unknown) {
+    runtime.coordinator.releaseObservation(session.id, toolCallId);
+    throw error;
+  } finally {
+    stream?.stop();
   }
-  return finalizeAbsoluteNonExit(
-    runtime,
-    session,
-    toolCallId,
-    startedAt,
-    parsed.normalized,
-    outcome,
-    signal,
-  );
 }
 
 export async function runWriteStdin(
@@ -375,8 +386,12 @@ export async function runWriteStdin(
     runFinalInputPolicies(finalInputEvent);
     throwIfCommandInputRejected(finalInputEvent);
   }
-  if (args.yield_until) {
-    return runAbsoluteWait(runtime, session, args.yield_until, signal, onUpdate, toolCallId);
+  if (isEmptyPoll) {
+    const parsed = args.yield_until ? parseYieldUntil(args.yield_until, Date.now()) : undefined;
+    const wait: EmptyWait = parsed
+      ? { mode: "absolute", durationMs: parsed.remainingMs, yieldUntil: parsed.normalized }
+      : { mode: "relative", durationMs: resolveEmptyPollYield(args.yield_time_ms) };
+    return runAttachedWait(runtime, session, wait, signal, onUpdate, toolCallId);
   }
-  return runRelativeWait(runtime, session, args, bytes, signal, onUpdate, toolCallId);
+  return runInputWait(runtime, session, args, bytes, signal, onUpdate, toolCallId);
 }

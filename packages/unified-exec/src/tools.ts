@@ -81,7 +81,7 @@ function registerWriteStdin(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
       "Write bytes to or poll a persistent session. Empty polls use yield_time_ms; yield_until is only for a human-requested long attached wait.",
     promptSnippet: "Send input to or poll a running session",
     promptGuidelines: [
-      `Use repeated empty progress polls of at most ${String(DEFAULT_MAX_BACKGROUND_POLL_MS)} ms.`,
+      `Use repeated ordinary empty progress polls of at most ${String(DEFAULT_MAX_BACKGROUND_POLL_MS)} ms. Longer attached waits require a human request.`,
       "Use yield_until only when the human explicitly requests a long attached wait or UTC deadline.",
       "Never use yield_until for interactive or indefinite processes.",
       'A direct terminal result consumes an armed on_exit wake; set_on_exit with "none" disarms without killing.',
@@ -221,6 +221,8 @@ function listing(
     elapsed_ms: now - session.startedAt,
     running: !session.hasExited,
     wake_armed: runtime.coordinator.isArmed(session.id),
+    shell_exited: session.shellExited,
+    note: session.heldOpenNote,
     exit_code: session.hasExited ? session.exitCode : undefined,
     signal: session.hasExited ? (session.signal ?? undefined) : undefined,
     failure_message: session.failureMessage ?? undefined,
@@ -235,14 +237,19 @@ function oneLineCommand(command: string, max = 60): string {
   return oneLine.length <= max ? oneLine : `${oneLine.slice(0, max - 1)}…`;
 }
 
+function heldPipeLabel(session: SessionListing): string {
+  return session.note ? " (shell exited, pipe held)" : "";
+}
+
 function sessionListingText(session: SessionListing): string {
   const exitedSuffix = session.running
     ? ""
     : `  [exited${session.exit_code !== undefined && session.exit_code !== null ? ` exit_code=${String(session.exit_code)}` : ""}${session.signal ? ` signal=${session.signal}` : ""}; removed from store]`;
   const wake = session.wake_armed ? " [wake]" : "";
+  const held = heldPipeLabel(session);
   return `  ${String(session.session_id).padStart(3)}  pid=${String(session.pid ?? "?").padStart(6)}  ${
     session.tty ? "tty" : "pipe"
-  }  ${((session.elapsed_ms / 1000).toFixed(1) + "s").padStart(8)}${wake}  ${oneLineCommand(session.command)}${exitedSuffix}\n        log: ${session.log_path}`;
+  }  ${((session.elapsed_ms / 1000).toFixed(1) + "s").padStart(8)}${wake}  ${oneLineCommand(session.command)}${held}${exitedSuffix}\n        log: ${session.log_path}`;
 }
 
 function registerListSessions(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
