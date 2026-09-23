@@ -14,7 +14,7 @@ export { MAX_EMPTY_POLL_ENV_VAR } from "./constants.ts";
 export { resolveMaxEmptyPollMs } from "./tool-helpers.ts";
 
 function keepBuiltinBash(pi: ExtensionAPI): boolean {
-  return (pi.getFlag("keep-builtin-bash") ?? pi.getFlag("--keep-builtin-bash")) === true;
+  return pi.getFlag("keep-builtin-bash") === true;
 }
 
 export default function unifiedExec(pi: ExtensionAPI): void {

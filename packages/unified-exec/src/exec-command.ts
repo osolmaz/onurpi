@@ -273,6 +273,7 @@ function finalizeRunning(
       on_exit: args.on_exit,
       ...(wantsWake ? { completion_notification: "armed" as const } : {}),
       tool_time_utc: nowUtcIso(),
+      note: command.session.heldOpenNote,
     },
   });
 }

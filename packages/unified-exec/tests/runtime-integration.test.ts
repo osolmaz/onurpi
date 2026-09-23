@@ -404,6 +404,56 @@ describe("runtime integration", () => {
     assert.equal(fullLog.length, 200000);
   });
 
+  it.skipIf(process.platform === "win32")(
+    "explains a shell exit while a background child holds the output pipe",
+    async () => {
+      const { runtime } = makeRuntime();
+      const command =
+        "node -e \"require('node:child_process').spawn(process.execPath," +
+        "['-e','setTimeout(()=>{},3000)'],{stdio:['ignore','inherit','inherit']}).unref()\"";
+      const sessionId = requireSessionId(await start(runtime, command));
+      const session = runtime.store.get(sessionId);
+      assert.ok(session);
+      await waitUntil(() => session.shellExited && !session.hasExited);
+      assert.equal(session.shellExited, true);
+      assert.equal(session.hasExited, false);
+      assert.match(session.heldOpenNote ?? "", /shell has exited/);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 50);
+      const result = await runWriteStdin(
+        runtime,
+        { session_id: sessionId, yield_time_ms: 600_000 },
+        controller.signal,
+        undefined,
+        "held-open-poll",
+      );
+      assert.equal(result.wait_status, "cancelled");
+      assert.match(result.note ?? "", /output pipe open/);
+      assert.equal(result.session_id, sessionId);
+    },
+  );
+
+  it("cancels a long relative poll without draining buffered output", async () => {
+    const { runtime } = makeRuntime();
+    const command = "node -e \"setTimeout(()=>{console.log('kept');setTimeout(()=>{},2500)},400)\"";
+    const sessionId = requireSessionId(await start(runtime, command));
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 350);
+    const result = await runWriteStdin(
+      runtime,
+      { session_id: sessionId, yield_time_ms: 600_000 },
+      controller.signal,
+      undefined,
+      "relative-cancel",
+    );
+    assert.equal(result.wait_status, "cancelled");
+    assert.equal(result.session_id, sessionId);
+    assert.equal(result.output, "");
+    const session = runtime.store.get(sessionId);
+    assert.ok(session);
+    assert.match(new TextDecoder().decode(session.outputBuffer.toBytes()), /kept/);
+  });
+
   it("returns at an absolute deadline while the process keeps running", async () => {
     const { runtime } = makeRuntime();
     const sessionId = requireSessionId(await start(runtime, delayedOutput(2000)));

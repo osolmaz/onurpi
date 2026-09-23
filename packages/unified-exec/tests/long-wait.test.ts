@@ -30,6 +30,16 @@ function clearTimer(handle: unknown): void {
 }
 
 describe("waitForExitOrDeadline", () => {
+  it("rejects unsafe durations before attaching listeners", async () => {
+    const exited = new AbortController();
+    for (const durationMs of [Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      await assert.rejects(
+        waitForExitOrDeadline({ exited: exited.signal, durationMs }),
+        /safe millisecond range/,
+      );
+    }
+  });
+
   it("returns 'exit' immediately when the process already exited", async () => {
     const exited = new AbortController();
     exited.abort();

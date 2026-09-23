@@ -29,6 +29,8 @@ export type SessionListing = Readonly<{
   elapsed_ms: number;
   running: boolean;
   wake_armed: boolean;
+  shell_exited?: boolean | undefined;
+  note?: string | undefined;
   exit_code?: number | null | undefined;
   signal?: string | undefined;
   failure_message?: string | undefined;
@@ -65,6 +67,7 @@ export type UnifiedExecDetails = Readonly<{
   completion_delivery?: "direct" | undefined;
   on_exit_wake?: "consumed" | undefined;
   tool_time_utc?: string | undefined;
+  note?: string | undefined;
   found?: boolean | undefined;
   status?: string | undefined;
   running?: boolean | undefined;

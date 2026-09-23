@@ -19,12 +19,12 @@ Mirrors codex's `exec_command` + `write_stdin` tool surface, with small pi-flavo
   polls. Session retention and attached per-call collection are both memory-bounded. Every byte the
   child prints is mirrored to an on-disk log file, so the full history is recoverable via
   `read(log_path)` even after the LLM-visible tail truncates.
-- **Bounded waits — the agent never stalls.** Every tool call returns within a hard ceiling: 30 s
-  for `exec_command` and interactive `write_stdin`, 290 s for pure background polls
-  (`yield_time_ms`). For a human-requested long attached wait, `yield_until` stays attached until an
-  absolute UTC deadline (no default max horizon; multi-day waits re-arm timers safely). A
-  long-running process keeps running; the agent just gets control back with a `session_id` and can
-  poll again when it chooses.
+- **Attached waits.** `exec_command` and input-bearing `write_stdin` calls return within 30 seconds.
+  Empty polls can wait longer without growing per-call memory; the operator can set
+  `PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS` to limit relative waits. Use ordinary polls of at most 290
+  seconds unless the human asks for a longer wait. For a human-requested UTC deadline, `yield_until`
+  also returns on process exit or cancellation. A long-running process remains alive after a wait
+  returns.
 - **Completion can resume the agent (opt-in).** `exec_command(on_exit: "wake")` (default is
   `"none"`) delivers exactly one follow-up model prompt (bounded exit metadata, no raw output) when
   a backgrounded process exits while nothing is observing it. OnurPi defers an exit detected during
@@ -120,23 +120,22 @@ When output exceeds the caps (50 KiB / 2000 lines), a footer is appended:
 
 Drives or polls an existing session.
 
-| Param           | Type   | Default | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------- | ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session_id`    | number | —       | Required.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `chars`         | string | `""`    | Empty = pure poll; non-empty writes (after escape decoding) then polls. Mutually exclusive with `chars_b64`.                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `chars_b64`     | string | `""`    | Base64-encoded bytes to write. Binary-safe. Mutually exclusive with `chars`.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `yield_time_ms` | number | `250`   | Attachment/progress window (not a process timeout). Clamped [250, 30_000] with input. Empty polls clamped [5_000, 290_000]; **values above the cap are rejected** with an error that includes the current host UTC time (`tool_time_utc`). Mutually exclusive with `yield_until`.                                                                                                                                                                                                                                                        |
-| `yield_until`   | string | —       | Absolute UTC deadline for an **empty poll only**, strict RFC 3339 UTC (`2026-07-21T18:30:00Z` or with `.mmm`; uppercase `Z`; no offsets/local time; real calendar dates only). **Only when the human explicitly asks** for a long attached wait — not a shortcut around the 290 s cap. The call stays attached until the process exits, the call is cancelled, or the deadline arrives — whichever is first. A past deadline is an immediate poll. No default max horizon. Mutually exclusive with `yield_time_ms` and with input bytes. |
+| Param           | Type   | Default | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `session_id`    | number | —       | Required.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `chars`         | string | `""`    | Empty = pure poll; non-empty writes (after escape decoding) then polls. Mutually exclusive with `chars_b64`.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `chars_b64`     | string | `""`    | Base64-encoded bytes to write. Binary-safe. Mutually exclusive with `chars`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `yield_time_ms` | number | `250`   | Attachment/progress window (not a process timeout). Clamped [250, 30_000] with input. Empty polls have a 5-second minimum and no built-in maximum; `PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS` sets an optional cap, which may exceed 290 seconds. Invalid explicit caps fail the call. Mutually exclusive with `yield_until`.                                                                                                                                                                                             |
+| `yield_until`   | string | —       | Absolute UTC deadline for an **empty poll only**, strict RFC 3339 UTC (`2026-07-21T18:30:00Z` or with `.mmm`; uppercase `Z`; no offsets/local time; real calendar dates only). **Only when the human explicitly asks** for a long attached wait or UTC deadline. The call stays attached until the process exits, the call is cancelled, or the deadline arrives — whichever is first. A past deadline is an immediate poll. No default max horizon. Mutually exclusive with `yield_time_ms` and with input bytes. |
 
 #### Waiting on long-running commands — the rules
 
-1. Use `yield_time_ms` for interaction or an empty progress poll of at most 290 seconds
-   (cache-friendly; stays under Anthropic's 5-minute prompt-cache TTL). Repeat polls as needed.
+1. Use `yield_time_ms` for interaction or ordinary empty progress polls of at most 290 seconds.
+   Repeat polls as needed. Use a longer relative wait only when the human requests one.
 2. Use `yield_until` **only when the human explicitly asks** for a long attached wait or a
-   wall-clock deadline on a **finite, non-interactive** command. Do **not** use it just to bypass
-   the 290 s cap. Omit `yield_time_ms` and pass a future UTC timestamp ending in `Z` (compute from
-   `tool_time_utc`). The call still returns immediately when the process exits; Esc never kills the
-   process.
+   wall-clock deadline on a **finite, non-interactive** command. Omit `yield_time_ms` and pass a
+   future UTC timestamp ending in `Z` (compute from `tool_time_utc`). The call still returns when
+   the process exits; Esc never kills the process.
 3. `on_exit` defaults to `"none"`. Use `"wake"` **only when the human explicitly wants** auto-resume
    on unobserved completion. If you armed wake by mistake or the job is abandoned, call
    `set_on_exit(session_id, on_exit: "none")` promptly (does not kill).
@@ -148,17 +147,16 @@ Drives or polls an existing session.
 debuggers, or any indefinite/interactive session — it is only for finite commands that exit on their
 own.
 
-During an absolute wait, the session machinery keeps working normally: the bounded head/tail buffer
+During an empty poll, the session machinery keeps working normally: the bounded head/tail buffer
 retains output, the rolling TUI tail updates (rate limited — no 250 ms heartbeat for hours), and
-every byte still lands in the log file. Internally the wall-clock deadline is converted once to a
-monotonic deadline, so NTP adjustments or manual clock changes cannot stretch or shrink an
-in-progress wait.
+every byte still lands in the log file. Relative waits use a monotonic clock; absolute deadlines are
+converted once to a duration, so later clock adjustments do not change an active wait.
 
 #### Wait/cap configuration
 
-| Env var                             | Default   | Notes                                                                                                                                                                                                         |
-| ----------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS` | `290_000` | Cap for empty `write_stdin` polls. May be **lowered** but never raises the effective cache-friendly maximum above 290 s. Positive values below `5_000` are raised to `5_000`; invalid values use the default. |
+| Env var                             | Default | Notes                                                                                                                                                                                  |
+| ----------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS` | unset   | Optional cap for empty relative `write_stdin` polls. Values above 290 seconds are allowed. Positive values below `5_000` are raised to `5_000`; invalid explicit values fail the call. |
 
 #### Control bytes and escapes in `chars`
 
@@ -431,12 +429,11 @@ MAX_SESSIONS                 = 64
 WARNING_SESSIONS             = 60
 LRU_PROTECTED_COUNT          = 8
 
-# Diverges from codex — codex allows 30 min; capped at 290 s to stay under
-# Anthropic's 5-minute prompt-cache TTL. The env override can only LOWER it;
-# longer waits use write_stdin's yield_until (absolute deadline):
-DEFAULT_MAX_BACKGROUND_POLL_MS = 290_000  (env: PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS, lower-only)
-LONG_WAIT_UPDATE_INTERVAL_MS   = 30_000  (rate limit for absolute-wait TUI updates)
-MAX_TIMER_ARM_MS               = 2^31-1   (setTimeout chunk size for multi-day yield_until)
+# Ordinary poll guidance is 290 s; the operator can set a longer or shorter cap.
+DEFAULT_MAX_BACKGROUND_POLL_MS = 290_000  (guidance, not a built-in limit)
+PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS        = optional operator limit
+LONG_WAIT_UPDATE_INTERVAL_MS   = 30_000  (rate limit for long-wait TUI updates)
+MAX_TIMER_ARM_MS               = 2^31-1   (setTimeout chunk size for long waits)
 
 # Diverges from codex — matches pi's built-in bash instead:
 DEFAULT_MAX_BYTES            = 50 KiB  (LLM-visible per-call truncation cap)
@@ -453,6 +450,9 @@ PREVIEW_LINES                = 5       (TUI preview lines before ctrl+o expand)
   next one, the session stays in the store. The next `write_stdin(session_id, …)` call will observe
   the exit and return `exit_code`, then remove the session; `list_sessions` reports it once with
   exit info before removing it. (Matches codex's `refresh_process_state` pattern.)
+- **Held-open output pipes are diagnosed**: if the shell exits but a background child still holds
+  stdout or stderr open, the session stays available and reports the condition in results and
+  `list_sessions`. The extension does not close the pipe or end the child automatically.
 - **Spawn failures are diagnosable**: a nonexistent shell binary or `workdir` (async ENOENT from the
   OS) surfaces as `failure_message` in the response instead of a silent empty exit.
 - **Closed stdin is safe**: a child that closes its stdin no longer crashes the host on EPIPE;

@@ -37,6 +37,24 @@ describe("bounded tool results", () => {
     assert.match(renderProcessResultText(details), /^\[still running\]/);
   });
 
+  it("shows a held-open pipe note without rendering terminal controls", () => {
+    const details = finalizeProcessResult({
+      operation: "write_stdin",
+      wallTimeSec: 0.1,
+      collected: new Uint8Array(),
+      sessionId: 7,
+      exitCode: undefined,
+      signal: null,
+      failure: null,
+      tty: false,
+      extra: { note: "shell exited\x1b]52;c;payload\x07; pipe held" },
+    });
+    assert.match(details.note ?? "", /pipe held/);
+    const text = renderProcessResultText(details);
+    assert.match(text, /note: shell exited/);
+    assert.doesNotMatch(text, /[\u001b\u009b]/);
+  });
+
   it("bounds kill output and puts the recovery marker in model-visible text", () => {
     const raw = Array.from(
       { length: DEFAULT_MAX_LINES + 1000 },
