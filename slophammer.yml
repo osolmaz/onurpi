@@ -11,6 +11,10 @@ typescript:
       - "**/*.test.ts"
       - pattern: "**/eslint.config.mjs"
         reason: Independent packages keep self-contained lint configuration for standalone checks.
+      - pattern: "packages/context-budget/config.ts"
+        reason:
+          Context and image budget extensions keep their config readers self-contained and forbid
+          runtime dependencies. Each package tests its config independently.
       - pattern: "**/test/support.ts"
         reason:
           Ported pi-extensions monorepo test harness; each vendored package keeps an independent
