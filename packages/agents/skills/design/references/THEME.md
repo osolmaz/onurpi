@@ -38,16 +38,11 @@ or controls that the user needs.
 
 ## Typography
 
-| Medium | Default font |
-| --- | --- |
-| New web/UI work, including quick pages | Inter from Google Fonts |
-| Videos and their title cards, posters, or related graphics | Yodel Grotesk |
-| Other media without a specified font | Helvetica |
-
-These are shared medium-specific defaults. Yodel Grotesk is not the global
-font. A standalone figure uses Helvetica; a figure made for a film uses the
-film's font. Product screenshots and faithful renderer ports retain source
-fonts unless the user explicitly requests an adaptation.
+Use Yodel Grotesk as the default font for all newly authored surfaces: web and
+UI work, graphs and figures, videos and their title cards, posters, covers,
+banners, and other graphics. A figure within an existing page matches that
+page. Product screenshots and faithful renderer ports retain source fonts unless
+the user explicitly requests an adaptation.
 
 Use an authorized source for font files and check embedding and redistribution
 rights. Repository access alone does not grant those rights. Do not put private
@@ -55,14 +50,17 @@ font repository locations, credentials, or private font files in public skill
 content. Record the source revision and file hashes in the task's provenance record.
 Include the license and actual selected face. No fonts are bundled with this skill.
 
-For web work, use Inter as the main font and a documented Helvetica, Arial,
-Liberation Sans, sans-serif fallback stack. Choose hosted Google Fonts or
-self-hosted licensed files according to the product's privacy and deployment
-requirements. Test the loading and fallback states.
+For web work, self-host licensed Yodel Grotesk files with `@font-face` only
+when the rights cover distribution to the page's audience. Give it a
+Helvetica, Arial, Liberation Sans, sans-serif stack for the loading state. Test
+the loading and fallback states.
 
-For static outputs, confirm the actual font before the full render. A Helvetica
-fallback may use Arial or Liberation Sans if recorded. Do not silently replace
-Inter or Yodel Grotesk in a final static output. If the required font is missing,
+For a static SVG that other people will view, such as a README cover or banner,
+convert all text to outlines so the file needs no font and ships no font file.
+Check that the delivered file has no `<text>` elements and no font references.
+
+For static outputs, confirm the actual font before the full render. Do not
+silently replace Yodel Grotesk in a final output. If the font files are missing,
 request an authorized source or approval for a substitute. Never claim a
 fallback render used the requested font.
 

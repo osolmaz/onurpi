@@ -1,8 +1,8 @@
 # Graphs and figures
 
 Create figures from actual source values and inspect the exported image. Apply
-the [shared theme](THEME.md). Standalone figures use Helvetica; figures for a
-film use its font, and figures within an existing page match that page.
+the [shared theme](THEME.md). Figures use Yodel Grotesk; figures within an
+existing page match that page.
 
 ## Data and meaning
 
@@ -79,6 +79,7 @@ python3 "$DESIGN_DIR/examples/graphs-figures/render_comparison_chart.py" \
 
 The example defaults to dark mode and requires a data file. Use `--example`
 explicitly for illustrative data, `--background light` for beige, or a concrete
-hex color to match a target page. The helper reports its actual font. For a film,
-pass an authorized font file with `--font-file`. It refuses to replace outputs.
+hex color to match a target page. The helper uses an installed Yodel Grotesk or
+an authorized font file passed with `--font-file`, and stops when neither is
+available. It reports its actual font and refuses to replace outputs.
 Keep example figures clearly labeled and never present them as measured results.

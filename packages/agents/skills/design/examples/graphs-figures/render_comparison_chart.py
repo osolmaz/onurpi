@@ -7,8 +7,8 @@ Usage:
     python render_comparison_chart.py --example --background light --out chart.svg --png chart.png
 
 Defaults follow references/THEME.md in the design skill: black dark mode,
-beige light mode, and Helvetica with a reported fallback. Sample data require
---example. Supply --font-file for an authorized film font. Outputs are new files.
+beige light mode, and Yodel Grotesk. Sample data require --example. Supply
+--font-file, once per weight, when Yodel Grotesk is not installed. Outputs are new files.
 """
 
 import argparse
@@ -354,13 +354,13 @@ def create_axes(fig):
     ]
 
 
-def render(data, out_path, png_path, background, font_file=None, rounded=False, example=False):
+def render(data, out_path, png_path, background, font_files=(), rounded=False, example=False):
     models = data["models"]
     names = [model["label"] for model in models]
     validate_data(data)
     style = resolve_style(background)
     style["rounded_block"] = rounded
-    font_name = select_font(font_file)
+    font_name = select_font(font_files)
     plt.rcParams.update(
         {
             "font.family": "sans-serif",
@@ -408,22 +408,25 @@ def render(data, out_path, png_path, background, font_file=None, rounded=False, 
     return fig
 
 
-def select_font(font_file):
-    if font_file is not None:
-        font_manager.fontManager.addfont(str(font_file))
-        name = font_manager.FontProperties(fname=font_file).get_name()
-        # Put the authorized file first, including when another version is installed.
-        font_manager.fontManager.ttflist.insert(0, font_manager.fontManager.ttflist.pop())
-        print(f"Font: {name} ({font_file})")
-        return name
-    for name in ["Helvetica", "Arial", "Liberation Sans"]:
-        try:
-            selected = font_manager.findfont(name, fallback_to_default=False)
-        except ValueError:
-            continue
-        print(f"Font: {name} ({selected})" + ("; documented Helvetica fallback" if name != "Helvetica" else ""))
-        return name
-    raise ValueError("Helvetica and documented fallbacks are unavailable; provide --font-file")
+def select_font(font_files):
+    if font_files:
+        names = set()
+        for font_file in font_files:
+            font_manager.fontManager.addfont(str(font_file))
+            names.add(font_manager.FontProperties(fname=font_file).get_name())
+            # Put the authorized file first, including when another version is installed.
+            font_manager.fontManager.ttflist.insert(0, font_manager.fontManager.ttflist.pop())
+            print(f"Font: {font_manager.fontManager.ttflist[0].name} {font_manager.fontManager.ttflist[0].weight} ({font_file})")
+        if len(names) != 1:
+            raise ValueError(f"--font-file files must share one family; got {sorted(names)}")
+        return names.pop()
+    name = "Yodel Grotesk"
+    try:
+        selected = font_manager.findfont(name, fallback_to_default=False)
+    except ValueError:
+        raise ValueError(f"{name} is not installed; provide an authorized file with --font-file") from None
+    print(f"Font: {name} ({selected})")
+    return name
 
 
 def validate_data(data):
@@ -450,7 +453,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data", nargs="?", type=Path, help="JSON data file")
     parser.add_argument("--example", action="store_true", help="Use clearly marked illustrative data")
-    parser.add_argument("--font-file", type=Path, help="Authorized font file, for example for a film")
+    parser.add_argument("--font-file", type=Path, action="append", default=[], help="Authorized font file, when Yodel Grotesk is not installed; repeat for each weight")
     parser.add_argument("--rounded", action="store_true", help="Optional rounded container with transparent corners")
     parser.add_argument("--background", default="dark", help='Target background: "light", "dark", or a six-digit hex color.')
     parser.add_argument("--out", type=Path, default=Path("comparison-chart.svg"))

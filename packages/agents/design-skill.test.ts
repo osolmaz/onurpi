@@ -69,9 +69,13 @@ describe("design skill", () => {
     }
     expect(example).toContain('default="dark"');
     expect(example).not.toContain("best = max");
-    expect(theme).toContain("Inter from Google Fonts");
-    expect(theme).toContain("Yodel Grotesk");
-    expect(theme).toContain("Helvetica");
+    expect(theme).toContain(
+      "Use Yodel Grotesk as the default font for all newly authored surfaces",
+    );
+    expect(theme).not.toMatch(/\bInter\b/);
+    expect(theme).toContain("convert all text to outlines");
+    expect(example).toContain('name = "Yodel Grotesk"');
+    expect(example).not.toContain('"Helvetica", "Arial"');
   });
 
   it("retains evidence, delivery, and visual-review requirements", () => {
