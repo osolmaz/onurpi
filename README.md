@@ -116,6 +116,11 @@ per-model overrides from `~/.pi/agent/models.json`. Only `providers.<name>.model
 copied. Endpoints, API keys, and model lists stay machine-local and are never written into this
 repository.
 
+[`web-search.json`](web-search.json) is the source-controlled copy of the reviewed `pi-web-access`
+settings from `~/.pi/agent/web-search.json`. Only the non-secret keys listed in `TRACKED_KEYS` are
+copied. Provider API keys, the proxy URL, and auth settings stay machine-local. The tracked copy
+turns the search curator off, so `web_search` returns results without opening a browser window.
+
 These scripts keep the copies in agreement without ever leaking machine-local development state.
 Both derive the canonical package entries from the root Pi resource manifest, so the list never
 needs manual maintenance:
@@ -123,8 +128,10 @@ needs manual maintenance:
 ```bash
 npm run settings:sync   # live settings -> tracked settings.json, repo entries normalized
                         # live models   -> tracked model-overrides.json
+                        # live web search -> tracked web-search.json
 npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
                         # apply tracked model-overrides.json to the live models.json
+                        # apply tracked web-search.json to the live web search settings
 ```
 
 An entry counts as belonging to this repo when it points into the main checkout, into an

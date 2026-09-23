@@ -2,15 +2,19 @@
 //
 //   node scripts/sync-settings.ts sync    live settings -> tracked settings.json (normalized)
 //                                         live models   -> tracked model-overrides.json
+//                                         live web search -> tracked web-search.json
 //   node scripts/sync-settings.ts reset   normalize the live settings in place
 //                                         apply tracked model-overrides.json to the live models.json
+//                                         apply tracked web-search.json to the live web search settings
 //
 // Entries belonging to this repo (main checkout paths, worktree paths, or the git source) are
 // replaced with one canonical local-path entry per package referenced by the root Pi manifest. All
 // other entries and settings pass through untouched.
 //
 // Only `providers.<name>.modelOverrides` is copied out of `models.json`. Endpoints, API keys, and
-// model lists stay machine-local and are never written into this repository.
+// model lists stay machine-local and are never written into this repository. The same rule applies
+// to `web-search.json`, which is also a credential store: only the reviewed, non-secret settings
+// from `TRACKED_KEYS` are copied.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -22,6 +26,7 @@ import {
   isModelOverrides,
   isRecord,
 } from "./model-overrides.ts";
+import { applyWebSearchSettings, extractWebSearchSettings } from "./web-search-config.ts";
 
 type Settings = { packages: string[] } & Record<string, unknown>;
 
@@ -30,6 +35,8 @@ const liveSettingsPath = join(homedir(), ".pi", "agent", "settings.json");
 const trackedSettingsPath = join(repoRoot, "settings.json");
 const liveModelsPath = join(homedir(), ".pi", "agent", "models.json");
 const trackedOverridesPath = join(repoRoot, "model-overrides.json");
+const liveWebSearchPath = join(homedir(), ".pi", "agent", "web-search.json");
+const trackedWebSearchPath = join(repoRoot, "web-search.json");
 
 const GIT_SOURCE = "git:github.com/osolmaz/onurpi";
 const REMOVED_OR_REPLACED_PACKAGE_SOURCES = [
@@ -132,6 +139,10 @@ if (mode === "sync") {
   const overrides = extractModelOverrides(readJsonIfPresent(liveModelsPath));
   writeJson(trackedOverridesPath, overrides);
   console.log(`Wrote model overrides to ${trackedOverridesPath}`);
+
+  const webSearch = extractWebSearchSettings(readJsonIfPresent(liveWebSearchPath));
+  writeJson(trackedWebSearchPath, webSearch);
+  console.log(`Wrote web search settings to ${trackedWebSearchPath}`);
 } else if (mode === "reset") {
   writeJson(liveSettingsPath, normalize(live));
   console.log(`Reset repo entries in ${liveSettingsPath}`);
@@ -144,6 +155,17 @@ if (mode === "sync") {
     applyModelOverrides(readJsonIfPresent(liveModelsPath) ?? {}, tracked, liveModelsPath),
   );
   console.log(`Applied model overrides to ${liveModelsPath}`);
+
+  const trackedWebSearch: unknown = readJson(trackedWebSearchPath);
+  writeJson(
+    liveWebSearchPath,
+    applyWebSearchSettings(
+      readJsonIfPresent(liveWebSearchPath),
+      trackedWebSearch,
+      trackedWebSearchPath,
+    ),
+  );
+  console.log(`Applied web search settings to ${liveWebSearchPath}`);
 } else {
   console.error("Usage: sync-settings.ts <sync|reset>");
   process.exit(1);
