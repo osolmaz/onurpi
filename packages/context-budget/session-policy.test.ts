@@ -74,7 +74,9 @@ describe("ContextBudgetSession", () => {
   });
 
   it("stays quiet under the budget but still sets the status line", () => {
-    const session = new ContextBudgetSession({ agentDir: agentDir({ warnChars: 100_000 }) });
+    const session = new ContextBudgetSession({
+      agentDir: agentDir({ warnChars: 100_000, status: true }),
+    });
     const { ctx, notifications, statuses } = recorder();
     session.onSessionStart({ prompt: prompt(10) }, ctx);
     expect(notifications).toEqual([]);
@@ -101,7 +103,7 @@ describe("ContextBudgetSession", () => {
   });
 
   it("clears its status and widget on shutdown", () => {
-    const session = new ContextBudgetSession({ agentDir: agentDir() });
+    const session = new ContextBudgetSession({ agentDir: agentDir({ status: true }) });
     const { ctx, statuses, widgets } = recorder();
     session.onSessionStart({ prompt: prompt(10) }, ctx);
     session.onSessionShutdown(ctx);

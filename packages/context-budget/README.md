@@ -53,7 +53,7 @@ session start or with `/context-budget reload`.
   "warnChars": 100000,
   "warnTokens": 24000,
   "charsPerToken": 4,
-  "status": true,
+  "status": false,
   "notify": true
 }
 ```
@@ -62,7 +62,8 @@ session start or with `/context-budget reload`.
 - `warnTokens` warns on the estimated tokens. Set it to `0` to check characters only.
 - `charsPerToken` converts characters to tokens for the estimate. Four is a fair default for prose
   and configuration files. The measured ratio for dense markdown with long paths is about 4.4.
-- `status` controls the footer line, and `notify` controls the startup warning.
+- `status` controls the footer line with the measured size, and it is off by default. `notify`
+  controls the startup warning.
 
 A missing file uses these defaults. An invalid key falls back to its default and is reported, and an
 unknown key is reported as a typo.

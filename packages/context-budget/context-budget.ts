@@ -16,6 +16,7 @@ export type ContextBudgetConfig = {
   /** Token warning threshold, or 0 to disable it. */
   warnTokens: number;
   charsPerToken: number;
+  /** Footer line with the measured size. Off by default. */
   status: boolean;
   notify: boolean;
 };
@@ -25,7 +26,7 @@ export const DEFAULT_CONFIG: ContextBudgetConfig = {
   warnChars: 100_000,
   warnTokens: 24_000,
   charsPerToken: 4,
-  status: true,
+  status: false,
   notify: true,
 };
 

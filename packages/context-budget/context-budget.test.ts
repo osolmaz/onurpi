@@ -258,11 +258,14 @@ describe("budget checks", () => {
 
   it("renders a status line only when it applies", () => {
     const over = measurement({ totalChars: 118_443 });
-    expect(statusText(over, config())).toBe("context! 118.4Kch ~29.6Ktok");
-    expect(statusText(measurement({ totalChars: 1000 }), config())).toBe("context 1.0Kch ~250tok");
-    expect(statusText(undefined, config())).toBeUndefined();
+    expect(statusText(over, config({ status: true }))).toBe("context! 118.4Kch ~29.6Ktok");
+    expect(statusText(measurement({ totalChars: 1000 }), config({ status: true }))).toBe(
+      "context 1.0Kch ~250tok",
+    );
+    expect(statusText(over, config())).toBeUndefined();
+    expect(statusText(undefined, config({ status: true }))).toBeUndefined();
     expect(statusText(over, config({ status: false }))).toBeUndefined();
-    expect(statusText(over, config({ enabled: false }))).toBeUndefined();
+    expect(statusText(over, config({ enabled: false, status: true }))).toBeUndefined();
   });
 });
 

@@ -91,7 +91,7 @@ describe("context-budget extension", () => {
   it("warns over budget and stays quiet the second time", async () => {
     const recorded = harness();
     registerContextBudget(recorded.pi as never, {
-      agentDir: budgetAgentDir({ warnChars: 100, warnTokens: 0 }),
+      agentDir: budgetAgentDir({ warnChars: 100, warnTokens: 0, status: true }),
     });
     const ctx = fakeContext(recorded);
     for (const handler of recorded.handlers.get("session_start") ?? []) {
@@ -115,7 +115,7 @@ describe("context-budget extension", () => {
 
   it("accepts the provider payload and the shutdown hook", async () => {
     const recorded = harness();
-    registerContextBudget(recorded.pi as never, { agentDir: budgetAgentDir() });
+    registerContextBudget(recorded.pi as never, { agentDir: budgetAgentDir({ status: true }) });
     const ctx = fakeContext(recorded);
     for (const handler of recorded.handlers.get("session_start") ?? []) {
       await handler({ type: "session_start", reason: "startup" }, ctx);
