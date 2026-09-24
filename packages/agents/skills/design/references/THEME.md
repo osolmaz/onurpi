@@ -57,6 +57,7 @@ files for a web page. Test the loading and fallback states.
 
 For a static SVG that other people will view, such as a README cover or banner,
 convert all text to outlines so the file needs no font and ships no font file.
+The [README cover](README_COVER.md) guide explains how to keep the kerning.
 Check that the delivered file has no `<text>` elements and no font references.
 
 For static outputs, confirm the actual font before the full render. Do not

@@ -27,6 +27,7 @@ rights, required tools, or conflicting instructions prevent correct work.
 | --- | --- |
 | Web page, interface, or visual layout | [Web and UI](references/WEB_UI.md) |
 | Chart, plot, or figure | [Graphs and figures](references/GRAPHS_FIGURES.md) |
+| README cover, repository banner, or similar static SVG | [README cover](references/README_COVER.md) |
 | Trim, speed change, or other existing-video edit | [Video editing](references/VIDEO_EDITING.md) |
 | Demo, showcase, teaser, or results film | [Demo video](references/DEMO_VIDEO.md) |
 | Model, materials, scene, cutaway, or interactive 3D asset | [3D work](references/THREE_D.md) |

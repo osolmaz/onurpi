@@ -50,7 +50,14 @@ describe("design skill", () => {
 
   it("routes each medium and excludes nonvisual design tasks", () => {
     const source = content("SKILL.md");
-    for (const domain of ["WEB_UI", "GRAPHS_FIGURES", "VIDEO_EDITING", "DEMO_VIDEO", "THREE_D"]) {
+    for (const domain of [
+      "WEB_UI",
+      "GRAPHS_FIGURES",
+      "README_COVER",
+      "VIDEO_EDITING",
+      "DEMO_VIDEO",
+      "THREE_D",
+    ]) {
       expect(source).toContain(`references/${domain}.md`);
     }
     for (const excluded of ["ordinary", "prose editing", "backend work", "software architecture"]) {
@@ -75,6 +82,10 @@ describe("design skill", () => {
     expect(theme).toContain("Web and UI work uses Inter, linked from Google\nFonts");
     expect(theme).toContain("Do not self-host font\nfiles for a web page.");
     expect(theme).toContain("convert all text to outlines");
+    const cover = content("references/README_COVER.md");
+    expect(cover).toContain("Shape each string with HarfBuzz");
+    expect(cover).toContain("no `<text>` element");
+    expect(cover).toContain("Prefer everyday words to precise-sounding technical ones.");
     expect(example).toContain('name = "Yodel Grotesk"');
     expect(example).not.toContain('"Helvetica", "Arial"');
   });
