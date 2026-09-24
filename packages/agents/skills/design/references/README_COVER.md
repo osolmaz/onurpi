@@ -37,8 +37,8 @@ in the middle of the gap between them. Each window gets equal padding of 12 to 1
 units, and the longest code line must keep that padding on the right. Keep the title clear of the window buttons.
 
 Code inside a window uses a monospace font such as Menlo, with syntax colors
-from the GitHub light theme. Keys are `#0550ae` and strings are `#116329`,
-table headers take `#8250df`, and punctuation stays gray at `#6e7781`. Terminal
+from the GitHub light theme. Keys are `#0550ae` and strings are `#116329`.
+Table headers take `#8250df`, and punctuation stays gray at `#6e7781`. Terminal
 text uses grays, with the product name in bold dark type.
 
 ## Text as outlines
@@ -53,6 +53,13 @@ font's kerning and ligatures, and the gaps show at pairs such as "y." and "To".
 Check the result by measuring the same strings in a browser with the font
 installed, for example with a canvas `measureText` call. The widths should
 match to the pixel.
+
+Tighten the name with negative tracking, about −5 units at a 64-unit size, and
+leave smaller text at zero. Tracking can make letters collide, and some fonts
+collide without it (Yodel Grotesk Bold's "r" and "y" touch at zero tracking).
+After tracking, measure the real gap between each pair of neighboring glyph
+outlines and push the right glyph and everything after it apart until the gap
+is at least 1% of the font size. Only the colliding pairs should move.
 
 Record the font source revision and file hashes in the pull request or
 provenance record. Check that the font's embedding flags allow outlining.
