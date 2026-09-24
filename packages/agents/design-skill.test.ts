@@ -70,9 +70,10 @@ describe("design skill", () => {
     expect(example).toContain('default="dark"');
     expect(example).not.toContain("best = max");
     expect(theme).toContain(
-      "Use Yodel Grotesk as the default font for all newly authored surfaces",
+      "Use Yodel Grotesk as the default font for all newly authored surfaces except\nweb pages",
     );
-    expect(theme).not.toMatch(/\bInter\b/);
+    expect(theme).toContain("Web and UI work uses Inter, linked from Google\nFonts");
+    expect(theme).toContain("Do not self-host font\nfiles for a web page.");
     expect(theme).toContain("convert all text to outlines");
     expect(example).toContain('name = "Yodel Grotesk"');
     expect(example).not.toContain('"Helvetica", "Arial"');

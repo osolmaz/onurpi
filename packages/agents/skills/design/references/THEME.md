@@ -38,10 +38,11 @@ or controls that the user needs.
 
 ## Typography
 
-Use Yodel Grotesk as the default font for all newly authored surfaces: web and
-UI work, graphs and figures, videos and their title cards, posters, covers,
-banners, and other graphics. A figure within an existing page matches that
-page. Product screenshots and faithful renderer ports retain source fonts unless
+Use Yodel Grotesk as the default font for all newly authored surfaces except
+web pages: graphs and figures, videos and their title cards, posters, covers,
+banners, and other graphics. Web and UI work uses Inter, linked from Google
+Fonts, because linking a hosted font is better than shipping font files with
+the page. A figure within an existing page matches that page. Product screenshots and faithful renderer ports retain source fonts unless
 the user explicitly requests an adaptation.
 
 Use an authorized source for font files and check embedding and redistribution
@@ -50,10 +51,9 @@ font repository locations, credentials, or private font files in public skill
 content. Record the source revision and file hashes in the task's provenance record.
 Include the license and actual selected face. No fonts are bundled with this skill.
 
-For web work, self-host licensed Yodel Grotesk files with `@font-face` only
-when the rights cover distribution to the page's audience. Give it a
-Helvetica, Arial, Liberation Sans, sans-serif stack for the loading state. Test
-the loading and fallback states.
+For web work, link Inter from Google Fonts and give it a Helvetica, Arial,
+Liberation Sans, sans-serif stack for the loading state. Do not self-host font
+files for a web page. Test the loading and fallback states.
 
 For a static SVG that other people will view, such as a README cover or banner,
 convert all text to outlines so the file needs no font and ships no font file.

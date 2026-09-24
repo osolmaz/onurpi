@@ -57,8 +57,8 @@ are excluded with `!` globs in the package manifest that loads them.
 
 Use `design` for web/UI, charts, video edits, demo films, and 3D work. It loads a shared theme and
 only the domain references needed for the task. In Pi, invoke `/skill:design` followed by the task.
-The font defaults are Inter for web/UI, Yodel Grotesk for video and related graphics, and Helvetica
-for other media. Font files are not bundled.
+The default font is Yodel Grotesk for everything except web/UI, which links Inter from Google Fonts.
+Font files are not bundled.
 
 This replaces `demo-video`, `video-editing`, `plot-graph`, and `3d-modeling`. Run a full
 `npm run agents:sync` without a skill selector to remove their old managed copies, then run

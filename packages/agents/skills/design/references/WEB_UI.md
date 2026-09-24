@@ -1,7 +1,7 @@
 # Web and UI
 
 Build the interface around the content and the user's task. Apply the
-[shared theme](THEME.md), including Yodel Grotesk for new web work. Preserve an existing
+[shared theme](THEME.md), including Inter from Google Fonts for new web work. Preserve an existing
 product's components and typography when extending it.
 
 ## Structure
