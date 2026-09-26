@@ -1,6 +1,6 @@
 {
   "defaultProvider": "huggingface",
-  "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
+  "defaultModel": "zai-org/GLM-5.3-Flash:baseten",
   "lastChangelogVersion": "0.87.1",
   "theme": "onur-dark",
   "packages": [
