@@ -55,7 +55,7 @@ owns its upstream pin and any OnurPi-specific integration. Their source remains 
 repositories.
 
 Extensions that need no OnurPi-specific integration load directly from a pinned npm entry in
-`settings.json`, such as `npm:pi-web-access@0.29.0` and `npm:pi-huggingface-oauth@0.3.0`.
+`settings.json`, such as `npm:pi-web-access@0.29.0` and `npm:pi-huggingface-oauth@0.4.0`.
 
 | Wrapper                                          | Source                                                                                 |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------- |

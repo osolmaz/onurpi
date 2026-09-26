@@ -125,7 +125,10 @@ describe("OnurPi package loading", () => {
 
   it("loads the Hugging Face extension from a pinned npm package", () => {
     const packages = readJson("settings.json")["packages"];
-    expect(packages).toContain("npm:pi-huggingface-oauth@0.3.0");
+    // Assert the source form, not the released version, so a version bump does not churn this test.
+    expect(packages).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^npm:pi-huggingface-oauth@\d+\.\d+\.\d+$/u)]),
+    );
     expect(packages).not.toEqual(
       expect.arrayContaining(["../../repos/onurpi/packages/huggingface-oauth"]),
     );

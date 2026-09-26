@@ -5,7 +5,7 @@
   "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.29.0",
-    "npm:pi-huggingface-oauth@0.3.0",
+    "npm:pi-huggingface-oauth@0.4.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
     "../../repos/onurpi/packages/turn-fold",
