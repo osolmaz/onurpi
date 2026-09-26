@@ -47,7 +47,6 @@ const REMOVED_OR_REPLACED_PACKAGE_SOURCES = [
   /^npm:@narumitw\/pi-btw(?:@.*)?$/,
   /^npm:@narumitw\/pi-usage(?:@.*)?$/,
   /^npm:@narumitw\/pi-tui-kit(?:@.*)?$/,
-  /^npm:pi-huggingface-oauth(?:@.*)?$/,
   /^npm:@osolmaz\/pi-workflows(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-workflows(?:@.*)?$/,
   /^git:github\.com\/osolmaz\/pi-must-win(?:@.*)?$/,

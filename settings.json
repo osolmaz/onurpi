@@ -1,10 +1,11 @@
 {
   "defaultProvider": "huggingface",
   "defaultModel": "deepseek-ai/DeepSeek-V4.1-Flash:novita",
-  "lastChangelogVersion": "0.87.0",
+  "lastChangelogVersion": "0.87.1",
   "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.29.0",
+    "npm:pi-huggingface-oauth@0.3.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
     "../../repos/onurpi/packages/turn-fold",
@@ -19,7 +20,6 @@
     "../../repos/onurpi/packages/plan-checklist",
     "../../repos/onurpi/packages/unified-exec",
     "../../repos/onurpi/packages/yarp",
-    "../../repos/onurpi/packages/huggingface-oauth",
     "../../repos/onurpi/packages/pi-must-win",
     "../../repos/onurpi/packages/regrafter-driver",
     "../../repos/onurpi/packages/workflows",
