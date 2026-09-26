@@ -152,12 +152,12 @@ jobs:
         run: npm run slophammer
       - name: Check external extension wrappers
         run: |
-          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
+          for package in demo-mode pi-must-win regrafter-driver workflows; do
             npm run check --workspace "@onurpi/$package"
           done
       - name: Check external extension wrappers with Slophammer
         run: |
-          for package in demo-mode huggingface-oauth pi-must-win regrafter-driver workflows; do
+          for package in demo-mode pi-must-win regrafter-driver workflows; do
             npm run slophammer --workspace "@onurpi/$package"
           done
   unified-exec-platform:

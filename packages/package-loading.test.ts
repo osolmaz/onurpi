@@ -56,11 +56,6 @@ const externalPackages = [
       "https://codeload.github.com/osolmaz/pi-demo-mode/tar.gz/8f18a3802a786be797404eb0a4ee3cce8a522b75",
   },
   {
-    directory: "huggingface-oauth",
-    dependency: "pi-huggingface-oauth",
-    source: "0.2.0",
-  },
-  {
     directory: "pi-must-win",
     dependency: "pi-must-win",
     source: "0.5.0",
@@ -126,6 +121,16 @@ describe("OnurPi package loading", () => {
         true,
       );
     }
+  });
+
+  it("loads the Hugging Face extension from a pinned npm package", () => {
+    const packages = readJson("settings.json")["packages"];
+    expect(packages).toContain("npm:pi-huggingface-oauth@0.3.0");
+    expect(packages).not.toEqual(
+      expect.arrayContaining(["../../repos/onurpi/packages/huggingface-oauth"]),
+    );
+    expect(resourceManifest()["extensions"]).not.toContain("./packages/huggingface-oauth/index.ts");
+    expect(existsSync(join(root, "packages", "huggingface-oauth"))).toBe(false);
   });
 
   it("keeps workflow plugin synchronization explicit", () => {

@@ -31,7 +31,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake    |
 | [`@onurpi/command-guard`](packages/command-guard/)                       | Fail-closed checks for destructive shell commands                   |
 | [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands                |
-| [`@onurpi/huggingface-oauth`](packages/huggingface-oauth/)               | Pinned Hugging Face OAuth and provider routes                       |
 | [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                         |
 | [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                            |
 | [`@onurpi/demo-mode`](packages/demo-mode/)                               | Opt-in self-driving demo mode                                       |
@@ -55,13 +54,15 @@ OnurPi loads external extensions through private wrapper packages under `package
 owns its upstream pin and any OnurPi-specific integration. Their source remains in the original
 repositories.
 
-| Wrapper                                            | Source                                                                                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [`huggingface-oauth`](packages/huggingface-oauth/) | [`osolmaz/pi-huggingface-oauth`](https://github.com/osolmaz/pi-huggingface-oauth) 0.1.1 |
-| [`pi-must-win`](packages/pi-must-win/)             | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) at an immutable commit  |
-| [`regrafter-driver`](packages/regrafter-driver/)   | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit    |
-| [`workflows`](packages/workflows/)                 | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.16.7   |
-| [`demo-mode`](packages/demo-mode/)                 | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`          |
+Extensions that need no OnurPi-specific integration load directly from a pinned npm entry in
+`settings.json`, such as `npm:pi-web-access@0.29.0` and `npm:pi-huggingface-oauth@0.3.0`.
+
+| Wrapper                                          | Source                                                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [`pi-must-win`](packages/pi-must-win/)           | [`osolmaz/pi-must-win`](https://github.com/osolmaz/pi-must-win) at an immutable commit |
+| [`regrafter-driver`](packages/regrafter-driver/) | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit   |
+| [`workflows`](packages/workflows/)               | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.16.7  |
+| [`demo-mode`](packages/demo-mode/)               | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`         |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
 provider natively. The Codex switcher keeps that provider identity while changing its account

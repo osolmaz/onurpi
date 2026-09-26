@@ -25,7 +25,6 @@
       "./packages/plan-checklist/index.ts",
       "./packages/unified-exec/index.ts",
       "./packages/yarp/index.ts",
-      "./packages/huggingface-oauth/index.ts",
       "./packages/pi-must-win/index.ts",
       "./packages/regrafter-driver/index.ts",
       "./packages/workflows/index.ts",
