@@ -99,6 +99,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ["scripts/**/*.test.ts"],
+    rules: {
+      "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
     // ANSI escape sequences are the subject matter here, so control characters are expected.
     files: ["packages/live-stats/**/*.ts"],
     rules: {

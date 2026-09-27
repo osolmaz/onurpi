@@ -75,17 +75,19 @@ than one resource type; settings synchronization deduplicates its package path.
 
 ## Settings synchronization
 
-The live settings file may point at the main checkout or a worktree during development. Generate
-canonical settings with the repository scripts:
+The live settings file may point at the main checkout or a worktree during development. Reconcile
+the live files with the tracked copies:
 
 ```bash
-npm run settings:reset
-npm run settings:sync
+npm run settings:sync   # both directions, stops on a conflict
+npm run settings:reset  # repository values onto the live files
 ```
 
-`settings:reset` rewrites repo-owned live entries to `../../repos/onurpi/packages/<name>`.
-`settings:sync` writes the normalized live settings to the tracked `settings.json`. Do not edit the
-tracked file by hand.
+`settings:sync` applies a tracked change to the live files, records a live change in the tracked
+copies, and exits non-zero without writing when both sides changed the same setting. Keep the live
+value for such a conflict with `npm run settings:sync -- --adopt-live`, or the repository value with
+`settings:reset`. `settings:reset` also rewrites repo-owned live entries to
+`../../repos/onurpi/packages/<name>`. Do not edit the tracked file by hand.
 
 After synchronization, run `pi list`. Every registered package must appear as its canonical local
 path. Run `/reload` in an existing Pi session before checking commands, tools, providers, skills, or

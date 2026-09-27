@@ -1,7 +1,6 @@
 {
   "defaultProvider": "huggingface",
   "defaultModel": "zai-org/GLM-5.3-Flash:baseten",
-  "lastChangelogVersion": "0.87.1",
   "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.29.0",

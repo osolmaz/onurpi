@@ -127,13 +127,21 @@ Both derive the canonical package entries from the root Pi resource manifest, so
 needs manual maintenance:
 
 ```bash
-npm run settings:sync   # live settings -> tracked settings.json, repo entries normalized
-                        # live models   -> tracked model-overrides.json
-                        # live web search -> tracked web-search.json
-npm run settings:reset  # normalize the live ~/.pi/agent/settings.json in place
-                        # apply tracked model-overrides.json to the live models.json
-                        # apply tracked web-search.json to the live web search settings
+npm run settings:sync   # reconcile the live files and the tracked copies in both directions
+npm run settings:reset  # force the repository values onto the live files
 ```
+
+`sync` compares the live files, the tracked copies, and the last reconciled state recorded in
+`~/.pi/agent/.onurpi-sync-base.json`. A key that changed on one side is applied to the other, so a
+change in the repository reaches the live files and a live change reaches the tracked copies without
+a manual edit. When both sides changed the same key, `sync` reports the conflicting settings, writes
+nothing, and exits non-zero. Choose the live value with `npm run settings:sync -- --adopt-live`, or
+the repository value with `npm run settings:reset`.
+
+The base file is machine-local and is not committed, so a fresh clone reconciles from scratch
+instead of inheriting another machine's state. Until a base exists, `sync` refuses to guess between
+two differing copies and asks for `reset` or `--adopt-live`. `lastChangelogVersion` is a
+machine-local key: it stays in the live file and is never tracked.
 
 An entry counts as belonging to this repo when it points into the main checkout, into an
 `onurpi-worktrees/` worktree, or at `git:github.com/osolmaz/onurpi`. The replaced sources for Goal,
@@ -148,7 +156,7 @@ killed, reaches the session cap, or Pi shuts down. That long-lived process model
 servers, interactive programs, and finite jobs that take more than two minutes.
 
 During development the live file may point anywhere, including a worktree or a dev-only package, and
-`sync` still writes the correct canonical values to the tracked copy.
+`sync` still compares and writes the correct canonical values in the tracked copy.
 
 ## Structure
 
@@ -168,8 +176,8 @@ TypeScript quality tooling at the workspace root.
 Extensions are developed from a live Pi session. Edit a checkout, then run `/reload`. On this
 machine the canonical install is per-package local paths into the main checkout, so `/reload` picks
 up local edits directly. To develop in a worktree instead, point the live settings entry at the
-worktree path; when done, `npm run settings:reset` restores the canonical entries and
-`npm run settings:sync` updates the tracked copy.
+worktree path; when done, `npm run settings:reset` restores the canonical entries, and `sync` never
+records a worktree path in the tracked copy.
 
 Quick-test without touching settings at all:
 

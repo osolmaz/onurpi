@@ -1,11 +1,15 @@
 // Keep the tracked copies of global Pi configuration in step with the live agent directory.
 //
-//   node scripts/sync-settings.ts sync    live settings -> tracked settings.json (normalized)
-//                                         live models   -> tracked model-overrides.json
-//                                         live web search -> tracked web-search.json
-//   node scripts/sync-settings.ts reset   normalize the live settings in place
-//                                         apply tracked model-overrides.json to the live models.json
-//                                         apply tracked web-search.json to the live web search settings
+//   node scripts/sync-settings.ts sync    converge the live and tracked copies. A change made on
+//                                         the repository side reaches this machine, and a change
+//                                         made on the machine is recorded in this repository.
+//   node scripts/sync-settings.ts reset   make the live files match the tracked copies, discarding
+//                                         live changes to reviewed settings.
+//
+// A converge merges against the base recorded by the previous run, so it can tell a one-sided
+// change from a conflict. A key that both sides changed differently stops the run, writes nothing,
+// and exits non-zero; set the live value, take the live value with `sync --adopt-live`, or apply the
+// repository values with `reset`.
 //
 // Entries belonging to this repo (main checkout paths, worktree paths, or the git source) are
 // replaced with one canonical local-path entry per package referenced by the root Pi manifest. All
@@ -14,18 +18,22 @@
 // Only `providers.<name>.modelOverrides` is copied out of `models.json`. Endpoints, API keys, and
 // model lists stay machine-local and are never written into this repository. The same rule applies
 // to `web-search.json`, which is also a credential store: only the reviewed, non-secret settings
-// from `TRACKED_KEYS` are copied.
+// from `TRACKED_KEYS` are copied. The keys in `LOCAL_ONLY_KEYS` stay out of the tracked
+// `settings.json` in the same way.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { differingKeys, isEqual, mergeThreeWay, type ConflictPolicy } from "./json-merge.ts";
 import {
   applyModelOverrides,
   extractModelOverrides,
   isModelOverrides,
   isRecord,
+  type ModelOverrides,
 } from "./model-overrides.ts";
+import { adoptTracked, applySettingsChanges, stripLocalOnly } from "./settings-file.ts";
 import { applyWebSearchSettings, extractWebSearchSettings } from "./web-search-config.ts";
 
 type Settings = { packages: string[] } & Record<string, unknown>;
@@ -66,10 +74,6 @@ function readJson(path: string): unknown {
 /** `models.json` is optional in Pi, so a missing file is a normal state, not an error. */
 function readJsonIfPresent(path: string): unknown {
   return existsSync(path) ? readJson(path) : undefined;
-}
-
-function writeJson(path: string, value: unknown): void {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function isSettings(value: unknown): value is Settings {
@@ -127,45 +131,273 @@ function normalize(settings: Settings): Settings {
   return { ...settings, packages: [...kept, ...canonicalEntries()] };
 }
 
+const SYNC_BASE_VERSION = 1;
+const SYNC_BASE_PATH = join(homedir(), ".pi", "agent", ".onurpi-sync-base.json");
+
+/** The reviewed part of each live file, in the shape the tracked copies use. */
+type Documents = {
+  settings: Record<string, unknown>;
+  modelOverrides: ModelOverrides;
+  webSearch: Record<string, unknown>;
+};
+
+type SyncBase = Documents & { version: number };
+
+type Converged = { ok: true; documents: Documents } | { ok: false };
+
+function isSyncBase(value: unknown): value is SyncBase {
+  if (!isRecord(value)) return false;
+  if (value["version"] !== SYNC_BASE_VERSION) return false;
+  if (!isRecord(value["settings"])) return false;
+  if (!isModelOverrides(value["modelOverrides"])) return false;
+  return isRecord(value["webSearch"]);
+}
+
+function readSyncBase(): SyncBase | undefined {
+  if (!existsSync(SYNC_BASE_PATH)) return undefined;
+  const stored = readJson(SYNC_BASE_PATH);
+  if (!isSyncBase(stored)) throw new Error(`Invalid sync base in ${SYNC_BASE_PATH}`);
+  return stored;
+}
+
+function syncBaseFrom(documents: Documents): SyncBase {
+  return {
+    version: SYNC_BASE_VERSION,
+    settings: documents.settings,
+    modelOverrides: documents.modelOverrides,
+    webSearch: documents.webSearch,
+  };
+}
+
+/** Write only when the formatted content changes, so an unchanged file keeps its exact bytes. */
+function writeJsonIfChanged(path: string, value: unknown): void {
+  const next = `${JSON.stringify(value, null, 2)}\n`;
+  const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
+  if (current === next) return;
+  writeFileSync(path, next);
+}
+
+/** Read a settings document and replace its repo-owned entries with the canonical ones. */
+function trackedSettings(value: unknown, label: string): Settings {
+  if (!isSettings(value)) throw new Error(`No packages array in ${label}`);
+  return normalize(value);
+}
+
+/**
+ * Read the live settings as the machine holds them. A write must keep that document intact,
+ * including package entries that point into a development worktree, so the raw document is
+ * returned alongside the canonical view the merge compares.
+ */
+function readLiveSettingsDocument(): Settings {
+  const value = readJson(liveSettingsPath);
+  if (!isSettings(value)) throw new Error(`No packages array in ${liveSettingsPath}`);
+  return value;
+}
+
+function readTrackedOverrides(): ModelOverrides {
+  const stored = readJson(trackedOverridesPath);
+  if (!isModelOverrides(stored))
+    throw new Error(`Invalid model overrides in ${trackedOverridesPath}`);
+  return stored;
+}
+
+function readTrackedWebSearch(): Record<string, unknown> {
+  const stored = readJson(trackedWebSearchPath);
+  if (!isRecord(stored)) throw new Error(`Invalid web search settings in ${trackedWebSearchPath}`);
+  return stored;
+}
+
+function documentsAgree(left: Documents, right: Documents): boolean {
+  return (
+    isEqual(left.settings, right.settings) &&
+    isEqual(left.modelOverrides, right.modelOverrides) &&
+    isEqual(left.webSearch, right.webSearch)
+  );
+}
+
+function reportChanges(label: string, live: unknown, tracked: unknown, merged: unknown): void {
+  const applied = differingKeys(live, merged);
+  const recorded = differingKeys(tracked, merged);
+  if (applied.length === 0 && recorded.length === 0) {
+    console.log(`${label}: in sync`);
+    return;
+  }
+  if (applied.length > 0) console.log(`${label}: repo -> live: ${applied.join(", ")}`);
+  if (recorded.length > 0) console.log(`${label}: live -> repo: ${recorded.join(", ")}`);
+}
+
+function reportDivergence(label: string, live: unknown, tracked: unknown): void {
+  const keys = differingKeys(live, tracked);
+  if (keys.length > 0) console.error(`  ${label}: ${keys.join(", ")}`);
+}
+
+/**
+ * Without a recorded base, a difference cannot be attributed to one side, so the run stops and the
+ * user picks a direction. Guessing here would silently discard one of the two states.
+ */
+function reportMissingBase(): void {
+  console.error(`No sync base in ${SYNC_BASE_PATH}, and the live and tracked copies differ:`);
+  reportDivergence("settings.json", liveDocuments.settings, trackedDocuments.settings);
+  reportDivergence(
+    "model-overrides.json",
+    liveDocuments.modelOverrides,
+    trackedDocuments.modelOverrides,
+  );
+  reportDivergence("web-search.json", liveDocuments.webSearch, trackedDocuments.webSearch);
+  console.error(
+    "Apply the repository values with `npm run settings:reset`, or record this machine's values " +
+      "with `npm run settings:sync --adopt-live`.",
+  );
+}
+
+function reportConflicts(conflicts: string[]): void {
+  console.error("Conflicting changes:");
+  for (const conflict of conflicts) console.error(`  ${conflict}`);
+  console.error(
+    "Nothing was written. Set the live value, take the live value with " +
+      "`npm run settings:sync --adopt-live`, or apply the repository values with " +
+      "`npm run settings:reset`.",
+  );
+}
+
+/** The artifacts that travel between the live agent directory and this repository. */
+const ARTIFACTS = [
+  ["settings.json", "settings"],
+  ["model-overrides.json", "modelOverrides"],
+  ["web-search.json", "webSearch"],
+] as const;
+
+type ArtifactKey = (typeof ARTIFACTS)[number][1];
+
+/** Merge every artifact against the base and label each conflict with its artifact. */
+function mergeAll(
+  base: SyncBase,
+  onConflict: ConflictPolicy,
+): { documents: Record<ArtifactKey, unknown>; conflicts: string[] } {
+  const documents = {} as Record<ArtifactKey, unknown>;
+  const conflicts: string[] = [];
+  for (const [label, key] of ARTIFACTS) {
+    const result = mergeThreeWay(base[key], liveDocuments[key], trackedDocuments[key], {
+      onConflict,
+    });
+    documents[key] = result.value;
+    conflicts.push(...result.conflicts.map((path) => `${label}: ${path}`));
+  }
+  return { documents, conflicts };
+}
+
+function asDocuments(documents: Record<ArtifactKey, unknown>): Documents {
+  const { settings, modelOverrides, webSearch } = documents;
+  if (!isRecord(settings) || !isModelOverrides(modelOverrides) || !isRecord(webSearch)) {
+    throw new Error("The merge produced an invalid document");
+  }
+  return { settings, modelOverrides, webSearch };
+}
+
+function converge(base: SyncBase | undefined): Converged {
+  if (base === undefined) {
+    if (adoptLive || documentsAgree(liveDocuments, trackedDocuments)) {
+      return { ok: true, documents: liveDocuments };
+    }
+    reportMissingBase();
+    return { ok: false };
+  }
+
+  const { documents, conflicts } = mergeAll(base, adoptLive ? "live" : "fail");
+  if (conflicts.length > 0) {
+    reportConflicts(conflicts);
+    return { ok: false };
+  }
+  return { ok: true, documents: asDocuments(documents) };
+}
+
+function runSync(): void {
+  const merged = converge(readSyncBase());
+  if (!merged.ok) process.exit(1);
+  const { settings, modelOverrides, webSearch } = merged.documents;
+
+  reportChanges("settings.json", liveDocuments.settings, trackedDocuments.settings, settings);
+  reportChanges(
+    "model-overrides.json",
+    liveDocuments.modelOverrides,
+    trackedDocuments.modelOverrides,
+    modelOverrides,
+  );
+  reportChanges("web-search.json", liveDocuments.webSearch, trackedDocuments.webSearch, webSearch);
+
+  writeJsonIfChanged(trackedSettingsPath, trackedSettings(settings, "the merged settings"));
+  writeJsonIfChanged(
+    liveSettingsPath,
+    applySettingsChanges(liveSettingsDocument, liveDocuments.settings, settings),
+  );
+  writeJsonIfChanged(trackedOverridesPath, modelOverrides);
+  writeJsonIfChanged(trackedWebSearchPath, webSearch);
+
+  // The live files are only rewritten when the merge changed their reviewed part, so a live entry
+  // that points into a worktree survives a run that has nothing to apply to it.
+  if (!isEqual(liveDocuments.modelOverrides, modelOverrides)) {
+    writeJsonIfChanged(
+      liveModelsPath,
+      applyModelOverrides(liveModels ?? {}, modelOverrides, liveModelsPath),
+    );
+  }
+  if (!isEqual(liveDocuments.webSearch, webSearch)) {
+    writeJsonIfChanged(
+      liveWebSearchPath,
+      applyWebSearchSettings(liveWebSearch, webSearch, trackedWebSearchPath),
+    );
+  }
+
+  writeJsonIfChanged(SYNC_BASE_PATH, syncBaseFrom(merged.documents));
+  console.log(`Sync base: ${SYNC_BASE_PATH}`);
+}
+
+function runReset(): void {
+  // Adopting the tracked settings must not drop external package entries that only this machine
+  // has, so the live package list is normalized in place instead of coming from the tracked file.
+  const adopted = adoptTracked(trackedDocuments.settings, liveSettingsDocument);
+  writeJsonIfChanged(liveSettingsPath, { ...adopted, packages: liveSettings.packages });
+  writeJsonIfChanged(
+    liveModelsPath,
+    applyModelOverrides(liveModels ?? {}, trackedDocuments.modelOverrides, liveModelsPath),
+  );
+  writeJsonIfChanged(
+    liveWebSearchPath,
+    applyWebSearchSettings(liveWebSearch, trackedDocuments.webSearch, trackedWebSearchPath),
+  );
+  writeJsonIfChanged(SYNC_BASE_PATH, syncBaseFrom(trackedDocuments));
+  console.log(`Settings: repo -> live: ${liveSettingsPath}`);
+  console.log(`Model overrides: repo -> live: ${liveModelsPath}`);
+  console.log(`Web search: repo -> live: ${liveWebSearchPath}`);
+  console.log(`Sync base: ${SYNC_BASE_PATH}`);
+}
+
 const mode = process.argv[2];
-const live = readJson(liveSettingsPath);
-if (!isSettings(live)) throw new Error(`No packages array in ${liveSettingsPath}`);
+const adoptLive = process.argv.includes("--adopt-live");
+
+if (mode !== "sync" && mode !== "reset") {
+  console.error("Usage: sync-settings.ts <sync|reset> [--adopt-live]");
+  process.exit(1);
+}
+
+const liveSettingsDocument = readLiveSettingsDocument();
+const liveSettings = normalize(liveSettingsDocument);
+const liveModels: unknown = readJsonIfPresent(liveModelsPath);
+const liveWebSearch: unknown = readJsonIfPresent(liveWebSearchPath);
+
+const liveDocuments: Documents = {
+  settings: stripLocalOnly(liveSettings),
+  modelOverrides: extractModelOverrides(liveModels),
+  webSearch: extractWebSearchSettings(liveWebSearch),
+};
+const trackedDocuments: Documents = {
+  settings: stripLocalOnly(trackedSettings(readJson(trackedSettingsPath), trackedSettingsPath)),
+  modelOverrides: readTrackedOverrides(),
+  webSearch: readTrackedWebSearch(),
+};
 
 if (mode === "sync") {
-  writeJson(trackedSettingsPath, normalize(live));
-  console.log(`Wrote normalized settings to ${trackedSettingsPath}`);
-
-  const overrides = extractModelOverrides(readJsonIfPresent(liveModelsPath));
-  writeJson(trackedOverridesPath, overrides);
-  console.log(`Wrote model overrides to ${trackedOverridesPath}`);
-
-  const webSearch = extractWebSearchSettings(readJsonIfPresent(liveWebSearchPath));
-  writeJson(trackedWebSearchPath, webSearch);
-  console.log(`Wrote web search settings to ${trackedWebSearchPath}`);
-} else if (mode === "reset") {
-  writeJson(liveSettingsPath, normalize(live));
-  console.log(`Reset repo entries in ${liveSettingsPath}`);
-
-  const tracked: unknown = readJson(trackedOverridesPath);
-  if (!isModelOverrides(tracked))
-    throw new Error(`Invalid model overrides in ${trackedOverridesPath}`);
-  writeJson(
-    liveModelsPath,
-    applyModelOverrides(readJsonIfPresent(liveModelsPath) ?? {}, tracked, liveModelsPath),
-  );
-  console.log(`Applied model overrides to ${liveModelsPath}`);
-
-  const trackedWebSearch: unknown = readJson(trackedWebSearchPath);
-  writeJson(
-    liveWebSearchPath,
-    applyWebSearchSettings(
-      readJsonIfPresent(liveWebSearchPath),
-      trackedWebSearch,
-      trackedWebSearchPath,
-    ),
-  );
-  console.log(`Applied web search settings to ${liveWebSearchPath}`);
+  runSync();
 } else {
-  console.error("Usage: sync-settings.ts <sync|reset>");
-  process.exit(1);
+  runReset();
 }
