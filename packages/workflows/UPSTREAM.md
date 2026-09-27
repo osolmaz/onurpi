@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.4`
-- Source commit: `63a8b740b6b6ce1819b06aeaa4e9fdeabb002839`
-- Package source: exact npm release `0.17.4`
+- Latest release at review: `v0.17.5`
+- Source commit: `2c0325f0801fa0b4b888f68d091eddf4417248c8`
+- Package source: exact npm release `0.17.5`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -77,7 +77,17 @@ reference. The controller reserves the ledger floor first, then bounds the obser
 left, and a prompt that still does not fit fails with the size of each part. The ledger also lists
 one entry per recorded result, so the include return step, the `observe` step, and the `dispatch`
 step never appear twice. Projection runs only when a prompt is built, so run state keeps the raw
-results and recorded runs stay readable and resumable.
+results and recorded runs stay readable and resumable. Release `0.17.5` makes the workflow server
+survive laptop sleep: the authenticated owner re-arms its own expired lease by matching the full
+recorded identity, so expiry gates takeover instead of killing the owner, and a superseded epoch
+still stops the server. Takeover requires the recorded holder to be provably not serving through a
+bounded socket hello probe, with the epoch claim row as the fencing authority, and concurrent
+starters converge instead of racing. The claim loser's cleanup can no longer unlink the winner's
+bound socket, a superseded holder's exit cannot strand the replacement because the replacement
+re-creates the socket file within one poll tick, and a fenced takeover attempt restores the
+displaced holder's lock record. Clients re-spawn a failed replacement within the start window,
+capped at three attempts, instead of warning after the full timeout, and the wake recovery behavior
+is documented in the upstream `docs/WORKFLOWS.md`.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
