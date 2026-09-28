@@ -9,6 +9,7 @@ const INFINITE_ATTEMPTS = Number.MAX_SAFE_INTEGER;
 const INFINITE_ATTEMPT_SUFFIX = `/${String(INFINITE_ATTEMPTS)})`;
 const PREPARE_RETRY_METHOD = "_prepareRetry";
 const WILL_RETRY_METHOD = "_willRetryAfterAgentEnd";
+const RECOVERY_OMISSION_METHOD = "_omitRecoveryAttempt";
 const RETRY_INDICATOR_SET_TEXT_METHOD = "setText";
 
 export type RetryStatus =
@@ -253,6 +254,7 @@ export function installInfiniteRetryPatch(
   );
   requireMethod(prototype, "_isRetryableError", 1, runtimeVersion);
   requireMethod(prototype, "abortRetry", 0, runtimeVersion);
+  requireOptionalRecoveryOmission(prototype, runtimeVersion);
   registry = {
     prototype,
     prepareDescriptor,
@@ -283,7 +285,7 @@ function installMethods(registry: PatchRegistry, maxDelayMs: number): void {
       delayMs,
       errorMessage: readErrorMessage(message),
     });
-    removeTrailingAssistantError(this);
+    omitFailedAttemptFromContext(this, message);
 
     const wait = new RetryWait(delayMs);
     if (registry.wait !== undefined) {
@@ -479,6 +481,18 @@ function requirePatchableMethodDescriptor(
   return descriptor;
 }
 
+function requireOptionalRecoveryOmission(prototype: object, runtimeVersion: string): void {
+  const omissionMethod: unknown = Reflect.get(prototype, RECOVERY_OMISSION_METHOD);
+  if (
+    omissionMethod !== undefined &&
+    (typeof omissionMethod !== "function" || omissionMethod.length !== 1)
+  ) {
+    throw new Error(
+      `Pi ${runtimeVersion} retry contract mismatch: invalid ${RECOVERY_OMISSION_METHOD}()`,
+    );
+  }
+}
+
 function requireMethod(
   prototype: object,
   name: string,
@@ -506,6 +520,22 @@ function readRetrySettings(value: unknown): { enabled: boolean; baseDelayMs: num
     throw new Error("Pi retry contract mismatch: invalid retry base delay");
   }
   return { enabled: settings["enabled"], baseDelayMs };
+}
+
+function omitFailedAttemptFromContext(session: unknown, message: unknown): void {
+  if (hasMethod(session, RECOVERY_OMISSION_METHOD)) {
+    // Pi 0.86+ persists the failed attempt and omits it from the model projection with
+    // session edits, then rebuilds live agent state from that projection. The omission
+    // must live in the session: popping live state alone is undone by any rebuild and
+    // leaves a trailing assistant error behind after consecutive failures.
+    callMethod(session, RECOVERY_OMISSION_METHOD, message);
+    return;
+  }
+  removeTrailingAssistantError(session);
+}
+
+function hasMethod(value: unknown, name: string): boolean {
+  return isRecord(value) && typeof value[name] === "function";
 }
 
 function removeTrailingAssistantError(value: unknown): void {

@@ -446,6 +446,101 @@ describe("patched retry behavior", () => {
   });
 });
 
+class OmittingFakeAgentSession extends FakeAgentSession {
+  readonly projection: unknown[] = [];
+  readonly omittedMessages: unknown[] = [];
+
+  // Mirrors stock Pi: drop the failed attempt from the session projection, then rebuild
+  // live agent state from that projection (_refreshFinalizedContext).
+  _omitRecoveryAttempt(message: unknown): void {
+    this.omittedMessages.push(message);
+    const index = this.projection.indexOf(message);
+    if (index >= 0) this.projection.splice(index, 1);
+    this.agent.state.messages = [...this.projection];
+  }
+}
+
+describe("recovery omission", () => {
+  it("delegates recovery omission to Pi when the session supports it", async () => {
+    vi.useFakeTimers();
+    const lease = install();
+    const session = new OmittingFakeAgentSession();
+    const failed = error();
+    session.projection.push({ role: "user" }, failed);
+    session.agent.state.messages = [...session.projection];
+
+    const pending = session._prepareRetry(failed);
+
+    expect(session.omittedMessages).toEqual([failed]);
+    expect(session.agent.state.messages).toEqual([{ role: "user" }]);
+    expect(lease.retryNow()).toBe(true);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it("survives consecutive failures and projection rebuilds without a trailing assistant", async () => {
+    vi.useFakeTimers();
+    const lease = install();
+    const session = new OmittingFakeAgentSession();
+    const first = error();
+    const second = error();
+    session.projection.push({ role: "user" }, first);
+    session.agent.state.messages = [...session.projection];
+
+    // First failure: the retry omits the failed attempt from the session projection.
+    const firstPending = session._prepareRetry(first);
+    expect(lease.retryNow()).toBe(true);
+    await expect(firstPending).resolves.toBe(true);
+    expect(session.agent.state.messages).toEqual([{ role: "user" }]);
+
+    // The retried stream fails again: the new error is appended live and persisted.
+    session.projection.push(second);
+    session.agent.state.messages.push(second);
+
+    // An agent_end handler appends a custom message, rebuilding live agent state from
+    // the session projection before the next retry is prepared.
+    session.agent.state.messages = [...session.projection];
+
+    const secondPending = session._prepareRetry(second);
+    expect(lease.retryNow()).toBe(true);
+    await expect(secondPending).resolves.toBe(true);
+    expect(session.omittedMessages).toEqual([first, second]);
+    const last = session.agent.state.messages.at(-1);
+    expect(last && isRecord(last) && last["role"] !== "assistant").toBe(true);
+  });
+
+  it("falls back to popping the trailing assistant error on older Pi runtimes", async () => {
+    vi.useFakeTimers();
+    const lease = install();
+    const session = new FakeAgentSession();
+    const failed = error();
+    session.agent.state.messages = [{ role: "user" }, failed];
+
+    const pending = session._prepareRetry(failed);
+
+    expect(session.agent.state.messages).toEqual([{ role: "user" }]);
+    expect(lease.retryNow()).toBe(true);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it("rejects a session whose recovery omission method has the wrong shape", () => {
+    const prototype = FakeAgentSession.prototype as unknown as Record<string, unknown>;
+    Object.defineProperty(prototype, "_omitRecoveryAttempt", {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      // Wrong arity: stock _omitRecoveryAttempt(message, toolResults?) takes one argument.
+      value: function badOmission(): boolean {
+        throw new Error("bad omission shape must never run");
+      },
+    });
+    try {
+      expect(() => install()).toThrow("retry contract mismatch: invalid _omitRecoveryAttempt()");
+    } finally {
+      Reflect.deleteProperty(prototype, "_omitRecoveryAttempt");
+    }
+  });
+});
+
 function callSetText(indicator: object, text: unknown): void {
   const method: unknown = Reflect.get(indicator, "setText");
   if (typeof method !== "function") throw new Error("Missing test setText() method");

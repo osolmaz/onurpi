@@ -2,8 +2,10 @@
 
 Infinite Retry makes Pi retry transient model failures until they succeed or you cancel them.
 
-It uses Pi's existing transient-error classifier and continuation path. The delay doubles after each
-failure and stops growing at 10 minutes:
+It uses Pi's existing transient-error classifier and continuation path. Each retry cleans up the
+failed attempt the way the running Pi does: through Pi's own recovery omission on Pi 0.86 and newer,
+and through a trailing failed assistant message removal on older runtimes. The delay doubles after
+each failure and stops growing at 10 minutes:
 
 ```text
 2s, 4s, 8s, 16s, ... 8m 32s, 10m, 10m, ...
@@ -28,9 +30,11 @@ retry behavior.
 
 Contract impact:
 
-- **Session state:** only Pi's ordinary assistant error and retry entries; no extension entries.
+- **Session state:** only Pi's ordinary assistant error, retry, and recovery-omission entries; no
+  extension entries.
 - **Other persistent data:** none.
-- **Pi internals:** three reversible private method wrappers; no Pi files are modified.
+- **Pi internals:** three reversible private method wrappers, plus Pi's own recovery-omission call
+  on newer runtimes; no Pi files are modified.
 - **Public API:** `session_start`, `session_shutdown`, `registerShortcut`, `registerCommand`, and
   `ctx.ui.setStatus()`.
 
