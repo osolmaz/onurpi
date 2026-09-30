@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.5`
-- Source commit: `2c0325f0801fa0b4b888f68d091eddf4417248c8`
-- Package source: exact npm release `0.17.5`
+- Latest release at review: `v0.17.6`
+- Source commit: `7937df1a6b4f12bfce2e7ada2842d5556dd95f72`
+- Package source: exact npm release `0.17.6`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -87,7 +87,12 @@ bound socket, a superseded holder's exit cannot strand the replacement because t
 re-creates the socket file within one poll tick, and a fenced takeover attempt restores the
 displaced holder's lock record. Clients re-spawn a failed replacement within the start window,
 capped at three attempts, instead of warning after the full timeout, and the wake recovery behavior
-is documented in the upstream `docs/WORKFLOWS.md`.
+is documented in the upstream `docs/WORKFLOWS.md`. Release `0.17.6` parses tool parameters that a
+transport delivers as raw JSON text: text starting with `{` or `[` is parsed before schema
+validation for start input, change-settings patch, submit output, and update update, so a
+model-started workflow run no longer crashes its runner with `input must be an object`; every other
+string is a genuine literal and passes through untouched, and free-text answer input wraps as
+`{ answer: text }` like the command path.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic

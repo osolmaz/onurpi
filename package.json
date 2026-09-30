@@ -68,7 +68,7 @@
     "@earendil-works/pi-coding-agent": "0.99.1",
     "@earendil-works/pi-tui": "0.99.1",
     "@eslint/js": "10.0.1",
-    "@osolmaz/pi-workflows": "0.17.5",
+    "@osolmaz/pi-workflows": "0.17.6",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/typescript-checker": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
