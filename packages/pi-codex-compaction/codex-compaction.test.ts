@@ -140,7 +140,7 @@ function harness(initialBranch: SessionEntry[] = [], options: HarnessOptions = {
 
   installCodexCompaction(
     api,
-    options.createCheckpoint ? { createCheckpoint: options.createCheckpoint as never } : {},
+    options.createCheckpoint ? { createCheckpoint: options.createCheckpoint } : {},
   );
 
   function handler<K extends HandlerKey>(name: string, key: K): Handlers[K] {
@@ -235,14 +235,14 @@ describe("session_before_compact", () => {
 
   it("sends credentials only to the validated official Codex endpoint", async () => {
     const seen: { url: unknown; authorization: string | null; feature: string | null }[] = [];
-    globalThis.fetch = ((url: unknown, init?: RequestInit) => {
+    globalThis.fetch = (url: unknown, init?: RequestInit) => {
       seen.push({
         url,
         authorization: new Headers(init?.headers).get("authorization"),
         feature: new Headers(init?.headers).get("x-codex-beta-features"),
       });
       return Promise.resolve(compactionSse("opaque-state"));
-    }) as typeof fetch;
+    };
 
     const h = harness([userEntry("user-1", "Remember BLUE-42.")]);
     const result = await h.handlers.sessionBeforeCompact()(
@@ -259,10 +259,10 @@ describe("session_before_compact", () => {
 
   it("never sends credentials to a custom model base URL", async () => {
     let called = false;
-    globalThis.fetch = (() => {
+    globalThis.fetch = () => {
       called = true;
       return Promise.resolve(compactionSse());
-    }) as typeof fetch;
+    };
 
     const h = harness([userEntry("user-1", "hello")], {
       model: codexModel({ baseUrl: "https://proxy.example.test" }),
@@ -279,8 +279,7 @@ describe("session_before_compact", () => {
   });
 
   it("cancels Pi compaction instead of falling back to text summarization", async () => {
-    globalThis.fetch = (() =>
-      Promise.resolve(new Response("bad request", { status: 400 }))) as typeof fetch;
+    globalThis.fetch = () => Promise.resolve(new Response("bad request", { status: 400 }));
     const h = harness([userEntry("user-1", "hello")]);
     const result = await h.handlers.sessionBeforeCompact()(
       beforeCompactEvent([userEntry("user-1", "hello")], { reason: "threshold" }),
@@ -293,7 +292,7 @@ describe("session_before_compact", () => {
 
   it("retries a message-less stream error once and then succeeds", async () => {
     let attempts = 0;
-    globalThis.fetch = (() => {
+    globalThis.fetch = () => {
       attempts += 1;
       if (attempts === 1) {
         return Promise.resolve(
@@ -304,7 +303,7 @@ describe("session_before_compact", () => {
         );
       }
       return Promise.resolve(compactionSse("retried-opaque"));
-    }) as typeof fetch;
+    };
     const h = harness([userEntry("user-1", "continue after a transient failure")]);
     const result = await h.handlers.sessionBeforeCompact()(
       beforeCompactEvent([userEntry("user-1", "continue after a transient failure")]),
@@ -321,7 +320,7 @@ describe("session_before_compact", () => {
 
   it("does not retry an explicit stream error", async () => {
     let attempts = 0;
-    globalThis.fetch = (() => {
+    globalThis.fetch = () => {
       attempts += 1;
       return Promise.resolve(
         new Response(
@@ -332,7 +331,7 @@ describe("session_before_compact", () => {
           },
         ),
       );
-    }) as typeof fetch;
+    };
     const h = harness([userEntry("user-1", "do not retry")]);
     const result = await h.handlers.sessionBeforeCompact()(
       beforeCompactEvent([userEntry("user-1", "do not retry")]),
@@ -345,8 +344,7 @@ describe("session_before_compact", () => {
   });
 
   it("cancels silently when the compaction signal is already aborted", async () => {
-    globalThis.fetch = (() =>
-      Promise.resolve(new Response("bad request", { status: 400 }))) as typeof fetch;
+    globalThis.fetch = () => Promise.resolve(new Response("bad request", { status: 400 }));
     const controller = new AbortController();
     controller.abort();
     const h = harness([userEntry("user-1", "hello")]);

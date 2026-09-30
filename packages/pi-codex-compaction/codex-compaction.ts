@@ -61,8 +61,7 @@ export type CodexCompactionContext = Pick<
 type ContextHookResult = { messages?: ContextEvent["messages"] } | undefined;
 
 type CompactionHookResult =
-  | { cancel?: boolean; compaction?: CompactionResult<NativeCompactionDetails> }
-  | undefined;
+  { cancel?: boolean; compaction?: CompactionResult<NativeCompactionDetails> } | undefined;
 
 export type CodexCompactionApi = {
   onSessionStart(handler: () => void): void;

@@ -2,10 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NyanRunwayPainter } from "./types.ts";
 
-const tuiMocks = vi.hoisted(() => ({
-  imageProtocol: "kitty" as string | null,
-  renderImage: vi.fn(() => ({ rows: 1, sequence: "IMAGE" })),
-}));
+const tuiMocks = vi.hoisted(
+  (): {
+    imageProtocol: string | null;
+    renderImage: ReturnType<typeof vi.fn<() => { rows: number; sequence: string }>>;
+  } => ({
+    imageProtocol: "kitty",
+    renderImage: vi.fn(() => ({ rows: 1, sequence: "IMAGE" })),
+  }),
+);
 
 vi.mock("@earendil-works/pi-tui", () => ({
   allocateImageId: () => 17,

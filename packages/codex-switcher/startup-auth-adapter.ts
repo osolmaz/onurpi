@@ -120,7 +120,7 @@ export function installStartupAuthAdapter(
   options: StartupAuthAdapterOptions,
 ): RestoreStartupAuthAdapter {
   assertSupportedPiVersion(options.piVersion ?? VERSION);
-  const prototype = options.runtimePrototype ?? (ModelRuntime.prototype as AuthRuntimePrototype);
+  const prototype = options.runtimePrototype ?? ModelRuntime.prototype;
   const state = stateFor(prototype);
   const token = Symbol("codex-switcher-startup-auth");
   state.checks.set(token, {

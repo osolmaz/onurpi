@@ -101,7 +101,7 @@ describe("paths", () => {
     expect(resolveConfigPath("/home/user/.pi/agent", env)).toBe("/tmp/custom.json");
     const empty = { [CONFIG_PATH_ENV]: "" } as NodeJS.ProcessEnv;
     expect(resolveConfigPath("/agent", empty)).toBe("/agent/focus-mode.json");
-    expect(resolveConfigPath("/agent", {} as NodeJS.ProcessEnv)).toBe("/agent/focus-mode.json");
+    expect(resolveConfigPath("/agent", {})).toBe("/agent/focus-mode.json");
   });
 });
 

@@ -57,8 +57,7 @@ const REJECTED_FLAGS = new Set([
 type FlagKind = "safeValue" | "safeBoolean" | "session" | "rejected" | "unknown";
 
 export type RestartArgumentPolicy =
-  | { supported: true; replayArgs: string[] }
-  | { supported: false; reason: string };
+  { supported: true; replayArgs: string[] } | { supported: false; reason: string };
 
 function flagKind(token: string): FlagKind {
   if (SAFE_VALUE_FLAGS.has(token)) return "safeValue";

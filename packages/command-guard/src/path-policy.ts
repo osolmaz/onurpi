@@ -76,7 +76,7 @@ async function existingPath(path: string): Promise<ExistingPath | undefined> {
     canonicalPath = await realpath(path);
   } catch (error: unknown) {
     if (isNotFound(error) && operandInfo.isSymbolicLink()) {
-      throw new Error(`cannot resolve dangling symlink target: ${path}`);
+      throw new Error(`cannot resolve dangling symlink target: ${path}`, { cause: error });
     }
     throw error;
   }

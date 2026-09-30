@@ -97,7 +97,7 @@ export function readConfig(): ReviewOptions {
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${path} is not valid JSON: ${(error as Error).message}`);
+    throw new Error(`${path} is not valid JSON: ${(error as Error).message}`, { cause: error });
   }
 
   return parseConfig(parsed, path);

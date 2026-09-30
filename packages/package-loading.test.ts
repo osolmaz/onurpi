@@ -63,7 +63,7 @@ const externalPackages = [
   {
     directory: "regrafter-driver",
     dependency: "pi-regraft",
-    source: "0.5.1",
+    source: "0.6.0",
   },
   {
     directory: "workflows",

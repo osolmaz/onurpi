@@ -197,11 +197,9 @@ export function createMockContext(overrides: Record<string, unknown> = {}) {
   let footer: unknown;
   let editorText = String(overrides["editorText"] ?? "");
   const selectOverride = overrides["select"] as
-    | ((title: string, options: string[]) => Promise<string | undefined>)
-    | undefined;
+    ((title: string, options: string[]) => Promise<string | undefined>) | undefined;
   const inputOverride = overrides["input"] as
-    | ((title: string, placeholder?: string) => Promise<unknown>)
-    | undefined;
+    ((title: string, placeholder?: string) => Promise<unknown>) | undefined;
   // eslint-disable-next-line complexity -- Keep the ported upstream mock dialog driver as one routine for regraft fidelity.
   const defaultCustom = async (factory: unknown) => {
     if (!selectOverride) return undefined;
@@ -267,8 +265,7 @@ export function createMockContext(overrides: Record<string, unknown> = {}) {
     return harness.result;
   };
   const customOverride = overrides["custom"] as
-    | ((factory: unknown, options?: unknown) => Promise<unknown>)
-    | undefined;
+    ((factory: unknown, options?: unknown) => Promise<unknown>) | undefined;
   const custom =
     customOverride && selectOverride
       ? async (factory: unknown, options?: unknown) => {

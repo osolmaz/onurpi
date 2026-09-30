@@ -78,11 +78,11 @@ const adaptiveReviewScreen: ReviewScreen<Action> = {
   ...reviewScreen,
   viewportSize: "adaptive",
 };
-void browseScreen;
-void inputScreen;
-void reviewScreen;
-void numericReviewScreen;
-void adaptiveReviewScreen;
+browseScreen;
+inputScreen;
+reviewScreen;
+numericReviewScreen;
+adaptiveReviewScreen;
 
 const invalidInputScreen: InputScreen<Action> = {
   kind: "input",
@@ -102,9 +102,9 @@ const invalidReviewViewport: ReviewScreen<Action> = {
   // @ts-expect-error Review viewports accept only a number or the adaptive policy.
   viewportSize: "fluid",
 };
-void invalidInputScreen;
-void invalidReviewScreen;
-void invalidReviewViewport;
+invalidInputScreen;
+invalidReviewScreen;
+invalidReviewViewport;
 
 declare const commandContext: ExtensionCommandContext;
 declare const lifecycleContext: ExtensionContext;
@@ -130,14 +130,14 @@ function describeMenuResult(result: RunMenuResult): string {
     }
   }
 }
-void describeMenuResult;
+describeMenuResult;
 
 // @ts-expect-error Closed menu results require a termination reason.
 const invalidClosedResult: RunMenuResult = { kind: "closed" };
 // @ts-expect-error Menu close reasons are interaction-level Back or Close only.
 const invalidCloseReason: MenuCloseReason = "cancelled";
-void invalidClosedResult;
-void invalidCloseReason;
+invalidClosedResult;
+invalidCloseReason;
 
 const commandTask: Promise<RunTaskResult<number>> = runTask(commandContext, {
   label: "Command task",

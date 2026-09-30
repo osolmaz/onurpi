@@ -45,8 +45,7 @@ export interface RunMenuOptions<State, Context extends MenuContext = ExtensionCo
 }
 
 type InternalScreenEvent<ScreenId extends string> =
-  | MenuScreenEvent
-  | { kind: "transition"; transition: MenuTransition<ScreenId> };
+  MenuScreenEvent | { kind: "transition"; transition: MenuTransition<ScreenId> };
 
 export async function runMenu<
   State,

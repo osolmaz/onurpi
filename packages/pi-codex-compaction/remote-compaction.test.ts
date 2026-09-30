@@ -62,7 +62,7 @@ describe("resolveCodexResponsesUrl", () => {
       "not a url",
     ];
     for (const baseUrl of rejected) {
-      expect(() => resolveCodexResponsesUrl(baseUrl)).toThrowError(/Codex/);
+      expect(() => resolveCodexResponsesUrl(baseUrl)).toThrow(/Codex/);
     }
   });
 });
@@ -115,7 +115,7 @@ describe("callRemoteCompaction", () => {
       headers: new Headers(),
       body: { input: [] },
       model: model(),
-      fetchImpl: (() => Promise.resolve(compactionSse("opaque-1"))) as typeof fetch,
+      fetchImpl: () => Promise.resolve(compactionSse("opaque-1")),
     });
     expect(result.compactionItem).toEqual({
       type: "compaction",
@@ -161,7 +161,7 @@ describe("callRemoteCompaction", () => {
         model: model(),
         fetchImpl,
       }),
-    ).rejects.toThrowError(/failed \(400\)/);
+    ).rejects.toThrow(/failed \(400\)/);
     expect(attempts).toBe(1);
   });
 
@@ -183,7 +183,7 @@ describe("callRemoteCompaction", () => {
         model: model(),
         fetchImpl,
       }),
-    ).rejects.toThrowError(/closed before response\.completed/);
+    ).rejects.toThrow(/closed before response\.completed/);
   });
 
   it("rejects malformed SSE data", async () => {
@@ -197,7 +197,7 @@ describe("callRemoteCompaction", () => {
         model: model(),
         fetchImpl,
       }),
-    ).rejects.toThrowError(/malformed compaction SSE data/);
+    ).rejects.toThrow(/malformed compaction SSE data/);
   });
 
   it("propagates aborts without retrying", async () => {
@@ -217,7 +217,7 @@ describe("callRemoteCompaction", () => {
         signal: controller.signal,
         fetchImpl,
       }),
-    ).rejects.toThrowError(/failed \(418\)/);
+    ).rejects.toThrow(/failed \(418\)/);
     expect(attempts).toBe(1);
   });
 });

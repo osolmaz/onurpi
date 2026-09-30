@@ -24,6 +24,15 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+          varsIgnorePattern: "^_",
+        },
+      ],
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "@typescript-eslint/no-unsafe-assignment": "error",
@@ -46,6 +55,13 @@ export default tseslint.config(
     files: ["*.test.ts"],
     rules: {
       "max-lines-per-function": ["error", { max: 160, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    // The fake screenshot terminal implements interface methods as no-ops on purpose.
+    files: ["render-integration.test.ts"],
+    rules: {
+      "@typescript-eslint/no-empty-function": "off",
     },
   },
 );

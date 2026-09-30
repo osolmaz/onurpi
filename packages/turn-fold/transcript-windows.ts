@@ -10,8 +10,7 @@ type BranchEntries = ReturnType<ExtensionContext["sessionManager"]["getBranch"]>
 type BranchEntry = BranchEntries[number];
 
 export type WindowArgumentResult =
-  | { error: string; ok: false }
-  | { ok: true; value: TranscriptWindowValue };
+  { error: string; ok: false } | { ok: true; value: TranscriptWindowValue };
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;

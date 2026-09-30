@@ -1,6 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { type Component, type Terminal, type TuiMode, TuiAltScreen } from "@earendil-works/pi-tui";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryExplorer } from "./history-viewer.ts";
 import { HistoryViewport } from "./history-viewport.ts";
@@ -12,10 +12,14 @@ function fakeTui(
   mode: TuiMode = "regular",
 ): {
   mode: TuiMode;
-  requestRender: ReturnType<typeof vi.fn>;
-  terminal: { rows: number; write: ReturnType<typeof vi.fn> };
+  requestRender: Mock<(force?: boolean) => void>;
+  terminal: { rows: number; write: Mock<(data: string) => void> };
 } {
-  return { mode, requestRender: vi.fn(), terminal: { rows, write: vi.fn() } };
+  return {
+    mode,
+    requestRender: vi.fn<(force?: boolean) => void>(),
+    terminal: { rows, write: vi.fn<(data: string) => void>() },
+  };
 }
 
 class InputTerminal implements Terminal {
@@ -550,7 +554,7 @@ describe("Turn Fold history explorer mouse support", () => {
 
 describe("Turn Fold history explorer hops", () => {
   it("hops between entries and user messages with navigation history", () => {
-    const requestRender = vi.fn();
+    const requestRender = vi.fn<(force?: boolean) => void>();
     const explorer = new HistoryExplorer(
       { ...fakeTui(20), requestRender },
       theme,
@@ -640,7 +644,7 @@ describe("Turn Fold history explorer", () => {
   });
 
   it("renders a Pi overlay and supports Mac-accessible movement", () => {
-    const requestRender = vi.fn();
+    const requestRender = vi.fn<(force?: boolean) => void>();
     const close = vi.fn();
     const explorer = new HistoryExplorer(
       { ...fakeTui(20), requestRender },
@@ -687,7 +691,7 @@ describe("Turn Fold history explorer", () => {
 
   it("cancels incremental search work when the explorer closes", async () => {
     vi.useFakeTimers();
-    const requestRender = vi.fn();
+    const requestRender = vi.fn<(force?: boolean) => void>();
     const close = vi.fn();
     const explorer = new HistoryExplorer(
       { ...fakeTui(20), requestRender },

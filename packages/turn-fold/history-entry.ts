@@ -9,13 +9,7 @@ import {
 export type HistoryEntryKind = "assistant" | "compaction" | "custom" | "error" | "tool" | "user";
 
 export type HistoryFilter =
-  | "all"
-  | "assistant"
-  | "compactions"
-  | "custom"
-  | "errors"
-  | "tools"
-  | "user";
+  "all" | "assistant" | "compactions" | "custom" | "errors" | "tools" | "user";
 
 export type HistorySectionKind = "diff" | "text" | "thinking" | "toolOutput";
 

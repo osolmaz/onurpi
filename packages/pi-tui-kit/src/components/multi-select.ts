@@ -16,8 +16,7 @@ type ActionRow<ScreenId extends string, ActionId extends string> = {
   item: ActionMenuItem<ScreenId, ActionId>;
 };
 type MultiSelectRow<ScreenId extends string, ActionId extends string> =
-  | ToggleRow
-  | ActionRow<ScreenId, ActionId>;
+  ToggleRow | ActionRow<ScreenId, ActionId>;
 
 // eslint-disable-next-line max-lines-per-function -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
 export function createMultiSelectComponent<ScreenId extends string, ActionId extends string>(

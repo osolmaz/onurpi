@@ -101,8 +101,7 @@ function withoutCredentialHeaders(headers: ProviderHeaders | undefined): Provide
 }
 
 function requestOptions(options: StreamOptions | undefined, auth: ModelAuth): StreamOptions {
-  const { apiKey: discardedApiKey, headers: originalHeaders, ...rest } = options ?? {};
-  void discardedApiKey;
+  const { apiKey: _discardedApiKey, headers: originalHeaders, ...rest } = options ?? {};
   return {
     ...rest,
     ...(auth.apiKey ? { apiKey: auth.apiKey } : {}),

@@ -12,8 +12,7 @@ export type WindowEntry = {
 };
 
 export type WindowRow =
-  | { kind: "empty"; label: string }
-  | { kind: "entry"; entry: WindowEntry; selected: boolean };
+  { kind: "empty"; label: string } | { kind: "entry"; entry: WindowEntry; selected: boolean };
 
 export type ManagerResult =
   | { kind: "close" }
@@ -75,20 +74,16 @@ export class ManagerWindowState {
 
   entries(): WindowEntry[] {
     if (this.tab === "queue") {
-      return this.queue.items().map(
-        (item): WindowEntry => ({
-          target: { kind: "queue", id: item.id },
-          text: item.text,
-          mode: item.mode,
-        }),
-      );
+      return this.queue.items().map((item): WindowEntry => ({
+        target: { kind: "queue", id: item.id },
+        text: item.text,
+        mode: item.mode,
+      }));
     }
-    return this.history.entries().map(
-      (text, index): WindowEntry => ({
-        target: { kind: "history", index },
-        text,
-      }),
-    );
+    return this.history.entries().map((text, index): WindowEntry => ({
+      target: { kind: "history", index },
+      text,
+    }));
   }
 
   rows(): WindowRow[] {

@@ -144,7 +144,7 @@ async function acquireLock(path: string, signal: AbortSignal): Promise<number> {
       if (errorCode(error) !== "EEXIST") throw error;
       removeStaleLock(path);
       if (Date.now() - started >= LOCK_TIMEOUT_MS) {
-        throw new Error("Timed out while waiting for the protected file lock.");
+        throw new Error("Timed out while waiting for the protected file lock.", { cause: error });
       }
       await delay(LOCK_RETRY_MS, signal);
     }

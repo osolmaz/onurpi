@@ -41,7 +41,7 @@ const modulesScreen: BrowseScreen = {
   ],
   viewportSize: "adaptive",
 };
-void modulesScreen;
+modulesScreen;
 
 const searchableToolsScreen: MultiSelectScreen<Screen, Action> = {
   kind: "multiSelect",
@@ -57,7 +57,7 @@ const searchableToolsScreen: MultiSelectScreen<Screen, Action> = {
   ],
   action: "refresh",
 };
-void searchableToolsScreen;
+searchableToolsScreen;
 
 const boundedInputScreen: InputScreen<Action> = {
   kind: "input",
@@ -65,7 +65,7 @@ const boundedInputScreen: InputScreen<Action> = {
   placeholder: "Label",
   action: "refresh",
 };
-void boundedInputScreen;
+boundedInputScreen;
 
 const reviewChangesScreen: ReviewScreen<Action> = {
   kind: "review",
@@ -75,7 +75,7 @@ const reviewChangesScreen: ReviewScreen<Action> = {
   viewportSize: "adaptive",
   confirm: { id: "apply", label: "Apply", action: "refresh" },
 };
-void reviewChangesScreen;
+reviewChangesScreen;
 
 const menu = defineMenu<State, Screen, Action>({
   start: "main",

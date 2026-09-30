@@ -88,7 +88,8 @@ function readDocument(path: string): VaultDocument {
     return parseDocument(JSON.parse(readPrivateFile(path, MAX_VAULT_BYTES)) as unknown);
   } catch (error) {
     if (isMissingFileError(error)) return emptyDocument();
-    if (error instanceof SyntaxError) throw new Error("Vault contains invalid JSON.");
+    if (error instanceof SyntaxError)
+      throw new Error("Vault contains invalid JSON.", { cause: error });
     throw error;
   }
 }

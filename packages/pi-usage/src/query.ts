@@ -179,7 +179,7 @@ export async function queryProviderUsage(
     return await adapter.query(auth, signal, timeoutMs);
   } catch (error) {
     if (isStaleExtensionContextError(error) || isAbortError(error)) throw error;
-    throw new Error(redactUsageError(errorMessage(error), auth.secrets));
+    throw new Error(redactUsageError(errorMessage(error), auth.secrets), { cause: error });
   }
 }
 
@@ -247,7 +247,9 @@ async function fetchProviderJson(
     try {
       parsed = JSON.parse(text) as unknown;
     } catch (error) {
-      throw new Error(`${description} returned invalid JSON: ${errorMessage(error)}`);
+      throw new Error(`${description} returned invalid JSON: ${errorMessage(error)}`, {
+        cause: error,
+      });
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error(`${description} response was not an object.`);
@@ -255,7 +257,9 @@ async function fetchProviderJson(
     return parsed as Record<string, unknown>;
   } catch (error) {
     if (timedOut) {
-      throw new Error(`Timed out after ${Math.round(timeoutMs / 1000)}s while fetching usage.`);
+      throw new Error(`Timed out after ${Math.round(timeoutMs / 1000)}s while fetching usage.`, {
+        cause: error,
+      });
     }
     if (signal.aborted)
       throw Object.assign(new Error("Usage query aborted."), { name: "AbortError" });

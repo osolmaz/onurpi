@@ -115,14 +115,13 @@ export default function usageExtension(pi: ExtensionAPI) {
     activeCurrentIdentity = nextIdentity;
   };
 
-  // eslint-disable-next-line max-lines-per-function -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
   const queryAdapterState = async (
     ctx: ExtensionContext,
     adapter: UsageProviderAdapter,
     displayState: UsageDisplayState,
     force: boolean,
     signal: AbortSignal,
-    // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
+    // eslint-disable-next-line max-lines-per-function, complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
   ): Promise<QueryOutcome> => {
     const startedAt = Date.now();
     let auth: ResolvedUsageAuth | undefined;

@@ -73,8 +73,7 @@ export type AllowDecision = Readonly<{
 }>;
 
 export type BlockDecision =
-  | Readonly<{ action: "deny"; reason: string }>
-  | Readonly<{ action: "rewrite"; reason: string }>;
+  Readonly<{ action: "deny"; reason: string }> | Readonly<{ action: "rewrite"; reason: string }>;
 
 export type PolicyDecision = AllowDecision | BlockDecision;
 

@@ -143,7 +143,7 @@ function reasoningItem(block: ThinkingContent): ResponseItem | undefined {
     ) {
       const cloned = structuredClone(parsed) as ResponseItem;
       // `status` is a response-only field; replaying it in a request is rejected by the API.
-      return omitKeys(cloned, ["status"]) as ResponseItem;
+      return omitKeys(cloned, ["status"]);
     }
   } catch {
     // Undecodable thinking signatures are dropped from the Responses replay.

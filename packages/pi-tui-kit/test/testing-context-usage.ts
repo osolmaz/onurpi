@@ -15,8 +15,8 @@ const tuiOptions: TuiHarnessOptions = { width: 80, rows: 24 };
 const tui: TuiHarness = createTuiHarness(tuiOptions);
 const custom: ExtensionContext["ui"]["custom"] = tui.custom;
 const key: TuiHarnessKey = "tui.select.confirm";
-void custom;
-void key;
+custom;
+key;
 
 const steps: readonly RpcHarnessStep[] = [
   { kind: "input", title: "Value", response: "12" },
@@ -25,8 +25,8 @@ const steps: readonly RpcHarnessStep[] = [
 const rpc: RpcHarness = createRpcHarness(steps);
 const rpcUi: Pick<ExtensionContext["ui"], "input" | "select" | "custom"> = rpc.ui;
 const dialogs: readonly RpcDialogRecord[] = rpc.dialogs;
-void rpcUi;
-void dialogs;
+rpcUi;
+dialogs;
 
 // @ts-expect-error Testing helpers stay off the production entrypoint.
 production.createTuiHarness;

@@ -137,7 +137,7 @@ export async function awaitWithDeadline<T>(
 // eslint-disable-next-line complexity -- Preserve the audited upstream routine as a single unit; reviewed during vendoring.
 export function sanitizeDisplayText(value: string, maxChars = 160): string {
   let result = "";
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < value.length;) {
     const codePoint = value.codePointAt(index) ?? 0;
     const character = String.fromCodePoint(codePoint);
     if (codePoint === 0x1b || codePoint === 0x9b || codePoint === 0x9d) {

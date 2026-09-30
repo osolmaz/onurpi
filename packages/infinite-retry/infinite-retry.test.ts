@@ -50,13 +50,11 @@ class FakeAgentSession {
     return isRecord(message) && message["retryable"] === true;
   }
 
-  _prepareRetry(message: unknown): Promise<boolean> {
-    void message;
+  _prepareRetry(_message: unknown): Promise<boolean> {
     return Promise.resolve(false);
   }
 
-  _willRetryAfterAgentEnd(event: unknown): boolean {
-    void event;
+  _willRetryAfterAgentEnd(_event: unknown): boolean {
     return false;
   }
 

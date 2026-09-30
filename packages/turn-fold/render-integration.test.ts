@@ -43,28 +43,17 @@ class MockTerminal implements Terminal {
   hideCursor(): void {
     return;
   }
-  moveBy(lines: number): void {
-    void lines;
-  }
-  setProgress(active: boolean): void {
-    void active;
-  }
-  setTitle(title: string): void {
-    void title;
-  }
+  moveBy(_lines: number): void {}
+  setProgress(_active: boolean): void {}
+  setTitle(_title: string): void {}
   showCursor(): void {
     return;
   }
-  start(onInput: (data: string) => void, onResize: () => void): void {
-    void onInput;
-    void onResize;
-  }
+  start(_onInput: (data: string) => void, _onResize: () => void): void {}
   stop(): void {
     return;
   }
-  write(data: string): void {
-    void data;
-  }
+  write(_data: string): void {}
 }
 
 function assistantMessage(

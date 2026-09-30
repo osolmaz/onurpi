@@ -21,10 +21,7 @@ function prototypeWith(result: boolean): {
   readonly original: RuntimePrototype["hasConfiguredAuth"];
   readonly prototype: RuntimePrototype;
 } {
-  const original = vi.fn((providerId: string) => {
-    void providerId;
-    return result;
-  });
+  const original = vi.fn(() => result);
   return { original, prototype: { hasConfiguredAuth: original } };
 }
 

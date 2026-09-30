@@ -92,8 +92,8 @@ function fakeNative(requests: string[]): CodexProvider {
   };
   return {
     ...native,
-    stream: transport as CodexProvider["stream"],
-    streamSimple: transport as CodexProvider["streamSimple"],
+    stream: transport,
+    streamSimple: transport,
   };
 }
 
@@ -217,10 +217,7 @@ describe("codex switcher startup", () => {
     });
     expect(runtime).toBeDefined();
     if (!runtime) return;
-    const original = vi.fn((providerId: string) => {
-      void providerId;
-      return false;
-    });
+    const original = vi.fn((_providerId: string) => false);
     const runtimePrototype = { hasConfiguredAuth: original };
 
     installCodexSwitcherStartup(test.api, runtime, {
@@ -244,10 +241,7 @@ describe("codex switcher startup", () => {
     });
     expect(runtime).toBeDefined();
     if (!runtime) return;
-    const original = vi.fn((providerId: string) => {
-      void providerId;
-      return false;
-    });
+    const original = vi.fn((_providerId: string) => false);
     const runtimePrototype = { hasConfiguredAuth: original };
 
     installCodexSwitcherStartup(test.api, runtime, {

@@ -25,9 +25,7 @@ export interface MenuKeybindings {
 }
 
 export type MenuScreenEvent =
-  | { kind: "activate"; itemId: string }
-  | { kind: "back" }
-  | { kind: "close" };
+  { kind: "activate"; itemId: string } | { kind: "back" } | { kind: "close" };
 
 export interface MenuSettingChange {
   itemId: string;
@@ -53,8 +51,7 @@ export interface MenuScreenComponent extends Component {
 }
 
 export type MenuChangeResponse<ScreenId extends string> =
-  | boolean
-  | { accepted: boolean; transition: MenuTransition<ScreenId> };
+  boolean | { accepted: boolean; transition: MenuTransition<ScreenId> };
 
 export interface MenuScreenComponentOptions<ScreenId extends string, ActionId extends string> {
   screen: MenuScreen<ScreenId, ActionId>;
@@ -65,11 +62,9 @@ export interface MenuScreenComponentOptions<ScreenId extends string, ActionId ex
   onEvent(event: MenuScreenEvent): void;
   onSelectionChange?: ((itemId: string) => void) | undefined;
   onSettingChange?:
-    | ((change: MenuSettingChange) => Promise<MenuChangeResponse<ScreenId>>)
-    | undefined;
+    ((change: MenuSettingChange) => Promise<MenuChangeResponse<ScreenId>>) | undefined;
   onMultiSelectChange?:
-    | ((change: MenuMultiSelectChange) => Promise<MenuChangeResponse<ScreenId>>)
-    | undefined;
+    ((change: MenuMultiSelectChange) => Promise<MenuChangeResponse<ScreenId>>) | undefined;
   onInputSubmit?: ((change: MenuInputSubmit) => Promise<MenuChangeResponse<ScreenId>>) | undefined;
   onTransition?: ((transition: MenuTransition<ScreenId>) => void) | undefined;
   onError?: ((error: unknown) => void) | undefined;

@@ -14,10 +14,7 @@ import type { TruncationMetadata } from "./tool-result.ts";
 
 export type WaitMode = "relative" | "absolute";
 export type WaitStatus =
-  | "completed"
-  | "relative_deadline_reached"
-  | "absolute_deadline_reached"
-  | "cancelled";
+  "completed" | "relative_deadline_reached" | "absolute_deadline_reached" | "cancelled";
 
 export type SessionListing = Readonly<{
   session_id: number;

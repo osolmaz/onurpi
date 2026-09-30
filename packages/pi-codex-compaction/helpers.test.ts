@@ -218,7 +218,7 @@ describe("effectiveInputForBranch", () => {
     });
     expect(() =>
       effectiveInputForBranch({ branch: [malformed], model: model(), tools: [] }),
-    ).toThrowError(/malformed/);
+    ).toThrow(/malformed/);
 
     const mismatched = nativeEntry(
       "compact-1",
@@ -226,7 +226,7 @@ describe("effectiveInputForBranch", () => {
     );
     expect(() =>
       effectiveInputForBranch({ branch: [mismatched], model: model(), tools: [] }),
-    ).toThrowError(/different model/);
+    ).toThrow(/different model/);
   });
 
   it("overflow recovery excludes the failed assistant response", () => {
@@ -322,7 +322,7 @@ describe("replacement history retention", () => {
   });
 
   it("rejects a compaction item without encrypted content", () => {
-    expect(() => buildReplacementHistory([], { type: "compaction" })).toThrowError(
+    expect(() => buildReplacementHistory([], { type: "compaction" })).toThrow(
       /valid compaction item/,
     );
   });
@@ -395,6 +395,7 @@ function toolInfo(name: string): ToolInfo {
     name,
     description: `${name} a file`,
     parameters: { type: "object" },
+    exposure: "direct",
     sourceInfo: {
       path: `/tools/${name}.ts`,
       source: "test",

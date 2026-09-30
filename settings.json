@@ -1,7 +1,4 @@
 {
-  "defaultProvider": "huggingface",
-  "defaultModel": "zai-org/GLM-5.3-Flash:baseten",
-  "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.29.0",
     "npm:pi-huggingface-oauth@0.4.0",
@@ -33,19 +30,22 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
+  "defaultProvider": "huggingface",
+  "defaultModel": "zai-org/GLM-5.3-Flash:baseten",
   "defaultThinkingLevel": "xhigh",
-  "compaction": {
-    "enabled": true,
-    "reserveTokens": 27200,
-    "keepRecentTokens": 20000
-  },
-  "markdown": {
-    "codeBlockIndent": ""
-  },
-  "outputPad": 0,
   "terminal": {
     "showImages": false,
     "images": false
   },
-  "tuiMode": "fullscreen"
+  "outputPad": 0,
+  "tuiMode": "fullscreen",
+  "theme": "onur-dark",
+  "markdown": {
+    "codeBlockIndent": ""
+  },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 27200,
+    "keepRecentTokens": 20000
+  }
 }

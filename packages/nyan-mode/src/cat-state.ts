@@ -1,12 +1,5 @@
 export type CatMood =
-  | "neutral"
-  | "dancing"
-  | "thinking"
-  | "focused"
-  | "pleased"
-  | "unimpressed"
-  | "annoyed"
-  | "angry";
+  "neutral" | "dancing" | "thinking" | "focused" | "pleased" | "unimpressed" | "annoyed" | "angry";
 
 export type CatContextStress = "none" | "watch" | "stressed" | "critical";
 

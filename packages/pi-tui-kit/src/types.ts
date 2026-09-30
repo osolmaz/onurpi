@@ -10,15 +10,10 @@ export interface MenuContext {
 export type MenuCloseReason = "back" | "close";
 
 export type MenuTransition<ScreenId extends string> =
-  | { kind: "stay" }
-  | { kind: "back" }
-  | { kind: "close" }
-  | { kind: "to"; screen: ScreenId };
+  { kind: "stay" } | { kind: "back" } | { kind: "close" } | { kind: "to"; screen: ScreenId };
 
 export type MenuActionResult<ScreenId extends string> =
-  | MenuTransition<ScreenId>
-  | { kind: "rejected"; error?: unknown }
-  | undefined;
+  MenuTransition<ScreenId> | { kind: "rejected"; error?: unknown } | undefined;
 
 export interface MenuActionContext<State, Context extends MenuContext = ExtensionCommandContext> {
   ctx: Context;

@@ -203,6 +203,7 @@ describe("Responses conversion", () => {
       name: "deferred_tool",
       description: "Loaded later",
       parameters: { type: "object" },
+      exposure: "deferred",
       sourceInfo: {
         path: "/tools/deferred.ts",
         source: "test",
@@ -472,12 +473,14 @@ describe("tool payload", () => {
           name: "b",
           description: "B",
           parameters: {},
+          exposure: "direct",
           sourceInfo: { path: "/b", source: "t", scope: "temporary", origin: "top-level" },
         },
         {
           name: "a",
           description: "A",
           parameters: {},
+          exposure: "direct",
           sourceInfo: { path: "/a", source: "t", scope: "temporary", origin: "top-level" },
         },
       ],

@@ -145,7 +145,7 @@ async function login(
     ctx.ui.notify(`Authenticated Codex account: ${accountId}`, "info");
   } catch (error) {
     if (error instanceof Error && error.message === "Authentication was cancelled.") throw error;
-    throw new Error("Codex authentication failed.");
+    throw new Error("Codex authentication failed.", { cause: error });
   } finally {
     ctx.ui.setStatus("codex-switcher-auth", undefined);
   }

@@ -20,9 +20,7 @@ export type ConvergeInput = {
 };
 
 export type ConvergeDecision =
-  | { action: "keep" }
-  | { action: "stop-self" }
-  | { action: "request-stop"; victim: Lease };
+  { action: "keep" } | { action: "stop-self" } | { action: "request-stop"; victim: Lease };
 
 /**
  * Order holders from the one that should continue longest to the one that should yield first. Ties

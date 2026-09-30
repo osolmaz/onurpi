@@ -137,7 +137,7 @@ function renderHighlightedHtml(
     textBuffer = "";
   };
 
-  for (let index = 0; index < html.length; ) {
+  for (let index = 0; index < html.length;) {
     if (html.startsWith("<span", index)) {
       const tagEnd = html.indexOf(">", index + 5);
       if (tagEnd >= 0) {

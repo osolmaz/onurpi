@@ -13,8 +13,7 @@ const RECOVERY_OMISSION_METHOD = "_omitRecoveryAttempt";
 const RETRY_INDICATOR_SET_TEXT_METHOD = "setText";
 
 export type RetryStatus =
-  | { state: "idle" }
-  | { state: "waiting"; attempt: number; delayMs: number; dueAt: number };
+  { state: "idle" } | { state: "waiting"; attempt: number; delayMs: number; dueAt: number };
 
 type RetryReporter = (status: RetryStatus) => void;
 
