@@ -36,9 +36,6 @@
   "defaultTools": [
     "+codemode"
   ],
-  "codemode": {
-    "mode": "only"
-  },
   "terminal": {
     "showImages": false,
     "images": false
