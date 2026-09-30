@@ -33,6 +33,9 @@
   "defaultProvider": "huggingface",
   "defaultModel": "zai-org/GLM-5.3-Flash:baseten",
   "defaultThinkingLevel": "xhigh",
+  "defaultTools": [
+    "+codemode"
+  ],
   "terminal": {
     "showImages": false,
     "images": false
