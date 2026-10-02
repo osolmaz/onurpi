@@ -8,7 +8,7 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "pi-anti-repeat": "https://codeload.github.com/osolmaz/pi-anti-repeat/tar.gz/470ef56bb593ccc9b9d85f621e4c86d6e4ce40e0"
+    "pi-anti-repeat": "https://codeload.github.com/osolmaz/pi-anti-repeat/tar.gz/f5406c3db4f201fa9e59cad731e258c662ddf92a"
   },
   "pi": {
     "extensions": [

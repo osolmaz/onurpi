@@ -63,7 +63,7 @@ Extensions that need no OnurPi-specific integration load directly from a pinned 
 | [`regrafter-driver`](packages/regrafter-driver/) | [`osolmaz/pi-regraft`](https://github.com/osolmaz/pi-regraft) at an immutable commit   |
 | [`workflows`](packages/workflows/)               | [`@osolmaz/pi-workflows`](https://www.npmjs.com/package/@osolmaz/pi-workflows) 0.16.7  |
 | [`demo-mode`](packages/demo-mode/)               | [`osolmaz/pi-demo-mode`](https://github.com/osolmaz/pi-demo-mode) at `8f18a38`         |
-| [`anti-repeat`](packages/anti-repeat/)           | [`osolmaz/pi-anti-repeat`](https://github.com/osolmaz/pi-anti-repeat) at `470ef56`     |
+| [`anti-repeat`](packages/anti-repeat/)           | [`osolmaz/pi-anti-repeat`](https://github.com/osolmaz/pi-anti-repeat) at `f5406c3`     |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
 provider natively. The Codex switcher keeps that provider identity while changing its account
