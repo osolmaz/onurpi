@@ -42,11 +42,11 @@ jobs:
       - name: Check @onurpi/turn-fold package with Slophammer
         working-directory: packages/turn-fold
         run: npm run slophammer
-      - name: Check @onurpi/loop-guard package
-        working-directory: packages/loop-guard
+      - name: Check @onurpi/anti-repeat package
+        working-directory: packages/anti-repeat
         run: npm run check
-      - name: Check @onurpi/loop-guard package with Slophammer
-        working-directory: packages/loop-guard
+      - name: Check @onurpi/anti-repeat package with Slophammer
+        working-directory: packages/anti-repeat
         run: npm run slophammer
       - name: Check @onurpi/live-stats package
         working-directory: packages/live-stats
@@ -192,8 +192,8 @@ jobs:
       - name: Mutate @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run mutate
-      - name: Mutate @onurpi/loop-guard package
-        working-directory: packages/loop-guard
+      - name: Mutate @onurpi/anti-repeat package
+        working-directory: packages/anti-repeat
         run: npm run mutate
       - name: Mutate @onurpi/live-stats package
         working-directory: packages/live-stats

@@ -1,6 +1,6 @@
 typescript:
   coverage:
-    threshold: 85
+    threshold: 100
   complexity:
     max: 8
   dry:
@@ -14,10 +14,7 @@ typescript:
       min_tokens: 100
   mutation:
     targets:
-      - feature-encoder.ts
-      - intervention-message.ts
-      - loop-detector.ts
-      - loop-guard-controller.ts
+      - index.ts
   dependency_boundaries:
     - from: .
       allow: []

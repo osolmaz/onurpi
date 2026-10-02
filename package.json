@@ -14,7 +14,7 @@
       "./packages/prompt-queue/index.ts",
       "./packages/restart/index.ts",
       "./packages/turn-fold/index.ts",
-      "./packages/loop-guard/index.ts",
+      "./packages/anti-repeat/index.ts",
       "./packages/live-stats/index.ts",
       "./packages/nyan-mode/index.ts",
       "./packages/codex-switcher/index.ts",
