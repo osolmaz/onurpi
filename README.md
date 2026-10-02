@@ -133,11 +133,11 @@ npm run settings:reset  # force the repository values onto the live files
 ```
 
 [`scripts/hf-context-floor.ts`](scripts/hf-context-floor.ts) generates Hugging Face overrides
-instead of hand-writing them: it reads the cached router catalog
-(`~/.pi/agent/models-store.json`) and raises every model below the 272,000-token floor to it in the
-tracked `model-overrides.json`. Models at or above the floor are never lowered, manual entries are
-preserved, and pure floor artifacts are pruned on re-run. Run it after `pi update --models` picks up
-new catalog entries, then reconcile with `npm run settings:sync`:
+instead of hand-writing them: it reads the cached router catalog (`~/.pi/agent/models-store.json`)
+and raises every model below the 272,000-token floor to it in the tracked `model-overrides.json`.
+Models at or above the floor are never lowered, manual entries are preserved, and pure floor
+artifacts are pruned on re-run. Run it after `pi update --models` picks up new catalog entries, then
+reconcile with `npm run settings:sync`:
 
 ```bash
 node scripts/hf-context-floor.ts
