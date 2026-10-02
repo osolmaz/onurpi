@@ -1,0 +1,32 @@
+{
+  "name": "@onurpi/context-ceiling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Global context ceiling for the Pi coding agent",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.4",
+    "eslint": "10.11.0",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "5.0.2"
+  },
+  "scripts": {
+    "format": "prettier --check .",
+    "lint": "eslint . --config eslint.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "npm run format && npm run lint && npm run typecheck && npm run test"
+  }
+}

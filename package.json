@@ -35,7 +35,8 @@
       "./packages/image-budget/index.ts",
       "./packages/context-budget/index.ts",
       "./packages/focus-mode/index.ts",
-      "./packages/command-guard/index.ts"
+      "./packages/command-guard/index.ts",
+      "./packages/context-ceiling/index.ts"
     ],
     "skills": [
       "./packages/agents/skills/*/SKILL.md",

@@ -27,6 +27,7 @@
     "../../repos/onurpi/packages/context-budget",
     "../../repos/onurpi/packages/focus-mode",
     "../../repos/onurpi/packages/command-guard",
+    "../../repos/onurpi/packages/context-ceiling",
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
