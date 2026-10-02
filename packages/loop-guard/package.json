@@ -27,7 +27,7 @@
     "@earendil-works/pi-coding-agent": ">=0.82.1"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.99.1",
+    "@earendil-works/pi-coding-agent": "1.0.0",
     "@eslint/js": "10.0.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/typescript-checker": "10.0.0",
