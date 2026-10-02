@@ -131,6 +131,21 @@ npm run settings:sync   # reconcile the live files and the tracked copies in bot
 npm run settings:reset  # force the repository values onto the live files
 ```
 
+[`scripts/hf-context-floor.ts`](scripts/hf-context-floor.ts) generates Hugging Face overrides
+instead of hand-writing them: it reads the cached router catalog
+(`~/.pi/agent/models-store.json`) and raises every model below the 272,000-token floor to it in the
+tracked `model-overrides.json`. Models at or above the floor are never lowered, manual entries are
+preserved, and pure floor artifacts are pruned on re-run. Run it after `pi update --models` picks up
+new catalog entries, then reconcile with `npm run settings:sync`:
+
+```bash
+node scripts/hf-context-floor.ts
+```
+
+Pi has no provider-wide context override: `modelOverrides` keys on exact model IDs, and the model
+registry hands out copies, so a runtime extension cannot patch model metadata. Generating the
+per-model entries is the documented mechanism without maintaining them by hand.
+
 `sync` compares the live files, the tracked copies, and the last reconciled state recorded in
 `~/.pi/agent/.onurpi-sync-base.json`. A key that changed on one side is applied to the other, so a
 change in the repository reaches the live files and a live change reaches the tracked copies without
