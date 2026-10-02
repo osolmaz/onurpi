@@ -1,11 +1,14 @@
 {
-  "name": "@onurpi/loop-guard",
+  "name": "@onurpi/anti-repeat",
   "version": "0.1.0",
   "private": true,
-  "description": "Opt-in bounded loop detection for the Pi coding agent",
+  "description": "Pinned Anti-Repeat extension for OnurPi",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "pi-anti-repeat": "https://codeload.github.com/osolmaz/pi-anti-repeat/tar.gz/470ef56bb593ccc9b9d85f621e4c86d6e4ce40e0"
   },
   "pi": {
     "extensions": [
@@ -24,7 +27,7 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.82.1"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "1.0.0",
