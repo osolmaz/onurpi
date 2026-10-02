@@ -131,6 +131,47 @@ function normalize(settings: Settings): Settings {
   return { ...settings, packages: [...kept, ...canonicalEntries()] };
 }
 
+/** The repository-owned package an entry names, for comparing entry sets across spellings. */
+function packageNameOf(entry: string): string {
+  const absolute = resolve(dirname(liveSettingsPath), entry);
+  const worktreeMatch = absolute.startsWith(`${WORKTREES_ROOT}/`)
+    ? /\/packages\/([^/]+)/.exec(absolute.slice(WORKTREES_ROOT.length))
+    : undefined;
+  if (worktreeMatch?.[1]) return worktreeMatch[1];
+  const canonicalPrefix = `${CANONICAL_REPO_ROOT}/packages/`;
+  if (absolute.startsWith(canonicalPrefix))
+    return absolute.slice(canonicalPrefix.length).split("/")[0] ?? entry;
+  return entry;
+}
+
+/**
+ * The merge compares canonical views, so a package added to the root manifest changes the reviewed
+ * part without changing any live value the merge could apply. When the merge actually changed the
+ * reviewed package list against the recorded base, append the reviewed entries the live file does
+ * not name yet, and keep the rest of the raw document, including worktree spellings.
+ */
+function reconcilePackages(
+  liveRaw: Record<string, unknown>,
+  reviewed: Record<string, unknown>,
+  base: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const reviewedPackages = Array.isArray(reviewed["packages"])
+    ? (reviewed["packages"] as string[])
+    : [];
+  const rawPackages = Array.isArray(liveRaw["packages"]) ? (liveRaw["packages"] as string[]) : [];
+  const basePackages = Array.isArray(base?.["packages"])
+    ? (base?.["packages"] as string[])
+    : undefined;
+  const packagesChanged = basePackages === undefined || !isEqual(basePackages, reviewedPackages);
+  if (!packagesChanged) return liveRaw;
+  const rawNames = new Set(rawPackages.filter(isOurs).map(packageNameOf));
+  const added = reviewedPackages.filter(
+    (entry) => isOurs(entry) && !rawNames.has(packageNameOf(entry)),
+  );
+  if (added.length === 0) return liveRaw;
+  return { ...liveRaw, packages: [...rawPackages, ...added] };
+}
+
 const SYNC_BASE_VERSION = 1;
 const SYNC_BASE_PATH = join(homedir(), ".pi", "agent", ".onurpi-sync-base.json");
 
@@ -312,7 +353,8 @@ function converge(base: SyncBase | undefined): Converged {
 }
 
 function runSync(): void {
-  const merged = converge(readSyncBase());
+  const base = readSyncBase();
+  const merged = converge(base);
   if (!merged.ok) process.exit(1);
   const { settings, modelOverrides, webSearch } = merged.documents;
 
@@ -328,7 +370,11 @@ function runSync(): void {
   writeJsonIfChanged(trackedSettingsPath, trackedSettings(settings, "the merged settings"));
   writeJsonIfChanged(
     liveSettingsPath,
-    applySettingsChanges(liveSettingsDocument, liveDocuments.settings, settings),
+    reconcilePackages(
+      applySettingsChanges(liveSettingsDocument, liveDocuments.settings, settings),
+      settings,
+      base?.settings,
+    ),
   );
   writeJsonIfChanged(trackedOverridesPath, modelOverrides);
   writeJsonIfChanged(trackedWebSearchPath, webSearch);

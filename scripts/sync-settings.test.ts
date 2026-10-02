@@ -108,6 +108,53 @@ describe("sync-settings.ts", () => {
     });
   });
 
+  it("delivers a manifest-added package to the live file", () => {
+    withFixture((fixture) => {
+      const tracked = readTrackedSettings(fixture);
+      const stale = {
+        ...tracked,
+        packages: (tracked["packages"] as string[]).filter(
+          (entry) => !entry.endsWith("context-ceiling"),
+        ),
+      };
+      writeLive(fixture, stale);
+      writeBase(fixture, stale); // the previous run recorded the list without the package
+
+      const result = run(fixture, "sync");
+
+      expect(result.status).toBe(0);
+      expect(readLiveSettings(fixture)["packages"]).toContain(
+        "../../repos/onurpi/packages/context-ceiling",
+      );
+    });
+  });
+
+  it("keeps a worktree spelling when a manifest-added package lands", () => {
+    withFixture((fixture) => {
+      const tracked = readTrackedSettings(fixture);
+      const staleLive = withWorktreeEntry(
+        {
+          ...tracked,
+          packages: (tracked["packages"] as string[]).filter(
+            (entry) => !entry.endsWith("context-ceiling"),
+          ),
+        },
+        fixture,
+      );
+      writeLive(fixture, staleLive);
+      writeBase(fixture, staleLive); // the previous run recorded the list without the package
+
+      const result = run(fixture, "sync");
+
+      expect(result.status).toBe(0);
+      const packages = readLiveSettings(fixture)["packages"] as string[];
+      expect(packages).toContain("../../repos/onurpi/packages/context-ceiling");
+      expect(packages).toContain(
+        join(fixture.home, "repos", "onurpi-worktrees", "dev", "packages", "onur-theme"),
+      );
+    });
+  });
+
   it("applies a repository change to the live file without a manual edit", () => {
     withFixture((fixture) => {
       const tracked = readTrackedSettings(fixture);
