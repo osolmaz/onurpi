@@ -65,9 +65,9 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.0.0",
-    "@earendil-works/pi-coding-agent": "1.0.0",
-    "@earendil-works/pi-tui": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.4",
+    "@earendil-works/pi-coding-agent": "1.0.4",
+    "@earendil-works/pi-tui": "1.0.4",
     "@eslint/js": "10.0.1",
     "@osolmaz/pi-workflows": "0.17.6",
     "@stryker-mutator/core": "10.0.0",
@@ -84,5 +84,9 @@
   },
   "overrides": {
     "qs": "6.16.0"
+  },
+  "allowScripts": {
+    "@homebridge/node-pty-prebuilt-multiarch@0.13.1": true,
+    "@homebridge/node-pty-prebuilt-multiarch@0.14.1": true
   }
 }
