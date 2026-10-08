@@ -150,18 +150,19 @@ function packageNameOf(entry: string): string {
  * reviewed package list against the recorded base, append the reviewed entries the live file does
  * not name yet, and keep the rest of the raw document, including worktree spellings.
  */
+/** The packages entry of a document, when it is a list of strings. */
+function packagesOf(document: Record<string, unknown>): string[] {
+  return Array.isArray(document["packages"]) ? (document["packages"] as string[]) : [];
+}
+
 function reconcilePackages(
   liveRaw: Record<string, unknown>,
   reviewed: Record<string, unknown>,
   base: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
-  const reviewedPackages = Array.isArray(reviewed["packages"])
-    ? (reviewed["packages"] as string[])
-    : [];
-  const rawPackages = Array.isArray(liveRaw["packages"]) ? (liveRaw["packages"] as string[]) : [];
-  const basePackages = Array.isArray(base?.["packages"])
-    ? (base?.["packages"] as string[])
-    : undefined;
+  const reviewedPackages = packagesOf(reviewed);
+  const rawPackages = packagesOf(liveRaw);
+  const basePackages = base ? packagesOf(base) : undefined;
   const packagesChanged = basePackages === undefined || !isEqual(basePackages, reviewedPackages);
   if (!packagesChanged) return liveRaw;
   const rawNames = new Set(rawPackages.filter(isOurs).map(packageNameOf));

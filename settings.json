@@ -1,7 +1,4 @@
 {
-  "defaultProvider": "huggingface",
-  "defaultModel": "zai-org/GLM-5.3-Flash:fireworks-ai",
-  "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.37.0",
     "npm:pi-huggingface-oauth@0.4.0",
@@ -29,26 +26,29 @@
     "../../repos/onurpi/packages/image-budget",
     "../../repos/onurpi/packages/context-budget",
     "../../repos/onurpi/packages/focus-mode",
-    "../../repos/onurpi/packages/command-guard",
     "../../repos/onurpi/packages/context-ceiling",
+    "../../repos/onurpi/packages/command-guard",
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
+  "defaultProvider": "huggingface",
+  "defaultModel": "zai-org/GLM-5.3-Flash:fireworks-ai",
   "defaultThinkingLevel": "xhigh",
+  "terminal": {
+    "showImages": false,
+    "images": false
+  },
+  "outputPad": 0,
+  "tuiMode": "fullscreen",
+  "theme": "onur-dark",
+  "markdown": {
+    "codeBlockIndent": ""
+  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 27200,
     "keepRecentTokens": 20000
   },
-  "markdown": {
-    "codeBlockIndent": ""
-  },
-  "outputPad": 0,
-  "terminal": {
-    "showImages": false,
-    "images": false
-  },
-  "tuiMode": "fullscreen",
-  "hideThinkingBlock": false,
-  "defaultTools": ["+codemode"]
+  "defaultTools": ["+codemode"],
+  "hideThinkingBlock": false
 }

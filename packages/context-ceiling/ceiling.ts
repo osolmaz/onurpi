@@ -13,20 +13,20 @@
 
 export const DEFAULT_CEILING_TOKENS = 272_000;
 
-export interface ContextUsageSample {
+export type ContextUsageSample = {
   tokens: number | null;
-}
+};
 
 export type CompactRequest = "none" | "deferred" | "requested";
 
-export interface CeilingState {
+export type CeilingState = {
   enabled: boolean;
   ceilingTokens: number;
   /** True while a requested compaction is still running, so a slow one is not re-requested. */
   compactionInFlight: boolean;
   /** True while the context is over the ceiling but the session is still busy. */
   waitingForIdle: boolean;
-}
+};
 
 export function createCeilingState(ceilingTokens: number = DEFAULT_CEILING_TOKENS): CeilingState {
   return { enabled: true, ceilingTokens, compactionInFlight: false, waitingForIdle: false };

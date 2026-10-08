@@ -91,7 +91,7 @@ function withWorktreeEntry(settings: Document, fixture: Fixture): Document {
   return { ...settings, packages: packages.map((entry, at) => (at === index ? worktree : entry)) };
 }
 
-describe("sync-settings.ts", () => {
+describe("sync-settings.ts sync", () => {
   it("keeps a worktree package entry when there is nothing to apply", () => {
     withFixture((fixture) => {
       const tracked = readTrackedSettings(fixture);
@@ -249,8 +249,10 @@ describe("sync-settings.ts", () => {
       expect(readTrackedSettings(fixture)).toEqual(tracked);
     });
   });
+});
 
-  it("makes the live file match the repository on reset", () => {
+describe("sync-settings.ts reset", () => {
+  it("makes the live file match the repository", () => {
     withFixture((fixture) => {
       const tracked = readTrackedSettings(fixture);
       writeLive(fixture, {
@@ -267,7 +269,7 @@ describe("sync-settings.ts", () => {
     });
   });
 
-  it("keeps an external package entry on reset", () => {
+  it("keeps an external package entry", () => {
     withFixture((fixture) => {
       const tracked = readTrackedSettings(fixture);
       const packages = [...(tracked["packages"] as string[]), "npm:third-party"];

@@ -150,6 +150,12 @@ jobs:
       - name: Check @onurpi/context-budget package with Slophammer
         working-directory: packages/context-budget
         run: npm run slophammer
+      - name: Check @onurpi/context-ceiling package
+        working-directory: packages/context-ceiling
+        run: npm run check
+      - name: Check @onurpi/context-ceiling package with Slophammer
+        working-directory: packages/context-ceiling
+        run: npm run slophammer
       - name: Check external extension wrappers
         run: |
           for package in demo-mode pi-must-win regrafter-driver workflows; do
@@ -189,6 +195,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run mutate
+      - name: Mutate @onurpi/context-ceiling package
+        working-directory: packages/context-ceiling
+        run: npm run mutate
       - name: Mutate @onurpi/turn-fold package
         working-directory: packages/turn-fold
         run: npm run mutate
