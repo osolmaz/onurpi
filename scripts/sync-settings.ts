@@ -210,9 +210,45 @@ function syncBaseFrom(documents: Documents): SyncBase {
   };
 }
 
-/** Write only when the formatted content changes, so an unchanged file keeps its exact bytes. */
+/** Write only when the content changes, so an unchanged file keeps its exact bytes. */
 function writeJsonIfChanged(path: string, value: unknown): void {
   const next = `${JSON.stringify(value, null, 2)}\n`;
+  const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
+  if (current === next) return;
+  writeFileSync(path, next);
+}
+
+/** The repository prettier setup, loaded lazily. */
+let prettierSetup: Promise<Format | undefined> | undefined;
+
+type Format = (source: string) => Promise<string>;
+
+/**
+ * Load prettier with the repository config. This checkout's dependencies travel with the repo, but
+ * a copied test fixture has no node_modules, so a missing prettier falls back to the plain form.
+ */
+function loadPrettier(): Promise<Format | undefined> {
+  prettierSetup ??= (async () => {
+    try {
+      const prettier = await import("prettier");
+      const config = (await prettier.resolveConfig(join(repoRoot, "package.json"))) ?? {};
+      return (source: string) => prettier.format(source, { ...config, filepath: "settings.json" });
+    } catch {
+      return undefined;
+    }
+  })();
+  return prettierSetup;
+}
+
+/**
+ * Write a tracked copy only when its prettier form changes. Formatting through prettier keeps
+ * the written form stable under `npm run format`: a plain JSON.stringify pass would re-expand
+ * short arrays on every run and fight the repository formatter forever.
+ */
+async function writeTrackedJsonIfChanged(path: string, value: unknown): Promise<void> {
+  const source = `${JSON.stringify(value, null, 2)}\n`;
+  const prettify = await loadPrettier();
+  const next = prettify === undefined ? source : await prettify(source);
   const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
   if (current === next) return;
   writeFileSync(path, next);
@@ -352,7 +388,7 @@ function converge(base: SyncBase | undefined): Converged {
   return { ok: true, documents: asDocuments(documents) };
 }
 
-function runSync(): void {
+async function runSync(): Promise<void> {
   const base = readSyncBase();
   const merged = converge(base);
   if (!merged.ok) process.exit(1);
@@ -367,7 +403,10 @@ function runSync(): void {
   );
   reportChanges("web-search.json", liveDocuments.webSearch, trackedDocuments.webSearch, webSearch);
 
-  writeJsonIfChanged(trackedSettingsPath, trackedSettings(settings, "the merged settings"));
+  await writeTrackedJsonIfChanged(
+    trackedSettingsPath,
+    trackedSettings(settings, "the merged settings"),
+  );
   writeJsonIfChanged(
     liveSettingsPath,
     reconcilePackages(
@@ -376,8 +415,8 @@ function runSync(): void {
       base?.settings,
     ),
   );
-  writeJsonIfChanged(trackedOverridesPath, modelOverrides);
-  writeJsonIfChanged(trackedWebSearchPath, webSearch);
+  await writeTrackedJsonIfChanged(trackedOverridesPath, modelOverrides);
+  await writeTrackedJsonIfChanged(trackedWebSearchPath, webSearch);
 
   // The live files are only rewritten when the merge changed their reviewed part, so a live entry
   // that points into a worktree survives a run that has nothing to apply to it.
@@ -443,7 +482,7 @@ const trackedDocuments: Documents = {
 };
 
 if (mode === "sync") {
-  runSync();
+  await runSync();
 } else {
   runReset();
 }
