@@ -130,6 +130,8 @@ function makeContext<TArgs>(
     expanded: false,
     showImages: false,
     isError: false,
+    durationMs: undefined,
+    outputPad: 0,
     invalidate: () => undefined,
   };
 }

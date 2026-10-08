@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { type Component, type Terminal, TuiMainScreen } from "@earendil-works/pi-tui";
+import {
+  type Component,
+  type ProgramStatus,
+  type Terminal,
+  TuiMainScreen,
+} from "@earendil-works/pi-tui";
 
 import { enableTranscriptShrinkClearing } from "./shortcut-editor.ts";
 
@@ -39,6 +44,10 @@ class RecordingTerminal implements Terminal {
 
   setProgress(active: boolean): void {
     this.operations.push(`setProgress:${String(active)}`);
+  }
+
+  setProgramStatus(status: ProgramStatus): void {
+    this.operations.push(`setProgramStatus:${status.state}`);
   }
 
   setTitle(title: string): void {

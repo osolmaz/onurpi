@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   Container,
+  type ProgramStatus,
   Spacer,
   Text,
   type Terminal,
@@ -45,6 +46,7 @@ class MockTerminal implements Terminal {
   }
   moveBy(_lines: number): void {}
   setProgress(_active: boolean): void {}
+  setProgramStatus(_status: ProgramStatus): void {}
   setTitle(_title: string): void {}
   showCursor(): void {
     return;

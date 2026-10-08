@@ -13,7 +13,7 @@
     ]
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.0.4",
+    "@earendil-works/pi-coding-agent": "1.1.0",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.4",
     "eslint": "10.11.0",

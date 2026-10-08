@@ -1,5 +1,11 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
-import { type Component, type Terminal, type TuiMode, TuiAltScreen } from "@earendil-works/pi-tui";
+import {
+  type Component,
+  type ProgramStatus,
+  type Terminal,
+  type TuiMode,
+  TuiAltScreen,
+} from "@earendil-works/pi-tui";
 import { type Mock, afterEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryExplorer } from "./history-viewer.ts";
@@ -53,6 +59,9 @@ class InputTerminal implements Terminal {
   }
   setProgress(active: boolean): void {
     this.operations.push(`setProgress:${String(active)}`);
+  }
+  setProgramStatus(status: ProgramStatus): void {
+    this.operations.push(`setProgramStatus:${status.state}`);
   }
   setTitle(title: string): void {
     this.operations.push(`setTitle:${title}`);

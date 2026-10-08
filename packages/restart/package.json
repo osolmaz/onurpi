@@ -29,7 +29,7 @@
     "@earendil-works/pi-coding-agent": ">=0.84.2"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.0.4",
+    "@earendil-works/pi-coding-agent": "1.1.0",
     "@eslint/js": "10.0.1",
     "@homebridge/node-pty-prebuilt-multiarch": "0.14.1",
     "@stryker-mutator/core": "10.0.0",
