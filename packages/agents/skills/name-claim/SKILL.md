@@ -149,6 +149,26 @@ official sources before recommending a purchase because registrar support and
 registry rules can change. Also check country-specific eligibility rules and
 the exact domain's availability.
 
+#### Two-letter domain scanner script
+
+`scripts/check_two_letter_domains.py` bulk-scans `o1`–`o9`, `os`, and `oo`
+labels across the two-letter TLDs above. Use it as a fast pre-filter, not as a
+final verdict.
+
+```bash
+python SKILL_DIR/scripts/check_two_letter_domains.py
+```
+
+- Uses only the Python standard library plus `dig` for DNS pre-checks.
+- A DNS answer marks a domain taken; otherwise it queries the TLD's
+  IANA-discovered WHOIS server and classifies `free`, `reserved`, `taken`, or
+  `unknown` from the response text.
+- Writes full JSON to `/tmp/two-letter-domain-scan.json` and prints counts with
+  the free, reserved, and unknown lists.
+- Always confirm `free` rows with the RDAP and registrar checks above. A WHOIS
+  `not found` can still mean reserved or blocked from registration, for example
+  SGNIC `.sg` domains.
+
 ### X/Twitter
 
 Use multiple signals because X can return bot defenses and odd status codes:
