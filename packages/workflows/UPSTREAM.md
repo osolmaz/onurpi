@@ -1,9 +1,9 @@
 # Upstream record
 
 - Repository: https://github.com/osolmaz/pi-workflows
-- Latest release at review: `v0.17.6`
-- Source commit: `7937df1a6b4f12bfce2e7ada2842d5556dd95f72`
-- Package source: exact npm release `0.17.6`
+- Latest release at review: `v0.17.7`
+- Source commit: `2cb8ab3a9c2e52d0c193d572728a9ccd7afdb77a`
+- Package source: exact npm release `0.17.7`
 - License: MIT
 - Local changes: `index.ts` re-exports the pinned extension, the package manifest exposes the
   upstream skills, and `sync.ts` invokes the upstream Herdr synchronization command
@@ -92,7 +92,13 @@ transport delivers as raw JSON text: text starting with `{` or `[` is parsed bef
 validation for start input, change-settings patch, submit output, and update update, so a
 model-started workflow run no longer crashes its runner with `input must be an object`; every other
 string is a genuine literal and passes through untouched, and free-text answer input wraps as
-`{ answer: text }` like the command path.
+`{ answer: text }` like the command path. Release `0.17.7` keeps a resumed step deliverable when Pi
+adds it after the send call returns, which Pi 0.87.0 and later do for a turn requested from an
+`agent_settled` handler. The server draws conclusions only about the message a branch report names,
+recovery reopens a cancelled re-issue target, and the extension reports the entry of a delivered
+step whose turn it owns, so one cancelled step can no longer hold back later steps. The release also
+tests with Pi 1.1.0, raises the Pi peer ranges to `>=0.99.0`, and makes Pi agent groups require a
+`started` prompt disposition.
 
 The extension and server use a versioned local protocol with strict validation. Durable interaction
 requests connect a workflow to its origin Pi session and survive Pi restarts. The server uses atomic
