@@ -1,0 +1,4 @@
+interface:
+  display_name: "TypeScript/JavaScript Defaults"
+  short_description: "Choose standard TS/JS libraries consistently"
+  default_prompt: "Use $ts-defaults to choose a production-ready TypeScript stack for this project."
