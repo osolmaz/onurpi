@@ -1,6 +1,6 @@
 ---
 name: plain-writing
-description: Use when writing or editing prose for readers, including blog posts, documentation, READMEs, reports, and notes. Replaces jargon, coined phrases, and dressed-up wording with plain words unless the technical term is genuinely required, and carries the general rules for titles and headings, Markdown formatting, sentence-level voice, and prose around displayed formulas.
+description: Use when writing or editing prose for readers, including blog posts, documentation, READMEs, reports, and notes. Replaces jargon, coined phrases, and dressed-up wording with plain words unless the technical term is genuinely required, and carries the general rules for the TL;DR at the top of every document, titles and headings, Markdown formatting, sentence-level voice, and prose around displayed formulas.
 ---
 
 # Plain Writing
@@ -80,6 +80,28 @@ it.
 Keep exact numbers, units, and names. Plain writing is concrete writing,
 and concreteness comes from named things and measured quantities, never
 from decoration.
+
+## TL;DR
+
+Start every document with a TL;DR, so that a reader who stops after a few lines still gets the
+result. Put it right after the title and before the introduction, under a `## TL;DR` heading. Skip
+it only when the whole document is about as short as the TL;DR would be.
+
+Write the TL;DR by the rules of the `bro` skill, which shapes short chat answers: main point first,
+two to five short full sentences, plain words and no bullets. Read `bro` for its full rules and
+examples instead of copying them here.
+
+A TL;DR carries the document's own conclusion. State the result or the recommendation with the one
+to three numbers that support it. If the reader needs to do or decide something, say what. Every
+claim in the TL;DR must also appear in the body, and the TL;DR must say the thing instead of
+pointing to a later section.
+
+- Bad: "This report covers the judge round and what comes next. See the results section."
+- Good: "DeepSeek matches the labels on 95.6% of rubric items and Luna on 93.9%. DeepSeek is too
+  lenient and Luna too strict, and many errors sit on rubric items that are already flagged as
+  flawed, so the rubric should be fixed before either judge becomes the default."
+
+The introduction still follows the TL;DR and says what the document is and what it covers.
 
 ## Context before new information
 
