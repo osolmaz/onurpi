@@ -109,7 +109,8 @@ describe("capProviderModels", () => {
   });
 
   test("treats models without an explicit type as chat models", () => {
-    const legacy = chatModel({ type: undefined });
+    const legacy = chatModel();
+    delete legacy.type;
     const plan = capProviderModels([legacy], 288_384);
     expect(plan?.cappedIds).toEqual(["big-model"]);
     expect(plan?.configs[0]?.type).toBe("chat");

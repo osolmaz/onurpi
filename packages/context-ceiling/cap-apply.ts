@@ -61,7 +61,10 @@ function createCapRegistry(pi: ExtensionAPI): CapRegistry {
       releaseCap(providerId);
       return false;
     }
-    const priorExtensionConfig = ctx.modelRegistry.getRegisteredProviderConfig(providerId);
+    // The registry getter types its return as the looser input twin of ProviderConfig, but the
+    // value only round-trips back through registerProvider, so the stored view is safe.
+    const priorExtensionConfig = ctx.modelRegistry.getRegisteredProviderConfig(providerId) as
+      ProviderConfig | undefined;
     pi.registerProvider(providerId, { models: plan.configs });
     appliedCaps.set(providerId, { originalConfigs, priorExtensionConfig, capWindow });
     return true;
