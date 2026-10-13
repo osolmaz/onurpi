@@ -1,5 +1,9 @@
 # @onurpi/context-ceiling
 
+- The README "Requirements" section is the governing contract: compaction must fire mid-run at the
+  ceiling through the effective context-window cap, the cap must stay global and derived from the
+  active model with no per-model lists, and the settle-time compaction is only a fallback. Never
+  regress to settle-only compaction or static model lists.
 - Keep ceiling state and trigger policy in `ceiling.ts`, free of the extension API, so the state
   machine stays testable without Pi.
 - Never interrupt a busy session: `ctx.compact()` aborts an active run, so a sample over the ceiling

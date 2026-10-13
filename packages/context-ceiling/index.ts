@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { createCapApplier } from "./cap-apply.ts";
 import {
   createCeilingState,
   describe,
@@ -26,6 +27,10 @@ function setWaitStatus(state: CeilingState, ctx: ExtensionContext, waiting: bool
  * quiet footer status; compacting mid-run would abort the run and surface it as an error. Over
  * the ceiling while idle, it defers the compaction by one macrotask so continuations that other
  * extensions queue at settle can start first, then compacts only if the session is still idle.
+ *
+ * This is the fallback path. The primary protection is the effective context-window cap (see
+ * cap-apply.ts): with the window capped at `ceiling + reserve`, Pi's own automatic compaction
+ * fires at the ceiling mid-run, between tool batches, without aborting anything.
  */
 function checkUsage(state: CeilingState, ctx: ExtensionContext, schedule: Scheduler): void {
   const usage = ctx.getContextUsage();
@@ -57,6 +62,7 @@ function checkUsage(state: CeilingState, ctx: ExtensionContext, schedule: Schedu
 
 export default function contextCeilingExtension(pi: ExtensionAPI): void {
   const state = createCeilingState();
+  const caps = createCapApplier(pi, state);
   let scheduled: ReturnType<typeof setTimeout> | undefined;
   const schedule: Scheduler = (fn) => {
     scheduled = setTimeout(() => {
@@ -65,7 +71,7 @@ export default function contextCeilingExtension(pi: ExtensionAPI): void {
     }, 0);
   };
 
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", async (_event, ctx) => {
     if (scheduled !== undefined) {
       clearTimeout(scheduled);
       scheduled = undefined;
@@ -73,6 +79,10 @@ export default function contextCeilingExtension(pi: ExtensionAPI): void {
     state.compactionInFlight = false;
     state.waitingForIdle = false;
     ctx.ui.setStatus(STATUS_KEY, undefined);
+    await caps.applyCapToModel(ctx, ctx.model);
+  });
+  pi.on("model_select", async (event, ctx) => {
+    await caps.applyCapToModel(ctx, event.model);
   });
   pi.on("turn_end", (_event, ctx) => {
     checkUsage(state, ctx, schedule);
@@ -98,8 +108,6 @@ export default function contextCeilingExtension(pi: ExtensionAPI): void {
         ? null
         : options.map((option) => ({ label: option, value: option }));
     },
-    // The command API requires an async handler; the body is a synchronous state update.
-    // eslint-disable-next-line @typescript-eslint/require-await
     handler: async (args, ctx) => {
       const parsed = parseCeilingCommand(state, args);
       if ("status" in parsed) {
@@ -108,9 +116,14 @@ export default function contextCeilingExtension(pi: ExtensionAPI): void {
       }
       const wasEnabled = state.enabled;
       Object.assign(state, parsed.state);
+      if (state.enabled) {
+        caps.capOtherProviders(ctx, ctx.model?.provider);
+        await caps.applyCapToModel(ctx, ctx.model);
+      }
       if (wasEnabled && !state.enabled) {
         state.waitingForIdle = false;
         ctx.ui.setStatus(STATUS_KEY, undefined);
+        await caps.restoreCaps(ctx);
       }
       ctx.ui.notify(describe(state), "info");
     },
