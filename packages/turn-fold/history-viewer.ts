@@ -5,6 +5,8 @@ import {
   visibleWidth,
   type Component,
   type TUI,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
 } from "@earendil-works/pi-tui";
 
 import { historyFilterKey, type HistoryFilter } from "./history-entry.ts";
@@ -195,23 +197,32 @@ export class HistoryExplorer implements Component {
     this.tui.terminal.write(MOUSE_DISABLE_SEQUENCE);
   }
 
+  /** Structured wheel dispatch from Pi's overlay mouse routing (negative delta scrolls up). */
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (event.type !== "wheel") return undefined;
+    this.scrollByWheel(event.wheelDelta ?? 0);
+    return { handled: true };
+  }
+
   private handleMouseInput(data: string): boolean {
     const direction = wheelDirection(data);
     if (direction === undefined) return false;
+    this.scrollByWheel(direction * WHEEL_SCROLL_LINES);
+    return true;
+  }
+
+  private scrollByWheel(delta: number): void {
+    if (delta === 0) return;
     if (this.mode === "help") {
       const limit = Math.max(0, helpLines().length - 1);
-      this.helpScroll = Math.min(
-        limit,
-        Math.max(0, this.helpScroll + direction * WHEEL_SCROLL_LINES),
-      );
+      this.helpScroll = Math.min(limit, Math.max(0, this.helpScroll + delta));
       this.requestRender();
-      return true;
+      return;
     }
-    if (this.mode !== "browse") return true;
-    if (direction < 0) this.viewport.moveBackward(WHEEL_SCROLL_LINES);
-    else this.viewport.moveForward(WHEEL_SCROLL_LINES);
+    if (this.mode !== "browse") return;
+    if (delta < 0) this.viewport.moveBackward(Math.abs(delta));
+    else this.viewport.moveForward(delta);
     this.requestRender();
-    return true;
   }
 
   private handleBrowseInput(data: string): void {

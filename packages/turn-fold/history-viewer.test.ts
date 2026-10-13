@@ -489,6 +489,9 @@ describe("Turn Fold history explorer mouse support", () => {
     });
 
     try {
+      // Pi dispatches wheel events to overlays by hit-testing the layouts it last painted, so
+      // paint once before sending the event.
+      tui.renderNow();
       const newest = explorer.render(80).join("\n");
       const transcriptTop = tui.viewportTop;
 

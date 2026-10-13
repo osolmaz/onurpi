@@ -18,6 +18,14 @@ import {
 import type { MenuScreen, MenuTransition } from "../src/types.js";
 
 initTheme("dark", false);
+
+/** Pi TUI renders the cursor cell wrapped in zero-width protocol markers that terminate with BEL
+ *  and are resolved at paint time; strip them so control-character assertions only see real
+ *  leaked controls. */
+const CURSOR_PROTOCOL = /\u001b_pi:(?:c|(?:\/)?fc)\u0007/g;
+function stripCursorProtocol(rendered: string): string {
+  return rendered.replaceAll(CURSOR_PROTOCOL, "");
+}
 const testKeybindings = new KeybindingsManager(TUI_KEYBINDINGS, {
   "tui.select.up": "k",
   "tui.select.down": "j",
@@ -450,7 +458,7 @@ test("settings sanitize terminal controls from bracketed search paste", () => {
   const pasted =
     "\u001b[200~man\u001b]8;;https://unsafe.example\u0007ual\u009dtitle\u009c\u001b[201~";
   harness.component.handleInput(pasted);
-  const rendered = harness.component.render(80).join("\n");
+  const rendered = stripCursorProtocol(harness.component.render(80).join("\n"));
   assert.equal(rendered.includes("\u001b]8;;https://unsafe.example"), false);
   assert.equal(rendered.includes("\u0007"), false);
   assert.equal(rendered.includes("\u009d"), false);
@@ -844,7 +852,7 @@ test("searchable multi-select forwards focus and sanitizes bracketed paste", () 
   focusable.focused = false;
 
   harness.component.handleInput("\u001b[200~📖\u0007\u009d\u009c\u001b[201~");
-  const rendered = harness.component.render(80).join("\n");
+  const rendered = stripCursorProtocol(harness.component.render(80).join("\n"));
   assert.match(stripVTControlCharacters(rendered), /讀取 📖/);
   assert.doesNotMatch(stripVTControlCharacters(rendered), /Write/);
   assert.equal(rendered.includes("\u001b[200~"), false);
