@@ -366,7 +366,10 @@ surrounding paragraphs alone.
 X", "Pick your path", "Status", "Out of scope", a "five minutes"
 time-to-value promise) marks a house style produced by one prompt. Any
 single page looks fine; side by side they are unmistakable. Let each
-document's structure follow its content.
+document's structure follow its content. The TL;DR that `plain-writing`
+requires at the top of every document is an allowed exception when it
+states that document's own conclusion and numbers. A TL;DR that could
+open any document is still a stamp.
 
 **Word diarrhea.** Do not pad with exhaustive feature taxonomies,
 implementation internals, long option catalogs, or process history the
