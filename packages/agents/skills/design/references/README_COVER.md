@@ -18,6 +18,11 @@ Grotesk Regular at about 19 units, in the secondary text color, over at most two
 lines. Leave clear space between the text block and the picture so the two read
 as separate groups.
 
+For every cover, look at other cover examples first, yours and other projects',
+to calibrate quality, layout, and tone. Then draw an original picture that
+reflects what this project is about. A copied layout or a stock metaphor reads
+as borrowed; the picture should not exist for any other project.
+
 Keep the picture to one idea, such as an input becoming an output. A related
 repository's cover should share the same layout and background, so the covers
 read as a set.
@@ -81,9 +86,14 @@ README alt text, and the tagline in the same words.
 
 ## Checks
 
-Render the final SVG to PNG and look at it at full size and at README width.
-Parse it as XML and search it for `<text>` elements and font references, which
-should find nothing. Compare the text widths with a browser rendering of the
-same font. Then check the margins and padding, and make sure no text
+Render the final SVG to PNG and read the image. Look at it at full size and at
+README width, then look again: for each thing that looks off, fix it, render
+again, and read the new image. Keep going until one render shows nothing left
+to fix. Do not decide from the first render, and do not count a render you
+have not looked at.
+
+Parse the SVG as XML and search it for `<text>` elements and font references,
+which should find nothing. Compare the text widths with a browser rendering of
+the same font. Then check the margins and padding, and make sure no text
 touches an edge. After pushing, open the file on GitHub,
 where it renders at about 880 units wide.
