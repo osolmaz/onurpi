@@ -5,6 +5,23 @@ the project in one plain line and shows a small picture of how it works. Apply
 the [shared theme](THEME.md), and use the plain-writing and kill-ai-smell skills
 for the words on it.
 
+## Examples
+
+Covers already shipped for these repositories, all following this reference:
+[pi-factory](https://github.com/osolmaz/pi-factory/blob/main/assets/cover.svg),
+[pi-workflows](https://github.com/osolmaz/pi-workflows/blob/main/assets/cover.svg),
+[llamaenv](https://github.com/osolmaz/llamaenv/blob/main/assets/cover.svg),
+[presidio-agent](https://github.com/osolmaz/presidio-agent/blob/main/assets/cover.svg),
+[oomwrap](https://github.com/osolmaz/oomwrap/blob/main/assets/cover.svg),
+[pi-anti-repeat](https://github.com/osolmaz/pi-anti-repeat/blob/main/assets/cover.svg),
+[localperf](https://github.com/osolmaz/localperf/blob/main/assets/cover.svg),
+[localpi](https://github.com/osolmaz/localpi/blob/main/assets/cover.svg),
+[pi-regraft](https://github.com/osolmaz/pi-regraft/blob/main/assets/cover.svg),
+[pi-reviewer](https://github.com/osolmaz/pi-reviewer/blob/main/assets/cover.svg),
+and [redtap](https://github.com/osolmaz/redtap/blob/main/assets/cover.svg).
+Read a few before drawing a new one, and reuse their structure (window
+drawing, arrow placement, text treatment) without copying their pictures.
+
 ## Layout
 
 Use a 960 by 320 canvas with a 12-unit corner radius. Use the light beige
