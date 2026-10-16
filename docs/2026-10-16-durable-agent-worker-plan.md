@@ -39,8 +39,8 @@ This document is the canonical plan for the agent worker and its Discord adapter
 ## Pi Durable in short
 
 Pi Durable is a library, not a program, and is marked experimental: its API changes without notice
-between releases. Version 1.2.0 is current. The `pi` CLI does not use it. The worker described here
-is the program that uses it.
+between releases. The worker pins version 1.3.0. The `pi` CLI does not use it. The worker described
+here is the program that uses it.
 
 Everything Durable does is an atomic commit to storage before anyone sees it. A conversation is a
 list of immutable entries. Work runs as tasks that save a checkpoint at every step: `pi.generation`
@@ -84,8 +84,10 @@ npm without a separate decision. Personal configuration never goes into OnurPi. 
 instructions and Discord ids live in the owner's private configuration, and the tokens live in
 OpenShell providers.
 
-- `packages/discord-adapter`: connects Discord to Pi Durable conversations. It depends on Pi Durable
-  and discord.js, and on nothing else in OnurPi, so it can move to its own repository later.
+- `packages/discord-adapter`: connects Discord to the agent's conversations. It depends only on
+  discord.js. It reaches the agent through a small `AgentPort` interface, which the worker
+  implements with Pi Durable, so the adapter has no Pi dependency, its tests need no storage, and it
+  can move to its own repository later.
 - `packages/agent-worker`: the program and its sandbox image. It opens the Durable harness with its
   extensions and starts the Discord adapter and the scheduler inbox. It also handles restarts. It
   also holds the OpenShell network policy that the sandbox runs with.
@@ -206,6 +208,25 @@ with SQLite's backup command, never a plain file copy while the worker runs.
    token must not reach paths outside its binding.
 5. **Rollout.** Add the agent's instructions, skills, and scheduled jobs. Verify: a week of daily
    use and scheduled jobs runs without a lost or repeated answer.
+
+## Phase 1 status
+
+The first version of both packages is in OnurPi. It has:
+
+- The worker with SQLite storage, the `echo` model for tests, the hosted model providers, and the
+  workspace `AGENTS.md` as a prompt section.
+- The Discord adapter with the access rules, one conversation per channel, direct-message channel,
+  or thread, and the Discord message id as the `requestId`. The reply is a placeholder that is
+  replaced by the answer.
+- A command that prints the OpenShell mount configuration for host folders or named volumes.
+
+A live test with a test bot and the `echo` model got its answer in Discord. Not done yet:
+
+- After a restart, the worker finishes unfinished runs, but it does not post their answers to
+  Discord yet, and it does not reread messages that arrived while it was stopped.
+- Streaming edits, tool status lines, follow-ups and steers, thread forks, attachments, and slash
+  commands.
+- The phase 1 test that stops the worker during a tool call, which needs a hosted model.
 
 ## Open questions
 
