@@ -20,7 +20,7 @@ import type { WorkerConfig } from "./config.ts";
 const context = BACKGROUND_CONTEXT;
 
 /** Maps a chat key, such as `discord:<channel id>`, to the conversation that holds it. */
-const ChatConversation = defineDocFamily<{ conversationId: number }, null>({
+const ChatConversation = defineDocFamily<{ conversationId: ConversationId | 0 }, null>({
   family: true,
   // 0 means no conversation yet; Pi Durable ids start at 1.
   initial: () => ({ conversationId: 0 }),
@@ -77,8 +77,7 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
   const conversationFor = async (key: string): Promise<ConversationId> =>
     harness.commit(async (tx) => {
       const record = await tx.doc(ChatConversation, key, null);
-      // The document stores the id as a plain number; it was a ConversationId when it was written.
-      if (record.conversationId > 0) return record.conversationId as ConversationId;
+      if (record.conversationId !== 0) return record.conversationId;
       const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
       record.conversationId = created.id;
       return created.id;
