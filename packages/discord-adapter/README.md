@@ -9,10 +9,29 @@ can use it.
 ## What it answers
 
 - Only users whose ids are in `ownerIds`. Other users and other bots are ignored.
-- In server channels, only messages that mention the bot, unless `requireMention` is `false`.
-- Only server channels in `channelIds`. A thread follows its parent channel. With an empty list, the
-  bot answers no server channel, only direct messages.
+- Only the server channels listed under `guilds`. A thread follows its parent channel. A new channel
+  gets no answer until you add it.
+- In a listed channel, only messages that mention the bot, unless `requireMention` is `false` for
+  the channel or for its server. The channel's own value wins.
 - Direct messages from an owner, unless `directMessages` is `false`.
+
+```json
+{
+  "ownerIds": ["<your Discord user id>"],
+  "guilds": {
+    "<server id>": {
+      "requireMention": false,
+      "channels": {
+        "<channel id>": {},
+        "<another channel id>": { "requireMention": true },
+        "<a paused channel id>": { "enabled": false }
+      }
+    }
+  }
+}
+```
+
+A channel stays in the list with `"enabled": false` when you want to pause it.
 
 Each channel or thread is its own conversation. The Discord message id is the request id, so a
 message seen twice is answered once.
@@ -45,4 +64,5 @@ permissions in each channel it answers.
 Without the Message Content intent, Discord sends the bot the text of a message only when the
 message mentions the bot or is a direct message. Keep `requireMention` on in that case. To answer
 messages without a mention, turn on the Message Content intent in the Discord Developer Portal and
-pass `messageContent: true`.
+pass `messageContent: true`. `answersWithoutMention(config)` tells you whether a configuration needs
+it.

@@ -9,6 +9,7 @@ import { defaultDependencies, startWorker, type WorkerDependencies } from "../sr
 const BOT = "100000000000000001";
 const OWNER = "200000000000000002";
 const CHANNEL = "400000000000000004";
+const GUILD = "700000000000000007";
 const folders: string[] = [];
 
 afterEach(() => {
@@ -20,7 +21,11 @@ function config(): WorkerConfig {
   folders.push(folder);
   return parseWorkerConfig(
     {
-      discord: { channelIds: [CHANNEL], ownerIds: [OWNER], tokenEnv: "TEST_BOT_TOKEN" },
+      discord: {
+        guilds: { [GUILD]: { channels: { [CHANNEL]: {} } } },
+        ownerIds: [OWNER],
+        tokenEnv: "TEST_BOT_TOKEN",
+      },
       model: { provider: "echo" },
       workspace: folder,
     },
@@ -86,6 +91,7 @@ describe("startWorker", () => {
       authorIsBot: false,
       channelId: CHANNEL,
       content: `<@${BOT}> ping`,
+      guildId: GUILD,
       id: "600000000000000006",
       isDirect: false,
       mentionsBot: true,

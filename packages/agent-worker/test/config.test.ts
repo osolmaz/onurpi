@@ -18,11 +18,10 @@ describe("parseWorkerConfig", () => {
       parseWorkerConfig({ discord, model: { provider: "echo" }, workspace: "work" }, "/srv/agent"),
     ).toEqual({
       discord: {
-        channelIds: [],
         directMessages: true,
+        guilds: {},
         messageContent: false,
         ownerIds: [OWNER],
-        requireMention: true,
         tokenEnv: "DISCORD_BOT_TOKEN",
       },
       model: { agentDir: join(homedir(), ".pi", "agent"), modelId: "echo", provider: "echo" },
@@ -69,6 +68,18 @@ describe("parseWorkerConfig", () => {
       "discord.messageContent must be true or false",
     ],
     [{ ...valid, discord: {} }, "discord.ownerIds must be a list of Discord ids"],
+    [
+      {
+        ...valid,
+        discord: {
+          ...discord,
+          guilds: {
+            "700000000000000007": { channels: { "400000000000000004": {} }, requireMention: false },
+          },
+        },
+      },
+      "discord.messageContent must be true when a channel answers without a mention",
+    ],
   ])("rejects %j", (value, error) => {
     expect(() => parseWorkerConfig(value, "/base")).toThrow(error);
   });

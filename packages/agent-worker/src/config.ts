@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { parseAdapterConfig, type AdapterConfig } from "@onurpi/discord-adapter";
+import {
+  answersWithoutMention,
+  parseAdapterConfig,
+  type AdapterConfig,
+} from "@onurpi/discord-adapter";
 
 export const MODEL_PROVIDERS = [
   "echo",
@@ -74,7 +78,13 @@ function parseDiscord(value: unknown): WorkerConfig["discord"] {
   const messageContent = discord["messageContent"] ?? false;
   if (typeof messageContent !== "boolean")
     throw new Error("discord.messageContent must be true or false");
-  return { ...parseAdapterConfig(discord), messageContent, tokenEnv };
+  const adapter = parseAdapterConfig(discord);
+  if (!messageContent && answersWithoutMention(adapter)) {
+    throw new Error(
+      "discord.messageContent must be true when a channel answers without a mention, because Discord sends the bot the text of other messages only with the Message Content intent",
+    );
+  }
+  return { ...adapter, messageContent, tokenEnv };
 }
 
 /** Parses a configuration object. Relative paths are resolved against `base`. */

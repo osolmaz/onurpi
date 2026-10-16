@@ -23,6 +23,7 @@ function toInbound(message: Message, botUserId: string): InboundMessage {
     authorId: message.author.id,
     authorIsBot: message.author.bot,
     channelId: message.channelId,
+    guildId: message.guildId,
     content: message.content,
     id: message.id,
     isDirect: channel.type === ChannelType.DM,

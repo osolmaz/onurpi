@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DiscordBridge, TYPING_INTERVAL_MS } from "../src/bridge.ts";
 import { parseAdapterConfig } from "../src/config.ts";
 import type { AgentReply } from "../src/types.ts";
-import { CHANNEL, FakeAgent, FakeTransport, message, OWNER, STRANGER } from "./helpers.ts";
+import { CHANNEL, FakeAgent, FakeTransport, message, oneChannel, STRANGER } from "./helpers.ts";
 
-const config = parseAdapterConfig({ channelIds: [CHANNEL], ownerIds: [OWNER] });
+const config = parseAdapterConfig(oneChannel());
 
 function setup(agent = new FakeAgent()) {
   const transport = new FakeTransport();

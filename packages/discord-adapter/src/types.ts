@@ -2,6 +2,8 @@
 export type InboundMessage = {
   readonly id: string;
   readonly channelId: string;
+  /** The server of the channel, or null for a direct message. */
+  readonly guildId: string | null;
   /** The parent channel of a thread, or null for a channel that is not a thread. */
   readonly parentChannelId: string | null;
   readonly isDirect: boolean;
