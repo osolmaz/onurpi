@@ -126,6 +126,12 @@ jobs:
       - name: Check @onurpi/discord-adapter package with Slophammer
         working-directory: packages/discord-adapter
         run: npm run slophammer
+      - name: Check @onurpi/agent-worker package
+        working-directory: packages/agent-worker
+        run: npm run check
+      - name: Check @onurpi/agent-worker package with Slophammer
+        working-directory: packages/agent-worker
+        run: npm run slophammer
       - name: Check @onurpi/plan-checklist package
         working-directory: packages/plan-checklist
         run: npm run check
