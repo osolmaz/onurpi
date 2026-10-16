@@ -1,7 +1,7 @@
 # discord-adapter
 
-discord-adapter is a Discord bot bridge for a personal agent. It accepts messages from the agent's
-owner, sends each one to the agent as a request, and posts the answer in the same channel or thread.
+discord-adapter is a Discord bot bridge for a personal agent. It gives each message from the agent's
+owner to the agent and posts the answer in the same channel or thread.
 
 The package is private. It does not import Pi. Any agent that implements the `AgentPort` interface
 can use it.
