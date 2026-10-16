@@ -33,7 +33,8 @@ This document is the canonical plan for the agent worker and its Discord adapter
 - No agent runs directly on the host. The OpenShell gateway runs as a host user that runs no agent.
 - Scheduled jobs reach the agent from a scheduler on the host, which only delivers prompts and never
   runs an agent itself.
-- The agent's storage is backed up to the host regularly.
+- The agent's workspace and configuration are folders mounted into the sandbox, so they outlive any
+  rebuild of the sandbox.
 
 ## Pi Durable in short
 
@@ -63,16 +64,17 @@ sandbox.
 host
 ├── OpenShell gateway (stores providers and policy)
 ├── scheduler (delivers job prompts)
-└── OpenShell sandbox
-    ├── agent worker: Pi Durable, SQLite storage, Discord adapter
-    └── workspace: AGENTS.md, skills, repositories, attachments
+└── OpenShell sandbox    ├── agent worker: Pi Durable, Discord adapter
+    ├── /sandbox/workspace (mounted, read-write): SQLite storage, AGENTS.md, skills, repositories
+    └── /sandbox/config (mounted, read-only): worker settings
             │
             └── proxy ──► Discord, model providers, GitHub, package registries
 ```
 
-The sandbox image contains Node.js and the worker. It holds no secrets. The gateway gives each
-provider to the sandbox as a placeholder value in its environment, and the proxy puts the real value
-into requests to the hosts and paths that the provider is bound to.
+The sandbox image contains Node.js and the worker. It holds no secrets, and neither do the mounted
+folders. The gateway gives each provider to the sandbox as a placeholder value in its environment,
+and the proxy puts the real value into requests to the hosts and paths that the provider is bound
+to.
 
 ## Packages
 
@@ -156,14 +158,25 @@ command. The file name is the job id plus the scheduled time. The worker watches
 submits each new file with that name as its `requestId`, so a retried delivery never runs a job
 twice. The worker posts the job's answer to the job's Discord channel.
 
-## Storage and backups
+## Storage
 
-The SQLite file lives in the sandbox workspace. Durable runs it in WAL mode, so a commit survives a
-process crash, but the newest commit can be lost on a power failure. Only the worker opens it,
-because Durable has no locking between processes.
+Two folders are mounted into the sandbox with OpenShell's driver configuration
+(`--driver-config-json`), which the Docker and Podman runtimes support:
 
-A backup job on the host makes a consistent copy with SQLite's backup command inside the sandbox,
-then downloads it with OpenShell's download command. Backups keep a rolling history on the host.
+- **Workspace, read-write.** It holds the SQLite file and `AGENTS.md`, plus the skills,
+  repositories, and attachments. The agent needs to write it.
+- **Configuration, read-only.** It holds the worker's settings, such as the allowed Discord
+  channels. The agent cannot change them. Secrets never go here; they are OpenShell providers.
+
+The data lives in the mounted folders, so a sandbox rebuild keeps it and nothing has to be copied
+out for the agent to work.
+
+The SQLite file stays in a mounted folder because WAL mode keeps `-wal` and `-shm` files next to the
+database. Only the worker opens the database, because Durable has no locking between processes.
+
+Backups are optional. They protect against two things a mount does not: the agent breaking its own
+data, which it can do because it writes the workspace, or the disk failing. A backup is a copy made
+with SQLite's backup command, never a plain file copy while the worker runs.
 
 ## Phases
 
@@ -174,9 +187,10 @@ then downloads it with OpenShell's download command. Backups keep a rolling hist
 2. **Inside OpenShell.** The sandbox image, the providers, and the network policy. Verify that the
    agent answers in Discord from inside the sandbox while its environment holds only placeholder
    values. A request to a host without a rule must be refused, and `sudo` and Docker must be
-   unavailable. The storage and the workspace must survive a sandbox restart and a rebuild.
-3. **Scheduler and backups.** The inbox and the backup job. Verify: a job runs once per scheduled
-   time, also when delivery is retried; a backup restores into a fresh sandbox.
+   unavailable. The mounted workspace must survive a sandbox rebuild, and the agent must not be able
+   to write the configuration folder.
+3. **Scheduler.** The inbox. Verify: a job runs once per scheduled time, also when delivery is
+   retried.
 4. **Approvals and GitHub.** Discord approval cards and the narrow GitHub provider. Verify that a
    held call waits for an answer, also across a worker restart, and runs only on approve. The GitHub
    token must not reach paths outside its binding.
@@ -185,17 +199,17 @@ then downloads it with OpenShell's download command. Backups keep a rolling hist
 
 ## Open questions
 
-- **Workspace persistence.** OpenShell's docs say custom workspaces on the Docker and Podman
-  runtimes use the container's writable layer, not a managed volume. Phase 2 must show that the
-  SQLite file survives a restart and a rebuild, or the storage must move to a location that does.
+- **Mount type.** A named Docker or Podman volume works without changing the gateway's defaults.
+  Mounting a folder from the host also works, but OpenShell turns it off by default and warns that
+  it "can bypass workspace isolation and filesystem policy". The docs do not say whether a named
+  volume is kept when its sandbox is deleted, so phase 2 tests that.
 - **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
   and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
   terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
 - **Gateway user and runtime.** The gateway's runtime decides what its host user needs. Docker
-  access is equal to root, so that user must run no agent. Rootless Podman 5 or the MicroVM runtime
-  avoid that. The owner sets this up, not an agent.
-- **Upload and download commands.** The exact OpenShell commands, and their limits, for the inbox
-  and the backups need checking against the installed version.
+  access is equal to root, so that user must run no agent. Rootless Podman 5 avoids that. The
+  MicroVM runtime does not support mounts, so it does not fit this plan. The owner sets this up, not
+  an agent.
 - **Replies.** One edited message per run, or separate messages for long runs: decide after using
   phase 1.
 
