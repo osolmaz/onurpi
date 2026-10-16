@@ -27,8 +27,10 @@ is `agent.sqlite` in the workspace unless `storage` names another file.
 
 The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
 `openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs no
-key. For a hosted provider, Pi AI reads the key from its usual environment variable, such as
-`ANTHROPIC_API_KEY` or `HF_TOKEN`.
+key. `openai-codex` uses a ChatGPT subscription through the codex-switcher provider: it reads the
+logins that codex-switcher keeps in the Pi agent folder, in place and with the same lock as Pi. The
+folder is `~/.pi/agent` unless `model.agentDir` names another one. For the other hosted providers,
+Pi AI reads the key from its usual environment variable, such as `ANTHROPIC_API_KEY` or `HF_TOKEN`.
 
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the
@@ -40,11 +42,13 @@ never goes in this file.
 From the repository root, after `npm install`:
 
 ```bash
-node packages/agent-worker/src/cli.ts run --config /path/to/config.json
+node --import jiti/register packages/agent-worker/src/cli.ts run --config /path/to/config.json
 ```
 
-The bot token must be in the environment variable that `tokenEnv` names. The worker prints one JSON
-line per event and stops cleanly on Ctrl-C after running answers finish.
+`jiti` is the loader that Pi uses for extensions. The worker needs it because codex-switcher's
+dependencies import `.ts` files by `.js` paths. The bot token must be in the environment variable
+that `tokenEnv` names. The worker prints one JSON line per event and stops cleanly on Ctrl-C after
+running answers finish.
 
 ## Mount its folders in OpenShell
 
@@ -54,9 +58,9 @@ command prints the value for `openshell sandbox create --driver-config-json`. Ea
 folder or a named volume:
 
 ```bash
-node packages/agent-worker/src/cli.ts mounts --runtime docker \
+node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime docker \
   --workspace host:/srv/agent/workspace --config host:/srv/agent/config
-node packages/agent-worker/src/cli.ts mounts --runtime podman \
+node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime podman \
   --workspace volume:agent-workspace --config volume:agent-config
 ```
 

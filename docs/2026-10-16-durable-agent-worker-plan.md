@@ -39,8 +39,9 @@ This document is the canonical plan for the agent worker and its Discord adapter
 ## Pi Durable in short
 
 Pi Durable is a library, not a program, and is marked experimental: its API changes without notice
-between releases. The worker pins version 1.3.0. The `pi` CLI does not use it. The worker described
-here is the program that uses it.
+between releases. The worker pins version 1.2.0, the Pi release that the rest of OnurPi uses, so it
+can use the codex-switcher provider. The `pi` CLI does not use it. The worker described here is the
+program that uses it.
 
 Everything Durable does is an atomic commit to storage before anyone sees it. A conversation is a
 list of immutable entries. Work runs as tasks that save a checkpoint at every step: `pi.generation`
@@ -213,20 +214,25 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 
 The first version of both packages is in OnurPi. It has:
 
-- The worker with SQLite storage, the `echo` model for tests, the hosted model providers, and the
-  workspace `AGENTS.md` as a prompt section.
+- The worker with SQLite storage, Pi Durable's built-in tools, and the workspace `AGENTS.md` as a
+  prompt section. It has no other extensions yet.
+- The `openai-codex` model on the owner's ChatGPT subscription, through the codex-switcher provider,
+  which reads the logins in the Pi agent folder in place. The other hosted providers and an `echo`
+  model for tests are also there.
 - The Discord adapter with the access rules, one conversation per channel, direct-message channel,
   or thread, and the Discord message id as the `requestId`. While the agent works, the bot shows the
   typing indicator, and the answer is a reply to the message.
 - A command that prints the OpenShell mount configuration for host folders or named volumes.
 
-A live test with a test bot and the `echo` model got its answer in Discord. Not done yet:
+A live test got a real answer in Discord from `gpt-6.1-sol` on the subscription. Not done yet:
 
 - After a restart, the worker finishes unfinished runs, but it does not post their answers to
   Discord yet, and it does not reread messages that arrived while it was stopped.
 - Streaming edits, tool status lines, follow-ups and steers, thread forks, attachments, and slash
   commands.
-- The phase 1 test that stops the worker during a tool call, which needs a hosted model.
+- The phase 1 test that stops the worker during a tool call.
+- Skills and the OnurPi extensions. Pi extensions do not load in Pi Durable, so each one that the
+  agent needs is ported as a Durable extension.
 
 ## Open questions
 
@@ -238,6 +244,9 @@ A live test with a test bot and the `echo` model got its answer in Discord. Not 
 - **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
   and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
   terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
+- **Subscription login in the sandbox.** The `openai-codex` logins are OAuth tokens that the
+  codex-switcher provider refreshes in its file on the host. Phase 2 decides how the sandbox gets
+  them as an OpenShell provider without a copy of the refresh token.
 - **Gateway user and runtime.** The gateway's runtime decides what its host user needs. Docker
   access is equal to root, so that user must run no agent. Rootless Podman 5 avoids that. The
   MicroVM runtime does not support mounts, so it does not fit this plan. The owner sets this up, not
