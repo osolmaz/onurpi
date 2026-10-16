@@ -106,7 +106,9 @@ maintained chat adapter for Pi, and shows how a chat maps onto a Pi session.
 Behaviour:
 
 - **Access.** Only the owner's Discord user can start a turn or answer a card. The adapter ignores
-  every other author, including other bots. Allowed channels are listed in the configuration.
+  every other author, including other bots. Allowed channels are listed in the configuration per
+  server, and a channel that is not listed gets no answer. Each server and each channel can turn the
+  mention rule off, and the channel's own value wins.
 - **Conversations.** Each direct-message channel and each allowed server channel maps to one Durable
   conversation, stored in an adapter document. A thread maps to its own conversation, forked from
   the channel's conversation at the message that started it.

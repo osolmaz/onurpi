@@ -9,6 +9,7 @@ import type {
 export const BOT = "100000000000000001";
 export const OWNER = "200000000000000002";
 export const STRANGER = "300000000000000003";
+export const GUILD = "700000000000000007";
 export const CHANNEL = "400000000000000004";
 export const OTHER_CHANNEL = "500000000000000005";
 
@@ -18,6 +19,7 @@ export function message(overrides: Partial<InboundMessage> = {}): InboundMessage
     authorIsBot: false,
     channelId: CHANNEL,
     content: `<@${BOT}> hello`,
+    guildId: GUILD,
     id: "600000000000000006",
     isDirect: false,
     mentionsBot: true,
@@ -71,4 +73,12 @@ export class FakeAgent implements AgentPort {
     this.requests.push(request);
     return Promise.resolve(this.reply(request));
   }
+}
+
+/** An adapter configuration that answers the owner in one channel of one server. */
+export function oneChannel(
+  channel: Record<string, unknown> = {},
+  guild: Record<string, unknown> = {},
+) {
+  return { guilds: { [GUILD]: { ...guild, channels: { [CHANNEL]: channel } } }, ownerIds: [OWNER] };
 }

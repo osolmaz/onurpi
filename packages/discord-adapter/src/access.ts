@@ -1,14 +1,24 @@
-import type { AdapterConfig } from "./config.ts";
+import type { AdapterConfig, ChannelConfig } from "./config.ts";
 import type { InboundMessage } from "./types.ts";
 
 function mentionPattern(botUserId: string): RegExp {
   return new RegExp(`<@!?${botUserId}>`, "gu");
 }
 
-function allowedPlace(message: InboundMessage, config: AdapterConfig): boolean {
-  if (message.isDirect) return config.directMessages;
-  const channel = message.parentChannelId ?? message.channelId;
-  return config.channelIds.includes(channel);
+/** The configuration of the server channel a message is in, or undefined when it is not listed. */
+function channelConfig(message: InboundMessage, config: AdapterConfig): ChannelConfig | undefined {
+  if (message.guildId === null) return undefined;
+  return config.guilds[message.guildId]?.channels[message.parentChannelId ?? message.channelId];
+}
+
+/** Whether the agent may answer in this place, and whether the message must mention the bot. */
+function placeRule(
+  message: InboundMessage,
+  config: AdapterConfig,
+): { readonly requireMention: boolean } | null {
+  if (message.isDirect) return config.directMessages ? { requireMention: false } : null;
+  const channel = channelConfig(message, config);
+  return channel?.enabled === true ? { requireMention: channel.requireMention } : null;
 }
 
 /**
@@ -22,8 +32,8 @@ export function acceptMessage(
 ): string | null {
   if (message.authorId === botUserId) return null;
   if (!config.ownerIds.includes(message.authorId)) return null;
-  if (!allowedPlace(message, config)) return null;
-  if (!message.isDirect && config.requireMention && !message.mentionsBot) return null;
+  const rule = placeRule(message, config);
+  if (rule === null || (rule.requireMention && !message.mentionsBot)) return null;
   const text = message.content.replace(mentionPattern(botUserId), "").trim();
   return text.length === 0 ? null : text;
 }

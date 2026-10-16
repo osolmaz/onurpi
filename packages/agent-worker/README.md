@@ -16,7 +16,7 @@ Make a folder for the agent's work and write a `config.json`:
   "model": { "provider": "echo" },
   "discord": {
     "ownerIds": ["<your Discord user id>"],
-    "channelIds": ["<a channel id>"]
+    "guilds": { "<server id>": { "channels": { "<channel id>": {} } } }
   }
 }
 ```
@@ -35,7 +35,8 @@ Pi AI reads the key from its usual environment variable, such as `ANTHROPIC_API_
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the
 environment variable that holds the bot token, which is `DISCORD_BOT_TOKEN` by default. The token
-never goes in this file.
+never goes in this file. Set `messageContent` to `true` when a channel answers without a mention.
+The worker refuses to start without it, because Discord would not send the bot the text.
 
 ## Run it
 
