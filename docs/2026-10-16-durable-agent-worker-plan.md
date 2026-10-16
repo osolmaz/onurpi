@@ -9,9 +9,8 @@ tags: [pi, durable, discord, openshell, sandbox, agents]
 
 ## Purpose
 
-Onur runs a personal agent on OpenClaw and talks to it mainly through Discord. He wants to replace
-OpenClaw with an agent built on Pi Durable (`@earendil-works/pi-durable`), and to fix how agents on
-his machine reach credentials and root.
+Onur wants a personal agent built on Pi Durable (`@earendil-works/pi-durable`) that he talks to
+mainly through Discord, and a safer way for agents on his machine to reach credentials and root.
 
 Two findings drive the design. First, any agent that runs as Onur's own user can become root,
 because that user has passwordless sudo and is in the `docker` group. A credential broker on the
@@ -35,8 +34,6 @@ document is the canonical plan for that worker and its Discord adapter.
 - Scheduled jobs reach the agent from a scheduler on the host, which only submits prompts and never
   runs an agent itself.
 - A tool call that needs approval waits for Onur's answer, given in Discord or on his phone.
-- OpenClaw is switched off for this agent once the worker has run its jobs and conversations for a
-  week without problems.
 
 ## Pi Durable in short
 
@@ -138,14 +135,12 @@ replaces it in phase 3, before the agent is used for real work.
 ## Instructions, skills, and extensions
 
 - **Instructions.** One `AGENTS.md` in the sandbox workspace, rendered as a prompt section.
-  OpenClaw's separate identity and memory files are not carried over; anything worth keeping is
-  merged into that file.
 - **Skills.** Pi Durable has no built-in skills. Its specification shows the pattern instead: a
   `skills` extension whose prompt section lists each skill's name and description, read from the
   environment, with the full `SKILL.md` loaded through `read` when needed. The environment's `watch`
   reloads the list when skills change.
-- **Extensions.** Each OpenClaw plugin the agent still needs becomes a Durable extension in
-  `packages/agent-worker`.
+- **Extensions.** Each capability the agent needs beyond the built-in tools is a Durable extension
+  in `packages/agent-worker`.
 - **Anti-Repeat.** `pi-anti-repeat/core` has no Pi dependency, so the worker feeds it the
   `thinking_delta` events from `watchEvents` and the finished runs. A detection aborts the
   conversation and submits one corrective follow-up, with the same policy as the Pi extension.
@@ -188,9 +183,8 @@ submits twice. The worker posts the job's answer to the job's Discord channel.
    refused; the agent cannot run `sudo` or Docker.
 4. **Approvals.** Discord approval cards, then the unYOLO integration. Verify: a held call waits for
    an answer, also across a worker restart. It runs on approve and fails on reject.
-5. **Migration.** Move the agent's instructions, skills, and scheduled jobs. Run the worker and
-   OpenClaw side by side on different channels for a week, then switch OpenClaw off for this agent
-   and keep its configuration as a backup.
+5. **Rollout.** Add the agent's instructions, skills, and scheduled jobs. Verify: a week of daily
+   use and scheduled jobs runs without a lost or repeated answer.
 
 ## Open questions
 
@@ -209,4 +203,3 @@ submits twice. The worker posts the job's answer to the job's Discord channel.
 - Telegram and other chat services.
 - Several people sharing the agent.
 - Publishing either package to npm.
-- OpenClaw's separate identity and memory files.
