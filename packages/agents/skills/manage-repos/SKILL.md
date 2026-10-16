@@ -31,7 +31,12 @@ When creating a new repository that is intended to publish open source software:
 
 - Set a concise GitHub repository description that says what the software does.
   Use `gh repo edit OWNER/REPO --description "..."` and keep it specific enough
-  to distinguish the repository in GitHub lists.
+  to distinguish the repository in GitHub lists. Write it by the "Taglines and
+  descriptions" rules of `kill-ai-smell`.
+  - Bad: "A CLI that has coding agents (Claude Code, Codex, Pi) vote on questions
+    about a folder over ACP, alone or after discussion"
+  - Good: "An LLM jury whose members are coding agents, such as Claude Code, Codex
+    and Pi"
 - Use the `add-license` skill to add the appropriate license. Default to MIT
   unless the user or repository requirements specify another license.
 - Use the `write-readme` skill for the README. Keep it user-focused: what the

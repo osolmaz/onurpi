@@ -81,6 +81,13 @@ Keep exact numbers, units, and names. Plain writing is concrete writing,
 and concreteness comes from named things and measured quantities, never
 from decoration.
 
+Name a model by its versioned API ID. An alias hides the version and
+changes when the tool updates. Check that the tool accepts the ID before
+you put it in an example.
+
+- Bad: `"model": "opus"`
+- Good: `"model": "claude-opus-5-5"`
+
 ## TL;DR
 
 Start every document with a TL;DR, so that a reader who stops after a few lines still gets the

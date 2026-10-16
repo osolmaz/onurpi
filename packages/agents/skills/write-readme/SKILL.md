@@ -25,6 +25,23 @@ Start the first paragraph with what the project is, then what it does.
 - Second sentence: state the practical job it performs for users.
 - Avoid starting with only a verb-led feature claim; readers should not have to
   infer what kind of thing the project is.
+- Write the first sentence by the "Openings" and "Taglines and descriptions"
+  rules of `kill-ai-smell`, and load `plain-writing` and `kill-ai-smell` before
+  you write it.
+
+Bad:
+
+```markdown
+Jurybox is a command-line tool that has coding agents vote on questions about a folder.
+```
+
+Good:
+
+```markdown
+Jurybox is an LLM jury whose members are coding agents, such as Claude Code, Codex and Pi.
+Each member answers the same question with its own tools, and when their answers differ,
+the members read each other's answers and answer again.
+```
 
 Example:
 

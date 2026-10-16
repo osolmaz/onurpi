@@ -97,6 +97,13 @@ distributions from one declarative manifest" still leaned on jargon. The
 version that shipped was "A toolkit for creating Pi distributions in a more
 structured way."
 
+Name the kind of system, not the interface, and keep the project's own terms
+off the cover.
+
+- Bad: "A command-line tool that has coding agents vote on questions about a folder."
+- Bad: "An LLM jury made of coding agents. They vote alone, then discuss the splits."
+- Good: "An LLM jury whose members are coding agents, such as Claude Code, Codex and Pi."
+
 Match the words that sibling projects already use for the same idea, so one
 term means one thing across the set. Keep the image's accessible label, the
 README alt text, and the tagline in the same words.

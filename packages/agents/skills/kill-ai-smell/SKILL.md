@@ -270,9 +270,44 @@ The identity sentence has degraded forms that do not count:
   purpose, and "root() is the product" is a meta-remark. Neither names a
   category.
 
+Name the kind of system a reader would compare the thing with. An
+interface (CLI, library, app) is the category only when the interface is
+the product. When the thing belongs to a known kind of system, name that
+kind.
+
+- Bad: "Jurybox is a command-line tool that has coding agents vote on
+  questions about a folder."
+- Good: "Jurybox is an LLM jury whose members are coding agents, such as
+  Claude Code, Codex and Pi."
+
 The same rule scales up: a section or report should open with sentences
 that orient the reader (what this is, what was done, what follows), never
 with a compressed context dump. See "Page structure" below.
+
+## Taglines and descriptions
+
+A tagline or a repository description is the first thing a stranger
+reads, so it uses only words that the stranger already knows, in one
+plain sentence.
+
+Do not write a two-beat slogan. Two short clauses with the same rhythm
+sound finished and say little.
+
+- Bad: "They vote alone, then discuss the splits."
+- Good: "When their answers differ, the members read each other's answers
+  and answer again."
+
+Do not use a term that only the project's own docs define, such as a
+"split" or a "board".
+
+- Bad: "...then discuss the splits."
+- Good: "...then discuss the items they disagree on."
+
+Leave out inputs, flags and folder layouts. They do not tell the reader
+what the thing is for.
+
+- Bad: "...vote on questions about a folder."
+- Good: "...answer the same question."
 
 ## Headings
 
