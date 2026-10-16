@@ -171,6 +171,16 @@ Two folders are mounted into the sandbox with OpenShell's driver configuration
 The data lives in the mounted folders, so a sandbox rebuild keeps it and nothing has to be copied
 out for the agent to work.
 
+The worker's setup supports both kinds of mount, chosen per folder:
+
+- **Host folder.** A normal folder on the host, which the owner can open and back up with ordinary
+  tools. This is the owner's choice for this agent. OpenShell turns host folders off by default and
+  warns that they "can bypass workspace isolation and filesystem policy", so the gateway needs
+  `enable_bind_mounts = true`, `allow_driver_config = true`, and its resource admission turned off.
+  Each mounted folder is used only by the agent and holds nothing else from the host.
+- **Named volume.** Storage that Docker or Podman manages and that is referred to by name. It works
+  with the gateway's default settings, but its files are reached only through the container runtime.
+
 The SQLite file stays in a mounted folder because WAL mode keeps `-wal` and `-shm` files next to the
 database. Only the worker opens the database, because Durable has no locking between processes.
 
@@ -199,10 +209,11 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 
 ## Open questions
 
-- **Mount type.** A named Docker or Podman volume works without changing the gateway's defaults.
-  Mounting a folder from the host also works, but OpenShell turns it off by default and warns that
-  it "can bypass workspace isolation and filesystem policy". The docs do not say whether a named
-  volume is kept when its sandbox is deleted, so phase 2 tests that.
+- **Host folder permissions.** The sandbox runs as a non-root user, so the host folders must be
+  writable by that user's id inside the container, and the configuration folder must stay read-only.
+  Phase 2 sets the folders' owner and checks both.
+- **Named volume lifetime.** The docs do not say whether a named volume is kept when its sandbox is
+  deleted. Phase 2 tests that for the named-volume setup.
 - **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
   and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
   terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
