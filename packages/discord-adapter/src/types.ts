@@ -16,10 +16,10 @@ export type InboundMessage = {
 export type ChatTransport = {
   readonly botUserId: string;
   onMessage(handler: (message: InboundMessage) => void): void;
+  /** Shows that the bot is typing. Discord clears it after about 10 seconds or at the next message. */
   startTyping(channelId: string): Promise<void>;
   /** Posts a message and returns its id. */
   send(channelId: string, text: string, replyTo?: string): Promise<string>;
-  edit(channelId: string, messageId: string, text: string): Promise<void>;
 };
 
 /** One question for the agent. `requestId` makes a repeated question return the first answer. */

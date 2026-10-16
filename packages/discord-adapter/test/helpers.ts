@@ -52,15 +52,6 @@ export class FakeTransport implements ChatTransport {
     this.posted.push({ channelId, id, replyTo, text });
     return Promise.resolve(id);
   }
-
-  edit(channelId: string, messageId: string, text: string): Promise<void> {
-    const posted = this.posted.find(
-      (item) => item.id === messageId && item.channelId === channelId,
-    );
-    if (posted === undefined) return Promise.reject(new Error(`no message ${messageId}`));
-    posted.text = text;
-    return Promise.resolve();
-  }
 }
 
 export class FakeAgent implements AgentPort {

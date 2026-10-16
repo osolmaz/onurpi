@@ -216,8 +216,8 @@ The first version of both packages is in OnurPi. It has:
 - The worker with SQLite storage, the `echo` model for tests, the hosted model providers, and the
   workspace `AGENTS.md` as a prompt section.
 - The Discord adapter with the access rules, one conversation per channel, direct-message channel,
-  or thread, and the Discord message id as the `requestId`. The reply is a placeholder that is
-  replaced by the answer.
+  or thread, and the Discord message id as the `requestId`. While the agent works, the bot shows the
+  typing indicator, and the answer is a reply to the message.
 - A command that prints the OpenShell mount configuration for host folders or named volumes.
 
 A live test with a test bot and the `echo` model got its answer in Discord. Not done yet:

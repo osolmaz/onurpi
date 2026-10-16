@@ -1,5 +1,5 @@
 export { acceptMessage, conversationKey } from "./access.ts";
-export { DiscordBridge, WORKING_TEXT, type BridgeLog } from "./bridge.ts";
+export { DiscordBridge, TYPING_INTERVAL_MS, type BridgeLog } from "./bridge.ts";
 export { DISCORD_MESSAGE_LIMIT, splitForDiscord } from "./chunks.ts";
 export { parseAdapterConfig, type AdapterConfig } from "./config.ts";
 export {

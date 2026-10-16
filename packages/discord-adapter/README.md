@@ -33,8 +33,9 @@ const bridge = new DiscordBridge(transport, agent, config, (event, details) =>
 bridge.start();
 ```
 
-The bot first replies with "Working on it…", then replaces that message with the answer. Answers
-longer than 2000 characters continue in more messages.
+While the agent works, Discord shows that the bot is typing. The bridge sends the typing indicator
+again every 8 seconds, because Discord clears it after about 10 seconds. The answer is a reply to
+the message, and an answer longer than 2000 characters goes on in more messages.
 
 ## Discord setup
 
