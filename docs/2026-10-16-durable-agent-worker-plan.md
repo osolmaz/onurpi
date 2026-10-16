@@ -9,14 +9,15 @@ tags: [pi, durable, discord, openshell, sandbox, agents]
 
 ## Purpose
 
-Onur wants a personal agent built on Pi Durable (`@earendil-works/pi-durable`) that he talks to
-mainly through Discord, and a safer way for agents on his machine to reach credentials and root.
+This plan describes a personal agent built on Pi Durable (`@earendil-works/pi-durable`) that its
+owner talks to through Discord, with a safe way for the agent to use credentials.
 
-Two findings drive the design. First, any agent that runs as Onur's own user can become root,
-because that user has passwordless sudo and is in the `docker` group. A credential broker on the
-same machine therefore protects nothing from such an agent. Second, Pi Durable separates the agent's
-state from the place where its tools run. The `@earendil-works/pi-env` README describes the intended
-split: the tools run elsewhere "while the Durable worker, its storage and credentials stay local."
+Two facts drive the design. First, an agent that runs as a user who can become root, for example
+through sudo or membership in the `docker` group, can read every secret on that machine. A
+credential broker on the same machine protects nothing from such an agent. Second, Pi Durable
+separates the agent's state from the place where its tools run. The `@earendil-works/pi-env` README
+describes the intended split: the tools run elsewhere "while the Durable worker, its storage and
+credentials stay local."
 
 This plan uses that split. A worker process holds the secrets and the agent's storage. The model
 acts only through tools, and the tools run in a sandbox that holds none of those secrets. This
@@ -26,14 +27,14 @@ document is the canonical plan for that worker and its Discord adapter.
 
 - One worker process runs the personal agent on Pi Durable, with SQLite storage. A crash or restart
   continues unfinished work, and a Discord message is never answered twice.
-- Onur talks to the agent in Discord: in direct messages and in the channels he allows. Nobody else
-  can start a turn.
+- The owner talks to the agent in Discord, in direct messages and in the channels the configuration
+  allows. Nobody else can start a turn.
 - The agent's file and command tools run in an OpenShell sandbox through `pi-env`. The sandbox holds
   no secrets and cannot use sudo or Docker.
 - The worker runs as an operating-system user that no agent controls.
 - Scheduled jobs reach the agent from a scheduler on the host, which only submits prompts and never
   runs an agent itself.
-- A tool call that needs approval waits for Onur's answer, given in Discord or on his phone.
+- A tool call that needs approval waits for the owner's answer.
 
 ## Pi Durable in short
 
@@ -67,8 +68,8 @@ Discord ──► worker (Pi Durable, SQLite, model keys, Discord token)
 ```
 
 The worker runs as a dedicated user, for example `agentd`. That user cannot use sudo or Docker, and
-it runs no agent CLI. Onur's own user cannot read its files. The worker reads its configuration and
-secrets from that user's home and never passes them to the sandbox.
+it runs no agent CLI. The owner's own user cannot read its files. The worker reads its configuration
+and secrets from that user's home and never passes them to the sandbox.
 
 The sandbox is where the model's actions happen. Its workspace holds the agent's repositories and
 skills. OpenShell confines it with Landlock and seccomp in its own network namespace, where every
@@ -100,8 +101,9 @@ maintained chat adapter for Pi, and shows how a chat maps onto a Pi session.
 
 Behaviour:
 
-- **Access.** Only Onur's Discord user can start a turn or answer an approval. The adapter ignores
-  every other author, including other bots. Allowed channels are listed in the configuration.
+- **Access.** Only the owner's Discord user can start a turn or answer an approval. The adapter
+  ignores every other author, including other bots. Allowed channels are listed in the
+  configuration.
 - **Conversations.** Each direct-message channel and each allowed server channel maps to one Durable
   conversation, stored in an adapter document. A thread maps to its own conversation, forked from
   the channel's conversation at the message that started it.
@@ -148,10 +150,10 @@ replaces it in phase 3, before the agent is used for real work.
 ## Approvals
 
 A `beforeTool` hook decides which calls need approval, for example commands that push, delete, or
-publish. A held call shows in Discord as a card with approve and reject buttons, and only Onur can
-answer it. The call continues on approve and gets an error result on reject.
+publish. A held call shows in Discord as a card with approve and reject buttons, and only the owner
+can answer it. The call continues on approve and gets an error result on reject.
 
-Approvals through unYOLO come next. unYOLO already sends approval requests to Onur's phone for its
+Approvals through unYOLO come next. unYOLO already asks an operator to approve requests to its
 brokers. A Pi Durable approval integration belongs in the unYOLO repository, so that one approval
 channel covers both the brokers and the agent's tools.
 
@@ -193,8 +195,8 @@ submits twice. The worker posts the job's answer to the job's Discord channel.
   fallback is a locked-down local user that runs the `pi-env` daemon.
 - **Git push from the sandbox.** Either the worker holds a narrow GitHub credential and runs push as
   a worker-side tool, or OpenShell holds it as a provider bound to GitHub's paths.
-- **Worker user.** Which user runs the worker, and who can restart it, is set up by Onur from his
-  own shell, not by an agent.
+- **Worker user.** Which user runs the worker, and who can restart it, is set up by the owner from
+  their own shell, not by an agent.
 - **Replies.** One edited message per run, or separate messages for long runs: decide after using
   phase 1.
 
