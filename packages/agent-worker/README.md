@@ -21,16 +21,19 @@ Make a folder for the agent's work and write a `config.json`:
 }
 ```
 
-- `workspace`: the folder the agent's tools work in. The agent reads its instructions from
-  `AGENTS.md` in this folder. Relative paths are resolved against the folder of `config.json`.
-- `storage`: the SQLite file. The default is `agent.sqlite` in the workspace.
-- `model`: `provider` is one of `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
-  `openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs
-  no key. Pi AI reads the key for a hosted provider from its usual environment variable, for example
-  `ANTHROPIC_API_KEY` or `HF_TOKEN`.
-- `discord`: who and where the agent answers. See the
-  [discord-adapter README](../discord-adapter/README.md). `tokenEnv` names the environment variable
-  that holds the bot token, `DISCORD_BOT_TOKEN` by default. The token never goes in this file.
+The agent's tools work in the `workspace` folder, and the agent reads its instructions from
+`AGENTS.md` there. Relative paths are resolved against the folder of `config.json`. The SQLite file
+is `agent.sqlite` in the workspace unless `storage` names another file.
+
+The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
+`openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs no
+key. For a hosted provider, Pi AI reads the key from its usual environment variable, such as
+`ANTHROPIC_API_KEY` or `HF_TOKEN`.
+
+The `discord` part says who the agent answers and where, as the
+[discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the
+environment variable that holds the bot token, which is `DISCORD_BOT_TOKEN` by default. The token
+never goes in this file.
 
 ## Run it
 
