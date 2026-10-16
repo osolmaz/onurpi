@@ -1,40 +1,39 @@
 ---
-title: A personal agent on Pi Durable, reached through Discord
+title: A personal agent on Pi Durable in OpenShell, reached through Discord
 author: Onur Solmaz <2453968+osolmaz@users.noreply.github.com>
 date: 2026-10-16
 tags: [pi, durable, discord, openshell, sandbox, agents]
 ---
 
-# A personal agent on Pi Durable, reached through Discord
+# A personal agent on Pi Durable in OpenShell, reached through Discord
 
 ## Purpose
 
-This plan describes a personal agent built on Pi Durable (`@earendil-works/pi-durable`) that its
-owner talks to through Discord, with a safe way for the agent to use credentials.
+This plan describes a personal agent built on Pi Durable (`@earendil-works/pi-durable`). Its owner
+talks to it through Discord. The whole agent runs inside an NVIDIA OpenShell sandbox, from the
+Durable worker and its storage to the Discord adapter and the tools.
 
-Two facts drive the design. First, an agent that runs as a user who can become root, for example
-through sudo or membership in the `docker` group, can read every secret on that machine. A
-credential broker on the same machine protects nothing from such an agent. Second, Pi Durable
-separates the agent's state from the place where its tools run. The `@earendil-works/pi-env` README
-describes the intended split: the tools run elsewhere "while the Durable worker, its storage and
-credentials stay local."
+An agent that runs directly on a host, as a user who can become root, can read every secret on that
+host. Running the agent in a sandbox removes that path. OpenShell runs the agent as a non-root user
+with no Linux capabilities, under Landlock and seccomp limits. Every network connection goes through
+a proxy that denies anything no rule allows. OpenShell also stores the agent's credentials and gives
+the agent only placeholder values, which the proxy replaces in the requests it allows.
 
-This plan uses that split. A worker process holds the secrets and the agent's storage. The model
-acts only through tools, and the tools run in a sandbox that holds none of those secrets. This
-document is the canonical plan for that worker and its Discord adapter.
+This document is the canonical plan for the agent worker and its Discord adapter.
 
 ## End state
 
-- One worker process runs the personal agent on Pi Durable, with SQLite storage. A crash or restart
-  continues unfinished work, and a Discord message is never answered twice.
+- One worker process runs the agent on Pi Durable, with SQLite storage, inside an OpenShell sandbox.
+  A crash or restart continues unfinished work, and a Discord message is never answered twice.
 - The owner talks to the agent in Discord, in direct messages and in the channels the configuration
   allows. Nobody else can start a turn.
-- The agent's file and command tools run in an OpenShell sandbox through `pi-env`. The sandbox holds
-  no secrets and cannot use sudo or Docker.
-- The worker runs as an operating-system user that no agent controls.
-- Scheduled jobs reach the agent from a scheduler on the host, which only submits prompts and never
+- Every credential the agent uses is an OpenShell provider. The agent sees only placeholder values
+  and cannot read the real ones.
+- The sandbox reaches only the hosts its network rules allow.
+- No agent runs directly on the host. The OpenShell gateway runs as a host user that runs no agent.
+- Scheduled jobs reach the agent from a scheduler on the host, which only delivers prompts and never
   runs an agent itself.
-- A tool call that needs approval waits for the owner's answer.
+- The agent's storage is backed up to the host regularly.
 
 ## Pi Durable in short
 
@@ -54,42 +53,42 @@ while the agent works waits in the conversation's inbox, as a steer or a follow-
 
 Behaviour comes from extensions: tools, system prompt sections, and hooks. `ToolTask` has
 `beforeTool` and `afterTool` hooks, and `GenerationTask` has `beforeRequest`, `afterResponse`,
-`onYield`, and `afterTools`. Tools reach files and processes only through an `ExecutionEnv` chosen
-per conversation, which can be local, a container, or a remote machine through `pi-env`.
+`onYield`, and `afterTools`. Tools reach files and processes through an `ExecutionEnv`. Here it is
+`NodeExecutionEnv`, so the built-in `read`, `write`, `edit`, and `bash` tools act inside the
+sandbox.
 
-## Process layout
+## Layout
 
 ```text
-Discord ──► worker (Pi Durable, SQLite, model keys, Discord token)
-               │         ▲
-               │         └── local submit socket ◄── host scheduler
-               │
-               └── pi-env over SSH ──► OpenShell sandbox (files, bash, git)
+host
+├── OpenShell gateway (stores providers and policy)
+├── scheduler (delivers job prompts)
+└── OpenShell sandbox
+    ├── agent worker: Pi Durable, SQLite storage, Discord adapter
+    └── workspace: AGENTS.md, skills, repositories, attachments
+            │
+            └── proxy ──► Discord, model providers, GitHub, package registries
 ```
 
-The worker runs as a dedicated user, for example `agentd`. That user cannot use sudo or Docker, and
-it runs no agent CLI. The owner's own user cannot read its files. The worker reads its configuration
-and secrets from that user's home and never passes them to the sandbox.
-
-The sandbox is where the model's actions happen. Its workspace holds the agent's repositories and
-skills. OpenShell confines it with Landlock and seccomp in its own network namespace, where every
-outbound connection that no rule allows is denied.
+The sandbox image contains Node.js and the worker. It holds no secrets. The gateway gives each
+provider to the sandbox as a placeholder value in its environment, and the proxy puts the real value
+into requests to the hosts and paths that the provider is bound to.
 
 ## Packages
 
 Both packages live in OnurPi for now, under `packages/`, and are not Pi CLI extensions: they stay
 out of the root Pi manifest and the settings sync. Both stay private, and neither is published to
 npm without a separate decision. Personal configuration never goes into OnurPi. The agent's
-instructions, the Discord ids, and the tokens live in the worker user's configuration.
+instructions and Discord ids live in the owner's private configuration, and the tokens live in
+OpenShell providers.
 
 - `packages/discord-adapter`: connects Discord to Pi Durable conversations. It depends on Pi Durable
   and discord.js, and on nothing else in OnurPi, so it can move to its own repository later.
-- `packages/agent-worker`: the program. It opens the Durable harness with its extensions and
-  execution environment. It also starts the Discord adapter and the submit socket, and it handles
-  restarts.
+- `packages/agent-worker`: the program and its sandbox image. It opens the Durable harness with its
+  extensions and starts the Discord adapter and the scheduler inbox. It also handles restarts. It
+  also holds the OpenShell network policy that the sandbox runs with.
 
-Pi Durable, `pi-env`, and Chord are pinned to exact versions, because their APIs change between
-releases.
+Pi Durable and Chord are pinned to exact versions, because their APIs change between releases.
 
 ## Discord adapter
 
@@ -101,9 +100,8 @@ maintained chat adapter for Pi, and shows how a chat maps onto a Pi session.
 
 Behaviour:
 
-- **Access.** Only the owner's Discord user can start a turn or answer an approval. The adapter
-  ignores every other author, including other bots. Allowed channels are listed in the
-  configuration.
+- **Access.** Only the owner's Discord user can start a turn or answer a card. The adapter ignores
+  every other author, including other bots. Allowed channels are listed in the configuration.
 - **Conversations.** Each direct-message channel and each allowed server channel maps to one Durable
   conversation, stored in an adapter document. A thread maps to its own conversation, forked from
   the channel's conversation at the message that started it.
@@ -113,33 +111,20 @@ Behaviour:
 - **Output.** The adapter follows the conversation with `watchEvents`. It posts one reply per run
   and edits it while text streams, no more often than Discord's rate limits allow. Tool calls show
   as a short status line. A reply longer than Discord's limit is split at paragraph boundaries.
-- **Attachments.** Files and images on a message are downloaded with size and time limits and placed
-  in the sandbox workspace. The message tells the model where they are.
+- **Attachments.** Files and images on a message are downloaded with size and time limits into the
+  workspace. The message tells the model where they are.
 - **Commands.** Slash commands: `/status` (model, running task, usage), `/abort`, `/reset` with an
   optional handoff note, and `/compact`.
 - **Restart.** On start, the adapter rereads the messages it has not answered in each allowed
   channel since its last stored position and submits them with their message ids. On stop, it lets
   running work reach a checkpoint first.
 
-## Execution environment
-
-Each conversation's environment is a `pi-env` `RemoteExecutionEnv` connected over SSH to the
-OpenShell sandbox. The built-in `read`, `write`, `edit`, and `bash` tools then run in the sandbox.
-`pi-env` states that its results match local execution there, except for error messages.
-
-Network rules in the sandbox start with GitHub, Hugging Face, npm, and PyPI, and grow through
-OpenShell's draft-rule approvals. The sandbox never reaches the model providers or Discord, because
-the worker makes those calls.
-
-Phase 1 runs with a local environment so the adapter can be built and tested first. The sandbox
-replaces it in phase 3, before the agent is used for real work.
-
 ## Instructions, skills, and extensions
 
-- **Instructions.** One `AGENTS.md` in the sandbox workspace, rendered as a prompt section.
+- **Instructions.** One `AGENTS.md` in the workspace, rendered as a prompt section.
 - **Skills.** Pi Durable has no built-in skills. Its specification shows the pattern instead: a
   `skills` extension whose prompt section lists each skill's name and description, read from the
-  environment, with the full `SKILL.md` loaded through `read` when needed. The environment's `watch`
+  workspace, with the full `SKILL.md` loaded through `read` when needed. The environment's `watch`
   reloads the list when skills change.
 - **Extensions.** Each capability the agent needs beyond the built-in tools is a Durable extension
   in `packages/agent-worker`.
@@ -147,56 +132,70 @@ replaces it in phase 3, before the agent is used for real work.
   `thinking_delta` events from `watchEvents` and the finished runs. A detection aborts the
   conversation and submits one corrective follow-up, with the same policy as the Pi extension.
 
-## Approvals
+## Limits and approvals
 
-A `beforeTool` hook decides which calls need approval, for example commands that push, delete, or
-publish. A held call shows in Discord as a card with approve and reject buttons, and only the owner
-can answer it. The call continues on approve and gets an error result on reject.
+The worker and the model's `bash` run in the same sandbox, so the agent can read and change its own
+code and storage. Anything that must hold against the agent is therefore enforced outside the
+sandbox:
 
-Approvals through unYOLO come next. unYOLO already asks an operator to approve requests to its
-brokers. A Pi Durable approval integration belongs in the unYOLO repository, so that one approval
-channel covers both the brokers and the agent's tools.
+- **Network.** OpenShell's rules decide which hosts and paths the sandbox reaches. A blocked request
+  becomes a draft rule that the owner approves or rejects from the host.
+- **Credentials.** Each provider is bound to the hosts and paths it may be used for. The GitHub
+  token is a narrow token without repository administration, bound to the API paths and Git
+  operations the agent needs.
+
+Inside the worker, a `beforeTool` hook can hold calls such as pushes, deletes, and publishes until
+the owner answers a Discord card with approve or reject. This is a convenience that stops honest
+mistakes. It is not a security limit, because the agent can change the worker that runs it.
 
 ## Scheduling
 
-The host scheduler keeps its schedules and its run records. For each job it sends the prompt to the
-worker's submit socket, a Unix socket owned by the worker user and writable only by the scheduler's
-group. The submission's `requestId` is the job id plus the scheduled time, so a retried run never
-submits twice. The worker posts the job's answer to the job's Discord channel.
+The scheduler on the host keeps its schedules and its run records. For each job it delivers the
+prompt into the sandbox as a file in an inbox directory of the workspace, using OpenShell's upload
+command. The file name is the job id plus the scheduled time. The worker watches the inbox and
+submits each new file with that name as its `requestId`, so a retried delivery never runs a job
+twice. The worker posts the job's answer to the job's Discord channel.
 
-## Credentials
+## Storage and backups
 
-- Model keys and the Discord token: in the worker user's configuration, used only by the worker.
-- GitHub and Hugging Face: through the unYOLO brokers. OpenShell blocks loopback addresses inside
-  the sandbox, so tools that need a broker run in the worker, not in the sandbox. Git transport from
-  the sandbox needs its own answer (see the open questions).
-- Nothing secret is placed in the sandbox environment or its workspace.
+The SQLite file lives in the sandbox workspace. Durable runs it in WAL mode, so a commit survives a
+process crash, but the newest commit can be lost on a power failure. Only the worker opens it,
+because Durable has no locking between processes.
+
+A backup job on the host makes a consistent copy with SQLite's backup command inside the sandbox,
+then downloads it with OpenShell's download command. Backups keep a rolling history on the host.
 
 ## Phases
 
-1. **Worker and Discord, local environment.** The worker, SQLite storage, the Discord adapter, owner
-   access, slash commands, and restart handling. Verify: a message is answered once; killing the
-   worker in the middle of a tool call and starting it again finishes the run without a second
-   answer; a message from another user starts nothing.
-2. **Scheduler.** The submit socket and the scheduler's jobs. Verify: a job runs once per scheduled
-   time, also when the scheduler retries.
-3. **Sandbox.** `pi-env` into an OpenShell sandbox. Verify: `bash` runs in the sandbox; the sandbox
-   cannot read the worker's files, the model keys, or the Discord token; a blocked domain is
-   refused; the agent cannot run `sudo` or Docker.
-4. **Approvals.** Discord approval cards, then the unYOLO integration. Verify: a held call waits for
-   an answer, also across a worker restart. It runs on approve and fails on reject.
+1. **Worker and Discord, outside a sandbox, for development only.** The worker with its storage and
+   the Discord adapter, run with a test bot and no real credentials. Verify: a message is answered
+   once; killing the worker in the middle of a tool call and starting it again finishes the run
+   without a second answer; a message from another user starts nothing.
+2. **Inside OpenShell.** The sandbox image, the providers, and the network policy. Verify that the
+   agent answers in Discord from inside the sandbox while its environment holds only placeholder
+   values. A request to a host without a rule must be refused, and `sudo` and Docker must be
+   unavailable. The storage and the workspace must survive a sandbox restart and a rebuild.
+3. **Scheduler and backups.** The inbox and the backup job. Verify: a job runs once per scheduled
+   time, also when delivery is retried; a backup restores into a fresh sandbox.
+4. **Approvals and GitHub.** Discord approval cards and the narrow GitHub provider. Verify that a
+   held call waits for an answer, also across a worker restart, and runs only on approve. The GitHub
+   token must not reach paths outside its binding.
 5. **Rollout.** Add the agent's instructions, skills, and scheduled jobs. Verify: a week of daily
    use and scheduled jobs runs without a lost or repeated answer.
 
 ## Open questions
 
-- **SSH into the sandbox.** `pi-env` reaches its environment over SSH. Whether an OpenShell sandbox
-  accepts an SSH connection for this, and how, needs a test before phase 3. If it does not, the
-  fallback is a locked-down local user that runs the `pi-env` daemon.
-- **Git push from the sandbox.** Either the worker holds a narrow GitHub credential and runs push as
-  a worker-side tool, or OpenShell holds it as a provider bound to GitHub's paths.
-- **Worker user.** Which user runs the worker, and who can restart it, is set up by the owner from
-  their own shell, not by an agent.
+- **Workspace persistence.** OpenShell's docs say custom workspaces on the Docker and Podman
+  runtimes use the container's writable layer, not a managed volume. Phase 2 must show that the
+  SQLite file survives a restart and a rebuild, or the storage must move to a location that does.
+- **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
+  and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
+  terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
+- **Gateway user and runtime.** The gateway's runtime decides what its host user needs. Docker
+  access is equal to root, so that user must run no agent. Rootless Podman 5 or the MicroVM runtime
+  avoid that. The owner sets this up, not an agent.
+- **Upload and download commands.** The exact OpenShell commands, and their limits, for the inbox
+  and the backups need checking against the installed version.
 - **Replies.** One edited message per run, or separate messages for long runs: decide after using
   phase 1.
 
