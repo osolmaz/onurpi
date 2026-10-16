@@ -21,16 +21,20 @@ Make a folder for the agent's work and write a `config.json`:
 }
 ```
 
-The agent's tools work in the `workspace` folder, and the agent reads its instructions from
-`AGENTS.md` there. Relative paths are resolved against the folder of `config.json`. The SQLite file
-is `agent.sqlite` in the workspace unless `storage` names another file.
+The agent's tools work in the `workspace` folder. Relative paths are resolved against the folder of
+`config.json`. The SQLite file is `agent.sqlite` in the workspace unless `storage` names another
+file.
+
+The agent loads its instructions as Pi does: the `AGENTS.md` in the Pi agent folder first, then one
+`AGENTS.md` or `CLAUDE.md` per folder from the root down to the workspace. The Pi agent folder is
+`~/.pi/agent` unless `agentDir` names another one. The files are read again for every answer.
 
 The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
 `openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs no
 key. `openai-codex` uses a ChatGPT subscription through the codex-switcher provider: it reads the
-logins that codex-switcher keeps in the Pi agent folder, in place and with the same lock as Pi. The
-folder is `~/.pi/agent` unless `model.agentDir` names another one. For the other hosted providers,
-Pi AI reads the key from its usual environment variable, such as `ANTHROPIC_API_KEY` or `HF_TOKEN`.
+logins that codex-switcher keeps in the Pi agent folder, in place and with the same lock as Pi. For
+the other hosted providers, Pi AI reads the key from its usual environment variable, such as
+`ANTHROPIC_API_KEY` or `HF_TOKEN`.
 
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the

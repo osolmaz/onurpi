@@ -19,16 +19,16 @@ export const MODEL_PROVIDERS = [
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
 export type WorkerConfig = {
-  /** Folder the agent works in. Its tools act here, and `AGENTS.md` is read from here. */
+  /** Folder the agent works in. Its tools act here. */
   readonly workspace: string;
+  /**
+   * Pi agent folder. As in Pi, its `AGENTS.md` is the global instructions file, and the
+   * `openai-codex` provider uses the codex-switcher logins kept here.
+   */
+  readonly agentDir: string;
   /** SQLite file that holds the agent's conversations and work. */
   readonly storage: string;
-  readonly model: {
-    readonly provider: ModelProvider;
-    readonly modelId: string;
-    /** Pi agent folder whose codex-switcher logins the `openai-codex` provider uses. */
-    readonly agentDir: string;
-  };
+  readonly model: { readonly provider: ModelProvider; readonly modelId: string };
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -53,18 +53,14 @@ function isProvider(value: string): value is ModelProvider {
   return (MODEL_PROVIDERS as readonly string[]).includes(value);
 }
 
-function parseModel(value: unknown, at: (path: string) => string): WorkerConfig["model"] {
+function parseModel(value: unknown): WorkerConfig["model"] {
   const model = record(value, "model");
   const provider = text(model["provider"], "model.provider");
   if (!isProvider(provider)) {
     throw new Error(`model.provider must be one of: ${MODEL_PROVIDERS.join(", ")}`);
   }
   const modelId = provider === "echo" ? "echo" : text(model["modelId"], "model.modelId");
-  const agentDir =
-    model["agentDir"] === undefined
-      ? join(homedir(), ".pi", "agent")
-      : at(text(model["agentDir"], "model.agentDir"));
-  return { agentDir, modelId, provider };
+  return { modelId, provider };
 }
 
 function parseDiscord(value: unknown): WorkerConfig["discord"] {
@@ -97,9 +93,14 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
       ? resolve(workspace, "agent.sqlite")
       : text(input["storage"], "storage"),
   );
+  const agentDir =
+    input["agentDir"] === undefined
+      ? join(homedir(), ".pi", "agent")
+      : at(text(input["agentDir"], "agentDir"));
   return {
+    agentDir,
     discord: parseDiscord(input["discord"]),
-    model: parseModel(input["model"], at),
+    model: parseModel(input["model"]),
     storage,
     workspace,
   };
