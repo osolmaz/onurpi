@@ -5,6 +5,9 @@
 - Private global instructions, private skills, and private control-plane configuration live outside
   this repository. Do not copy their content, repository names, identifiers, or local paths into
   OnurPi.
+- Write nothing about Onur except his name in this repository: no details of his machines and their
+  setup, accounts, habits, schedules, ids, or security. This covers code, docs, commits, issues, and
+  pull requests. Call him the owner or the operator where a role is needed.
 - Read the installed Pi documentation and relevant examples completely before changing an extension.
 - Keep each extension independent under `packages/<name>/` with a Pi manifest, entry point, tests,
   and README; also register development entry points in the root Pi manifest.
