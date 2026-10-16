@@ -17,6 +17,7 @@ describe("parseWorkerConfig", () => {
     expect(
       parseWorkerConfig({ discord, model: { provider: "echo" }, workspace: "work" }, "/srv/agent"),
     ).toEqual({
+      agentDir: join(homedir(), ".pi", "agent"),
       discord: {
         directMessages: true,
         guilds: {},
@@ -24,7 +25,7 @@ describe("parseWorkerConfig", () => {
         ownerIds: [OWNER],
         tokenEnv: "DISCORD_BOT_TOKEN",
       },
-      model: { agentDir: join(homedir(), ".pi", "agent"), modelId: "echo", provider: "echo" },
+      model: { modelId: "echo", provider: "echo" },
       storage: "/srv/agent/work/agent.sqlite",
       workspace: "/srv/agent/work",
     });
@@ -34,7 +35,8 @@ describe("parseWorkerConfig", () => {
     const config = parseWorkerConfig(
       {
         discord: { ...discord, messageContent: true, tokenEnv: "AGENT_BOT_TOKEN" },
-        model: { agentDir: "pi", modelId: "gpt-6.1-sol", provider: "openai-codex" },
+        agentDir: "pi",
+        model: { modelId: "gpt-6.1-sol", provider: "openai-codex" },
         storage: "/data/agent.sqlite",
         workspace: "/sandbox/workspace",
       },
@@ -42,11 +44,8 @@ describe("parseWorkerConfig", () => {
     );
     expect(config.storage).toBe("/data/agent.sqlite");
     expect(config.workspace).toBe("/sandbox/workspace");
-    expect(config.model).toEqual({
-      agentDir: "/elsewhere/pi",
-      modelId: "gpt-6.1-sol",
-      provider: "openai-codex",
-    });
+    expect(config.agentDir).toBe("/elsewhere/pi");
+    expect(config.model).toEqual({ modelId: "gpt-6.1-sol", provider: "openai-codex" });
     expect(config.discord.tokenEnv).toBe("AGENT_BOT_TOKEN");
     expect(config.discord.messageContent).toBe(true);
   });
@@ -58,7 +57,7 @@ describe("parseWorkerConfig", () => {
     [{ ...valid, storage: 3 }, "storage must be text"],
     [{ ...valid, model: { provider: "llama" } }, "model.provider must be one of"],
     [{ ...valid, model: { provider: "openai" } }, "model.modelId must be text"],
-    [{ ...valid, model: { agentDir: "", provider: "echo" } }, "model.agentDir must be text"],
+    [{ ...valid, agentDir: "" }, "agentDir must be text"],
     [
       { ...valid, discord: { ...discord, tokenEnv: "my token" } },
       "discord.tokenEnv must be an environment variable",

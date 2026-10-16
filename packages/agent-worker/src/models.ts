@@ -49,18 +49,18 @@ const KEY_PROVIDERS = {
 
 /**
  * Models with the one configured provider. `openai-codex` uses the ChatGPT subscription through
- * the codex-switcher provider, which reads the logins in the Pi agent folder in place, with the
+ * the codex-switcher provider, which reads the logins in `agentDir` in place, with the
  * same lock and account order as Pi. The other hosted providers read their key from the
  * environment.
  */
-export function workerModels(model: WorkerConfig["model"]): WorkerModels {
+export function workerModels(model: WorkerConfig["model"], agentDir: string): WorkerModels {
   const models = createModels();
   if (model.provider !== "openai-codex") {
     models.setProvider(KEY_PROVIDERS[model.provider]());
     return { close: () => undefined, models };
   }
   const codex = createProvider({
-    agentDir: model.agentDir,
+    agentDir,
     nativeProvider: openaiCodexProvider(),
     providerId: "openai-codex",
   });

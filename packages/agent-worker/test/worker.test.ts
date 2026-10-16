@@ -26,6 +26,7 @@ function config(): WorkerConfig {
         ownerIds: [OWNER],
         tokenEnv: "TEST_BOT_TOKEN",
       },
+      agentDir: folder,
       model: { provider: "echo" },
       workspace: folder,
     },

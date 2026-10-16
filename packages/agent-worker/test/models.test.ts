@@ -21,7 +21,7 @@ describe("workerModels", () => {
   it.each(MODEL_PROVIDERS)("sets up the %s provider without a network call", (provider) => {
     const agentDir = mkdtempSync(join(tmpdir(), "agent-worker-pi-"));
     folders.push(agentDir);
-    const created = workerModels({ agentDir, modelId: "test-model", provider });
+    const created = workerModels({ modelId: "test-model", provider }, agentDir);
     expect(created.models.getProvider(provider)?.id).toBe(provider);
     created.close();
   });

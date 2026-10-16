@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createModels } from "@earendil-works/pi-ai/models";
@@ -19,11 +19,14 @@ afterEach(async () => {
 function workspace(): WorkerConfig {
   const folder = mkdtempSync(join(tmpdir(), "agent-worker-"));
   folders.push(folder);
+  mkdirSync(join(folder, "pi-agent"));
+  mkdirSync(join(folder, "workspace"));
   return parseWorkerConfig(
     {
+      agentDir: "pi-agent",
       discord: { ownerIds: ["200000000000000002"] },
       model: { provider: "echo" },
-      workspace: folder,
+      workspace: "workspace",
     },
     folder,
   );
@@ -80,8 +83,9 @@ describe("openAgent", () => {
     expect(await second.conversationFor("discord:a")).toBe(id);
   });
 
-  it("gives the workspace AGENTS.md to the model", async () => {
+  it("gives the model the global and the workspace AGENTS.md, global first, as Pi does", async () => {
     const config = workspace();
+    writeFileSync(join(config.agentDir, "AGENTS.md"), "Global: be brief.\n");
     writeFileSync(join(config.workspace, "AGENTS.md"), "Always answer in French.\n");
     const seen: string[] = [];
     const faux = fauxProvider({ models: [{ id: "echo", name: "Echo" }], provider: "echo" });
@@ -96,7 +100,14 @@ describe("openAgent", () => {
     const agent = await open(config, models);
 
     expect(await agent.ask(request)).toEqual({ kind: "answer", text: "Bonjour" });
-    expect(seen.join("")).toContain("Always answer in French.");
+    const prompt = seen.join("");
+    expect(prompt).toContain(
+      `<project_instructions path=\\"${join(config.agentDir, "AGENTS.md")}\\">`,
+    );
+    expect(prompt.indexOf("Global: be brief.")).toBeGreaterThan(-1);
+    expect(prompt.indexOf("Global: be brief.")).toBeLessThan(
+      prompt.indexOf("Always answer in French."),
+    );
   });
 
   it("reports a failed model call", async () => {

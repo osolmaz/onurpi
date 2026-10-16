@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Message, Models } from "@earendil-works/pi-ai";
+import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   type ConversationId,
@@ -29,13 +28,21 @@ const ChatConversation = defineDocFamily<{ conversationId: ConversationId | 0 },
   version: 1,
 });
 
-async function instructions(workspace: string): Promise<string | undefined> {
-  try {
-    const text = await readFile(join(workspace, "AGENTS.md"), "utf8");
-    return text.trim().length === 0 ? undefined : text;
-  } catch {
-    return undefined;
-  }
+/**
+ * The instructions Pi would load: the `AGENTS.md` in the Pi agent folder, then one context file per
+ * folder from the root down to the workspace. The format is Pi's, so the model sees the same text.
+ * The files are read for every request, so an edit applies to the next answer.
+ */
+function instructions(config: WorkerConfig): string | undefined {
+  const files = loadProjectContextFiles({ agentDir: config.agentDir, cwd: config.workspace });
+  if (files.length === 0) return undefined;
+  return [
+    "Project-specific instructions and guidelines:",
+    ...files.map(
+      ({ path, content }) =>
+        `<project_instructions path="${path}">\n${content}\n</project_instructions>`,
+    ),
+  ].join("\n\n");
 }
 
 function answerText(message: Message | undefined): string {
@@ -62,9 +69,7 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
   registry.install(
     defineExtension({
       name: "agent-instructions",
-      sections: [
-        section("instructions-file", () => instructions(config.workspace), { tag: false }),
-      ],
+      sections: [section("instructions-file", () => instructions(config), { tag: false })],
     }),
   );
   const storage = await openNodeSqliteStorage(config.storage);

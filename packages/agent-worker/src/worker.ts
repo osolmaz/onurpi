@@ -40,7 +40,7 @@ export async function startWorker(
       `Set the Discord bot token in the environment variable ${config.discord.tokenEnv}`,
     );
   }
-  const models = workerModels(config.model);
+  const models = workerModels(config.model, config.agentDir);
   const agent = await openAgent(config, models.models);
   let transport: DiscordTransport;
   try {
