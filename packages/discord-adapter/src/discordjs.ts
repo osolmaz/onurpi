@@ -55,10 +55,6 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
   return {
     botUserId,
     close: () => client.destroy(),
-    edit: async (channelId, messageId, text) => {
-      const channel = await sendable(client, channelId);
-      await channel.messages.edit(messageId, { content: text });
-    },
     onMessage: (handler) => {
       client.on(Events.MessageCreate, (message) => {
         handler(toInbound(message, botUserId));

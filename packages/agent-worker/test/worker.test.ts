@@ -51,11 +51,6 @@ class FakeDiscord implements DiscordTransport {
     return Promise.resolve(String(this.sent.length));
   }
 
-  edit(_channelId: string, messageId: string, text: string): Promise<void> {
-    this.sent[Number(messageId) - 1] = text;
-    return Promise.resolve();
-  }
-
   close(): Promise<void> {
     this.closed = true;
     return Promise.resolve();
