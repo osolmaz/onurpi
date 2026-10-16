@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { MODEL_PROVIDERS } from "../src/config.ts";
 import { echoProvider, workerModels } from "../src/models.ts";
+
+const folders: string[] = [];
+
+afterEach(() => {
+  for (const folder of folders.splice(0)) rmSync(folder, { force: true, recursive: true });
+});
 
 describe("echoProvider", () => {
   it("always has an answer ready", () => {
@@ -10,6 +19,10 @@ describe("echoProvider", () => {
 
 describe("workerModels", () => {
   it.each(MODEL_PROVIDERS)("sets up the %s provider without a network call", (provider) => {
-    expect(() => workerModels(provider)).not.toThrow();
+    const agentDir = mkdtempSync(join(tmpdir(), "agent-worker-pi-"));
+    folders.push(agentDir);
+    const created = workerModels({ agentDir, modelId: "test-model", provider });
+    expect(created.models.getProvider(provider)?.id).toBe(provider);
+    created.close();
   });
 });

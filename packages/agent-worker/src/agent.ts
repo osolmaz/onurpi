@@ -72,7 +72,10 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
     new NodeExecutionEnv({ cwd });
   const harness = await Harness.open(storage, { env, models, registry }, context);
   harness.resume();
-  const agent = { cwd: config.workspace, model: config.model };
+  const agent = {
+    cwd: config.workspace,
+    model: { modelId: config.model.modelId, provider: config.model.provider },
+  };
 
   const conversationFor = async (key: string): Promise<ConversationId> =>
     harness.commit(async (tx) => {

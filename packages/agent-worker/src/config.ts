@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { parseAdapterConfig, type AdapterConfig } from "@onurpi/discord-adapter";
 
 export const MODEL_PROVIDERS = [
@@ -18,7 +19,12 @@ export type WorkerConfig = {
   readonly workspace: string;
   /** SQLite file that holds the agent's conversations and work. */
   readonly storage: string;
-  readonly model: { readonly provider: ModelProvider; readonly modelId: string };
+  readonly model: {
+    readonly provider: ModelProvider;
+    readonly modelId: string;
+    /** Pi agent folder whose codex-switcher logins the `openai-codex` provider uses. */
+    readonly agentDir: string;
+  };
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -43,14 +49,18 @@ function isProvider(value: string): value is ModelProvider {
   return (MODEL_PROVIDERS as readonly string[]).includes(value);
 }
 
-function parseModel(value: unknown): WorkerConfig["model"] {
+function parseModel(value: unknown, at: (path: string) => string): WorkerConfig["model"] {
   const model = record(value, "model");
   const provider = text(model["provider"], "model.provider");
   if (!isProvider(provider)) {
     throw new Error(`model.provider must be one of: ${MODEL_PROVIDERS.join(", ")}`);
   }
   const modelId = provider === "echo" ? "echo" : text(model["modelId"], "model.modelId");
-  return { modelId, provider };
+  const agentDir =
+    model["agentDir"] === undefined
+      ? join(homedir(), ".pi", "agent")
+      : at(text(model["agentDir"], "model.agentDir"));
+  return { agentDir, modelId, provider };
 }
 
 function parseDiscord(value: unknown): WorkerConfig["discord"] {
@@ -79,7 +89,7 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
   );
   return {
     discord: parseDiscord(input["discord"]),
-    model: parseModel(input["model"]),
+    model: parseModel(input["model"], at),
     storage,
     workspace,
   };

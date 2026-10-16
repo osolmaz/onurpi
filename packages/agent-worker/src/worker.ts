@@ -40,12 +40,14 @@ export async function startWorker(
       `Set the Discord bot token in the environment variable ${config.discord.tokenEnv}`,
     );
   }
-  const agent = await openAgent(config, workerModels(config.model.provider));
+  const models = workerModels(config.model);
+  const agent = await openAgent(config, models.models);
   let transport: DiscordTransport;
   try {
     transport = await dependencies.connect(token, config.discord.messageContent);
   } catch (error) {
     await agent.close();
+    models.close();
     throw error;
   }
   const bridge = new DiscordBridge(transport, agent, config.discord, dependencies.log);
@@ -58,6 +60,7 @@ export async function startWorker(
     await bridge.idle();
     await transport.close();
     await agent.close();
+    models.close();
   };
   return { agent, bridge, stop };
 }

@@ -10,7 +10,8 @@ import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
-import type { ModelProvider } from "./config.ts";
+import { createProvider } from "@onurpi/codex-switcher/provider";
+import type { ModelProvider, WorkerConfig } from "./config.ts";
 
 function lastUserText(messages: readonly Message[]): string {
   const user = messages.findLast((message): message is UserMessage => message.role === "user");
@@ -32,18 +33,37 @@ export function echoProvider(): ReturnType<typeof fauxProvider> {
   return echo;
 }
 
-const PROVIDERS = {
+export type WorkerModels = {
+  readonly models: Models;
+  /** Releases what the provider holds, such as the Codex account router. */
+  close(): void;
+};
+
+const KEY_PROVIDERS = {
   anthropic: anthropicProvider,
   echo: () => echoProvider().provider,
   huggingface: huggingfaceProvider,
   openai: openaiProvider,
-  "openai-codex": openaiCodexProvider,
   openrouter: openrouterProvider,
-} as const satisfies Record<ModelProvider, () => unknown>;
+} as const satisfies Record<Exclude<ModelProvider, "openai-codex">, () => unknown>;
 
-/** Models with the one configured provider. Hosted providers read their key from the environment. */
-export function workerModels(provider: ModelProvider): Models {
+/**
+ * Models with the one configured provider. `openai-codex` uses the ChatGPT subscription through
+ * the codex-switcher provider, which reads the logins in the Pi agent folder in place, with the
+ * same lock and account order as Pi. The other hosted providers read their key from the
+ * environment.
+ */
+export function workerModels(model: WorkerConfig["model"]): WorkerModels {
   const models = createModels();
-  models.setProvider(PROVIDERS[provider]());
-  return models;
+  if (model.provider !== "openai-codex") {
+    models.setProvider(KEY_PROVIDERS[model.provider]());
+    return { close: () => undefined, models };
+  }
+  const codex = createProvider({
+    agentDir: model.agentDir,
+    nativeProvider: openaiCodexProvider(),
+    providerId: "openai-codex",
+  });
+  models.setProvider(codex.provider);
+  return { close: codex.close, models };
 }
