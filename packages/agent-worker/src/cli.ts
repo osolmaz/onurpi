@@ -8,7 +8,7 @@ import { startWorker } from "./worker.ts";
 
 const USAGE = `usage:
   agent-worker run --config <config.json>
-  agent-worker mounts --runtime docker|podman --workspace host:/path|volume:name --config host:/path|volume:name`;
+  agent-worker mounts --runtime docker|podman --workspace host:/path|volume:name --config host:/path|volume:name [--instructions host:/path/AGENTS.md]`;
 
 async function run(args: readonly string[]): Promise<void> {
   const { values } = parseArgs({ args: [...args], options: { config: { type: "string" } } });
@@ -26,6 +26,7 @@ function mounts(args: readonly string[]): void {
     args: [...args],
     options: {
       config: { type: "string" },
+      instructions: { type: "string" },
       runtime: { type: "string" },
       workspace: { type: "string" },
     },
@@ -42,6 +43,7 @@ function mounts(args: readonly string[]): void {
     runtime satisfies SandboxRuntime,
     parseMountSource(values.workspace),
     parseMountSource(values.config),
+    values.instructions === undefined ? undefined : parseMountSource(values.instructions),
   );
   console.log(JSON.stringify(driver));
 }

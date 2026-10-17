@@ -1,0 +1,25 @@
+# Discord bot token for the agent worker. The token reaches the REST API in the Authorization
+# header and the gateway in the IDENTIFY text message; the sandbox sees only a placeholder.
+#   openshell profile import -f discord-bot.yaml
+id: discord-bot
+display_name: Discord bot
+description: Discord bot token for the gateway WebSocket and the REST API
+category: messaging
+credentials:
+  - name: bot_token
+    description: Discord bot token
+    env_vars: [DISCORD_BOT_TOKEN]
+    required: true
+endpoints:
+  - host: discord.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+  - host: "*.discord.gg"
+    port: 443
+    protocol: websocket
+    access: read-write
+    enforcement: enforce
+    websocket_credential_rewrite: true
+binaries: [/usr/local/bin/node]
