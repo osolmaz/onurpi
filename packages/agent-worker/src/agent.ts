@@ -5,6 +5,7 @@ import {
   AssistantEntry,
   type ConversationId,
   createRegistry,
+  defineDoc,
   defineDocFamily,
   defineExtension,
   Harness,
@@ -13,7 +14,13 @@ import {
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
-import type { AgentPort, AgentReply, AgentRequest } from "@onurpi/discord-adapter";
+import type {
+  AgentPort,
+  AgentReply,
+  AgentRequest,
+  InboundMessage,
+  ReplyLedger,
+} from "@onurpi/discord-adapter";
 import type { WorkerConfig } from "./config.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -53,7 +60,49 @@ function answerText(message: Message | undefined): string {
     .trim();
 }
 
+type StoredMessage = { [Key in keyof InboundMessage]: InboundMessage[Key] };
+
+/** What the Discord bridge keeps across restarts, committed with the conversations. */
+const DiscordLedger = defineDoc<{
+  pending: Record<string, StoredMessage>;
+  positions: Record<string, string>;
+}>({
+  initial: () => ({ pending: {}, positions: {} }),
+  kind: "agent-worker.discord-ledger",
+  scope: "session",
+  version: 1,
+});
+
+function discordLedger(harness: Harness): ReplyLedger {
+  const read = async () =>
+    (await harness.snapshot(DiscordLedger, context)) ?? { pending: {}, positions: {} };
+  return {
+    accept: (message) =>
+      harness.commit(async (tx) => {
+        (await tx.doc(DiscordLedger)).pending[message.id] = { ...message };
+      }, context),
+    answered: (messageId) =>
+      harness.commit(async (tx) => {
+        const ledger = await tx.doc(DiscordLedger);
+        ledger.pending = Object.fromEntries(
+          Object.entries(ledger.pending).filter(([id]) => id !== messageId),
+        );
+      }, context),
+    pending: async () => Object.values((await read()).pending),
+    positions: async () => ({ ...(await read()).positions }),
+    seen: (channelId, messageId) =>
+      harness.commit(async (tx) => {
+        const ledger = await tx.doc(DiscordLedger);
+        const last = ledger.positions[channelId];
+        if (last === undefined || BigInt(messageId) > BigInt(last))
+          ledger.positions[channelId] = messageId;
+      }, context),
+  };
+}
+
 export type RunningAgent = AgentPort & {
+  /** The Discord bridge's record of unanswered messages and channel positions. */
+  readonly ledger: ReplyLedger;
   /** Conversation that holds a chat key, created on first use. */
   conversationFor(key: string): Promise<ConversationId>;
   close(): Promise<void>;
@@ -114,5 +163,10 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
     return { kind: "answer", text: answerText(entry?.model?.[0]) };
   };
 
-  return { ask, close: () => harness.close(context), conversationFor };
+  return {
+    ask,
+    close: () => harness.close(context),
+    conversationFor,
+    ledger: discordLedger(harness),
+  };
 }

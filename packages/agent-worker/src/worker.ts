@@ -50,7 +50,13 @@ export async function startWorker(
     models.close();
     throw error;
   }
-  const bridge = new DiscordBridge(transport, agent, config.discord, dependencies.log);
+  const bridge = new DiscordBridge({
+    agent,
+    config: config.discord,
+    ledger: agent.ledger,
+    log: dependencies.log,
+    transport,
+  });
   bridge.start();
   dependencies.log("ready", {
     bot: transport.botUserId,

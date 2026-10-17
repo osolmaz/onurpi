@@ -214,27 +214,26 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 
 ## Phase 1 status
 
-The first version of both packages is in OnurPi. It has:
+Phase 1 is done. The worker has:
 
-- The worker with SQLite storage, Pi Durable's built-in tools, and the workspace `AGENTS.md` as a
-  prompt section. It has no other extensions yet.
+- SQLite storage, Pi Durable's built-in tools, and the instructions that Pi would load: the
+  `AGENTS.md` in the Pi agent folder, then the context files from the root down to the workspace.
 - The `openai-codex` model on the owner's ChatGPT subscription, through the codex-switcher provider,
   which reads the logins in the Pi agent folder in place. The other hosted providers and an `echo`
   model for tests are also there.
-- The Discord adapter with the access rules, one conversation per channel, direct-message channel,
-  or thread, and the Discord message id as the `requestId`. While the agent works, the bot shows the
-  typing indicator, and the answer is a reply to the message.
+- The Discord adapter with the access rules per server and channel, one conversation per channel,
+  direct-message channel, or thread, and the Discord message id as the `requestId`. While the agent
+  works, the bot shows the typing indicator, and the answer is a reply to the message.
+- A ledger in the same storage that holds the accepted messages without an answer and the newest
+  message seen in each channel. On start, the bridge answers the waiting messages, unless the bot
+  already replied, and then the messages that arrived while no process ran.
 - A command that prints the OpenShell mount configuration for host folders or named volumes.
 
-A live test got a real answer in Discord from `gpt-6.1-sol` on the subscription. Not done yet:
+Verified live: an answer from `gpt-6.1-sol` in Discord, and a worker killed with SIGKILL while its
+`bash` tool ran, which posted exactly one reply after a restart.
 
-- After a restart, the worker finishes unfinished runs, but it does not post their answers to
-  Discord yet, and it does not reread messages that arrived while it was stopped.
-- Streaming edits, tool status lines, follow-ups and steers, thread forks, attachments, and slash
-  commands.
-- The phase 1 test that stops the worker during a tool call.
-- Skills and the OnurPi extensions. Pi extensions do not load in Pi Durable, so each one that the
-  agent needs is ported as a Durable extension.
+Not done in phase 1: streaming edits, tool status lines, follow-ups and steers, thread forks,
+attachments, slash commands, and skills.
 
 ## Open questions
 

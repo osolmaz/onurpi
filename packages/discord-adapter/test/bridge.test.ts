@@ -2,16 +2,33 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DiscordBridge, TYPING_INTERVAL_MS } from "../src/bridge.ts";
 import { parseAdapterConfig } from "../src/config.ts";
 import type { AgentReply } from "../src/types.ts";
-import { CHANNEL, FakeAgent, FakeTransport, message, oneChannel, STRANGER } from "./helpers.ts";
+import {
+  CHANNEL,
+  FakeAgent,
+  FakeLedger,
+  FakeTransport,
+  message,
+  oneChannel,
+  STRANGER,
+} from "./helpers.ts";
 
 const config = parseAdapterConfig(oneChannel());
 
-function setup(agent = new FakeAgent()) {
-  const transport = new FakeTransport();
+function setup(
+  agent = new FakeAgent(),
+  ledger = new FakeLedger(),
+  transport = new FakeTransport(),
+) {
   const events: string[] = [];
-  const bridge = new DiscordBridge(transport, agent, config, (event) => events.push(event));
+  const bridge = new DiscordBridge({
+    agent,
+    config,
+    ledger,
+    log: (event) => events.push(event),
+    transport,
+  });
   bridge.start();
-  return { agent, bridge, events, transport };
+  return { agent, bridge, events, ledger, transport };
 }
 
 afterEach(() => {
@@ -117,5 +134,77 @@ describe("DiscordBridge", () => {
     expect(agent.requests).toEqual([]);
     expect(transport.typing).toEqual([]);
     expect(transport.posted).toEqual([]);
+  });
+
+  it("records every message it sees, also the ones it ignores", async () => {
+    const { bridge, ledger, transport } = setup();
+    transport.emit(message({ authorId: STRANGER, id: "600000000000000009" }));
+    await bridge.idle();
+
+    expect(await ledger.positions()).toEqual({ [CHANNEL]: "600000000000000009" });
+    expect(await ledger.pending()).toEqual([]);
+  });
+});
+
+describe("DiscordBridge after a restart", () => {
+  it("answers a message that an earlier process accepted but did not answer", async () => {
+    const ledger = new FakeLedger();
+    await ledger.accept(message());
+    const { bridge, events, transport } = setup(new FakeAgent(), ledger);
+    await bridge.idle();
+
+    expect(transport.posted.map((item) => item.text)).toEqual(["Echo: hello"]);
+    expect(await ledger.pending()).toEqual([]);
+    expect(events).toEqual(["resumed", "answered"]);
+  });
+
+  it("does not reply twice when the earlier process already replied", async () => {
+    const ledger = new FakeLedger();
+    await ledger.accept(message());
+    const transport = new FakeTransport();
+    await transport.send(CHANNEL, "Echo: hello", "600000000000000006");
+    const { agent, bridge } = setup(new FakeAgent(), ledger, transport);
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(transport.posted).toHaveLength(1);
+    expect(await ledger.pending()).toEqual([]);
+  });
+
+  it("drops a waiting message that the configuration no longer accepts", async () => {
+    const ledger = new FakeLedger();
+    await ledger.accept(message({ authorId: STRANGER }));
+    const { agent, bridge } = setup(new FakeAgent(), ledger);
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(await ledger.pending()).toEqual([]);
+  });
+
+  it("answers the messages that arrived while no process ran, and only those", async () => {
+    const ledger = new FakeLedger();
+    await ledger.seen(CHANNEL, "600000000000000006");
+    const transport = new FakeTransport();
+    transport.history.push(
+      message({ content: "old", id: "600000000000000005" }),
+      message({ content: "missed one", id: "600000000000000007" }),
+      message({ content: "missed two", id: "600000000000000008" }),
+    );
+    const { agent, bridge } = setup(new FakeAgent(), ledger, transport);
+    await bridge.idle();
+
+    expect(agent.requests.map((request) => request.text)).toEqual(["missed one", "missed two"]);
+    expect(await ledger.positions()).toEqual({ [CHANNEL]: "600000000000000008" });
+  });
+
+  it("logs a channel it cannot read and goes on", async () => {
+    const ledger = new FakeLedger();
+    await ledger.seen(CHANNEL, "600000000000000006");
+    const transport = new FakeTransport();
+    transport.fetchAfter = () => Promise.reject(new Error("missing access"));
+    const { bridge, events } = setup(new FakeAgent(), ledger, transport);
+    await bridge.idle();
+
+    expect(events).toEqual(["catch_up_failed"]);
   });
 });

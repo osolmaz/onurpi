@@ -22,6 +22,23 @@ export type ChatTransport = {
   startTyping(channelId: string): Promise<void>;
   /** Posts a message and returns its id. */
   send(channelId: string, text: string, replyTo?: string): Promise<string>;
+  /** Up to `limit` messages posted after `afterId` in a channel, oldest first. */
+  fetchAfter(channelId: string, afterId: string, limit: number): Promise<readonly InboundMessage[]>;
+  /** Whether the bot already replied to a message. */
+  hasReply(channelId: string, messageId: string): Promise<boolean>;
+};
+
+/**
+ * What the bridge keeps across restarts: the messages it accepted but has not answered yet, and the
+ * newest message it saw in each channel. The worker stores it with the agent's other state.
+ */
+export type ReplyLedger = {
+  accept(message: InboundMessage): Promise<void>;
+  answered(messageId: string): Promise<void>;
+  pending(): Promise<readonly InboundMessage[]>;
+  /** Records a message id as seen. A position only moves forward. */
+  seen(channelId: string, messageId: string): Promise<void>;
+  positions(): Promise<Readonly<Record<string, string>>>;
 };
 
 /** One question for the agent. `requestId` makes a repeated question return the first answer. */

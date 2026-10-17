@@ -61,6 +61,34 @@ class FakeDiscord implements DiscordTransport {
     this.closed = true;
     return Promise.resolve();
   }
+
+  readonly history: InboundMessage[] = [];
+
+  fetchAfter(channelId: string, afterId: string): Promise<readonly InboundMessage[]> {
+    return Promise.resolve(
+      this.history.filter(
+        (item) => item.channelId === channelId && BigInt(item.id) > BigInt(afterId),
+      ),
+    );
+  }
+
+  hasReply(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+}
+
+function ping(id: string, content = `<@${BOT}> ping`): InboundMessage {
+  return {
+    authorId: OWNER,
+    authorIsBot: false,
+    channelId: CHANNEL,
+    content,
+    guildId: GUILD,
+    id,
+    isDirect: false,
+    mentionsBot: true,
+    parentChannelId: null,
+  };
 }
 
 function dependencies(
@@ -133,5 +161,25 @@ describe("startWorker", () => {
     spy.mockRestore();
 
     expect(JSON.parse(lines[0] ?? "")).toMatchObject({ event: "accepted", message: "1" });
+  });
+
+  it("after a restart, answers the unanswered message and the ones that arrived meanwhile", async () => {
+    const settings = config();
+    const first = new FakeDiscord();
+    const running = await startWorker(settings, dependencies(first).deps);
+    first.emit(ping("600000000000000006"));
+    await running.bridge.idle();
+    // A message the first process accepted but never answered, as after a crash.
+    await running.agent.ledger.accept(ping("600000000000000007", `<@${BOT}> waiting`));
+    await running.stop();
+
+    const second = new FakeDiscord();
+    second.history.push(ping("600000000000000008", `<@${BOT}> missed`));
+    const restarted = await startWorker(settings, dependencies(second).deps);
+    await restarted.bridge.idle();
+    await restarted.stop();
+
+    expect(first.sent).toEqual(["Echo: ping"]);
+    expect([...second.sent].sort()).toEqual(["Echo: missed", "Echo: waiting"]);
   });
 });
