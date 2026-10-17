@@ -81,6 +81,8 @@ export type InboxOptions = {
   readonly ledger: JobLedger;
   /** Discord channels that deliveries may post to. Others are refused. */
   readonly channelIds: readonly string[];
+  /** Answers that mean "nothing to report": posted nowhere, but the delivery still completes. */
+  readonly suppress?: readonly string[];
   readonly log: BridgeLog;
   readonly pollMs?: number;
 };
@@ -94,9 +96,16 @@ export class Inbox {
   private timer: NodeJS.Timeout | undefined;
   private scanning: Promise<void> = Promise.resolve();
   private stopped = false;
+  private readonly suppress: ReadonlySet<string>;
 
   constructor(options: InboxOptions) {
     this.options = options;
+    this.suppress = new Set((options.suppress ?? []).map((value) => value.trim()));
+  }
+
+  /** True when the answer means "nothing to report". */
+  private suppressed(answer: string): boolean {
+    return this.suppress.has(answer.trim());
   }
 
   start(): void {
@@ -135,29 +144,39 @@ export class Inbox {
   }
 
   private async answer(name: string): Promise<void> {
-    const { agent, channelIds, folder, ledger, log, transport } = this.options;
+    const { channelIds, folder, ledger, log } = this.options;
     const delivery = parseDelivery(JSON.parse(await readFile(join(folder, name), "utf8")));
     const requestId = `job:${name.slice(0, -".json".length)}`;
     if (!channelIds.includes(delivery.channelId)) {
       log("job_refused", { channel: delivery.channelId, delivery: name });
     } else if (!(await ledger.posted(requestId))) {
-      const reply = await agent.ask({
-        conversationKey: `job:${delivery.job}`,
-        requestId,
-        text: delivery.prompt,
-      });
-      const answer =
-        reply.kind === "answer"
-          ? reply.text
-          : `Sorry, the job ${delivery.job} could not finish: ${reply.reason}`;
-      let first: string | undefined;
-      for (const chunk of splitForDiscord(answer)) {
-        const id = await transport.send(delivery.channelId, chunk);
-        first ??= id;
-      }
-      await ledger.markPosted(requestId, first ?? "");
-      log("job_answered", { delivery: name, outcome: reply.kind });
+      await this.respond(delivery, requestId);
     }
     await rename(join(folder, name), join(folder, "done", name));
+  }
+
+  /** Asks the agent and posts the answer, unless it means "nothing to report". */
+  private async respond(delivery: Delivery, requestId: string): Promise<void> {
+    const { agent, log, transport } = this.options;
+    const reply = await agent.ask({
+      conversationKey: `job:${delivery.job}`,
+      requestId,
+      text: delivery.prompt,
+    });
+    const answer =
+      reply.kind === "answer"
+        ? reply.text
+        : `Sorry, the job ${delivery.job} could not finish: ${reply.reason}`;
+    if (reply.kind === "answer" && this.suppressed(answer)) {
+      log("job_suppressed", { delivery: delivery.job });
+      return;
+    }
+    let first: string | undefined;
+    for (const chunk of splitForDiscord(answer)) {
+      const id = await transport.send(delivery.channelId, chunk);
+      first ??= id;
+    }
+    await this.options.ledger.markPosted(requestId, first ?? "");
+    log("job_answered", { delivery: delivery.job, outcome: reply.kind });
   }
 }

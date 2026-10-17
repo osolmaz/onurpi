@@ -1,8 +1,10 @@
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
 import type { Message, Models } from "@earendil-works/pi-ai";
 import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
+  type AgentEvent,
+  type Conversation,
   type ConversationId,
   createRegistry,
   defineDoc,
@@ -10,6 +12,8 @@ import {
   defineExtension,
   Harness,
   section,
+  type SettledSubmissionRecord,
+  watchEvents,
 } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -21,6 +25,7 @@ import type {
   InboundMessage,
   ReplyLedger,
 } from "@onurpi/discord-adapter";
+import { AntiRepeatWatcher, type AntiRepeatFeedback } from "./anti-repeat.ts";
 import type { WorkerConfig } from "./config.ts";
 import {
   approvalsExtension,
@@ -29,6 +34,7 @@ import {
   type ApprovalStore,
 } from "./approvals.ts";
 import type { JobLedger } from "./inbox.ts";
+import { skillsExtension } from "./skills.ts";
 
 const context = BACKGROUND_CONTEXT;
 
@@ -159,6 +165,103 @@ export type AgentOptions = {
   readonly approvals?: ApprovalEvents;
 };
 
+/** What one ask needs from the agent it talks to. */
+type AskAgent = {
+  readonly agent: {
+    readonly cwd: string;
+    readonly model: { readonly modelId: string; readonly provider: string };
+  };
+  readonly conversationFor: (key: string) => Promise<ConversationId>;
+  readonly harness: Harness;
+  readonly request: AgentRequest;
+  readonly watchListener: (
+    conversation: Conversation,
+    watcher: AntiRepeatWatcher,
+    seen: { feedback: AntiRepeatFeedback | null },
+  ) => (events: readonly AgentEvent[]) => Promise<void>;
+  readonly watchers: Map<ConversationId, AntiRepeatWatcher>;
+};
+
+function watcherFor(watchers: Map<ConversationId, AntiRepeatWatcher>, id: ConversationId) {
+  const known = watchers.get(id);
+  if (known !== undefined) return known;
+  const watcher = new AntiRepeatWatcher();
+  watchers.set(id, watcher);
+  return watcher;
+}
+
+/** The watch listener: run the policy, and abort a repeating streamed response once. */
+function watchListener(
+  conversation: Conversation,
+  watcher: AntiRepeatWatcher,
+  seen: { feedback: AntiRepeatFeedback | null },
+): (events: readonly AgentEvent[]) => Promise<void> {
+  let aborting = false;
+  return async (events) => {
+    seen.feedback ??= watcher.feed(events);
+    if (!aborting && seen.feedback?.activeResponse === true) {
+      aborting = true;
+      await conversation.abort(context).catch(() => undefined);
+    }
+  };
+}
+
+/** Awaits one submission and turns its settled answer into a reply. */
+async function replyOf(
+  conversation: Conversation,
+  submission: { wait(context: Context): Promise<SettledSubmissionRecord> },
+): Promise<AgentReply> {
+  const settled = await submission.wait(context);
+  if (settled.type !== "input")
+    throw new Error(`Pi Durable settled a ${settled.type} submission for an input`);
+  if (settled.status !== "done") return { kind: "failed", reason: settled.reason };
+  const entry = await conversation.commit(
+    (tx) => tx.entry(AssistantEntry, settled.answer),
+    context,
+  );
+  return { kind: "answer", text: answerText(entry?.model?.[0]) };
+}
+
+/**
+ * Submits one request and watches the conversation while it runs. The watcher sees the streamed
+ * reasoning and the run boundaries; its "correct" decision submits one corrective follow-up, as
+ * the Pi extension's default policy, and its "stop" decision leaves the answer aborted.
+ */
+async function askAgent(ask: AskAgent): Promise<AgentReply> {
+  const { agent, conversationFor, harness, request, watchListener, watchers } = ask;
+  const conversationId = await conversationFor(request.conversationKey);
+  const conversation = await harness.conversation(conversationId, context);
+  if (conversation === undefined) return { kind: "failed", reason: "the conversation is missing" };
+  await conversation.configure(agent, context);
+  const watcher = watcherFor(watchers, conversationId);
+  watcher.onNewInput(request.text);
+
+  const watch = await watchEvents(harness, conversationId, context);
+  const seen: { feedback: AntiRepeatFeedback | null } = { feedback: null };
+  watch.start(watchListener(conversation, watcher, seen));
+  const reply = await replyOf(
+    conversation,
+    await conversation.submit(
+      { content: request.text, requestId: request.requestId, type: "input" },
+      context,
+    ),
+  );
+  await watch.stop().catch(() => undefined);
+  if (seen.feedback?.action !== "correct") return reply;
+  // The corrective follow-up, with a request id that a retried delivery never runs twice.
+  return replyOf(
+    conversation,
+    await conversation.submit(
+      {
+        content: watcher.correction(seen.feedback.detection),
+        requestId: `${request.requestId}:anti-repeat`,
+        type: "input",
+      },
+      context,
+    ),
+  );
+}
+
 export async function openAgent(
   config: WorkerConfig,
   models: Models,
@@ -175,6 +278,7 @@ export async function openAgent(
       sections: [section("instructions-file", () => instructions(config), { tag: false })],
     }),
   );
+  registry.install(skillsExtension(config.workspace));
   const storage = await openNodeSqliteStorage(config.storage);
   const env = ({ cwd = config.workspace }: { readonly cwd?: string }) =>
     new NodeExecutionEnv({ cwd });
@@ -198,28 +302,18 @@ export async function openAgent(
       return record.conversationId;
     }, context);
 
-  const ask = async (request: AgentRequest): Promise<AgentReply> => {
-    const conversation = await harness.conversation(
-      await conversationFor(request.conversationKey),
-      context,
-    );
-    if (conversation === undefined)
-      return { kind: "failed", reason: "the conversation is missing" };
-    await conversation.configure(agent, context);
-    const submission = await conversation.submit(
-      { content: request.text, requestId: request.requestId, type: "input" },
-      context,
-    );
-    const settled = await submission.wait(context);
-    if (settled.type !== "input")
-      throw new Error(`Pi Durable settled a ${settled.type} submission for an input`);
-    if (settled.status !== "done") return { kind: "failed", reason: settled.reason };
-    const entry = await conversation.commit(
-      (tx) => tx.entry(AssistantEntry, settled.answer),
-      context,
-    );
-    return { kind: "answer", text: answerText(entry?.model?.[0]) };
-  };
+  // One Anti-Repeat watcher per conversation, kept across runs of that conversation.
+  const watchers = new Map<ConversationId, AntiRepeatWatcher>();
+
+  const ask = (request: AgentRequest): Promise<AgentReply> =>
+    askAgent({
+      agent,
+      conversationFor,
+      harness,
+      request,
+      watchListener,
+      watchers,
+    });
 
   return {
     ask,
