@@ -229,7 +229,10 @@ Phases 1 to 4 have code in OnurPi; what was verified live is listed with each ph
   owner's folders showed: uid 1001, both instruction files, hidden secrets, a writable workspace, a
   read-only configuration, no sudo or Docker, a refused outside host, and no host home folder. The
   gateway runs as the owner's user, not a separate user: that user already has sudo and Docker, so a
-  separate user would protect nothing; the boundary is the sandbox.
+  separate user would protect nothing; the boundary is the sandbox. The agent now runs in the
+  sandbox with its two providers. Its environment holds only placeholders, it answered in Discord,
+  and the sandbox log shows Codex and Discord reached through the provider policies with nothing
+  denied.
 - **Phase 3.** The inbox and `agent-worker deliver`; onurcron passes `ONURCRON_JOB_ID` and
   `ONURCRON_SCHEDULED_FOR` to command jobs. Two deliveries of one scheduled time gave one answer in
   Discord.
