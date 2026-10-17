@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DiscordTransport, InboundMessage } from "@onurpi/discord-adapter";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseWorkerConfig, type WorkerConfig } from "../src/config.ts";
+import { deliver } from "../src/inbox.ts";
 import { defaultDependencies, startWorker, type WorkerDependencies } from "../src/worker.ts";
 
 const BOT = "100000000000000001";
@@ -181,5 +182,31 @@ describe("startWorker", () => {
 
     expect(first.sent).toEqual(["Echo: ping"]);
     expect([...second.sent].sort()).toEqual(["Echo: missed", "Echo: waiting"]);
+  });
+
+  it("posts the answer of a delivered prompt to the job's channel", async () => {
+    const settings = config();
+    const inboxed = {
+      ...settings,
+      inbox: { channelIds: [CHANNEL], folder: join(settings.workspace, "inbox") },
+    };
+    // Delivered before the start, so the first scan finds it.
+    await deliver(inboxed.inbox.folder, {
+      channelId: CHANNEL,
+      job: "digest",
+      prompt: "news",
+      scheduledFor: "2026-10-18T01:00:00Z",
+    });
+    const discord = new FakeDiscord();
+    const running = await startWorker(inboxed, dependencies(discord).deps);
+    for (let tries = 0; tries < 40 && discord.sent.length === 0; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    await running.stop();
+
+    expect(discord.sent).toEqual(["Echo: news"]);
+    expect(readdirSync(join(inboxed.inbox.folder, "done"))).toEqual([
+      "digest@2026-10-18T01:00:00.000Z.json",
+    ]);
   });
 });

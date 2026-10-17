@@ -10,6 +10,7 @@ export { DISCORD_MESSAGE_LIMIT, splitForDiscord } from "./chunks.ts";
 export {
   answersWithoutMention,
   parseAdapterConfig,
+  parseDiscordIds,
   type AdapterConfig,
   type ChannelConfig,
   type GuildConfig,
