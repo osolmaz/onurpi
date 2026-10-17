@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { DEFAULT_HELD_COMMANDS } from "./approvals.ts";
 import {
   answersWithoutMention,
   parseAdapterConfig,
@@ -42,6 +43,11 @@ export type WorkerConfig = {
      */
     readonly login: CodexLogin;
   };
+  /**
+   * Tool calls that wait for the owner's approval in Discord: `bash` commands that match a pattern.
+   * Cards for conversations that are not a Discord channel go to `channelId`.
+   */
+  readonly approvals: { readonly held: readonly RegExp[]; readonly channelId?: string };
   /** Scheduled prompts that the host scheduler delivers, with the channels they may post to. */
   readonly inbox?: { readonly folder: string; readonly channelIds: readonly string[] };
   readonly discord: AdapterConfig & {
@@ -109,6 +115,21 @@ function parseDiscord(value: unknown): WorkerConfig["discord"] {
   return { ...adapter, messageContent, tokenEnv };
 }
 
+function parseApprovals(value: unknown): WorkerConfig["approvals"] {
+  const input = record(value ?? {}, "approvals");
+  const held = input["held"] ?? DEFAULT_HELD_COMMANDS;
+  if (!Array.isArray(held) || held.some((pattern) => typeof pattern !== "string")) {
+    throw new Error("approvals.held must be a list of regular expressions");
+  }
+  const channel = input["channelId"];
+  return {
+    held: held.map((pattern: string) => new RegExp(pattern, "u")),
+    ...(channel === undefined
+      ? {}
+      : { channelId: parseDiscordIds([channel], "approvals.channelId")[0] ?? "" }),
+  };
+}
+
 /** Parses a configuration object. Relative paths are resolved against `base`. */
 export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
   const input = record(value, "config");
@@ -126,6 +147,7 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
   const inbox = input["inbox"] === undefined ? undefined : record(input["inbox"], "inbox");
   return {
     agentDir,
+    approvals: parseApprovals(input["approvals"]),
     discord: parseDiscord(input["discord"]),
     ...(inbox === undefined
       ? {}

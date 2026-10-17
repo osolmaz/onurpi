@@ -75,6 +75,15 @@ The file name is the job id and the scheduled time. Under onurcron they come fro
 and `ONURCRON_SCHEDULED_FOR`; `--job` and `--scheduled-for` set them by hand. A second delivery of
 the same scheduled time writes nothing, and each delivery is answered once.
 
+## Approvals
+
+Some `bash` commands wait for the owner: `git push`, `gh pr merge`, `gh release create`,
+`gh repo delete`, `npm publish`, and `rm -rf`. The worker blocks the call and posts a card in the
+chat with a request number. The owner replies `approve <n>` or `reject <n>`; after an approval the
+agent runs exactly the same call once. Requests and decisions are stored, so they survive a restart.
+`approvals.held` replaces the list of patterns, and `approvals.channelId` names where cards for
+scheduled jobs go. This stops honest mistakes; it is not a security limit.
+
 ## Mount its folders in OpenShell
 
 The agent is meant to run inside an OpenShell sandbox, with its workspace mounted read-write at
@@ -88,6 +97,14 @@ node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime do
 node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime podman \
   --workspace volume:agent-workspace --config volume:agent-config
 ```
+
+`--hide` keeps a workspace path out of the sandbox: a folder that ends in `/` gets an empty tmpfs
+and a file gets `/dev/null`. Use it for a secrets folder that lives in the workspace.
+
+The `openshell` folder holds the sandbox image (`build-image.sh` builds it from the committed tree),
+the network policy, and three provider profiles: `discord-bot`, `chatgpt-codex`, whose access token
+the gateway refreshes, and `agent-github`, a narrow GitHub token with repository administration
+denied.
 
 Host folders work only when the gateway has `enable_bind_mounts = true` and
 `allow_driver_config = true`. Named volumes work with the default gateway settings.

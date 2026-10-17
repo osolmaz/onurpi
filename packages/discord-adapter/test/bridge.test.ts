@@ -146,6 +146,53 @@ describe("DiscordBridge", () => {
   });
 });
 
+describe("DiscordBridge with an intercept", () => {
+  it("posts an intercept's reply without asking the agent", async () => {
+    const agent = new FakeAgent();
+    const transport = new FakeTransport();
+    const ledger = new FakeLedger();
+    const events: string[] = [];
+    const bridge = new DiscordBridge({
+      agent,
+      config,
+      intercept: (_message, text) =>
+        Promise.resolve(text === "hello" ? { reply: "Handled." } : undefined),
+      ledger,
+      log: (event) => events.push(event),
+      transport,
+    });
+    bridge.start();
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(transport.posted.map((item) => item.text)).toEqual(["Handled."]);
+    expect(await ledger.pending()).toEqual([]);
+    expect(events).toEqual(["accepted", "intercepted"]);
+  });
+
+  it("gives the agent an intercept's text, in the conversation it names", async () => {
+    const agent = new FakeAgent();
+    const transport = new FakeTransport();
+    const bridge = new DiscordBridge({
+      agent,
+      config,
+      intercept: () => Promise.resolve({ conversationKey: "job:digest", text: "approved" }),
+      ledger: new FakeLedger(),
+      log: () => undefined,
+      transport,
+    });
+    bridge.start();
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([
+      { conversationKey: "job:digest", requestId: "discord:600000000000000006", text: "approved" },
+    ]);
+    expect(transport.posted[0]?.replyTo).toBe("600000000000000006");
+  });
+});
+
 describe("DiscordBridge after a restart", () => {
   it("answers a message that an earlier process accepted but did not answer", async () => {
     const ledger = new FakeLedger();
