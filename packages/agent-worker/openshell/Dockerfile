@@ -14,4 +14,6 @@ COPY . /app
 RUN npm ci --ignore-scripts --omit=dev --no-audit --no-fund && npm cache clean --force
 
 USER agent
-WORKDIR /sandbox/work
+# OpenShell treats the image's working folder as its own workspace and refuses a mount there,
+# so the image starts in the home folder; the worker's tools use the mounted /sandbox/work.
+WORKDIR /home/agent
