@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CONFIG_TARGET,
+  INSTRUCTIONS_TARGET,
   parseMountSource,
   sandboxDriverConfig,
   WORKSPACE_TARGET,
@@ -68,5 +69,20 @@ describe("sandboxDriverConfig", () => {
     expect(() => sandboxDriverConfig("docker", { kind: "volume", name: "../etc" }, config)).toThrow(
       "A volume name may hold only",
     );
+  });
+
+  it("adds the global instructions file read-only when given", () => {
+    const driver = sandboxDriverConfig(
+      "docker",
+      { kind: "host", path: "/srv/workspace" },
+      { kind: "host", path: "/srv/config" },
+      { kind: "host", path: "/srv/pi/AGENTS.md" },
+    );
+    expect(driver["docker"]?.mounts[2]).toEqual({
+      read_only: true,
+      source: "/srv/pi/AGENTS.md",
+      target: INSTRUCTIONS_TARGET,
+      type: "bind",
+    });
   });
 });

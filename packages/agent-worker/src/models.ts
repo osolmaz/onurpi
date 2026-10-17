@@ -12,6 +12,7 @@ import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-code
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import { createProvider } from "@onurpi/codex-switcher/provider";
 import type { ModelProvider, WorkerConfig } from "./config.ts";
+import { openshellCodexCredentials } from "./openshell.ts";
 
 function lastUserText(messages: readonly Message[]): string {
   const user = messages.findLast((message): message is UserMessage => message.role === "user");
@@ -53,7 +54,16 @@ const KEY_PROVIDERS = {
  * same lock and account order as Pi. The other hosted providers read their key from the
  * environment.
  */
-export function workerModels(model: WorkerConfig["model"], agentDir: string): WorkerModels {
+export function workerModels(
+  model: WorkerConfig["model"],
+  agentDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): WorkerModels {
+  if (model.provider === "openai-codex" && model.login === "openshell") {
+    const sandboxed = createModels({ credentials: openshellCodexCredentials(env) });
+    sandboxed.setProvider(openaiCodexProvider());
+    return { close: () => undefined, models: sandboxed };
+  }
   const models = createModels();
   if (model.provider !== "openai-codex") {
     models.setProvider(KEY_PROVIDERS[model.provider]());

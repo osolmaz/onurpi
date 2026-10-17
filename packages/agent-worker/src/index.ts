@@ -6,9 +6,11 @@ export {
   type ModelProvider,
   type WorkerConfig,
 } from "./config.ts";
-export { echoProvider, workerModels } from "./models.ts";
+export { echoProvider, workerModels, type WorkerModels } from "./models.ts";
+export { codexTokenAlias, openshellCodexCredentials } from "./openshell.ts";
 export {
   CONFIG_TARGET,
+  INSTRUCTIONS_TARGET,
   parseMountSource,
   sandboxDriverConfig,
   WORKSPACE_TARGET,

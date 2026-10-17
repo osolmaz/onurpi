@@ -7,6 +7,8 @@ export type SandboxRuntime = "docker" | "podman";
 
 export const WORKSPACE_TARGET = "/sandbox/workspace";
 export const CONFIG_TARGET = "/sandbox/config";
+/** The owner's global `AGENTS.md`, read-only. Use `/sandbox/pi-agent` as `agentDir` in the sandbox. */
+export const INSTRUCTIONS_TARGET = "/sandbox/pi-agent/AGENTS.md";
 
 type Mount = {
   readonly type: "bind" | "volume";
@@ -48,10 +50,9 @@ export function sandboxDriverConfig(
   runtime: SandboxRuntime,
   workspace: MountSource,
   config: MountSource,
+  instructions?: MountSource,
 ): Readonly<Record<string, { readonly mounts: readonly Mount[] }>> {
-  return {
-    [runtime]: {
-      mounts: [mount(workspace, WORKSPACE_TARGET, false), mount(config, CONFIG_TARGET, true)],
-    },
-  };
+  const mounts = [mount(workspace, WORKSPACE_TARGET, false), mount(config, CONFIG_TARGET, true)];
+  if (instructions !== undefined) mounts.push(mount(instructions, INSTRUCTIONS_TARGET, true));
+  return { [runtime]: { mounts } };
 }
