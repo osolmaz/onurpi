@@ -39,8 +39,9 @@ This document is the canonical plan for the agent worker and its Discord adapter
 ## Pi Durable in short
 
 Pi Durable is a library, not a program, and is marked experimental: its API changes without notice
-between releases. Version 1.2.0 is current. The `pi` CLI does not use it. The worker described here
-is the program that uses it.
+between releases. The worker pins version 1.2.0, the Pi release that the rest of OnurPi uses, so it
+can use the codex-switcher provider. The `pi` CLI does not use it. The worker described here is the
+program that uses it.
 
 Everything Durable does is an atomic commit to storage before anyone sees it. A conversation is a
 list of immutable entries. Work runs as tasks that save a checkpoint at every step: `pi.generation`
@@ -65,7 +66,7 @@ host
 ├── OpenShell gateway (stores providers and policy)
 ├── scheduler (delivers job prompts)
 └── OpenShell sandbox    ├── agent worker: Pi Durable, Discord adapter
-    ├── /sandbox/workspace (mounted, read-write): SQLite storage, AGENTS.md, skills, repositories
+    ├── /sandbox/work (mounted, read-write): SQLite storage, AGENTS.md, skills, repositories
     └── /sandbox/config (mounted, read-only): worker settings
             │
             └── proxy ──► Discord, model providers, GitHub, package registries
@@ -84,8 +85,10 @@ npm without a separate decision. Personal configuration never goes into OnurPi. 
 instructions and Discord ids live in the owner's private configuration, and the tokens live in
 OpenShell providers.
 
-- `packages/discord-adapter`: connects Discord to Pi Durable conversations. It depends on Pi Durable
-  and discord.js, and on nothing else in OnurPi, so it can move to its own repository later.
+- `packages/discord-adapter`: connects Discord to the agent's conversations. It depends only on
+  discord.js. It reaches the agent through a small `AgentPort` interface, which the worker
+  implements with Pi Durable, so the adapter has no Pi dependency, its tests need no storage, and it
+  can move to its own repository later.
 - `packages/agent-worker`: the program and its sandbox image. It opens the Durable harness with its
   extensions and starts the Discord adapter and the scheduler inbox. It also handles restarts. It
   also holds the OpenShell network policy that the sandbox runs with.
@@ -103,7 +106,9 @@ maintained chat adapter for Pi, and shows how a chat maps onto a Pi session.
 Behaviour:
 
 - **Access.** Only the owner's Discord user can start a turn or answer a card. The adapter ignores
-  every other author, including other bots. Allowed channels are listed in the configuration.
+  every other author, including other bots. Allowed channels are listed in the configuration per
+  server, and a channel that is not listed gets no answer. Each server and each channel can turn the
+  mention rule off, and the channel's own value wins.
 - **Conversations.** Each direct-message channel and each allowed server channel maps to one Durable
   conversation, stored in an adapter document. A thread maps to its own conversation, forked from
   the channel's conversation at the message that started it.
@@ -153,10 +158,13 @@ mistakes. It is not a security limit, because the agent can change the worker th
 ## Scheduling
 
 The scheduler on the host keeps its schedules and its run records. For each job it delivers the
-prompt into the sandbox as a file in an inbox directory of the workspace, using OpenShell's upload
-command. The file name is the job id plus the scheduled time. The worker watches the inbox and
-submits each new file with that name as its `requestId`, so a retried delivery never runs a job
-twice. The worker posts the job's answer to the job's Discord channel.
+prompt as a file in an inbox folder of the workspace, with `agent-worker deliver`. The workspace is
+a host folder, so the scheduler writes the file directly; a named volume would need OpenShell's
+upload command instead. The file name is the job id plus the scheduled time, which the scheduler
+passes to command jobs as `ONURCRON_JOB_ID` and `ONURCRON_SCHEDULED_FOR`. The worker watches the
+inbox and submits each new file with that name as its `requestId`, so a retried delivery never runs
+a job twice. The worker posts the job's answer to the job's Discord channel, which must be one of
+the inbox's configured channels.
 
 ## Storage
 
@@ -207,6 +215,42 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 5. **Rollout.** Add the agent's instructions, skills, and scheduled jobs. Verify: a week of daily
    use and scheduled jobs runs without a lost or repeated answer.
 
+## Status
+
+Phases 1 to 4 have code in OnurPi; what was verified live is listed with each phase.
+
+- **Phase 1.** The worker, the Discord adapter, Pi's instructions, the ChatGPT subscription through
+  codex-switcher, per-channel access rules, and the reply ledger. A worker killed with SIGKILL
+  during a `bash` call posted exactly one reply after a restart.
+- **Phase 2.** The sandbox image, the network policy, and the `discord-bot` and `chatgpt-codex`
+  provider profiles. Inside the sandbox, Codex reads placeholders through a JWT-shaped wrapper, and
+  the gateway refreshes the access token. The workspace is mounted at `/sandbox/work`, because
+  OpenShell reserves `/sandbox/workspace` and the image's working folder. A test sandbox with the
+  owner's folders showed: uid 1001, both instruction files, hidden secrets, a writable workspace, a
+  read-only configuration, no sudo or Docker, a refused outside host, and no host home folder. The
+  gateway runs as the owner's user, not a separate user: that user already has sudo and Docker, so a
+  separate user would protect nothing; the boundary is the sandbox. The agent now runs in the
+  sandbox with its two providers. Its environment holds only placeholders, it answered in Discord,
+  and the sandbox log shows Codex and Discord reached through the provider policies with nothing
+  denied.
+- **Phase 3.** The inbox and `agent-worker deliver`; onurcron passes `ONURCRON_JOB_ID` and
+  `ONURCRON_SCHEDULED_FOR` to command jobs. Two deliveries of one scheduled time gave one answer in
+  Discord.
+- **Phase 4.** Approval cards for held `bash` commands, and the `agent-github` profile.
+- **Phase 5, in progress.** The skills extension lists the workspace's skills with their name and
+  description and rereads the folder for every request, so a change applies to the next answer.
+  Anti-Repeat runs as a per-conversation watcher over `watchEvents`: it feeds the `thinking_delta`
+  events and the finished runs to `pi-anti-repeat/core`, aborts a repeating streamed response, and
+  submits one corrective follow-up, with the extension's default policy. A run that such a detection
+  aborted is discarded instead of counted. The inbox takes a `suppress` list, so a scheduled job's
+  sentinel answer such as `NO_SIGNAL` completes the delivery without posting. The network policy
+  gained read-only hosts for three watch jobs, which now arrive as inbox deliveries and post to
+  their old channels. A test delivery ran end to end in the rebuilt sandbox. The week of daily use
+  that the phase asks for starts now.
+
+Not done yet: streaming edits, tool status lines, follow-ups and steers, thread forks, attachments,
+slash commands, and the remaining extensions a week of use shows necessary.
+
 ## Open questions
 
 - **Host folder permissions.** The sandbox runs as a non-root user, so the host folders must be
@@ -217,6 +261,9 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 - **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
   and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
   terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
+- **Subscription login in the sandbox.** The `openai-codex` logins are OAuth tokens that the
+  codex-switcher provider refreshes in its file on the host. Phase 2 decides how the sandbox gets
+  them as an OpenShell provider without a copy of the refresh token.
 - **Gateway user and runtime.** The gateway's runtime decides what its host user needs. Docker
   access is equal to root, so that user must run no agent. Rootless Podman 5 avoids that. The
   MicroVM runtime does not support mounts, so it does not fit this plan. The owner sets this up, not
