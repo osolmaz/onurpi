@@ -4,7 +4,7 @@ version: 1
 filesystem_policy:
   include_workdir: false
   read_only: [/usr, /lib, /etc, /app, /sandbox/config, /sandbox/pi-agent]
-  read_write: [/sandbox/workspace, /tmp, /home/agent]
+  read_write: [/sandbox/work, /tmp, /home/agent]
 network_policies:
   npm_registry:
     endpoints:

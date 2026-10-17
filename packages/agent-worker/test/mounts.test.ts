@@ -92,7 +92,7 @@ describe("sandboxDriverConfig", () => {
       workspace: host("/srv/workspace"),
     });
     expect(driver["docker"]?.mounts.slice(2)).toEqual([
-      { read_only: true, target: `${WORKSPACE_TARGET}/secrets`, type: "tmpfs" },
+      { target: `${WORKSPACE_TARGET}/secrets`, type: "tmpfs" },
       {
         read_only: true,
         source: "/dev/null",

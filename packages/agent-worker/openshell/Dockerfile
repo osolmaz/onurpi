@@ -14,4 +14,4 @@ COPY . /app
 RUN npm ci --ignore-scripts --omit=dev --no-audit --no-fund && npm cache clean --force
 
 USER agent
-WORKDIR /sandbox/workspace
+WORKDIR /sandbox/work

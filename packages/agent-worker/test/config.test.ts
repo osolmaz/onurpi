@@ -38,12 +38,12 @@ describe("parseWorkerConfig", () => {
         agentDir: "pi",
         model: { login: "openshell", modelId: "gpt-6.1-sol", provider: "openai-codex" },
         storage: "/data/agent.sqlite",
-        workspace: "/sandbox/workspace",
+        workspace: "/sandbox/work",
       },
       "/elsewhere",
     );
     expect(config.storage).toBe("/data/agent.sqlite");
-    expect(config.workspace).toBe("/sandbox/workspace");
+    expect(config.workspace).toBe("/sandbox/work");
     expect(config.agentDir).toBe("/elsewhere/pi");
     expect(config.model).toEqual({
       login: "openshell",

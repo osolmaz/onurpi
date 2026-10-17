@@ -58,7 +58,7 @@ running answers finish.
 ## Mount its folders in OpenShell
 
 The agent is meant to run inside an OpenShell sandbox, with its workspace mounted read-write at
-`/sandbox/workspace` and its configuration mounted read-only at `/sandbox/config`. The `mounts`
+`/sandbox/work` and its configuration mounted read-only at `/sandbox/config`. The `mounts`
 command prints the value for `openshell sandbox create --driver-config-json`. Each folder is a host
 folder or a named volume:
 
