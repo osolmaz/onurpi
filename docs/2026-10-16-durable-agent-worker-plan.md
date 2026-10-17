@@ -237,9 +237,19 @@ Phases 1 to 4 have code in OnurPi; what was verified live is listed with each ph
   `ONURCRON_SCHEDULED_FOR` to command jobs. Two deliveries of one scheduled time gave one answer in
   Discord.
 - **Phase 4.** Approval cards for held `bash` commands, and the `agent-github` profile.
+- **Phase 5, in progress.** The skills extension lists the workspace's skills with their name and
+  description and rereads the folder for every request, so a change applies to the next answer.
+  Anti-Repeat runs as a per-conversation watcher over `watchEvents`: it feeds the `thinking_delta`
+  events and the finished runs to `pi-anti-repeat/core`, aborts a repeating streamed response, and
+  submits one corrective follow-up, with the extension's default policy. A run that such a detection
+  aborted is discarded instead of counted. The inbox takes a `suppress` list, so a scheduled job's
+  sentinel answer such as `NO_SIGNAL` completes the delivery without posting. The network policy
+  gained read-only hosts for three watch jobs, which now arrive as inbox deliveries and post to
+  their old channels. A test delivery ran end to end in the rebuilt sandbox. The week of daily use
+  that the phase asks for starts now.
 
 Not done yet: streaming edits, tool status lines, follow-ups and steers, thread forks, attachments,
-slash commands, skills, and porting OnurPi extensions as Durable extensions.
+slash commands, and the remaining extensions a week of use shows necessary.
 
 ## Open questions
 
