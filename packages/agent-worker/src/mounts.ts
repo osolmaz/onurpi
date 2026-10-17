@@ -11,11 +11,37 @@ export const CONFIG_TARGET = "/sandbox/config";
 export const INSTRUCTIONS_TARGET = "/sandbox/pi-agent/AGENTS.md";
 
 type Mount = {
-  readonly type: "bind" | "volume";
-  readonly source: string;
+  readonly type: "bind" | "volume" | "tmpfs";
+  readonly source?: string;
   readonly target: string;
   readonly read_only: boolean;
 };
+
+export type SandboxMounts = {
+  readonly workspace: MountSource;
+  readonly config: MountSource;
+  readonly instructions?: MountSource;
+  /**
+   * Workspace paths the sandbox must not see, such as a folder of secrets. A path that ends in `/`
+   * is a folder and gets an empty tmpfs; any other path is a file and gets `/dev/null`.
+   */
+  readonly hide?: readonly string[];
+};
+
+function hidden(path: string): Mount {
+  const relative = path.replace(/\/$/u, "");
+  if (
+    relative === "" ||
+    relative.startsWith("/") ||
+    relative.split("/").some((part) => part === ".." || part === ".")
+  ) {
+    throw new Error(`A hidden path must be relative to the workspace: ${path}`);
+  }
+  const target = `${WORKSPACE_TARGET}/${relative}`;
+  return path.endsWith("/")
+    ? { read_only: true, target, type: "tmpfs" }
+    : { read_only: true, source: "/dev/null", target, type: "bind" };
+}
 
 function mount(source: MountSource, target: string, readOnly: boolean): Mount {
   if (source.kind === "host") {
@@ -48,11 +74,14 @@ export function parseMountSource(value: string): MountSource {
  */
 export function sandboxDriverConfig(
   runtime: SandboxRuntime,
-  workspace: MountSource,
-  config: MountSource,
-  instructions?: MountSource,
+  folders: SandboxMounts,
 ): Readonly<Record<string, { readonly mounts: readonly Mount[] }>> {
-  const mounts = [mount(workspace, WORKSPACE_TARGET, false), mount(config, CONFIG_TARGET, true)];
-  if (instructions !== undefined) mounts.push(mount(instructions, INSTRUCTIONS_TARGET, true));
+  const mounts = [
+    mount(folders.workspace, WORKSPACE_TARGET, false),
+    mount(folders.config, CONFIG_TARGET, true),
+  ];
+  if (folders.instructions !== undefined)
+    mounts.push(mount(folders.instructions, INSTRUCTIONS_TARGET, true));
+  for (const path of folders.hide ?? []) mounts.push(hidden(path));
   return { [runtime]: { mounts } };
 }

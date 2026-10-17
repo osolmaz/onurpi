@@ -15,6 +15,7 @@ export {
   sandboxDriverConfig,
   WORKSPACE_TARGET,
   type MountSource,
+  type SandboxMounts,
   type SandboxRuntime,
 } from "./mounts.ts";
 export {
