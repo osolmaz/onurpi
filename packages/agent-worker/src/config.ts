@@ -49,7 +49,12 @@ export type WorkerConfig = {
    */
   readonly approvals: { readonly held: readonly RegExp[]; readonly channelId?: string };
   /** Scheduled prompts that the host scheduler delivers, with the channels they may post to. */
-  readonly inbox?: { readonly folder: string; readonly channelIds: readonly string[] };
+  readonly inbox?: {
+    readonly folder: string;
+    readonly channelIds: readonly string[];
+    /** Answers that mean "nothing to report": posted nowhere, but the delivery completes. */
+    readonly suppress?: readonly string[];
+  };
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -68,6 +73,13 @@ function text(value: unknown, path: string): string {
   if (typeof value !== "string" || value.trim().length === 0)
     throw new Error(`${path} must be text`);
   return value;
+}
+
+function stringArrayOf(value: unknown, path: string): readonly string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`${path} must be an array of text`);
+  }
+  return value.map((item) => item as string);
 }
 
 function isProvider(value: string): value is ModelProvider {
@@ -155,6 +167,11 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
           inbox: {
             channelIds: parseDiscordIds(inbox["channelIds"], "inbox.channelIds"),
             folder: at(text(inbox["folder"], "inbox.folder")),
+            ...(inbox["suppress"] === undefined
+              ? {}
+              : {
+                  suppress: stringArrayOf(inbox["suppress"], "inbox.suppress"),
+                }),
           },
         }),
     model: parseModel(input["model"]),

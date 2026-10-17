@@ -73,6 +73,7 @@ export async function startWorker(
           ledger: agent.jobs,
           log: dependencies.log,
           transport,
+          ...(config.inbox.suppress === undefined ? {} : { suppress: config.inbox.suppress }),
         });
   inbox?.start();
   dependencies.log("ready", {

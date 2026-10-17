@@ -23,6 +23,7 @@ function setup(
     kind: "answer",
     text: `Echo: ${request.text}`,
   }),
+  suppress?: readonly string[],
 ) {
   const folder = inboxFolder();
   const requests: AgentRequest[] = [];
@@ -54,6 +55,7 @@ function setup(
     ledger,
     log: (event) => events.push(event),
     pollMs: 10,
+    ...(suppress === undefined ? {} : { suppress }),
     transport,
   });
   return { events, folder, inbox, ledger, posted, requests, sent, transport };
@@ -174,6 +176,29 @@ describe("Inbox", () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     await inbox.stop();
 
+    expect(sent).toHaveLength(1);
+  });
+
+  it("posts a suppressed answer nowhere, but still completes the delivery", async () => {
+    const { events, folder, inbox, posted, sent } = setup(
+      () => ({ kind: "answer", text: "NO_SIGNAL" }),
+      ["NO_SIGNAL"],
+    );
+    await deliver(folder, delivery);
+    await inbox.scan();
+
+    expect(sent).toEqual([]);
+    expect(events).toEqual(["job_suppressed"]);
+    expect([...posted.keys()]).toEqual([]);
+    expect(readdirSync(join(folder, "done"))).toContain(
+      "daily-digest@2026-10-18T01:00:00.000Z.json",
+    );
+  });
+
+  it("keeps a non-suppressed answer posting normally", async () => {
+    const { folder, inbox, sent } = setup(undefined, ["NO_SIGNAL"]);
+    await deliver(folder, { ...delivery, job: "watch" });
+    await inbox.scan();
     expect(sent).toHaveLength(1);
   });
 });
