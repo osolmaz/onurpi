@@ -6,6 +6,7 @@ import {
 } from "@onurpi/discord-adapter";
 import { openAgent, type RunningAgent } from "./agent.ts";
 import type { WorkerConfig } from "./config.ts";
+import { ApprovalDesk } from "./desk.ts";
 import { Inbox } from "./inbox.ts";
 import { workerModels } from "./models.ts";
 
@@ -42,7 +43,8 @@ export async function startWorker(
     );
   }
   const models = workerModels(config.model, config.agentDir, dependencies.env);
-  const agent = await openAgent(config, models.models);
+  const desk = new ApprovalDesk(dependencies.log, config.approvals.channelId);
+  const agent = await openAgent(config, models.models, { approvals: desk });
   let transport: DiscordTransport;
   try {
     transport = await dependencies.connect(token, config.discord.messageContent);
@@ -51,9 +53,11 @@ export async function startWorker(
     models.close();
     throw error;
   }
+  desk.attach(agent, transport);
   const bridge = new DiscordBridge({
     agent,
     config: config.discord,
+    intercept: desk.intercept,
     ledger: agent.ledger,
     log: dependencies.log,
     transport,
@@ -78,6 +82,7 @@ export async function startWorker(
   const stop = async () => {
     await inbox?.stop();
     await bridge.idle();
+    await desk.idle();
     await transport.close();
     await agent.close();
     models.close();

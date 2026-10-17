@@ -22,6 +22,12 @@ import type {
   ReplyLedger,
 } from "@onurpi/discord-adapter";
 import type { WorkerConfig } from "./config.ts";
+import {
+  approvalsExtension,
+  approvalStore,
+  type ApprovalEvents,
+  type ApprovalStore,
+} from "./approvals.ts";
 import type { JobLedger } from "./inbox.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -122,7 +128,19 @@ function jobLedger(harness: Harness): JobLedger {
   };
 }
 
+/** The chat key of each conversation, so a held call's card goes to the right channel. */
+const ConversationKeys = defineDoc<{ keys: Record<string, string> }>({
+  initial: () => ({ keys: {} }),
+  kind: "agent-worker.conversation-keys",
+  scope: "session",
+  version: 1,
+});
+
 export type RunningAgent = AgentPort & {
+  /** Approval requests for held tool calls. */
+  readonly approvals: ApprovalStore;
+  /** The chat key that a conversation belongs to. */
+  chatKeyOf(conversationId: number): Promise<string | undefined>;
   /** The inbox's record of scheduled deliveries that already have their answer in Discord. */
   readonly jobs: JobLedger;
   /** The Discord bridge's record of unanswered messages and channel positions. */
@@ -136,9 +154,21 @@ export type RunningAgent = AgentPort & {
  * Opens the agent's storage and continues any work an earlier process left unfinished. Every
  * answer is committed before it is returned, so a crash between two steps loses nothing.
  */
-export async function openAgent(config: WorkerConfig, models: Models): Promise<RunningAgent> {
+export type AgentOptions = {
+  /** Where held tool calls go. Without it, no call is held. */
+  readonly approvals?: ApprovalEvents;
+};
+
+export async function openAgent(
+  config: WorkerConfig,
+  models: Models,
+  options: AgentOptions = {},
+): Promise<RunningAgent> {
   const registry = createRegistry();
   registry.install(CodingTools);
+  if (options.approvals !== undefined && config.approvals.held.length > 0) {
+    registry.install(approvalsExtension(config.approvals.held, options.approvals));
+  }
   registry.install(
     defineExtension({
       name: "agent-instructions",
@@ -158,10 +188,14 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
   const conversationFor = async (key: string): Promise<ConversationId> =>
     harness.commit(async (tx) => {
       const record = await tx.doc(ChatConversation, key, null);
-      if (record.conversationId !== 0) return record.conversationId;
-      const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
-      record.conversationId = created.id;
-      return created.id;
+      if (record.conversationId === 0) {
+        record.conversationId = (
+          await tx.createConversation({ ownership: { kind: "ownerless" } })
+        ).id;
+      }
+      const keys = await tx.doc(ConversationKeys);
+      keys.keys[String(record.conversationId)] ??= key;
+      return record.conversationId;
     }, context);
 
   const ask = async (request: AgentRequest): Promise<AgentReply> => {
@@ -191,6 +225,9 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
     ask,
     close: () => harness.close(context),
     conversationFor,
+    approvals: approvalStore(harness),
+    chatKeyOf: async (conversationId) =>
+      (await harness.snapshot(ConversationKeys, context))?.keys[String(conversationId)],
     jobs: jobLedger(harness),
     ledger: discordLedger(harness),
   };

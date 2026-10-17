@@ -11,6 +11,13 @@ export const MISSED_MESSAGE_LIMIT = 100;
 
 export type BridgeLog = (event: string, details: Readonly<Record<string, string>>) => void;
 
+/**
+ * What an intercept makes of an accepted message: a direct reply without the agent, or other text
+ * for the agent, optionally for another conversation.
+ */
+export type Interception =
+  { readonly reply: string } | { readonly text: string; readonly conversationKey?: string };
+
 export type BridgeOptions = {
   readonly transport: ChatTransport;
   readonly agent: AgentPort;
@@ -18,6 +25,8 @@ export type BridgeOptions = {
   readonly ledger: ReplyLedger;
   readonly log: BridgeLog;
   readonly typingIntervalMs?: number;
+  /** Sees each accepted message first, for commands such as approvals. */
+  readonly intercept?: (message: InboundMessage, text: string) => Promise<Interception | undefined>;
 };
 
 /**
@@ -35,6 +44,7 @@ export class DiscordBridge {
   private readonly ledger: ReplyLedger;
   private readonly log: BridgeLog;
   private readonly typingIntervalMs: number;
+  private readonly intercept: BridgeOptions["intercept"];
   private readonly pending = new Set<Promise<void>>();
 
   constructor(options: BridgeOptions) {
@@ -44,6 +54,7 @@ export class DiscordBridge {
     this.ledger = options.ledger;
     this.log = options.log;
     this.typingIntervalMs = options.typingIntervalMs ?? TYPING_INTERVAL_MS;
+    this.intercept = options.intercept;
   }
 
   start(): void {
@@ -72,7 +83,14 @@ export class DiscordBridge {
     if (text === null) return;
     this.log("accepted", { message: message.id, channel: message.channelId });
     await this.ledger.accept(message);
-    await this.reply(message, text);
+    const interception = await this.intercept?.(message, text);
+    if (interception !== undefined && "reply" in interception) {
+      await this.transport.send(message.channelId, interception.reply, message.id);
+      await this.ledger.answered(message.id);
+      this.log("intercepted", { message: message.id });
+      return;
+    }
+    await this.reply(message, interception?.text ?? text, interception?.conversationKey);
   }
 
   private async recover(): Promise<void> {
@@ -96,13 +114,13 @@ export class DiscordBridge {
     }
   }
 
-  private async reply(message: InboundMessage, text: string): Promise<void> {
+  private async reply(
+    message: InboundMessage,
+    text: string,
+    key = conversationKey(message),
+  ): Promise<void> {
     const reply = await this.whileTyping(message, () =>
-      this.agent.ask({
-        conversationKey: conversationKey(message),
-        requestId: `discord:${message.id}`,
-        text,
-      }),
+      this.agent.ask({ conversationKey: key, requestId: `discord:${message.id}`, text }),
     );
     const answer =
       reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;

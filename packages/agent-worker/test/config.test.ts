@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { DEFAULT_HELD_COMMANDS } from "../src/approvals.ts";
 import { loadWorkerConfig, parseWorkerConfig } from "../src/config.ts";
 
 const OWNER = "200000000000000002";
@@ -18,6 +19,7 @@ describe("parseWorkerConfig", () => {
       parseWorkerConfig({ discord, model: { provider: "echo" }, workspace: "work" }, "/srv/agent"),
     ).toEqual({
       agentDir: join(homedir(), ".pi", "agent"),
+      approvals: { held: DEFAULT_HELD_COMMANDS.map((pattern) => new RegExp(pattern, "u")) },
       discord: {
         directMessages: true,
         guilds: {},
@@ -62,6 +64,11 @@ describe("parseWorkerConfig", () => {
     [{ ...valid, model: { provider: "llama" } }, "model.provider must be one of"],
     [{ ...valid, model: { provider: "openai" } }, "model.modelId must be text"],
     [{ ...valid, agentDir: "" }, "agentDir must be text"],
+    [
+      { ...valid, approvals: { held: [3] } },
+      "approvals.held must be a list of regular expressions",
+    ],
+    [{ ...valid, approvals: { channelId: "x" } }, "approvals.channelId[0] must be a Discord id"],
     [{ ...valid, model: { login: "keychain", provider: "echo" } }, "model.login must be one of"],
     [
       { ...valid, model: { login: "openshell", provider: "echo" } },
@@ -130,5 +137,18 @@ describe("loadWorkerConfig", () => {
         "/",
       ),
     ).toThrow("inbox.channelIds[0] must be a Discord id");
+  });
+
+  it("reads held commands and a card channel for approvals", () => {
+    const config = parseWorkerConfig(
+      {
+        approvals: { channelId: "400000000000000004", held: ["^deploy"] },
+        discord,
+        model: { provider: "echo" },
+        workspace: "/w",
+      },
+      "/base",
+    );
+    expect(config.approvals).toEqual({ channelId: "400000000000000004", held: [/^deploy/u] });
   });
 });

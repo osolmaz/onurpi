@@ -5,6 +5,7 @@ export {
   TYPING_INTERVAL_MS,
   type BridgeLog,
   type BridgeOptions,
+  type Interception,
 } from "./bridge.ts";
 export { DISCORD_MESSAGE_LIMIT, splitForDiscord } from "./chunks.ts";
 export {

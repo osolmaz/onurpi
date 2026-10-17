@@ -215,28 +215,28 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 5. **Rollout.** Add the agent's instructions, skills, and scheduled jobs. Verify: a week of daily
    use and scheduled jobs runs without a lost or repeated answer.
 
-## Phase 1 status
+## Status
 
-Phase 1 is done. The worker has:
+Phases 1 to 4 have code in OnurPi; what was verified live is listed with each phase.
 
-- SQLite storage, Pi Durable's built-in tools, and the instructions that Pi would load: the
-  `AGENTS.md` in the Pi agent folder, then the context files from the root down to the workspace.
-- The `openai-codex` model on the owner's ChatGPT subscription, through the codex-switcher provider,
-  which reads the logins in the Pi agent folder in place. The other hosted providers and an `echo`
-  model for tests are also there.
-- The Discord adapter with the access rules per server and channel, one conversation per channel,
-  direct-message channel, or thread, and the Discord message id as the `requestId`. While the agent
-  works, the bot shows the typing indicator, and the answer is a reply to the message.
-- A ledger in the same storage that holds the accepted messages without an answer and the newest
-  message seen in each channel. On start, the bridge answers the waiting messages, unless the bot
-  already replied, and then the messages that arrived while no process ran.
-- A command that prints the OpenShell mount configuration for host folders or named volumes.
+- **Phase 1.** The worker, the Discord adapter, Pi's instructions, the ChatGPT subscription through
+  codex-switcher, per-channel access rules, and the reply ledger. A worker killed with SIGKILL
+  during a `bash` call posted exactly one reply after a restart.
+- **Phase 2.** The sandbox image, the network policy, and the `discord-bot` and `chatgpt-codex`
+  provider profiles. Inside the sandbox, Codex reads placeholders through a JWT-shaped wrapper, and
+  the gateway refreshes the access token. The workspace is mounted at `/sandbox/work`, because
+  OpenShell reserves `/sandbox/workspace` and the image's working folder. A test sandbox with the
+  owner's folders showed: uid 1001, both instruction files, hidden secrets, a writable workspace, a
+  read-only configuration, no sudo or Docker, a refused outside host, and no host home folder. The
+  gateway runs as the owner's user, not a separate user: that user already has sudo and Docker, so a
+  separate user would protect nothing; the boundary is the sandbox.
+- **Phase 3.** The inbox and `agent-worker deliver`; onurcron passes `ONURCRON_JOB_ID` and
+  `ONURCRON_SCHEDULED_FOR` to command jobs. Two deliveries of one scheduled time gave one answer in
+  Discord.
+- **Phase 4.** Approval cards for held `bash` commands, and the `agent-github` profile.
 
-Verified live: an answer from `gpt-6.1-sol` in Discord, and a worker killed with SIGKILL while its
-`bash` tool ran, which posted exactly one reply after a restart.
-
-Not done in phase 1: streaming edits, tool status lines, follow-ups and steers, thread forks,
-attachments, slash commands, and skills.
+Not done yet: streaming edits, tool status lines, follow-ups and steers, thread forks, attachments,
+slash commands, skills, and porting OnurPi extensions as Durable extensions.
 
 ## Open questions
 
