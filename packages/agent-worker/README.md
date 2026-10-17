@@ -1,8 +1,8 @@
 # agent-worker
 
-agent-worker is a personal coding agent built on Pi Durable that its owner talks to in Discord. It
-keeps every conversation in one SQLite file, so after a restart it continues unfinished work, and a
-Discord message that arrives twice is answered once.
+agent-worker is a personal coding agent built on Pi Durable that its owner talks to in Discord.
+Every conversation lives in one SQLite file. After a restart the worker continues unfinished work
+and answers the messages that came in meanwhile, and a message that arrives twice gets one answer.
 
 The package is private and is not a Pi extension.
 
