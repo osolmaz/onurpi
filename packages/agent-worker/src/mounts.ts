@@ -5,17 +5,20 @@ export type MountSource =
 
 export type SandboxRuntime = "docker" | "podman";
 
-export const WORKSPACE_TARGET = "/sandbox/workspace";
+export const WORKSPACE_TARGET = "/sandbox/work";
 export const CONFIG_TARGET = "/sandbox/config";
 /** The owner's global `AGENTS.md`, read-only. Use `/sandbox/pi-agent` as `agentDir` in the sandbox. */
 export const INSTRUCTIONS_TARGET = "/sandbox/pi-agent/AGENTS.md";
 
-type Mount = {
-  readonly type: "bind" | "volume" | "tmpfs";
-  readonly source?: string;
-  readonly target: string;
-  readonly read_only: boolean;
-};
+type Mount =
+  | {
+      readonly type: "bind" | "volume";
+      readonly source: string;
+      readonly target: string;
+      readonly read_only: boolean;
+    }
+  // The Docker driver takes no read-only flag for tmpfs; an empty tmpfs hides the path either way.
+  | { readonly type: "tmpfs"; readonly target: string };
 
 export type SandboxMounts = {
   readonly workspace: MountSource;
@@ -39,7 +42,7 @@ function hidden(path: string): Mount {
   }
   const target = `${WORKSPACE_TARGET}/${relative}`;
   return path.endsWith("/")
-    ? { read_only: true, target, type: "tmpfs" }
+    ? { target, type: "tmpfs" }
     : { read_only: true, source: "/dev/null", target, type: "bind" };
 }
 

@@ -66,7 +66,7 @@ host
 ├── OpenShell gateway (stores providers and policy)
 ├── scheduler (delivers job prompts)
 └── OpenShell sandbox    ├── agent worker: Pi Durable, Discord adapter
-    ├── /sandbox/workspace (mounted, read-write): SQLite storage, AGENTS.md, skills, repositories
+    ├── /sandbox/work (mounted, read-write): SQLite storage, AGENTS.md, skills, repositories
     └── /sandbox/config (mounted, read-only): worker settings
             │
             └── proxy ──► Discord, model providers, GitHub, package registries
