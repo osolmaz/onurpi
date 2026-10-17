@@ -36,7 +36,8 @@ function snowflake(value: string, path: string): string {
   return value;
 }
 
-function snowflakes(value: unknown, path: string): readonly string[] {
+/** Reads a list of Discord ids, given as strings of digits. */
+export function parseDiscordIds(value: unknown, path: string): readonly string[] {
   if (!Array.isArray(value)) throw new Error(`${path} must be a list of Discord ids`);
   return value.map((item, index) =>
     snowflake(typeof item === "string" ? item : "", `${path}[${index}]`),
@@ -72,7 +73,7 @@ function parseGuild(value: unknown, path: string): GuildConfig {
 /** Reads and checks the adapter part of the worker configuration. */
 export function parseAdapterConfig(value: unknown, path = "discord"): AdapterConfig {
   const input = record(value, path);
-  const ownerIds = snowflakes(input["ownerIds"], `${path}.ownerIds`);
+  const ownerIds = parseDiscordIds(input["ownerIds"], `${path}.ownerIds`);
   if (ownerIds.length === 0) throw new Error(`${path}.ownerIds must name at least one owner`);
   const guilds = Object.entries(record(input["guilds"] ?? {}, `${path}.guilds`)).map(
     ([id, guild]) => {

@@ -6,6 +6,7 @@ import {
 } from "@onurpi/discord-adapter";
 import { openAgent, type RunningAgent } from "./agent.ts";
 import type { WorkerConfig } from "./config.ts";
+import { Inbox } from "./inbox.ts";
 import { workerModels } from "./models.ts";
 
 export type Worker = {
@@ -58,11 +59,24 @@ export async function startWorker(
     transport,
   });
   bridge.start();
+  const inbox =
+    config.inbox === undefined
+      ? undefined
+      : new Inbox({
+          agent,
+          channelIds: config.inbox.channelIds,
+          folder: config.inbox.folder,
+          ledger: agent.jobs,
+          log: dependencies.log,
+          transport,
+        });
+  inbox?.start();
   dependencies.log("ready", {
     bot: transport.botUserId,
     model: `${config.model.provider}/${config.model.modelId}`,
   });
   const stop = async () => {
+    await inbox?.stop();
     await bridge.idle();
     await transport.close();
     await agent.close();

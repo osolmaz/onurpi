@@ -104,4 +104,31 @@ describe("loadWorkerConfig", () => {
     );
     expect(loadWorkerConfig(file).workspace).toBe(join(folder, "workspace"));
   });
+
+  it("reads an inbox folder and its channels", () => {
+    const config = parseWorkerConfig(
+      {
+        discord,
+        inbox: { channelIds: ["400000000000000004"], folder: ".agent-worker/inbox" },
+        model: { provider: "echo" },
+        workspace: "/srv/agent",
+      },
+      "/srv/config",
+    );
+    expect(config.inbox).toEqual({
+      channelIds: ["400000000000000004"],
+      folder: "/srv/config/.agent-worker/inbox",
+    });
+    expect(() =>
+      parseWorkerConfig(
+        {
+          discord,
+          inbox: { channelIds: ["1"], folder: "x" },
+          model: { provider: "echo" },
+          workspace: "/w",
+        },
+        "/",
+      ),
+    ).toThrow("inbox.channelIds[0] must be a Discord id");
+  });
 });

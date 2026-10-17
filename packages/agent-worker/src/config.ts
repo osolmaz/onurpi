@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
   answersWithoutMention,
   parseAdapterConfig,
+  parseDiscordIds,
   type AdapterConfig,
 } from "@onurpi/discord-adapter";
 
@@ -41,6 +42,8 @@ export type WorkerConfig = {
      */
     readonly login: CodexLogin;
   };
+  /** Scheduled prompts that the host scheduler delivers, with the channels they may post to. */
+  readonly inbox?: { readonly folder: string; readonly channelIds: readonly string[] };
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -120,9 +123,18 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
     input["agentDir"] === undefined
       ? join(homedir(), ".pi", "agent")
       : at(text(input["agentDir"], "agentDir"));
+  const inbox = input["inbox"] === undefined ? undefined : record(input["inbox"], "inbox");
   return {
     agentDir,
     discord: parseDiscord(input["discord"]),
+    ...(inbox === undefined
+      ? {}
+      : {
+          inbox: {
+            channelIds: parseDiscordIds(inbox["channelIds"], "inbox.channelIds"),
+            folder: at(text(inbox["folder"], "inbox.folder")),
+          },
+        }),
     model: parseModel(input["model"]),
     storage,
     workspace,

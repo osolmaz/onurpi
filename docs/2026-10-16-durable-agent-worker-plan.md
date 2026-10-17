@@ -158,10 +158,13 @@ mistakes. It is not a security limit, because the agent can change the worker th
 ## Scheduling
 
 The scheduler on the host keeps its schedules and its run records. For each job it delivers the
-prompt into the sandbox as a file in an inbox directory of the workspace, using OpenShell's upload
-command. The file name is the job id plus the scheduled time. The worker watches the inbox and
-submits each new file with that name as its `requestId`, so a retried delivery never runs a job
-twice. The worker posts the job's answer to the job's Discord channel.
+prompt as a file in an inbox folder of the workspace, with `agent-worker deliver`. The workspace is
+a host folder, so the scheduler writes the file directly; a named volume would need OpenShell's
+upload command instead. The file name is the job id plus the scheduled time, which the scheduler
+passes to command jobs as `ONURCRON_JOB_ID` and `ONURCRON_SCHEDULED_FOR`. The worker watches the
+inbox and submits each new file with that name as its `requestId`, so a retried delivery never runs
+a job twice. The worker posts the job's answer to the job's Discord channel, which must be one of
+the inbox's configured channels.
 
 ## Storage
 

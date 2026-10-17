@@ -55,12 +55,32 @@ dependencies import `.ts` files by `.js` paths. The bot token must be in the env
 that `tokenEnv` names. The worker prints one JSON line per event and stops cleanly on Ctrl-C after
 running answers finish.
 
+## Scheduled prompts
+
+With an `inbox` in the configuration, the worker answers prompts that a scheduler drops into a
+folder and posts each answer to the prompt's Discord channel:
+
+```json
+"inbox": { "folder": "inbox", "channelIds": ["<a channel id>"] }
+```
+
+The scheduler delivers a prompt with:
+
+```bash
+node --import jiti/register packages/agent-worker/src/cli.ts deliver \
+  --inbox /path/to/inbox --channel "<a channel id>" --prompt "Write today's digest."
+```
+
+The file name is the job id and the scheduled time. Under onurcron they come from `ONURCRON_JOB_ID`
+and `ONURCRON_SCHEDULED_FOR`; `--job` and `--scheduled-for` set them by hand. A second delivery of
+the same scheduled time writes nothing, and each delivery is answered once.
+
 ## Mount its folders in OpenShell
 
 The agent is meant to run inside an OpenShell sandbox, with its workspace mounted read-write at
-`/sandbox/work` and its configuration mounted read-only at `/sandbox/config`. The `mounts`
-command prints the value for `openshell sandbox create --driver-config-json`. Each folder is a host
-folder or a named volume:
+`/sandbox/work` and its configuration mounted read-only at `/sandbox/config`. The `mounts` command
+prints the value for `openshell sandbox create --driver-config-json`. Each folder is a host folder
+or a named volume:
 
 ```bash
 node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime docker \

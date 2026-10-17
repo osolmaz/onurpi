@@ -22,6 +22,7 @@ import type {
   ReplyLedger,
 } from "@onurpi/discord-adapter";
 import type { WorkerConfig } from "./config.ts";
+import type { JobLedger } from "./inbox.ts";
 
 const context = BACKGROUND_CONTEXT;
 
@@ -100,7 +101,30 @@ function discordLedger(harness: Harness): ReplyLedger {
   };
 }
 
+/** Which scheduled deliveries already have their answer in Discord. */
+const JobPosts = defineDoc<{ posted: Record<string, string> }>({
+  initial: () => ({ posted: {} }),
+  kind: "agent-worker.job-posts",
+  scope: "session",
+  version: 1,
+});
+
+function jobLedger(harness: Harness): JobLedger {
+  return {
+    markPosted: (requestId, messageId) =>
+      harness.commit(async (tx) => {
+        (await tx.doc(JobPosts)).posted[requestId] = messageId;
+      }, context),
+    posted: async (requestId) => {
+      const posts = await harness.snapshot(JobPosts, context);
+      return posts !== undefined && requestId in posts.posted;
+    },
+  };
+}
+
 export type RunningAgent = AgentPort & {
+  /** The inbox's record of scheduled deliveries that already have their answer in Discord. */
+  readonly jobs: JobLedger;
   /** The Discord bridge's record of unanswered messages and channel positions. */
   readonly ledger: ReplyLedger;
   /** Conversation that holds a chat key, created on first use. */
@@ -167,6 +191,7 @@ export async function openAgent(config: WorkerConfig, models: Models): Promise<R
     ask,
     close: () => harness.close(context),
     conversationFor,
+    jobs: jobLedger(harness),
     ledger: discordLedger(harness),
   };
 }

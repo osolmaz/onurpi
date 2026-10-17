@@ -148,4 +148,15 @@ describe("openAgent", () => {
     expect(await second.ledger.pending()).toEqual([waiting]);
     expect(await second.ledger.positions()).toEqual({ "400000000000000004": "600000000000000009" });
   });
+
+  it("keeps the record of posted job answers across a restart", async () => {
+    const config = workspace();
+    const first = await open(config);
+    expect(await first.jobs.posted("job:digest@2026-10-18T01:00:00.000Z")).toBe(false);
+    await first.jobs.markPosted("job:digest@2026-10-18T01:00:00.000Z", "message-1");
+    await agents.pop()?.close();
+
+    const second = await open(config);
+    expect(await second.jobs.posted("job:digest@2026-10-18T01:00:00.000Z")).toBe(true);
+  });
 });
