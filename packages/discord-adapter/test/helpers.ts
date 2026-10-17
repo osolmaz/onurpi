@@ -4,6 +4,7 @@ import type {
   AgentRequest,
   ChatTransport,
   InboundMessage,
+  ReplyLedger,
 } from "../src/types.ts";
 
 export const BOT = "100000000000000001";
@@ -53,6 +54,56 @@ export class FakeTransport implements ChatTransport {
     const id = `sent-${this.posted.length + 1}`;
     this.posted.push({ channelId, id, replyTo, text });
     return Promise.resolve(id);
+  }
+
+  /** Messages the channel holds, as `fetchAfter` returns them. */
+  readonly history: InboundMessage[] = [];
+
+  fetchAfter(
+    channelId: string,
+    afterId: string,
+    limit: number,
+  ): Promise<readonly InboundMessage[]> {
+    return Promise.resolve(
+      this.history
+        .filter((item) => item.channelId === channelId && BigInt(item.id) > BigInt(afterId))
+        .slice(0, limit),
+    );
+  }
+
+  hasReply(_channelId: string, messageId: string): Promise<boolean> {
+    return Promise.resolve(this.posted.some((item) => item.replyTo === messageId));
+  }
+}
+
+/** A ledger kept in memory, as the worker keeps it in storage. */
+export class FakeLedger implements ReplyLedger {
+  readonly accepted = new Map<string, InboundMessage>();
+  readonly seenIds = new Map<string, string>();
+
+  accept(message: InboundMessage): Promise<void> {
+    this.accepted.set(message.id, message);
+    return Promise.resolve();
+  }
+
+  answered(messageId: string): Promise<void> {
+    this.accepted.delete(messageId);
+    return Promise.resolve();
+  }
+
+  pending(): Promise<readonly InboundMessage[]> {
+    return Promise.resolve([...this.accepted.values()]);
+  }
+
+  seen(channelId: string, messageId: string): Promise<void> {
+    const last = this.seenIds.get(channelId);
+    if (last === undefined || BigInt(messageId) > BigInt(last))
+      this.seenIds.set(channelId, messageId);
+    return Promise.resolve();
+  }
+
+  positions(): Promise<Readonly<Record<string, string>>> {
+    return Promise.resolve(Object.fromEntries(this.seenIds));
   }
 }
 

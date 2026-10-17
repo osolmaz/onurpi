@@ -1,5 +1,11 @@
 export { acceptMessage, conversationKey } from "./access.ts";
-export { DiscordBridge, TYPING_INTERVAL_MS, type BridgeLog } from "./bridge.ts";
+export {
+  DiscordBridge,
+  MISSED_MESSAGE_LIMIT,
+  TYPING_INTERVAL_MS,
+  type BridgeLog,
+  type BridgeOptions,
+} from "./bridge.ts";
 export { DISCORD_MESSAGE_LIMIT, splitForDiscord } from "./chunks.ts";
 export {
   answersWithoutMention,
@@ -19,4 +25,5 @@ export type {
   AgentRequest,
   ChatTransport,
   InboundMessage,
+  ReplyLedger,
 } from "./types.ts";

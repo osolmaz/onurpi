@@ -121,4 +121,31 @@ describe("openAgent", () => {
 
     expect(await agent.ask(request)).toMatchObject({ kind: "failed" });
   });
+
+  it("keeps the Discord ledger across a restart, with positions that only move forward", async () => {
+    const config = workspace();
+    const first = await open(config);
+    const waiting = {
+      authorId: "200000000000000002",
+      authorIsBot: false,
+      channelId: "400000000000000004",
+      content: "hi",
+      guildId: "700000000000000007",
+      id: "600000000000000006",
+      isDirect: false,
+      mentionsBot: true,
+      parentChannelId: null,
+    };
+    await first.ledger.accept(waiting);
+    await first.ledger.accept({ ...waiting, id: "600000000000000007" });
+    await first.ledger.answered("600000000000000007");
+    await first.ledger.answered("600000000000000099");
+    await first.ledger.seen("400000000000000004", "600000000000000009");
+    await first.ledger.seen("400000000000000004", "600000000000000008");
+    await agents.pop()?.close();
+
+    const second = await open(config);
+    expect(await second.ledger.pending()).toEqual([waiting]);
+    expect(await second.ledger.positions()).toEqual({ "400000000000000004": "600000000000000009" });
+  });
 });

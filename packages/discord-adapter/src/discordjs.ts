@@ -73,5 +73,21 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
     startTyping: async (channelId) => {
       await (await sendable(client, channelId)).sendTyping();
     },
+    fetchAfter: async (channelId, afterId, limit) => {
+      const messages = await (
+        await sendable(client, channelId)
+      ).messages.fetch({ after: afterId, limit });
+      return [...messages.values()]
+        .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+        .map((message) => toInbound(message, botUserId));
+    },
+    hasReply: async (channelId, messageId) => {
+      const later = await (
+        await sendable(client, channelId)
+      ).messages.fetch({ after: messageId, limit: 100 });
+      return later.some(
+        (message) => message.author.id === botUserId && message.reference?.messageId === messageId,
+      );
+    },
   };
 }
