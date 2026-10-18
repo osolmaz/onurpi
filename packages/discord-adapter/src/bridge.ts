@@ -156,15 +156,20 @@ export class DiscordBridge {
     this.log("answered", { message: message.id, outcome: reply.kind });
   }
 
-  /** Posts the answer, into the progress message when it exists, otherwise as a fresh reply. */
+  /** Posts the answer, into the progress message when one was started, otherwise as a reply. */
   private async post(
     message: InboundMessage,
     editor: ProgressEditor | undefined,
     answer: string,
   ): Promise<void> {
     const [first, ...rest] = splitForDiscord(answer);
-    if (editor?.posted) await editor.finish(first ?? answer);
-    else await this.transport.send(message.channelId, first ?? answer, message.id);
+    if (editor?.started) {
+      if (!(await editor.finish(first ?? answer))) {
+        await this.transport.send(message.channelId, first ?? answer, message.id);
+      }
+    } else {
+      await this.transport.send(message.channelId, first ?? answer, message.id);
+    }
     for (const chunk of rest) await this.transport.send(message.channelId, chunk);
   }
 

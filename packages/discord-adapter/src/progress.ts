@@ -41,6 +41,11 @@ export class ProgressEditor {
     return this.messageId !== undefined;
   }
 
+  /** Whether a status message was posted or is being posted, so the answer must edit, not send. */
+  get started(): boolean {
+    return this.starting || this.messageId !== undefined;
+  }
+
   /** Adds one note about what the agent is doing now. Notes after `finish` are ignored. */
   note(label: string): void {
     if (this.finished) return;
@@ -64,21 +69,30 @@ export class ProgressEditor {
     }
   }
 
-  /** Replaces the status message with the answer. Without one, the caller posts the answer. */
-  finish(text: string): Promise<void> {
+  /**
+   * Replaces the status message with the answer. Resolves to true when the answer went into the
+   * status message, and to false when there was none and the caller must send it. The chain runs
+   * the edit after a post that is still in flight, so the answer is never posted twice.
+   */
+  finish(text: string): Promise<boolean> {
     this.finished = true;
     if (this.scheduled !== undefined) clearTimeout(this.scheduled);
     this.scheduled = undefined;
     return this.enqueue(async () => {
       const id = this.messageId;
       this.messageId = undefined;
-      if (id !== undefined) await this.edit(id, text);
+      if (id === undefined) return false;
+      await this.edit(id, text);
+      return true;
     });
   }
 
-  private enqueue(work: () => Promise<void>): Promise<void> {
+  private enqueue<T>(work: () => Promise<T>): Promise<T> {
     const tracked = this.chain.then(work, work);
-    this.chain = tracked.catch(() => undefined);
+    this.chain = tracked.then(
+      () => undefined,
+      () => undefined,
+    );
     return tracked;
   }
 
