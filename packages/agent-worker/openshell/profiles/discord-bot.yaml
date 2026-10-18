@@ -14,8 +14,10 @@ endpoints:
   - host: discord.com
     port: 443
     protocol: rest
-    access: read-write
     enforcement: enforce
+    rules:
+      # The whole REST API, including the reaction DELETE the acknowledgment uses.
+      - allow: { method: "*", path: "/api/v10/**" }
   - host: "*.discord.gg"
     port: 443
     protocol: websocket
