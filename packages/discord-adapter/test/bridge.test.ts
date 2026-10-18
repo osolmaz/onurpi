@@ -9,6 +9,7 @@ import {
   FakeTransport,
   message,
   oneChannel,
+  ProgressAgent,
   STRANGER,
 } from "./helpers.ts";
 
@@ -18,11 +19,12 @@ function setup(
   agent = new FakeAgent(),
   ledger = new FakeLedger(),
   transport = new FakeTransport(),
+  overrides: Record<string, unknown> = {},
 ) {
   const events: string[] = [];
   const bridge = new DiscordBridge({
     agent,
-    config,
+    config: parseAdapterConfig({ ...oneChannel(), ...overrides }),
     ledger,
     log: (event) => events.push(event),
     transport,
@@ -253,5 +255,94 @@ describe("DiscordBridge after a restart", () => {
     await bridge.idle();
 
     expect(events).toEqual(["catch_up_failed"]);
+  });
+});
+
+describe("DiscordBridge with reactions and progress", () => {
+  it("reacts when it accepts a message and clears the reaction once the answer is in", async () => {
+    const { bridge, transport } = setup(new FakeAgent(), new FakeLedger(), new FakeTransport(), {
+      ackReaction: "👀",
+    });
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.reacted).toEqual([
+      { channelId: CHANNEL, emoji: "👀", messageId: "600000000000000006" },
+    ]);
+    expect(transport.unreacted).toEqual([
+      { channelId: CHANNEL, emoji: "👀", messageId: "600000000000000006" },
+    ]);
+  });
+
+  it("answers on the normal path when no progress note arrived", async () => {
+    const { bridge, transport } = setup(new FakeAgent(), new FakeLedger(), new FakeTransport(), {
+      progress: true,
+    });
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.posted).toEqual([
+      { channelId: CHANNEL, id: "sent-1", replyTo: "600000000000000006", text: "Echo: hello" },
+    ]);
+    expect(transport.edits).toEqual([]);
+  });
+
+  it("posts the progress notes into one message and edits it into the answer", async () => {
+    const { bridge, transport } = setup(
+      new ProgressAgent(["Thinking", "bash: git status"]),
+      new FakeLedger(),
+      new FakeTransport(),
+      { progress: true },
+    );
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.posted).toEqual([
+      {
+        channelId: CHANNEL,
+        id: "sent-1",
+        replyTo: "600000000000000006",
+        text: "- Thinking\n- bash: git status",
+      },
+    ]);
+    expect(transport.edits.map((edit) => edit.text)).toEqual(["Echo: hello"]);
+    expect(transport.unreacted).toEqual([]);
+  });
+
+  it("edits the failure into the status message when the agent fails", async () => {
+    const agent = new FakeAgent(() => ({ kind: "failed", reason: "the model is unreachable" }));
+    agent.progress = ["Thinking"];
+    const { bridge, transport } = setup(agent, new FakeLedger(), new FakeTransport(), {
+      progress: true,
+    });
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.edits.map((edit) => edit.text)).toEqual([
+      "Sorry, I could not answer: the model is unreachable",
+    ]);
+    expect(transport.posted.map((item) => item.text)).toEqual(["- Thinking"]);
+  });
+
+  it("logs a failed reaction and still answers", async () => {
+    const transport = new FakeTransport();
+    transport.react = () => Promise.reject(new Error("missing permissions"));
+    const { bridge, events } = setup(new FakeAgent(), new FakeLedger(), transport, {
+      ackReaction: "👀",
+    });
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.posted.map((item) => item.text)).toEqual(["Echo: hello"]);
+    expect(events).toEqual(["accepted", "react_failed", "answered"]);
+  });
+
+  it("does not react when the configuration names no emoji", async () => {
+    const { bridge, transport } = setup();
+    transport.emit(message());
+    await bridge.idle();
+
+    expect(transport.reacted).toEqual([]);
+    expect(transport.unreacted).toEqual([]);
   });
 });

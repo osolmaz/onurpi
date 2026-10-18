@@ -1,7 +1,15 @@
 import { acceptMessage, conversationKey } from "./access.ts";
 import { splitForDiscord } from "./chunks.ts";
+import { ProgressEditor } from "./progress.ts";
 import type { AdapterConfig } from "./config.ts";
-import type { AgentPort, AgentReply, ChatTransport, InboundMessage, ReplyLedger } from "./types.ts";
+import type {
+  AgentPort,
+  AgentReply,
+  BridgeLog,
+  ChatTransport,
+  InboundMessage,
+  ReplyLedger,
+} from "./types.ts";
 
 /** Discord shows a typing indicator for about 10 seconds, so the bridge sends it again sooner. */
 export const TYPING_INTERVAL_MS = 8000;
@@ -9,7 +17,7 @@ export const TYPING_INTERVAL_MS = 8000;
 /** How many missed messages the bridge reads per channel after a restart. */
 export const MISSED_MESSAGE_LIMIT = 100;
 
-export type BridgeLog = (event: string, details: Readonly<Record<string, string>>) => void;
+export type { BridgeLog } from "./types.ts";
 
 /**
  * What an intercept makes of an accepted message: a direct reply without the agent, or other text
@@ -119,16 +127,67 @@ export class DiscordBridge {
     text: string,
     key = conversationKey(message),
   ): Promise<void> {
+    await this.acknowledge(message);
+    const editor =
+      this.config.progress === undefined
+        ? undefined
+        : new ProgressEditor({
+            channelId: message.channelId,
+            intervalMs: this.config.progress.intervalMs,
+            log: this.log,
+            replyTo: message.id,
+            transport: this.transport,
+          });
     const reply = await this.whileTyping(message, () =>
-      this.agent.ask({ conversationKey: key, requestId: `discord:${message.id}`, text }),
+      this.agent.ask(
+        { conversationKey: key, requestId: `discord:${message.id}`, text },
+        editor === undefined
+          ? undefined
+          : (progress) => {
+              editor.note(progress.label);
+            },
+      ),
     );
     const answer =
       reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;
-    const [first, ...rest] = splitForDiscord(answer);
-    await this.transport.send(message.channelId, first ?? answer, message.id);
-    for (const chunk of rest) await this.transport.send(message.channelId, chunk);
+    await this.post(message, editor, answer);
+    await this.dismiss(message);
     await this.ledger.answered(message.id);
     this.log("answered", { message: message.id, outcome: reply.kind });
+  }
+
+  /** Posts the answer, into the progress message when it exists, otherwise as a fresh reply. */
+  private async post(
+    message: InboundMessage,
+    editor: ProgressEditor | undefined,
+    answer: string,
+  ): Promise<void> {
+    const [first, ...rest] = splitForDiscord(answer);
+    if (editor?.posted) await editor.finish(first ?? answer);
+    else await this.transport.send(message.channelId, first ?? answer, message.id);
+    for (const chunk of rest) await this.transport.send(message.channelId, chunk);
+  }
+
+  /** Reacts to the message the agent is about to answer, so the owner sees it was picked up. */
+  private async acknowledge(message: InboundMessage): Promise<void> {
+    const emoji = this.config.ackReaction;
+    if (emoji === undefined) return;
+    try {
+      await this.transport.react?.(message.channelId, message.id, emoji);
+    } catch (error) {
+      this.log("react_failed", { message: message.id, error: String(error) });
+    }
+  }
+
+  /** Removes the acknowledgment, because the answer is in. */
+  private async dismiss(message: InboundMessage): Promise<void> {
+    const emoji = this.config.ackReaction;
+    if (emoji === undefined) return;
+    try {
+      await this.transport.unreact?.(message.channelId, message.id, emoji);
+    } catch (error) {
+      this.log("unreact_failed", { message: message.id, error: String(error) });
+    }
   }
 
   /** Keeps the typing indicator on until the agent has answered or failed. */
