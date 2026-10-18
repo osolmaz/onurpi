@@ -23,6 +23,7 @@ import type {
   AgentReply,
   AgentRequest,
   InboundMessage,
+  ProgressSink,
   ReplyLedger,
 } from "@onurpi/discord-adapter";
 import { AntiRepeatWatcher, type AntiRepeatFeedback } from "./anti-repeat.ts";
@@ -174,10 +175,12 @@ type AskAgent = {
   readonly conversationFor: (key: string) => Promise<ConversationId>;
   readonly harness: Harness;
   readonly request: AgentRequest;
+  readonly onProgress?: ProgressSink;
   readonly watchListener: (
     conversation: Conversation,
     watcher: AntiRepeatWatcher,
     seen: { feedback: AntiRepeatFeedback | null },
+    onProgress?: ProgressSink,
   ) => (events: readonly AgentEvent[]) => Promise<void>;
   readonly watchers: Map<ConversationId, AntiRepeatWatcher>;
 };
@@ -190,11 +193,12 @@ function watcherFor(watchers: Map<ConversationId, AntiRepeatWatcher>, id: Conver
   return watcher;
 }
 
-/** The watch listener: run the policy, and abort a repeating streamed response once. */
+/** The watch listener: run the policy, abort a repeating streamed response once, and note progress. */
 function watchListener(
   conversation: Conversation,
   watcher: AntiRepeatWatcher,
   seen: { feedback: AntiRepeatFeedback | null },
+  onProgress?: ProgressSink,
 ): (events: readonly AgentEvent[]) => Promise<void> {
   let aborting = false;
   return async (events) => {
@@ -203,7 +207,67 @@ function watchListener(
       aborting = true;
       await conversation.abort(context).catch(() => undefined);
     }
+    if (onProgress !== undefined) {
+      const label = progressOf(events);
+      if (label !== undefined) onProgress({ label });
+    }
   };
+}
+
+/**
+ * The one progress label a batch of events is about, or none. Later events in the batch win, so
+ * the label names what the agent is doing now: thinking, writing, a tool call, or the text of an
+ * intermediate answer.
+ */
+export function progressOf(events: readonly AgentEvent[]): string | undefined {
+  let label: string | undefined;
+  for (const event of events) label = progressOfEvent(event, label);
+  return label;
+}
+
+/** The label one event contributes, on top of what earlier events in its batch already said. */
+function progressOfEvent(event: AgentEvent, previous: string | undefined): string | undefined {
+  if (event.type === "tool_execution_start") return toolLabel(event.toolName, event.args);
+  if (event.type === "message_update") return changeLabel(event.changes, previous);
+  if (event.type === "message_end") return assistantText(event.entry) ?? previous;
+  return previous;
+}
+
+/** The newest activity one in-flight message shows: thinking, or writing its answer. */
+function changeLabel(
+  changes: readonly { readonly type: string }[],
+  previous: string | undefined,
+): string | undefined {
+  let updated = previous;
+  for (const change of changes) {
+    if (change.type === "thinking_start" || change.type === "thinking_delta") updated = "Thinking";
+    else if (change.type === "text_start" || change.type === "text_delta") updated = "Writing";
+  }
+  return updated;
+}
+
+/** The first line of an intermediate assistant answer, shortened. */
+function assistantText(entry: { readonly model?: readonly Message[] }): string | undefined {
+  const message = entry.model?.at(-1);
+  if (message?.role !== "assistant") return undefined;
+  const text = message.content
+    .map((block) => (block.type === "text" ? block.text : ""))
+    .join(" ")
+    .trim();
+  if (text.length === 0) return undefined;
+  return shorten(text.split("\n", 1)[0] ?? text, 96);
+}
+
+/** What a tool call is doing, as `name: first argument`. */
+function toolLabel(name: string, args: Record<string, unknown>): string {
+  const values = Object.values(args);
+  const head =
+    values.length === 1 && typeof values[0] === "string" ? values[0] : JSON.stringify(args);
+  return `${name}: ${shorten(head.replaceAll("\n", " ").trim(), 96)}`;
+}
+
+function shorten(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
 /** Awaits one submission and turns its settled answer into a reply. */
@@ -238,7 +302,7 @@ async function askAgent(ask: AskAgent): Promise<AgentReply> {
 
   const watch = await watchEvents(harness, conversationId, context);
   const seen: { feedback: AntiRepeatFeedback | null } = { feedback: null };
-  watch.start(watchListener(conversation, watcher, seen));
+  watch.start(watchListener(conversation, watcher, seen, ask.onProgress));
   const reply = await replyOf(
     conversation,
     await conversation.submit(
@@ -305,7 +369,7 @@ export async function openAgent(
   // One Anti-Repeat watcher per conversation, kept across runs of that conversation.
   const watchers = new Map<ConversationId, AntiRepeatWatcher>();
 
-  const ask = (request: AgentRequest): Promise<AgentReply> =>
+  const ask = (request: AgentRequest, onProgress?: ProgressSink): Promise<AgentReply> =>
     askAgent({
       agent,
       conversationFor,
@@ -313,6 +377,7 @@ export async function openAgent(
       request,
       watchListener,
       watchers,
+      ...(onProgress === undefined ? {} : { onProgress }),
     });
 
   return {

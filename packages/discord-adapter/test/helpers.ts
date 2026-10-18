@@ -35,6 +35,9 @@ export class FakeTransport implements ChatTransport {
   readonly botUserId = BOT;
   readonly posted: Posted[] = [];
   readonly typing: string[] = [];
+  readonly reacted: { channelId: string; emoji: string; messageId: string }[] = [];
+  readonly unreacted: { channelId: string; emoji: string; messageId: string }[] = [];
+  readonly edits: { channelId: string; id: string; text: string }[] = [];
   private handler: ((message: InboundMessage) => void) | undefined;
 
   onMessage(handler: (message: InboundMessage) => void): void {
@@ -54,6 +57,21 @@ export class FakeTransport implements ChatTransport {
     const id = `sent-${this.posted.length + 1}`;
     this.posted.push({ channelId, id, replyTo, text });
     return Promise.resolve(id);
+  }
+
+  edit(channelId: string, messageId: string, text: string): Promise<void> {
+    this.edits.push({ channelId, id: messageId, text });
+    return Promise.resolve();
+  }
+
+  react(channelId: string, messageId: string, emoji: string): Promise<void> {
+    this.reacted.push({ channelId, emoji, messageId });
+    return Promise.resolve();
+  }
+
+  unreact(channelId: string, messageId: string, emoji: string): Promise<void> {
+    this.unreacted.push({ channelId, emoji, messageId });
+    return Promise.resolve();
   }
 
   /** Messages the channel holds, as `fetchAfter` returns them. */
@@ -120,9 +138,31 @@ export class FakeAgent implements AgentPort {
     this.reply = reply;
   }
 
-  ask(request: AgentRequest): Promise<AgentReply> {
+  ask(
+    request: AgentRequest,
+    onProgress?: (progress: { label: string }) => void,
+  ): Promise<AgentReply> {
     this.requests.push(request);
+    for (const label of this.progress) onProgress?.({ label });
     return Promise.resolve(this.reply(request));
+  }
+
+  /** Progress notes the next ask emits while it works. */
+  progress: string[] = [];
+}
+
+/** An agent that answers after emitting fixed progress notes. */
+export class ProgressAgent extends FakeAgent {
+  constructor(private readonly labels: string[]) {
+    super();
+  }
+
+  override ask(
+    request: AgentRequest,
+    onProgress?: (progress: { label: string }) => void,
+  ): Promise<AgentReply> {
+    this.progress = [...this.labels];
+    return super.ask(request, onProgress);
   }
 }
 

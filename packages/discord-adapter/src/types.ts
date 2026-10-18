@@ -1,3 +1,6 @@
+/** How the adapter logs: one line per event, as the worker's log keeps them. */
+export type BridgeLog = (event: string, details: Readonly<Record<string, string>>) => void;
+
 /** A Discord message as the adapter sees it, independent of the Discord client library. */
 export type InboundMessage = {
   readonly id: string;
@@ -26,6 +29,12 @@ export type ChatTransport = {
   fetchAfter(channelId: string, afterId: string, limit: number): Promise<readonly InboundMessage[]>;
   /** Whether the bot already replied to a message. */
   hasReply(channelId: string, messageId: string): Promise<boolean>;
+  /** Reacts to a message. Absent when the transport cannot react. */
+  react?(channelId: string, messageId: string, emoji: string): Promise<void>;
+  /** Removes the bot's own reaction. Absent when the transport cannot react. */
+  unreact?(channelId: string, messageId: string, emoji: string): Promise<void>;
+  /** Replaces a posted message's text. Absent when the transport cannot edit. */
+  edit?(channelId: string, messageId: string, text: string): Promise<void>;
 };
 
 /**
@@ -48,11 +57,19 @@ export type AgentRequest = {
   readonly text: string;
 };
 
+/** One short note about what the agent is doing while it works on a request. */
+export type AgentProgress = {
+  readonly label: string;
+};
+
+/** Receives the progress notes of one running answer, when the adapter shows progress. */
+export type ProgressSink = (progress: AgentProgress) => void;
+
 export type AgentReply =
   | { readonly kind: "answer"; readonly text: string }
   | { readonly kind: "failed"; readonly reason: string };
 
 /** What the adapter needs from the agent. The worker implements it with Pi Durable. */
 export type AgentPort = {
-  ask(request: AgentRequest): Promise<AgentReply>;
+  ask(request: AgentRequest, onProgress?: ProgressSink): Promise<AgentReply>;
 };

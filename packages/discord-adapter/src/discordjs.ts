@@ -89,5 +89,18 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
         (message) => message.author.id === botUserId && message.reference?.messageId === messageId,
       );
     },
+    edit: async (channelId, messageId, text) => {
+      const message = await (await sendable(client, channelId)).messages.fetch(messageId);
+      await message.edit({ allowedMentions: { parse: [] }, content: text });
+    },
+    react: async (channelId, messageId, emoji) => {
+      const message = await (await sendable(client, channelId)).messages.fetch(messageId);
+      await message.react(emoji);
+    },
+    unreact: async (channelId, messageId, emoji) => {
+      const message = await (await sendable(client, channelId)).messages.fetch(messageId);
+      const reaction = message.reactions.cache.find((item) => item.emoji.name === emoji);
+      await reaction?.remove();
+    },
   };
 }

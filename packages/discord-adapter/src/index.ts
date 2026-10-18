@@ -17,15 +17,23 @@ export {
   type GuildConfig,
 } from "./config.ts";
 export {
+  MAX_STATUS_CHARS,
+  MAX_STATUS_NOTES,
+  ProgressEditor,
+  PROGRESS_INTERVAL_MS,
+} from "./progress.ts";
+export {
   connectDiscord,
   type DiscordTransport,
   type DiscordTransportOptions,
 } from "./discordjs.ts";
 export type {
   AgentPort,
+  AgentProgress,
   AgentReply,
   AgentRequest,
   ChatTransport,
   InboundMessage,
+  ProgressSink,
   ReplyLedger,
 } from "./types.ts";
