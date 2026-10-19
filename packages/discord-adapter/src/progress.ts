@@ -141,10 +141,10 @@ export class ProgressEditor {
 
   private render(): string {
     let lines = [...this.lines];
-    let text = lines.map((line) => `- ${line}`).join("\n");
+    let text = lines.join("\n");
     while (text.length > MAX_STATUS_CHARS && lines.length > 1) {
       lines = lines.slice(1);
-      text = lines.map((line) => `- ${line}`).join("\n");
+      text = lines.join("\n");
     }
     return text.length > MAX_STATUS_CHARS ? `${text.slice(0, MAX_STATUS_CHARS - 1)}…` : text;
   }
