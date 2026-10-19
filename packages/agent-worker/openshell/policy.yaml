@@ -18,8 +18,14 @@ network_policies:
   # Hosts the scheduled jobs in the inbox fetch: the LocalLLaMA radar reads Reddit listings and
   # primary artifacts, the model-release watch reads Hugging Face and GitHub, and the ACP draft
   # tracker reads the protocol site and GitHub. Reads only; writes go through the GitHub provider.
+  # The owner's own site is here so the agent can answer questions about it.
   web_reads:
     endpoints:
+      - host: solmaz.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
       - host: www.reddit.com
         port: 443
         protocol: rest
