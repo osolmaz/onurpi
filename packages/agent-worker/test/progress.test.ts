@@ -35,23 +35,36 @@ function messageEnd(model: unknown): AgentEvent {
 }
 
 describe("progressOf", () => {
-  it("names the tool call the agent started", () => {
-    expect(progressOf([toolStart("bash", { command: "git status" })])).toEqual("bash: git status");
+  it("names the tool call the agent started with an icon and its target", () => {
+    expect(progressOf([toolStart("bash", { command: "git status" })])).toEqual("🔧 git status");
+    expect(progressOf([toolStart("read", { path: "docs/plan.md" })])).toEqual("📖 plan.md");
+    expect(progressOf([toolStart("write", { path: "docs/plan.md", content: "x" })])).toEqual(
+      "✍️ plan.md",
+    );
+    expect(progressOf([toolStart("edit", { path: "src/a.ts", oldText: "x" })])).toEqual("✏️ a.ts");
+    expect(progressOf([toolStart("grep", { pattern: "TODO" })])).toEqual("🔍 TODO");
+  });
+
+  it("marks unknown tools as generic work with their name", () => {
+    expect(progressOf([toolStart("update_plan", { plan: [{ step: "x" }] })])).toContain(
+      "⚙️ update_plan:",
+    );
   });
 
   it("names thinking and writing, with the newest state winning", () => {
-    expect(progressOf([thinkingDelta()])).toEqual("Thinking");
-    expect(progressOf([thinkingDelta(), textDelta()])).toEqual("Writing");
-    expect(progressOf([textDelta(), toolStart("read", { path: "a.md" })])).toEqual("read: a.md");
+    expect(progressOf([thinkingDelta()])).toEqual("💭 Thinking");
+    expect(progressOf([thinkingDelta(), textDelta()])).toEqual("✍️ Writing");
+    expect(progressOf([textDelta()])).toEqual("✍️ Writing");
+    expect(progressOf([textDelta(), toolStart("read", { path: "a.md" })])).toEqual("📖 a.md");
   });
 
   it("uses a tool's single string argument and shortens long ones", () => {
     expect(progressOf([toolStart("bash", { command: "echo one\ntwo" })])).toEqual(
-      "bash: echo one two",
+      "🔧 echo one two",
     );
     const long = "x".repeat(200);
     const label = progressOf([toolStart("read", { path: long })]);
-    expect(label?.length).toBeLessThanOrEqual("read: ".length + 96);
+    expect(label?.length).toBeLessThanOrEqual("📖 ".length + 96);
     expect(label?.endsWith("…")).toBe(true);
   });
 
@@ -62,7 +75,7 @@ describe("progressOf", () => {
         content: [{ type: "text", text: "Checked the first source.\nNow the second." }],
       },
     ];
-    expect(progressOf([messageEnd(model)])).toEqual("Checked the first source.");
+    expect(progressOf([messageEnd(model)])).toEqual("💬 Checked the first source.");
   });
 
   it("ignores events with nothing to show", () => {
@@ -75,7 +88,7 @@ describe("progressOf", () => {
   });
 
   it("picks the last notable event of a batch", () => {
-    expect(progressOf([toolStart("bash", { command: "one" }), textDelta()])).toEqual("Writing");
-    expect(progressOf([textDelta(), toolStart("bash", { command: "one" })])).toEqual("bash: one");
+    expect(progressOf([toolStart("bash", { command: "one" }), textDelta()])).toEqual("✍️ Writing");
+    expect(progressOf([textDelta(), toolStart("bash", { command: "one" })])).toEqual("🔧 one");
   });
 });

@@ -46,9 +46,10 @@ export class ProgressEditor {
     return this.starting || this.messageId !== undefined;
   }
 
-  /** Adds one note about what the agent is doing now. Notes after `finish` are ignored. */
+  /** Adds one note about what the agent is doing now. Repeats add nothing and are dropped. */
   note(label: string): void {
     if (this.finished) return;
+    if (label === this.lines.at(-1)) return;
     this.lines.push(label);
     if (this.lines.length > MAX_STATUS_NOTES)
       this.lines.splice(0, this.lines.length - MAX_STATUS_NOTES);

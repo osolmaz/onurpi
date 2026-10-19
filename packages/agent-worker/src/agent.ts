@@ -257,8 +257,10 @@ function changeLabel(
 ): string | undefined {
   let updated = previous;
   for (const change of changes) {
-    if (change.type === "thinking_start" || change.type === "thinking_delta") updated = "Thinking";
-    else if (change.type === "text_start" || change.type === "text_delta") updated = "Writing";
+    if (change.type === "thinking_start" || change.type === "thinking_delta")
+      updated = "\u{1F4AD} Thinking";
+    else if (change.type === "text_start" || change.type === "text_delta")
+      updated = "\u270D\uFE0F Writing";
   }
   return updated;
 }
@@ -272,15 +274,51 @@ function assistantText(entry: { readonly model?: readonly Message[] }): string |
     .join(" ")
     .trim();
   if (text.length === 0) return undefined;
-  return shorten(text.split("\n", 1)[0] ?? text, 96);
+  return `\u{1F4AC} ${shorten(text.split("\n", 1)[0] ?? text, 96)}`;
 }
 
-/** What a tool call is doing, as `name: first argument`. */
+/** How a known tool call reads in the status line: an icon and the argument naming its target. */
+const TOOL_LABELS: Readonly<
+  Record<string, { readonly icon: string; readonly arg?: string; readonly base?: boolean }>
+> = {
+  bash: { icon: "\u{1F527}", arg: "command" },
+  read: { icon: "\u{1F4D6}", arg: "path", base: true },
+  write: { icon: "\u270D\uFE0F", arg: "path", base: true },
+  edit: { icon: "\u270F\uFE0F", arg: "path", base: true },
+  grep: { icon: "\u{1F50D}", arg: "pattern" },
+  find: { icon: "\u{1F4C2}", arg: "pattern" },
+  ls: { icon: "\u{1F4C2}", arg: "path" },
+  web_search: { icon: "\u{1F310}", arg: "query" },
+  fetch: { icon: "\u{1F4E5}", arg: "url" },
+};
+
+/** What a tool call is doing: an icon plus the file, command, or pattern it works on. */
 function toolLabel(name: string, args: Record<string, unknown>): string {
-  const values = Object.values(args);
-  const head =
-    values.length === 1 && typeof values[0] === "string" ? values[0] : JSON.stringify(args);
-  return `${name}: ${shorten(head.replaceAll("\n", " ").trim(), 96)}`;
+  const known = TOOL_LABELS[name];
+  const icon = known?.icon ?? "\u2699\uFE0F";
+  const target = knownTarget(known, args) ?? fallbackTarget(args);
+  const prefix = known === undefined ? `${name}: ` : "";
+  return `${icon} ${prefix}${target}`;
+}
+
+/** The argument that names what a known tool call works on, shortened to a file name when asked. */
+function knownTarget(
+  known: { readonly arg?: string; readonly base?: boolean } | undefined,
+  args: Record<string, unknown>,
+): string | undefined {
+  if (known?.arg === undefined) return undefined;
+  const value = args[known.arg];
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  const flat = shorten(value.replaceAll("\n", " ").trim(), 96);
+  if (flat.length === 0) return undefined;
+  return known.base === true ? flat.split("/").at(-1) : flat;
+}
+
+/** The target for an unknown tool: its first string argument, or the whole argument object. */
+function fallbackTarget(args: Record<string, unknown>): string {
+  const first = Object.values(args).find((value) => typeof value === "string" && value.length > 0);
+  const head = typeof first === "string" ? first : JSON.stringify(args);
+  return shorten(head.replaceAll("\n", " ").trim(), 96);
 }
 
 function shorten(text: string, max: number): string {
