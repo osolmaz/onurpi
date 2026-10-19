@@ -114,12 +114,20 @@ Behaviour:
   the channel's conversation at the message that started it.
 - **Input.** A message becomes an input submission with `requestId` set to the Discord message id,
   so a message seen again after a restart is not answered twice. While the agent works, a new
-  message is a follow-up by default. A message that starts with a configured prefix is a steer.
+  message steers the running turn: pi-durable stops the generation, keeps the partial answer in the
+  transcript, and the model continues with the new message in view, so one answer covers all the
+  messages. A message that starts with `q ` or `queue ` (read after the mention is stripped) queues
+  as a follow-up instead, so it gets its own answer after the run. The bridge acknowledges each
+  message with the eyes reaction, posts one reply to the newest message, and clears every eyes
+  reaction when the answer lands.
 - **Output.** The adapter follows the conversation with `watchEvents`. It posts one reply per run
   and edits it while text streams, no more often than Discord's rate limits allow. Tool calls show
   as a short status line. A reply longer than Discord's limit is split at paragraph boundaries.
 - **Attachments.** Files and images on a message are downloaded with size and time limits into the
-  workspace. The message tells the model where they are.
+  workspace. The message tells the model where they are, and images ride along as image blocks the
+  model sees. A worker that restarts downloads a message's attachments again before answering, so a
+  resumed answer keeps the files whose CDN addresses expire. A daily sweep deletes attachment
+  folders older than thirty days and logs how many it removed; a failed sweep is logged and ignored.
 - **Commands.** Slash commands: `/status` (model, running task, usage), `/abort`, `/reset` with an
   optional handoff note, and `/compact`.
 - **Restart.** On start, the adapter rereads the messages it has not answered in each allowed
@@ -248,8 +256,12 @@ Phases 1 to 4 have code in OnurPi; what was verified live is listed with each ph
   their old channels. A test delivery ran end to end in the rebuilt sandbox. The week of daily use
   that the phase asks for starts now.
 
-Not done yet: streaming edits, tool status lines, follow-ups and steers, thread forks, attachments,
-slash commands, and the remaining extensions a week of use shows necessary.
+- **Phase 6, planned.** Steering by default with a `q ` queue keyword, attachment pruning after
+  thirty days, and attachment re-download on recovery. The owner approved the plan and a rebase
+  merge.
+
+Not done yet: streaming edits, tool status lines, thread forks, slash commands, and the remaining
+extensions a week of use shows necessary.
 
 ## Open questions
 
