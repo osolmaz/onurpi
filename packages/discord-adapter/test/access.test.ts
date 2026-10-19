@@ -86,6 +86,19 @@ describe("acceptMessage", () => {
   });
 });
 
+it("answers a bot the configuration names and ignores every other bot", () => {
+  const allowing = parseAdapterConfig({
+    ...oneChannel(),
+    bots: ["1483185871439003790"],
+  });
+  expect(
+    acceptMessage(message({ authorId: "1483185871439003790", authorIsBot: true }), allowing, BOT),
+  ).toBe("hello");
+  expect(
+    acceptMessage(message({ authorId: STRANGER, authorIsBot: true }), allowing, BOT),
+  ).toBeNull();
+});
+
 describe("conversationKey", () => {
   it("gives each channel or thread its own conversation", () => {
     expect(conversationKey(message())).toBe(`discord:${CHANNEL}`);

@@ -17,6 +17,8 @@ export type GuildConfig = {
 export type AdapterConfig = {
   /** Discord user ids that may start a turn. Bots are ignored unless they are listed here. */
   readonly ownerIds: readonly string[];
+  /** Bot user ids whose messages are answered like an owner's. Absent means every bot is ignored. */
+  readonly bots?: readonly string[];
   /** Answer direct messages from an owner. */
   readonly directMessages: boolean;
   /** Servers by id. The agent answers only in the channels listed under a server. */
@@ -101,6 +103,7 @@ export function parseAdapterConfig(value: unknown, path = "discord"): AdapterCon
   const input = record(value, path);
   const ownerIds = parseDiscordIds(input["ownerIds"], `${path}.ownerIds`);
   if (ownerIds.length === 0) throw new Error(`${path}.ownerIds must name at least one owner`);
+  const bots = input["bots"] === undefined ? [] : parseDiscordIds(input["bots"], `${path}.bots`);
   const guilds = Object.entries(record(input["guilds"] ?? {}, `${path}.guilds`)).map(
     ([id, guild]) => {
       const at = `${path}.guilds.${id}`;
@@ -108,6 +111,7 @@ export function parseAdapterConfig(value: unknown, path = "discord"): AdapterCon
     },
   );
   return {
+    ...(bots.length === 0 ? {} : { bots }),
     ...presentation(input, path),
     directMessages: flag(input["directMessages"], `${path}.directMessages`, true),
     guilds: Object.fromEntries(guilds),

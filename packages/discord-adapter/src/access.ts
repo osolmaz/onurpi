@@ -21,17 +21,24 @@ function placeRule(
   return channel?.enabled === true ? { requireMention: channel.requireMention } : null;
 }
 
+/** Whether someone other than the bot itself may start a turn. */
+function isAllowed(message: InboundMessage, config: AdapterConfig, botUserId: string): boolean {
+  if (message.authorId === botUserId) return false;
+  return (
+    config.ownerIds.includes(message.authorId) || (config.bots ?? []).includes(message.authorId)
+  );
+}
+
 /**
  * Returns the prompt text when the agent should answer the message, or null when it should ignore
- * it. Only owners are answered, never the bot itself, and only in allowed places.
+ * it. Only owners and the bots named in the configuration are answered, and only in allowed places.
  */
 export function acceptMessage(
   message: InboundMessage,
   config: AdapterConfig,
   botUserId: string,
 ): string | null {
-  if (message.authorId === botUserId) return null;
-  if (!config.ownerIds.includes(message.authorId)) return null;
+  if (!isAllowed(message, config, botUserId)) return null;
   const rule = placeRule(message, config);
   if (rule === null || (rule.requireMention && !message.mentionsBot)) return null;
   const text = message.content.replace(mentionPattern(botUserId), "").trim();
