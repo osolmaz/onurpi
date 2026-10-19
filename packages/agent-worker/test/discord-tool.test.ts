@@ -170,6 +170,40 @@ describe("discord tool", () => {
     expect(result.output?.[0]?.text).toContain("Discord denies it");
   });
 
+  it("pages backwards with before and names the next id", async () => {
+    const stub = stubFetch({
+      "/channels/400000000000000004/messages?limit=2&before=2000000000000000009": {
+        body: [
+          {
+            id: "2000000000000000008",
+            timestamp: "2026-10-18T17:20:29.646000+00:00",
+            content: "to",
+            author: { id: "1483185871439003790", username: "looper" },
+          },
+          {
+            id: "2000000000000000007",
+            timestamp: "2026-10-18T17:19:00.000000+00:00",
+            content: "earlier",
+            author: { id: "1027998401889050715", username: "onur" },
+          },
+        ],
+        status: 200,
+      },
+    });
+    const tool = createDiscordTool({ config, channelOf: channel, fetchImpl: stub.fetchImpl });
+    const result = await run(tool, {
+      action: "fetch_messages",
+      before: "2000000000000000009",
+      limit: 2,
+    });
+
+    expect(stub.calls[0]?.path).toBe(
+      "/channels/400000000000000004/messages?limit=2&before=2000000000000000009",
+    );
+    const text = result.output?.[0]?.text ?? "";
+    expect(text).toContain("continue with before=2000000000000000007");
+  });
+
   it("fails clearly when the token is missing", async () => {
     const stub = stubFetch({});
     const prior = process.env["DISCORD_BOT_TOKEN"];

@@ -42,6 +42,12 @@ const schema = Type.Object({
   limit: Type.Optional(
     Type.Number({ description: `Messages to fetch, 1-${MAX_LIMIT}; default ${DEFAULT_LIMIT}` }),
   ),
+  before: Type.Optional(
+    Type.String({
+      description:
+        "Message id to page backwards from: fetch the messages just before this one. The result names the id to pass next.",
+    }),
+  ),
   emoji: Type.Optional(
     Type.String({ description: "Reaction emoji, such as 👍 or name:id for a custom one" }),
   ),
@@ -174,16 +180,19 @@ async function fetchMessages(args: ActionArgs, deps: Deps): Promise<string> {
     args.channel_id === undefined
       ? await deps.defaultChannel()
       : requireSnowflake(args.channel_id, "channel_id");
+  const before =
+    args.before === undefined ? "" : `&before=${requireSnowflake(args.before, "before")}`;
   const messages = (await call(
     deps.config,
     deps.fetchImpl,
-    `/channels/${channelId}/messages?limit=${limit}`,
+    `/channels/${channelId}/messages?limit=${limit}${before}`,
     "GET",
   )) as readonly Record<string, unknown>[];
   const lines = [...messages].reverse().map(formatMessage);
-  return lines.length === 0
-    ? "No messages found."
-    : `The last ${lines.length} message${lines.length === 1 ? "" : "s"} in ${channelId}, oldest first:\n${lines.join("\n")}`;
+  if (lines.length === 0) return "No messages found.";
+  const oldestId = asText(messages[messages.length - 1]?.["id"]);
+  const more = messages.length === limit ? ` Older history: continue with before=${oldestId}.` : "";
+  return `The last ${lines.length} message${lines.length === 1 ? "" : "s"} in ${channelId}, oldest first:\n${lines.join("\n")}${more}`;
 }
 
 async function listChannels(args: ActionArgs, deps: Deps): Promise<string> {
