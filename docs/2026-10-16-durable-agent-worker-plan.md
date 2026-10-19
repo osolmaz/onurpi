@@ -254,11 +254,11 @@ slash commands, and the remaining extensions a week of use shows necessary.
 ## Open questions
 
 - **GitHub for the agent.** The `agent-github` profile puts a token in the sandbox, but the owner
-  wants GitHub access to go through the unYOLO credential broker instead, where the agent client
-  is already `bob` and pushes stay policy-checked. A sandbox cannot reach the broker's host Unix
-  socket, so this needs a sandbox-reachable broker endpoint and a safe way to hand the broker
-  client secret to the sandbox. Until then the agent holds no GitHub token and asks the owner for
-  any GitHub work.
+  wants GitHub access to go through the unYOLO credential broker instead, where the agent client is
+  already `bob` and pushes stay policy-checked. A sandbox cannot reach the broker's host Unix
+  socket, so this needs a sandbox-reachable broker endpoint and a safe way to hand the broker client
+  secret to the sandbox. Until then the agent holds no GitHub token and asks the owner for any
+  GitHub work.
 - **Host folder permissions.** The sandbox runs as a non-root user, so the host folders must be
   writable by that user's id inside the container, and the configuration folder must stay read-only.
   Phase 2 sets the folders' owner and checks both.
