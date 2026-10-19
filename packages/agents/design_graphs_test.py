@@ -32,7 +32,7 @@ class ComparisonChartTests(unittest.TestCase):
         svg = self.root / f"{background}.svg"
         png = self.root / f"{background}.png"
         figure = chart.render(copy.deepcopy(chart.DEFAULT_DATA), svg, png, background,
-                              font_file=self.font, **kwargs)
+                              font_files=(self.font,), **kwargs)
         return figure, svg, png
 
     def test_theme_and_exact_labels(self):
@@ -70,7 +70,7 @@ class ComparisonChartTests(unittest.TestCase):
         for model in data["models"]:
             model["precision"] = None
         figure = chart.render(data, self.root / "missing.svg", self.root / "missing.png",
-                              "dark", font_file=self.font)
+                              "dark", font_files=(self.font,))
         self.assertEqual([text.get_text() for text in figure.axes[0].texts].count("n/a"), 3)
 
     def test_invalid_values_are_rejected(self):
@@ -93,7 +93,7 @@ class ComparisonChartTests(unittest.TestCase):
 
     def test_no_silent_font_substitution(self):
         with patch.object(font_manager, "findfont", side_effect=ValueError("Unavailable")):
-            with self.assertRaisesRegex(ValueError, "provide --font-file"):
+            with self.assertRaisesRegex(ValueError, "provide an authorized file with --font-file"):
                 chart.select_font(None)
 
 
