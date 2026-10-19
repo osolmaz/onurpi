@@ -33,7 +33,9 @@ export type {
   AgentReply,
   AgentRequest,
   ChatTransport,
+  InboundAttachment,
   InboundMessage,
   ProgressSink,
   ReplyLedger,
+  SavedAttachment,
 } from "./types.ts";

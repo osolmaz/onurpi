@@ -1,5 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
-import type { Message, Models } from "@earendil-works/pi-ai";
+import type { ImageContent, Message, Models, UserMessage } from "@earendil-works/pi-ai";
 import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
@@ -25,6 +26,7 @@ import type {
   InboundMessage,
   ProgressSink,
   ReplyLedger,
+  SavedAttachment,
 } from "@onurpi/discord-adapter";
 import { AntiRepeatWatcher, type AntiRepeatFeedback } from "./anti-repeat.ts";
 import type { WorkerConfig } from "./config.ts";
@@ -38,6 +40,9 @@ import type { JobLedger } from "./inbox.ts";
 import { skillsExtension } from "./skills.ts";
 
 const context = BACKGROUND_CONTEXT;
+
+/** What a user turn may contain: text, or text with image blocks. */
+type UserInput = UserMessage["content"];
 
 /** Maps a chat key, such as `discord:<channel id>`, to the conversation that holds it. */
 const ChatConversation = defineDocFamily<{ conversationId: ConversationId | 0 }, null>({
@@ -74,7 +79,16 @@ function answerText(message: Message | undefined): string {
     .trim();
 }
 
-type StoredMessage = { [Key in keyof InboundMessage]: InboundMessage[Key] };
+type StoredMessage = Omit<InboundMessage, "attachments"> & { attachments?: StoredAttachment[] };
+
+/** The attachment shape the ledger stores, JSON-ready. */
+type StoredAttachment = {
+  contentType: string | null;
+  id: string;
+  name: string;
+  size: number;
+  url: string;
+};
 
 /** What the Discord bridge keeps across restarts, committed with the conversations. */
 const DiscordLedger = defineDoc<{
@@ -93,7 +107,10 @@ function discordLedger(harness: Harness): ReplyLedger {
   return {
     accept: (message) =>
       harness.commit(async (tx) => {
-        (await tx.doc(DiscordLedger)).pending[message.id] = { ...message };
+        const { attachments, ...rest } = message;
+        const stored =
+          attachments === undefined ? rest : { ...rest, attachments: [...attachments] };
+        (await tx.doc(DiscordLedger)).pending[message.id] = stored;
       }, context),
     answered: (messageId) =>
       harness.commit(async (tx) => {
@@ -291,6 +308,30 @@ async function replyOf(
  * reasoning and the run boundaries; its "correct" decision submits one corrective follow-up, as
  * the Pi extension's default policy, and its "stop" decision leaves the answer aborted.
  */
+/**
+ * Builds the model input for one request: the prompt text, plus image attachments as image blocks
+ * the model sees directly. Other files stay on disk; the prompt names their paths.
+ */
+export async function inputFor(request: AgentRequest): Promise<UserInput> {
+  const attachments = request.attachments ?? [];
+  if (attachments.length === 0) return request.text;
+  const images: ImageContent[] = [];
+  for (const attachment of attachments) {
+    if (!isImage(attachment)) continue;
+    images.push({
+      mimeType: attachment.contentType ?? "image/png",
+      type: "image",
+      data: (await readFile(attachment.path)).toString("base64"),
+    });
+  }
+  if (images.length === 0) return request.text;
+  return [{ type: "text", text: request.text }, ...images];
+}
+
+function isImage(attachment: SavedAttachment): boolean {
+  return (attachment.contentType ?? "").startsWith("image/");
+}
+
 async function askAgent(ask: AskAgent): Promise<AgentReply> {
   const { agent, conversationFor, harness, request, watchListener, watchers } = ask;
   const conversationId = await conversationFor(request.conversationKey);
@@ -306,7 +347,7 @@ async function askAgent(ask: AskAgent): Promise<AgentReply> {
   const reply = await replyOf(
     conversation,
     await conversation.submit(
-      { content: request.text, requestId: request.requestId, type: "input" },
+      { content: await inputFor(request), requestId: request.requestId, type: "input" },
       context,
     ),
   );

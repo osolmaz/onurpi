@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DiscordBridge, TYPING_INTERVAL_MS } from "../src/bridge.ts";
 import { parseAdapterConfig } from "../src/config.ts";
+import type { InboundAttachment } from "../src/types.ts";
 import type { AgentReply } from "../src/types.ts";
 import {
   BOT,
@@ -23,6 +24,7 @@ function setup(
   ledger = new FakeLedger(),
   transport = new FakeTransport(),
   overrides: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {},
 ) {
   const events: string[] = [];
   const bridge = new DiscordBridge({
@@ -31,6 +33,7 @@ function setup(
     ledger,
     log: (event) => events.push(event),
     transport,
+    ...extra,
   });
   bridge.start();
   return { agent, bridge, events, ledger, transport };
@@ -39,6 +42,77 @@ function setup(
 afterEach(() => {
   vi.useRealTimers();
 });
+
+it("saves attachments, names their paths in the prompt, and passes them to the agent", async () => {
+  const { agent, bridge, transport } = setup(
+    new FakeAgent(),
+    new FakeLedger(),
+    new FakeTransport(),
+    {},
+    {
+      download: (attachment: InboundAttachment) =>
+        Promise.resolve(`/workspace/attachments/${attachment.id}-${attachment.name}`),
+    },
+  );
+  transport.emit(message({ attachments: [attachment()] }));
+  await bridge.idle();
+
+  expect(agent.requests[0]?.text).toContain(
+    "photo.png saved at /workspace/attachments/a1-photo.png",
+  );
+  expect(agent.requests[0]?.attachments).toEqual([
+    { contentType: "image/png", name: "photo.png", path: "/workspace/attachments/a1-photo.png" },
+  ]);
+});
+
+it("notes but survives skipped and failed attachments", async () => {
+  const { agent, bridge, transport } = setup(
+    new FakeAgent(),
+    new FakeLedger(),
+    new FakeTransport(),
+    { attachments: { maxBytes: 10, maxCount: 2 } },
+    {
+      download: (attachment: InboundAttachment): Promise<string> =>
+        attachment.name === "bad.png"
+          ? Promise.reject(new Error("offline"))
+          : Promise.resolve(`/workspace/${attachment.name}`),
+    },
+  );
+  transport.emit(
+    message({
+      attachments: [
+        attachment({ id: "a1", name: "good.txt", size: 5 }),
+        attachment({ id: "a2", name: "big.bin", size: 11 }),
+        attachment({ id: "a3", name: "bad.png", size: 5 }),
+        attachment({ id: "a4", name: "extra.txt", size: 5 }),
+        attachment({ id: "a5", name: "one-more.txt", size: 5 }),
+      ],
+    }),
+  );
+  await bridge.idle();
+
+  const prompt = agent.requests[0]?.text ?? "";
+  expect(prompt).toContain("good.txt saved at /workspace/good.txt");
+  expect(prompt).toContain("big.bin: skipped, larger than the 10 byte limit");
+  expect(prompt).toContain("bad.png: download failed (Error: offline)");
+  expect(prompt).toContain("extra.txt saved at /workspace/extra.txt");
+  expect(prompt).toContain("one-more.txt: skipped, at most 2 files per message");
+  expect(agent.requests[0]?.attachments).toEqual([
+    { contentType: "image/png", name: "good.txt", path: "/workspace/good.txt" },
+    { contentType: "image/png", name: "extra.txt", path: "/workspace/extra.txt" },
+  ]);
+});
+
+function attachment(overrides: Record<string, unknown> = {}) {
+  return {
+    contentType: "image/png",
+    id: "a1",
+    name: "photo.png",
+    size: 1000,
+    url: "https://x/y",
+    ...overrides,
+  };
+}
 
 describe("DiscordBridge", () => {
   it("shows typing, then replies to the message with the answer", async () => {

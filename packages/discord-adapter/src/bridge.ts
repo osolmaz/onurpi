@@ -1,14 +1,16 @@
 import { acceptMessage, conversationKey } from "./access.ts";
 import { splitForDiscord } from "./chunks.ts";
+import { DEFAULT_ATTACHMENT_LIMITS, type AdapterConfig } from "./config.ts";
 import { ProgressEditor } from "./progress.ts";
-import type { AdapterConfig } from "./config.ts";
 import type {
   AgentPort,
   AgentReply,
   BridgeLog,
   ChatTransport,
+  InboundAttachment,
   InboundMessage,
   ReplyLedger,
+  SavedAttachment,
 } from "./types.ts";
 
 /** Discord shows a typing indicator for about 10 seconds, so the bridge sends it again sooner. */
@@ -35,6 +37,8 @@ export type BridgeOptions = {
   readonly typingIntervalMs?: number;
   /** Sees each accepted message first, for commands such as approvals. */
   readonly intercept?: (message: InboundMessage, text: string) => Promise<Interception | undefined>;
+  /** Saves one attachment where the agent's tools can read it, and returns its path. */
+  readonly download?: (attachment: InboundAttachment) => Promise<string>;
 };
 
 /**
@@ -53,6 +57,7 @@ export class DiscordBridge {
   private readonly log: BridgeLog;
   private readonly typingIntervalMs: number;
   private readonly intercept: BridgeOptions["intercept"];
+  private readonly download: BridgeOptions["download"];
   private readonly pending = new Set<Promise<void>>();
   /** Whether the last answered turn in a conversation came from a bot, not a person. */
   private readonly botTurns = new Map<string, boolean>();
@@ -65,6 +70,7 @@ export class DiscordBridge {
     this.log = options.log;
     this.typingIntervalMs = options.typingIntervalMs ?? TYPING_INTERVAL_MS;
     this.intercept = options.intercept;
+    this.download = options.download;
   }
 
   start(): void {
@@ -100,15 +106,66 @@ export class DiscordBridge {
 
   /** Runs the intercept, then either posts its direct reply or lets the agent answer. */
   private async deliver(message: InboundMessage, key: string, text: string): Promise<void> {
-    const interception = await this.intercept?.(message, text);
+    const saved = await this.saveAttachments(message);
+    const prompt =
+      saved.notes.length === 0
+        ? text
+        : `${text}\n\n<attachments>\n${saved.notes.join("\n")}\n</attachments>`;
+    const interception = await this.intercept?.(message, prompt);
     if (interception === undefined || !("reply" in interception)) {
-      await this.reply(message, interception?.text ?? text, interception?.conversationKey);
+      await this.reply(
+        message,
+        interception?.text ?? prompt,
+        interception?.conversationKey,
+        saved.attachments,
+      );
       return;
     }
     await this.transport.send(message.channelId, interception.reply, message.id);
     await this.ledger.answered(message.id);
     this.botTurns.set(key, this.isBotTurn(message));
     this.log("intercepted", { message: message.id });
+  }
+
+  /** Saves the message's attachments within the configured limits, with one note per file. */
+  private async saveAttachments(message: InboundMessage): Promise<{
+    readonly attachments: readonly SavedAttachment[];
+    readonly notes: readonly string[];
+  }> {
+    const list = message.attachments ?? [];
+    const download = this.download;
+    if (download === undefined || list.length === 0) return { attachments: [], notes: [] };
+    const limits = this.config.attachments ?? DEFAULT_ATTACHMENT_LIMITS;
+    const attachments: SavedAttachment[] = [];
+    const notes: string[] = [];
+    for (const attachment of list) {
+      const outcome = await this.saveOne(attachment, attachments.length, limits, download);
+      if (outcome.saved !== undefined) attachments.push(outcome.saved);
+      notes.push(outcome.note);
+    }
+    return { attachments, notes };
+  }
+
+  /** Saves one attachment, or explains why it was skipped. */
+  private async saveOne(
+    attachment: InboundAttachment,
+    savedCount: number,
+    limits: { readonly maxBytes: number; readonly maxCount: number },
+    download: (attachment: InboundAttachment) => Promise<string>,
+  ): Promise<{ readonly note: string; readonly saved?: SavedAttachment }> {
+    if (attachment.size > limits.maxBytes) {
+      return { note: `${attachment.name}: skipped, larger than the ${limits.maxBytes} byte limit` };
+    }
+    if (savedCount >= limits.maxCount) {
+      return { note: `${attachment.name}: skipped, at most ${limits.maxCount} files per message` };
+    }
+    try {
+      const path = await download(attachment);
+      const saved = { contentType: attachment.contentType, name: attachment.name, path };
+      return { note: `${attachment.name} saved at ${path}`, saved };
+    } catch (error) {
+      return { note: `${attachment.name}: download failed (${String(error)})` };
+    }
   }
 
   private async recover(): Promise<void> {
@@ -136,6 +193,7 @@ export class DiscordBridge {
     message: InboundMessage,
     text: string,
     key = conversationKey(message),
+    attachments: readonly SavedAttachment[] = [],
   ): Promise<void> {
     await this.acknowledge(message);
     const editor =
@@ -150,7 +208,12 @@ export class DiscordBridge {
           });
     const reply = await this.whileTyping(message, () =>
       this.agent.ask(
-        { conversationKey: key, requestId: `discord:${message.id}`, text },
+        {
+          conversationKey: key,
+          requestId: `discord:${message.id}`,
+          text,
+          ...(attachments.length === 0 ? {} : { attachments }),
+        },
         editor === undefined
           ? undefined
           : (progress) => {
