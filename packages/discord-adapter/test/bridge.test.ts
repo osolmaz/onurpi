@@ -598,23 +598,6 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(events).toEqual(["commanded"]);
   });
 
-  it("lets an unknown command flow to the agent as ordinary text", async () => {
-    const { agent, bridge, transport } = setup(
-      new FakeAgent(),
-      new FakeLedger(),
-      new FakeTransport(),
-      {},
-      {
-        command: (): Promise<string | undefined> => Promise.resolve(undefined),
-      },
-    );
-    transport.emit(message({ content: `<@${BOT}> /frobnicate`, id: "700000000000000052" }));
-    await bridge.idle();
-
-    expect(agent.requests).toHaveLength(1);
-    expect(agent.requests[0]?.text).toBe(tagged("/frobnicate"));
-  });
-
   it("re-downloads attachments when it resumes an unanswered message", async () => {
     const downloads: string[] = [];
     const agent = new FakeAgent();
@@ -640,5 +623,63 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(agent.requests[0]?.attachments).toEqual([
       { contentType: "image/png", name: "photo.png", path: "/workspace/photo.png" },
     ]);
+  });
+});
+
+describe("DiscordBridge owner commands", () => {
+  it("aborts on a bare stop from an owner, without the agent", async () => {
+    const { agent, bridge, events, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {},
+      {
+        command: (_message: unknown, text: string): Promise<string | undefined> =>
+          Promise.resolve(
+            text === "/stop" ? "Stopped; the answer so far stays in the transcript." : undefined,
+          ),
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> STOP`, id: "700000000000000053" }));
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(transport.reacted).toEqual([]);
+    expect(transport.posted[0]?.text).toBe("Stopped; the answer so far stays in the transcript.");
+    expect(events).toEqual(["commanded"]);
+  });
+
+  it("lets a longer message that merely mentions stop flow to the agent", async () => {
+    const { agent, bridge, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {},
+      {
+        command: (): Promise<string | undefined> => Promise.resolve("aborted"),
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> stop doing that`, id: "700000000000000054" }));
+    await bridge.idle();
+
+    expect(agent.requests).toHaveLength(1);
+    expect(agent.requests[0]?.text).toBe(tagged("stop doing that"));
+  });
+
+  it("lets an unknown command flow to the agent as ordinary text", async () => {
+    const { agent, bridge, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {},
+      {
+        command: (): Promise<string | undefined> => Promise.resolve(undefined),
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> /frobnicate`, id: "700000000000000052" }));
+    await bridge.idle();
+
+    expect(agent.requests).toHaveLength(1);
+    expect(agent.requests[0]?.text).toBe(tagged("/frobnicate"));
   });
 });

@@ -1,4 +1,5 @@
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import type { RunningAgent } from "./agent.ts";
@@ -19,6 +20,35 @@ type CommandTarget = { readonly key: string; readonly busy: boolean };
 
 /** One command's work: the argument in, the reply text out. */
 type Command = (argument: string, target: CommandTarget) => Promise<string>;
+
+/** The command list `/help` shows, with the pi runtime's version when it can be read. */
+function helpText(config: WorkerConfig, model: string): string {
+  let version: string | undefined;
+  try {
+    const manifest = JSON.parse(
+      readFileSync(
+        fileURLToPath(import.meta.resolve("@earendil-works/pi-durable/package.json")),
+        "utf8",
+      ),
+    ) as { version?: string };
+    version = manifest.version;
+  } catch {
+    version = undefined;
+  }
+  const runtime = version === undefined ? "pi-durable" : `pi-durable ${version}`;
+  return [
+    `I am a Pi Durable agent (${runtime}) \u2014 ${model} in ${config.workspace}.`,
+    "Commands, owners only, answered instantly:",
+    "/new [message] \u2014 reset this session; a message becomes its first",
+    "/stop \u2014 abort the running turn; the partial answer stays",
+    "/status \u2014 model, state, and context size",
+    "/context \u2014 the transcript's size",
+    "/model \u2014 the model in use",
+    "/jobs \u2014 the scheduled deliveries",
+    "/skills \u2014 the installed skills",
+    "/help \u2014 this list",
+  ].join("\n");
+}
 
 /** The table of commands an owner can send, answered before the agent runs. */
 function commandTable(
@@ -68,8 +98,11 @@ function commandTable(
     },
     stop: async (_argument, target) => {
       await agent.abort(target.key);
-      return "Stopped; the answer so far stays in the transcript.";
+      return target.busy
+        ? "Stopped; the answer so far stays in the transcript."
+        : "Nothing is running.";
     },
+    help: () => Promise.resolve(helpText(config, model())),
   };
 }
 
