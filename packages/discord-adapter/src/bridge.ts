@@ -49,6 +49,15 @@ export type BridgeOptions = {
   readonly intercept?: (message: InboundMessage, text: string) => Promise<Interception | undefined>;
   /** Saves one attachment where the agent's tools can read it, and returns its path. */
   readonly download?: (attachment: InboundAttachment) => Promise<string>;
+  /**
+   * Answers an owner's `/command` before the agent runs, returning the reply text, or undefined
+   * when the word is unknown and the message should flow on as ordinary text.
+   */
+  readonly command?: (
+    message: InboundMessage,
+    text: string,
+    busy: boolean,
+  ) => Promise<string | undefined>;
 };
 
 /**
@@ -68,6 +77,7 @@ export class DiscordBridge {
   private readonly typingIntervalMs: number;
   private readonly intercept: BridgeOptions["intercept"];
   private readonly download: BridgeOptions["download"];
+  private readonly command: BridgeOptions["command"];
   private readonly pending = new Set<Promise<void>>();
   /** Whether the last answered turn in a conversation came from a bot, not a person. */
   private readonly botTurns = new Map<string, boolean>();
@@ -85,6 +95,7 @@ export class DiscordBridge {
     this.typingIntervalMs = options.typingIntervalMs ?? TYPING_INTERVAL_MS;
     this.intercept = options.intercept;
     this.download = options.download;
+    this.command = options.command;
   }
 
   start(): void {
@@ -108,6 +119,13 @@ export class DiscordBridge {
   }
 
   private async receive(message: InboundMessage): Promise<void> {
+    const key = conversationKey(message);
+    const text = acceptMessage(message, this.config, this.transport.botUserId);
+    if (text === null) {
+      await this.ledger.seen(message.channelId, message.id);
+      return;
+    }
+    if (await this.ownerCommand(message, key, text)) return;
     const verdict = this.verdict(message);
     if (verdict.kind === "ignore") {
       await this.ledger.seen(message.channelId, message.id);
@@ -126,6 +144,30 @@ export class DiscordBridge {
       verdict.prompt,
       verdict.kind === "start" ? verdict.run : undefined,
     );
+  }
+
+  /**
+   * Runs an owner's `/command` through the handler and answers it at once, without the eyes and
+   * without the agent. False when the message is not a command this bridge handles, so it flows on
+   * through the ordinary verdict.
+   */
+  private async ownerCommand(message: InboundMessage, key: string, text: string): Promise<boolean> {
+    const command = this.command;
+    if (
+      command === undefined ||
+      !text.startsWith("/") ||
+      !this.config.ownerIds.includes(message.authorId)
+    ) {
+      return false;
+    }
+    const answer = await command(message, text, this.runs.has(key));
+    if (answer === undefined) return false;
+    this.log("commanded", { message: message.id, channel: message.channelId });
+    await this.ledger.seen(message.channelId, message.id);
+    await this.transport.send(message.channelId, answer, message.id);
+    await this.ledger.answered(message.id);
+    this.botTurns.set(key, this.isBotTurn(message));
+    return true;
   }
 
   /**
@@ -426,16 +468,6 @@ export class DiscordBridge {
         this.finishRun(key);
       }
     }
-  }
-
-  /** The run entry a reply belongs to: its own run, or the run already in flight. */
-  private entryFor(key: string, message: InboundMessage, queued: boolean): Run | undefined {
-    if (queued) return undefined;
-    const known = this.runs.get(key);
-    if (known !== undefined) return known;
-    const entry: Run = { messages: [message], steers: 0, finished: false };
-    this.runs.set(key, entry);
-    return entry;
   }
 
   /** Posts the answer, into the progress message when one was started, otherwise as a reply. */
