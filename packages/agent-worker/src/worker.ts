@@ -4,7 +4,7 @@ import {
   type BridgeLog,
   type DiscordTransport,
 } from "@onurpi/discord-adapter";
-import { saveAttachment } from "./attachments.ts";
+import { pruneAttachments, saveAttachment } from "./attachments.ts";
 import { openAgent, type RunningAgent } from "./agent.ts";
 import type { WorkerConfig } from "./config.ts";
 import { ApprovalDesk } from "./desk.ts";
@@ -31,6 +31,9 @@ export const defaultDependencies: WorkerDependencies = {
     console.log(JSON.stringify({ event, ...details, time: new Date().toISOString() }));
   },
 };
+
+/** How often the attachment sweep runs: once a day. */
+const ATTACHMENT_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /** Opens the agent, connects to Discord, and starts answering. */
 export async function startWorker(
@@ -78,11 +81,13 @@ export async function startWorker(
           ...(config.inbox.suppress === undefined ? {} : { suppress: config.inbox.suppress }),
         });
   inbox?.start();
+  const pruneTimer = startAttachmentSweep(config.workspace, dependencies.log);
   dependencies.log("ready", {
     bot: transport.botUserId,
     model: `${config.model.provider}/${config.model.modelId}`,
   });
   const stop = async () => {
+    clearInterval(pruneTimer);
     await inbox?.stop();
     await bridge.idle();
     await desk.idle();
@@ -91,4 +96,22 @@ export async function startWorker(
     models.close();
   };
   return { agent, bridge, stop };
+}
+
+/** Removes old attachments now and once a day; a failed sweep is logged and ignored. */
+function startAttachmentSweep(workspace: string, log: BridgeLog): NodeJS.Timeout {
+  const sweep = async () => {
+    try {
+      const removed = await pruneAttachments(workspace, Date.now());
+      if (removed > 0) log("pruned", { count: String(removed) });
+    } catch (error) {
+      log("prune_failed", { error: String(error) });
+    }
+  };
+  void sweep();
+  const timer = setInterval(() => {
+    void sweep();
+  }, ATTACHMENT_SWEEP_INTERVAL_MS);
+  timer.unref();
+  return timer;
 }

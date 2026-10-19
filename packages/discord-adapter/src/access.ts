@@ -1,6 +1,17 @@
 import type { AdapterConfig, ChannelConfig } from "./config.ts";
 import type { InboundMessage } from "./types.ts";
 
+/** Matches a leading request to queue instead of steering: `q …` or `queue …`. */
+const QUEUE_PREFIX = /^(?:q|queue)\s+/i;
+
+/** Splits a leading queue keyword off the prompt text. */
+export function splitQueuePrefix(text: string): { queued: boolean; text: string } {
+  const match = QUEUE_PREFIX.exec(text);
+  return match === null
+    ? { queued: false, text }
+    : { queued: true, text: text.slice(match[0].length).trim() };
+}
+
 function mentionPattern(botUserId: string): RegExp {
   return new RegExp(`<@!?${botUserId}>`, "gu");
 }

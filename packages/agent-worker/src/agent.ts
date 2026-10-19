@@ -347,7 +347,12 @@ async function askAgent(ask: AskAgent): Promise<AgentReply> {
   const reply = await replyOf(
     conversation,
     await conversation.submit(
-      { content: await inputFor(request), requestId: request.requestId, type: "input" },
+      {
+        content: await inputFor(request),
+        requestId: request.requestId,
+        type: "input",
+        ...(request.busyMode === undefined ? {} : { whenBusy: request.busyMode }),
+      },
       context,
     ),
   );

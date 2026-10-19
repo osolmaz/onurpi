@@ -1,4 +1,4 @@
-import { acceptMessage, conversationKey } from "./access.ts";
+import { acceptMessage, conversationKey, splitQueuePrefix } from "./access.ts";
 import { splitForDiscord } from "./chunks.ts";
 import { DEFAULT_ATTACHMENT_LIMITS, type AdapterConfig } from "./config.ts";
 import { ProgressEditor } from "./progress.ts";
@@ -20,6 +20,16 @@ export const TYPING_INTERVAL_MS = 8000;
 export const MISSED_MESSAGE_LIMIT = 100;
 
 export type { BridgeLog } from "./types.ts";
+
+/** One run in flight: the messages it answers, its editor, and the answer it posted. */
+type Run = {
+  editor?: ProgressEditor | undefined;
+  messages: InboundMessage[];
+  answeredText?: string;
+  dismissed?: boolean;
+  steers: number;
+  finished: boolean;
+};
 
 /**
  * What an intercept makes of an accepted message: a direct reply without the agent, or other text
@@ -61,6 +71,10 @@ export class DiscordBridge {
   private readonly pending = new Set<Promise<void>>();
   /** Whether the last answered turn in a conversation came from a bot, not a person. */
   private readonly botTurns = new Map<string, boolean>();
+  /** The runs in flight, by conversation key: what they answer and what they posted. */
+  private readonly runs = new Map<string, Run>();
+  /** The answer posts in flight, by conversation key, so a conversation posts in order. */
+  private readonly posts = new Map<string, Promise<void>>();
 
   constructor(options: BridgeOptions) {
     this.transport = options.transport;
@@ -94,23 +108,158 @@ export class DiscordBridge {
   }
 
   private async receive(message: InboundMessage): Promise<void> {
-    await this.ledger.seen(message.channelId, message.id);
-    const text = acceptMessage(message, this.config, this.transport.botUserId);
-    if (text === null) return;
-    const key = conversationKey(message);
-    if (this.suppressBotTurn(message, key)) return;
+    const verdict = this.verdict(message);
+    if (verdict.kind === "ignore") {
+      await this.ledger.seen(message.channelId, message.id);
+      return;
+    }
     this.log("accepted", { message: message.id, channel: message.channelId });
+    await this.ledger.seen(message.channelId, message.id);
     await this.ledger.accept(message);
-    await this.deliver(message, key, text);
+    if (verdict.kind === "steer") {
+      await this.steer(verdict.run, verdict.key, message, verdict.prompt);
+      return;
+    }
+    await this.deliver(
+      message,
+      verdict.key,
+      verdict.prompt,
+      verdict.kind === "start" ? verdict.run : undefined,
+    );
+  }
+
+  /**
+   * Decides what one message becomes, before any await, so two messages of one conversation agree
+   * on which run each belongs to: a steer into the running turn, a queued follow-up, or a new run.
+   */
+  private verdict(
+    message: InboundMessage,
+  ):
+    | { kind: "ignore" }
+    | { kind: "queue"; key: string; prompt: string }
+    | { kind: "steer" | "start"; key: string; prompt: string; run: Run } {
+    const key = conversationKey(message);
+    const text = acceptMessage(message, this.config, this.transport.botUserId);
+    if (text === null) return { kind: "ignore" };
+    if (this.suppressBotTurn(message, key)) return { kind: "ignore" };
+    const { queued, text: prompt } = splitQueuePrefix(text);
+    if (queued) return { kind: "queue", key, prompt };
+    const run = this.runs.get(key);
+    if (run !== undefined) return { kind: "steer", key, prompt, run };
+    return { kind: "start", key, prompt, run: this.registerRun(key, message) };
+  }
+
+  /** Registers a new run for the conversation, before any await, so later messages steer it. */
+  private registerRun(key: string, message: InboundMessage): Run {
+    const entry: Run = { messages: [message], steers: 0, finished: false };
+    this.runs.set(key, entry);
+    return entry;
+  }
+
+  /** Hands a message to the running turn, so its answer covers the new message too. */
+  private async steer(
+    run: Run,
+    key: string,
+    message: InboundMessage,
+    prompt: string,
+  ): Promise<void> {
+    run.messages.push(message);
+    run.steers += 1;
+    await this.acknowledge(message);
+    const reply = await this.agent
+      .ask({
+        busyMode: "steer",
+        conversationKey: key,
+        requestId: `discord:${message.id}`,
+        text: prompt,
+      })
+      .catch((error: unknown) => {
+        this.log("agent_failed", { message: message.id, error: String(error) });
+        return undefined;
+      })
+      .finally(() => {
+        run.steers -= 1;
+      });
+    const answer =
+      reply === undefined
+        ? undefined
+        : reply.kind === "answer"
+          ? reply.text
+          : `Sorry, I could not answer: ${reply.reason}`;
+    if (answer !== undefined) {
+      await this.postAnswer(key, message, answer, undefined, run);
+      this.log("answered", { message: message.id, outcome: reply?.kind ?? "steered" });
+    }
+    this.finishRun(key);
+  }
+
+  /** Posts one answer per conversation in order, once per distinct answer, and clears the eyes. */
+  private async postAnswer(
+    key: string,
+    message: InboundMessage,
+    answer: string,
+    editor: ProgressEditor | undefined,
+    run: Run | undefined,
+  ): Promise<void> {
+    const previous = this.posts.get(key) ?? Promise.resolve();
+    const next = previous.then(() => this.postAll(key, message, answer, editor, run));
+    this.posts.set(key, next);
+    await next.finally(() => {
+      if (this.posts.get(key) === next) this.posts.delete(key);
+    });
+  }
+
+  /** The chained post: one answer per run, then the eyes come off every message it answered. */
+  private async postAll(
+    key: string,
+    message: InboundMessage,
+    answer: string,
+    editor: ProgressEditor | undefined,
+    run: Run | undefined,
+  ): Promise<void> {
+    if (run?.answeredText !== answer) await this.postOnce(run, message, answer, editor);
+    if (run?.dismissed === true) return;
+    await this.dismissAll(key, run?.messages ?? [message]);
+    if (run !== undefined) run.dismissed = true;
+  }
+
+  /** Posts the run's answer once, as a reply to the newest message it answers. */
+  private async postOnce(
+    run: Run | undefined,
+    message: InboundMessage,
+    answer: string,
+    editor: ProgressEditor | undefined,
+  ): Promise<void> {
+    if (run?.answeredText === answer) return;
+    const target = (run?.messages ?? [message]).at(-1) ?? message;
+    await this.post(target, editor, answer);
+    if (run !== undefined) run.answeredText = answer;
+  }
+
+  /** Clears the eyes of every answered message and marks each one answered. */
+  private async dismissAll(key: string, messages: readonly InboundMessage[]): Promise<void> {
+    for (const item of messages) {
+      await this.dismiss(item);
+      await this.ledger.answered(item.id);
+      this.botTurns.set(key, this.isBotTurn(item));
+    }
+  }
+
+  /** Forgets a run once its answer is posted and no steer is still settling. */
+  private finishRun(key: string): void {
+    const run = this.runs.get(key);
+    if (run?.finished === true && run.steers === 0) this.runs.delete(key);
   }
 
   /** Runs the intercept, then either posts its direct reply or lets the agent answer. */
-  private async deliver(message: InboundMessage, key: string, text: string): Promise<void> {
+  private async deliver(
+    message: InboundMessage,
+    key: string,
+    text: string,
+    entry: Run | undefined,
+  ): Promise<void> {
     const saved = await this.saveAttachments(message);
-    const prompt =
-      saved.notes.length === 0
-        ? text
-        : `${text}\n\n<attachments>\n${saved.notes.join("\n")}\n</attachments>`;
+    const prompt = this.promptWithAttachments(text, saved);
     const interception = await this.intercept?.(message, prompt);
     if (interception === undefined || !("reply" in interception)) {
       await this.reply(
@@ -118,6 +267,7 @@ export class DiscordBridge {
         interception?.text ?? prompt,
         interception?.conversationKey,
         saved.attachments,
+        entry,
       );
       return;
     }
@@ -125,6 +275,16 @@ export class DiscordBridge {
     await this.ledger.answered(message.id);
     this.botTurns.set(key, this.isBotTurn(message));
     this.log("intercepted", { message: message.id });
+  }
+
+  /** The prompt text with one line per saved or skipped attachment. */
+  private promptWithAttachments(
+    text: string,
+    saved: { readonly notes: readonly string[] },
+  ): string {
+    return saved.notes.length === 0
+      ? text
+      : `${text}\n\n<attachments>\n${saved.notes.join("\n")}\n</attachments>`;
   }
 
   /** Saves the message's attachments within the configured limits, with one note per file. */
@@ -176,7 +336,19 @@ export class DiscordBridge {
         continue;
       }
       this.log("resumed", { message: message.id, channel: message.channelId });
-      this.track(this.reply(message, text), "reply_failed", message.id);
+      const saved = await this.saveAttachments(message);
+      const key = conversationKey(message);
+      this.track(
+        this.reply(
+          message,
+          this.promptWithAttachments(text, saved),
+          key,
+          saved.attachments,
+          this.registerRun(key, message),
+        ),
+        "reply_failed",
+        message.id,
+      );
     }
     for (const [channelId, after] of Object.entries(await this.ledger.positions())) {
       this.track(this.catchUp(channelId, after), "catch_up_failed", after);
@@ -194,6 +366,7 @@ export class DiscordBridge {
     text: string,
     key = conversationKey(message),
     attachments: readonly SavedAttachment[] = [],
+    entry: Run | undefined,
   ): Promise<void> {
     await this.acknowledge(message);
     const editor =
@@ -206,28 +379,46 @@ export class DiscordBridge {
             replyTo: message.id,
             transport: this.transport,
           });
-    const reply = await this.whileTyping(message, () =>
-      this.agent.ask(
-        {
-          conversationKey: key,
-          requestId: `discord:${message.id}`,
-          text,
-          ...(attachments.length === 0 ? {} : { attachments }),
-        },
-        editor === undefined
-          ? undefined
-          : (progress) => {
-              editor.note(progress.label);
-            },
-      ),
-    );
-    const answer =
-      reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;
-    await this.post(message, editor, answer);
-    await this.dismiss(message);
-    await this.ledger.answered(message.id);
-    this.botTurns.set(key, this.isBotTurn(message));
-    this.log("answered", { message: message.id, outcome: reply.kind });
+    if (entry !== undefined) entry.editor = editor;
+    try {
+      const reply = await this.whileTyping(message, () =>
+        this.agent.ask(
+          {
+            conversationKey: key,
+            requestId: `discord:${message.id}`,
+            text,
+            ...(attachments.length === 0 ? {} : { attachments }),
+            ...(entry === undefined
+              ? { busyMode: "followUp" as const }
+              : { busyMode: "steer" as const }),
+          },
+          editor === undefined
+            ? undefined
+            : (progress) => {
+                editor.note(progress.label);
+              },
+        ),
+      );
+      const answer =
+        reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;
+      await this.postAnswer(key, message, answer, editor, entry);
+      this.log("answered", { message: message.id, outcome: reply.kind });
+    } finally {
+      if (entry !== undefined) {
+        entry.finished = true;
+        this.finishRun(key);
+      }
+    }
+  }
+
+  /** The run entry a reply belongs to: its own run, or the run already in flight. */
+  private entryFor(key: string, message: InboundMessage, queued: boolean): Run | undefined {
+    if (queued) return undefined;
+    const known = this.runs.get(key);
+    if (known !== undefined) return known;
+    const entry: Run = { messages: [message], steers: 0, finished: false };
+    this.runs.set(key, entry);
+    return entry;
   }
 
   /** Posts the answer, into the progress message when one was started, otherwise as a reply. */
