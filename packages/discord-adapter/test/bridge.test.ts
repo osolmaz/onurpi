@@ -3,12 +3,15 @@ import { DiscordBridge, TYPING_INTERVAL_MS } from "../src/bridge.ts";
 import { parseAdapterConfig } from "../src/config.ts";
 import type { AgentReply } from "../src/types.ts";
 import {
+  BOT,
   CHANNEL,
   FakeAgent,
   FakeLedger,
   FakeTransport,
+  GUILD,
   message,
   oneChannel,
+  OTHER_CHANNEL,
   ProgressAgent,
   STRANGER,
 } from "./helpers.ts";
@@ -55,6 +58,81 @@ describe("DiscordBridge", () => {
       { channelId: CHANNEL, id: "sent-1", replyTo: "600000000000000006", text: "Echo: hello" },
     ]);
     expect(events).toEqual(["accepted", "answered"]);
+  });
+
+  it("answers a listed bot once until a person speaks in that conversation again", async () => {
+    const LOOPER = "1483185871439003790";
+    const { agent, bridge, events, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      { bots: [LOOPER] },
+    );
+    const fromLooper = (id: string, content: string) =>
+      message({ authorId: LOOPER, authorIsBot: true, content, id });
+
+    transport.emit(fromLooper("700000000000000010", `<@${BOT}> run the check`));
+    await bridge.idle();
+    transport.emit(fromLooper("700000000000000011", `<@${BOT}> run it again`));
+    await bridge.idle();
+    transport.emit(message({ content: "hello", id: "700000000000000012" }));
+    await bridge.idle();
+    transport.emit(fromLooper("700000000000000013", `<@${BOT}> once more`));
+    await bridge.idle();
+
+    expect(agent.requests.map((request) => request.requestId)).toEqual([
+      "discord:700000000000000010",
+      "discord:700000000000000012",
+      "discord:700000000000000013",
+    ]);
+    expect(events).toContain("bot_suppressed");
+  });
+
+  it("tracks bot turns per conversation, so a loop in one channel cannot mute another", async () => {
+    const LOOPER = "1483185871439003790";
+    const { agent, bridge, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {
+        bots: [LOOPER],
+        guilds: { [GUILD]: { channels: { [CHANNEL]: {}, [OTHER_CHANNEL]: {} } } },
+      },
+    );
+    transport.emit(
+      message({
+        authorId: LOOPER,
+        authorIsBot: true,
+        channelId: OTHER_CHANNEL,
+        content: `<@${BOT}> ping`,
+        id: "700000000000000020",
+      }),
+    );
+    await bridge.idle();
+    transport.emit(
+      message({
+        authorId: LOOPER,
+        authorIsBot: true,
+        channelId: OTHER_CHANNEL,
+        content: `<@${BOT}> ping`,
+        id: "700000000000000021",
+      }),
+    );
+    await bridge.idle();
+    transport.emit(
+      message({
+        authorId: LOOPER,
+        authorIsBot: true,
+        channelId: OTHER_CHANNEL,
+        content: `<@${BOT}> ping`,
+        id: "700000000000000022",
+      }),
+    );
+    await bridge.idle();
+
+    expect(agent.requests.map((request) => request.requestId)).toEqual([
+      "discord:700000000000000020",
+    ]);
   });
 
   it("keeps typing while the agent works and stops when it answers", async () => {
