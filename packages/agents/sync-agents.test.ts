@@ -260,3 +260,31 @@ describe("agent synchronization", () => {
     expect(existsSync(join(root, "installed"))).toBe(false);
   });
 });
+
+describe("skipped destinations", () => {
+  it("creates an empty private skills root when the private source has no skills", () => {
+    const root = temporaryDirectory();
+    const privateRoot = join(root, "private");
+    createSkill(join(root, "public", "skills"), "public-skill");
+    mkdirSync(join(privateRoot, "skills"), { recursive: true });
+    write(join(privateRoot, "AGENTS.md"), "private instructions\n");
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    run(root, "sync", syncArgs(root, privateRoot));
+    expect(existsSync(join(root, "installed", "agents", "skills"))).toBe(true);
+  });
+
+  it("refuses to run when every destination is skipped", () => {
+    const root = temporaryDirectory();
+    const privateRoot = createSources(root);
+    const args = [
+      "--skip-codex",
+      "--skip-claude",
+      "--skip-cursor",
+      "--skip-pi",
+      ...syncArgs(root, privateRoot),
+    ];
+    expect(() => {
+      run(root, "sync", args);
+    }).toThrow(/Nothing to do/u);
+  });
+});
