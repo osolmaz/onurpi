@@ -171,6 +171,12 @@ export type RunningAgent = AgentPort & {
   readonly ledger: ReplyLedger;
   /** Conversation that holds a chat key, created on first use. */
   conversationFor(key: string): Promise<ConversationId>;
+  /** Resets the conversation: a new context, with `handoff` as its first message when given. */
+  reset(key: string, handoff?: string): Promise<void>;
+  /** Aborts the conversation's running turn and withdraws its queued inputs. */
+  abort(key: string): Promise<void>;
+  /** The active transcript's size, in entries and model messages. */
+  inspect(key: string): Promise<{ entries: number; messages: number }>;
   close(): Promise<void>;
 };
 
@@ -473,5 +479,24 @@ export async function openAgent(
       (await harness.snapshot(ConversationKeys, context))?.keys[String(conversationId)],
     jobs: jobLedger(harness),
     ledger: discordLedger(harness),
+    reset: async (key, handoff) => {
+      const conversation = await harness.conversation(await conversationFor(key), context);
+      if (conversation === undefined) throw new Error(`the conversation for ${key} is missing`);
+      await conversation.reset(
+        handoff === undefined || handoff.length === 0 ? undefined : handoff,
+        context,
+      );
+    },
+    abort: async (key) => {
+      const conversation = await harness.conversation(await conversationFor(key), context);
+      if (conversation === undefined) throw new Error(`the conversation for ${key} is missing`);
+      await conversation.abort(context);
+    },
+    inspect: async (key) => {
+      const conversation = await harness.conversation(await conversationFor(key), context);
+      if (conversation === undefined) throw new Error(`the conversation for ${key} is missing`);
+      const view = await conversation.context(context);
+      return { entries: view.entries.length, messages: view.messages.length };
+    },
   };
 }

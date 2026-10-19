@@ -575,6 +575,46 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(transport.posted[0]?.text).toBe(`Echo: ${tagged("list the files")}`);
   });
 
+  it("answers an owner's command before the agent, without the eyes", async () => {
+    const { agent, bridge, events, ledger, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {},
+      {
+        command: (_message: unknown, text: string): Promise<string | undefined> =>
+          Promise.resolve(text === "/status" ? "model: test" : undefined),
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> /status`, id: "700000000000000050" }));
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(transport.posted).toEqual([
+      { channelId: CHANNEL, id: "sent-1", replyTo: "700000000000000050", text: "model: test" },
+    ]);
+    expect(transport.reacted).toEqual([]);
+    expect(await ledger.pending()).toEqual([]);
+    expect(events).toEqual(["commanded"]);
+  });
+
+  it("lets an unknown command flow to the agent as ordinary text", async () => {
+    const { agent, bridge, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      {},
+      {
+        command: (): Promise<string | undefined> => Promise.resolve(undefined),
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> /frobnicate`, id: "700000000000000052" }));
+    await bridge.idle();
+
+    expect(agent.requests).toHaveLength(1);
+    expect(agent.requests[0]?.text).toBe(tagged("/frobnicate"));
+  });
+
   it("re-downloads attachments when it resumes an unanswered message", async () => {
     const downloads: string[] = [];
     const agent = new FakeAgent();

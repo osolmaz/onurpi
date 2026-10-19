@@ -6,6 +6,7 @@ import {
 } from "@onurpi/discord-adapter";
 import { pruneAttachments, saveAttachment } from "./attachments.ts";
 import { openAgent, type RunningAgent } from "./agent.ts";
+import { createCommandHandler } from "./commands.ts";
 import type { WorkerConfig } from "./config.ts";
 import { ApprovalDesk } from "./desk.ts";
 import { Inbox } from "./inbox.ts";
@@ -60,6 +61,7 @@ export async function startWorker(
   desk.attach(agent, transport);
   const bridge = new DiscordBridge({
     agent,
+    command: createCommandHandler({ agent, config }),
     config: config.discord,
     download: (attachment) => saveAttachment(config.workspace, attachment),
     intercept: desk.intercept,
