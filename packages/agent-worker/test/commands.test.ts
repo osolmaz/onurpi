@@ -67,6 +67,27 @@ describe("commands", () => {
     );
   });
 
+  it("aborts the running turn on /stop and says when nothing is running", async () => {
+    const agent = fakeAgent();
+    const handler = createCommandHandler({ agent, config });
+    expect(await handler({ channelId: "400000000000000004" }, "/stop", true)).toBe(
+      "Stopped; the answer so far stays in the transcript.",
+    );
+    expect(await handler({ channelId: "400000000000000004" }, "/stop", false)).toBe(
+      "Nothing is running.",
+    );
+    expect(agent.abortCalls).toEqual(["discord:400000000000000004", "discord:400000000000000004"]);
+  });
+
+  it("lists the commands, the model, and the pi runtime on /help", async () => {
+    const handler = createCommandHandler({ agent: fakeAgent(), config });
+    const help = await handler({ channelId: "400000000000000004" }, "/help", false);
+    expect(help).toContain("/new [message]");
+    expect(help).toContain("/stop");
+    expect(help).toContain("openai-codex/gpt-6.1-sol");
+    expect(help).toMatch(/pi-durable( \d+\.\d+\.\d+)?/);
+  });
+
   it("returns undefined for an unknown word, so the message flows on to the agent", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });

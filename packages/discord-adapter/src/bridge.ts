@@ -147,20 +147,17 @@ export class DiscordBridge {
   }
 
   /**
-   * Runs an owner's `/command` through the handler and answers it at once, without the eyes and
-   * without the agent. False when the message is not a command this bridge handles, so it flows on
-   * through the ordinary verdict.
+   * Runs an owner's `/command` — or a bare `stop`, which means the same as `/stop` — through the
+   * handler and answers it at once, without the eyes and without the agent. False when the message
+   * is not a command this bridge handles, so it flows on through the ordinary verdict.
    */
   private async ownerCommand(message: InboundMessage, key: string, text: string): Promise<boolean> {
     const command = this.command;
-    if (
-      command === undefined ||
-      !text.startsWith("/") ||
-      !this.config.ownerIds.includes(message.authorId)
-    ) {
-      return false;
-    }
-    const answer = await command(message, text, this.runs.has(key));
+    const word = text.trim().toLowerCase();
+    if (command === undefined || !this.config.ownerIds.includes(message.authorId)) return false;
+    const commandText = word === "stop" ? "/stop" : text;
+    if (!commandText.startsWith("/")) return false;
+    const answer = await command(message, commandText, this.runs.has(key));
     if (answer === undefined) return false;
     this.log("commanded", { message: message.id, channel: message.channelId });
     await this.ledger.seen(message.channelId, message.id);
