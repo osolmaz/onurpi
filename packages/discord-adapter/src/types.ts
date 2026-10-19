@@ -1,6 +1,16 @@
 /** How the adapter logs: one line per event, as the worker's log keeps them. */
 export type BridgeLog = (event: string, details: Readonly<Record<string, string>>) => void;
 
+/** One file attached to an inbound message, as Discord reports it. */
+export type InboundAttachment = {
+  readonly id: string;
+  readonly name: string;
+  readonly url: string;
+  /** What Discord says the file is, or null when it does not know. */
+  readonly contentType: string | null;
+  readonly size: number;
+};
+
 /** A Discord message as the adapter sees it, independent of the Discord client library. */
 export type InboundMessage = {
   readonly id: string;
@@ -15,6 +25,8 @@ export type InboundMessage = {
   readonly content: string;
   /** True when the message mentions the adapter's own bot user. */
   readonly mentionsBot: boolean;
+  /** The files attached to the message. Absent means none. */
+  readonly attachments?: readonly InboundAttachment[];
 };
 
 /** What the adapter needs from Discord. The live implementation uses discord.js. */
@@ -50,11 +62,20 @@ export type ReplyLedger = {
   positions(): Promise<Readonly<Record<string, string>>>;
 };
 
+/** One attachment the host saved where the agent's tools can read it. */
+export type SavedAttachment = {
+  readonly path: string;
+  readonly name: string;
+  readonly contentType: string | null;
+};
+
 /** One question for the agent. `requestId` makes a repeated question return the first answer. */
 export type AgentRequest = {
   readonly conversationKey: string;
   readonly requestId: string;
   readonly text: string;
+  /** The message's saved attachments. Absent means the message had none. */
+  readonly attachments?: readonly SavedAttachment[];
 };
 
 /** One short note about what the agent is doing while it works on a request. */

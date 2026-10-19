@@ -7,7 +7,7 @@ import {
   Partials,
   type SendableChannels,
 } from "discord.js";
-import type { ChatTransport, InboundMessage } from "./types.ts";
+import type { ChatTransport, InboundAttachment, InboundMessage } from "./types.ts";
 
 export type DiscordTransportOptions = {
   readonly token: string;
@@ -29,6 +29,20 @@ function toInbound(message: Message, botUserId: string): InboundMessage {
     isDirect: channel.type === ChannelType.DM,
     mentionsBot: message.mentions.users.has(botUserId),
     parentChannelId: channel.isThread() ? channel.parentId : null,
+    ...attachmentList(message),
+  };
+}
+
+function attachmentList(message: Message): { attachments?: readonly InboundAttachment[] } {
+  if (message.attachments.size === 0) return {};
+  return {
+    attachments: [...message.attachments.values()].map((attachment) => ({
+      contentType: attachment.contentType ?? null,
+      id: attachment.id,
+      name: attachment.name,
+      size: attachment.size,
+      url: attachment.url,
+    })),
   };
 }
 

@@ -27,7 +27,12 @@ export type AdapterConfig = {
   readonly ackReaction?: string;
   /** Edit one status message with progress notes while the agent works. Absent means no edits. */
   readonly progress?: { readonly intervalMs: number };
+  /** Attachment download limits. Absent means the defaults. */
+  readonly attachments?: { readonly maxBytes: number; readonly maxCount: number };
 };
+
+/** The attachment limits used when the configuration names none. */
+export const DEFAULT_ATTACHMENT_LIMITS = { maxBytes: 25 * 1024 * 1024, maxCount: 5 } as const;
 
 const SNOWFLAKE = /^\d{17,20}$/u;
 
@@ -78,6 +83,14 @@ function wholeNumber(value: unknown, path: string): number {
   return value;
 }
 
+/** A whole number with a default, used for the attachment limits. */
+function positiveInteger(value: unknown, path: string, fallback: number): number {
+  if (value === undefined) return fallback;
+  const number = wholeNumber(value, path);
+  if (number === 0) throw new Error(`${path} must be above zero`);
+  return number;
+}
+
 function parseChannel(value: unknown, path: string, requireMention: boolean): ChannelConfig {
   const input = record(value, path);
   return {
@@ -104,6 +117,10 @@ export function parseAdapterConfig(value: unknown, path = "discord"): AdapterCon
   const ownerIds = parseDiscordIds(input["ownerIds"], `${path}.ownerIds`);
   if (ownerIds.length === 0) throw new Error(`${path}.ownerIds must name at least one owner`);
   const bots = input["bots"] === undefined ? [] : parseDiscordIds(input["bots"], `${path}.bots`);
+  const attachments =
+    input["attachments"] === undefined
+      ? undefined
+      : parseAttachments(input["attachments"], `${path}.attachments`);
   const guilds = Object.entries(record(input["guilds"] ?? {}, `${path}.guilds`)).map(
     ([id, guild]) => {
       const at = `${path}.guilds.${id}`;
@@ -112,11 +129,23 @@ export function parseAdapterConfig(value: unknown, path = "discord"): AdapterCon
   );
   return {
     ...(bots.length === 0 ? {} : { bots }),
+    ...(attachments === undefined ? {} : { attachments }),
     ...presentation(input, path),
     directMessages: flag(input["directMessages"], `${path}.directMessages`, true),
     guilds: Object.fromEntries(guilds),
     ownerIds,
   };
+}
+
+/** Reads and checks the attachment limits. */
+function parseAttachments(
+  value: unknown,
+  path: string,
+): { readonly maxBytes: number; readonly maxCount: number } {
+  const input = record(value, path);
+  const maxBytes = positiveInteger(input["maxBytes"], `${path}.maxBytes`, 25 * 1024 * 1024);
+  const maxCount = positiveInteger(input["maxCount"], `${path}.maxCount`, 5);
+  return { maxBytes, maxCount };
 }
 
 /** The reaction and progress options, which only shape how an answer looks. */

@@ -4,6 +4,7 @@ import {
   type BridgeLog,
   type DiscordTransport,
 } from "@onurpi/discord-adapter";
+import { saveAttachment } from "./attachments.ts";
 import { openAgent, type RunningAgent } from "./agent.ts";
 import type { WorkerConfig } from "./config.ts";
 import { ApprovalDesk } from "./desk.ts";
@@ -57,6 +58,7 @@ export async function startWorker(
   const bridge = new DiscordBridge({
     agent,
     config: config.discord,
+    download: (attachment) => saveAttachment(config.workspace, attachment),
     intercept: desk.intercept,
     ledger: agent.ledger,
     log: dependencies.log,
