@@ -54,6 +54,8 @@ export class DiscordBridge {
   private readonly typingIntervalMs: number;
   private readonly intercept: BridgeOptions["intercept"];
   private readonly pending = new Set<Promise<void>>();
+  /** Whether the last answered turn in a conversation came from a bot, not a person. */
+  private readonly botTurns = new Map<string, boolean>();
 
   constructor(options: BridgeOptions) {
     this.transport = options.transport;
@@ -89,16 +91,24 @@ export class DiscordBridge {
     await this.ledger.seen(message.channelId, message.id);
     const text = acceptMessage(message, this.config, this.transport.botUserId);
     if (text === null) return;
+    const key = conversationKey(message);
+    if (this.suppressBotTurn(message, key)) return;
     this.log("accepted", { message: message.id, channel: message.channelId });
     await this.ledger.accept(message);
+    await this.deliver(message, key, text);
+  }
+
+  /** Runs the intercept, then either posts its direct reply or lets the agent answer. */
+  private async deliver(message: InboundMessage, key: string, text: string): Promise<void> {
     const interception = await this.intercept?.(message, text);
-    if (interception !== undefined && "reply" in interception) {
-      await this.transport.send(message.channelId, interception.reply, message.id);
-      await this.ledger.answered(message.id);
-      this.log("intercepted", { message: message.id });
+    if (interception === undefined || !("reply" in interception)) {
+      await this.reply(message, interception?.text ?? text, interception?.conversationKey);
       return;
     }
-    await this.reply(message, interception?.text ?? text, interception?.conversationKey);
+    await this.transport.send(message.channelId, interception.reply, message.id);
+    await this.ledger.answered(message.id);
+    this.botTurns.set(key, this.isBotTurn(message));
+    this.log("intercepted", { message: message.id });
   }
 
   private async recover(): Promise<void> {
@@ -153,6 +163,7 @@ export class DiscordBridge {
     await this.post(message, editor, answer);
     await this.dismiss(message);
     await this.ledger.answered(message.id);
+    this.botTurns.set(key, this.isBotTurn(message));
     this.log("answered", { message: message.id, outcome: reply.kind });
   }
 
@@ -173,6 +184,24 @@ export class DiscordBridge {
       await this.transport.send(message.channelId, first ?? answer, message.id);
     }
     for (const chunk of rest) await this.transport.send(message.channelId, chunk);
+  }
+
+  /**
+   * Whether the bot turn must stay unanswered because the previous answered turn was a bot's: two
+   * bots in a row would let two automations loop forever.
+   */
+  private suppressBotTurn(message: InboundMessage, key: string): boolean {
+    if (!this.isBotTurn(message)) return false;
+    if (this.botTurns.get(key) === true) {
+      this.log("bot_suppressed", { message: message.id, channel: message.channelId });
+      return true;
+    }
+    return false;
+  }
+
+  /** Whether the message came from a listed bot rather than a person or an owner. */
+  private isBotTurn(message: InboundMessage): boolean {
+    return message.authorIsBot && !this.config.ownerIds.includes(message.authorId);
   }
 
   /** Reacts to the message the agent is about to answer, so the owner sees it was picked up. */
