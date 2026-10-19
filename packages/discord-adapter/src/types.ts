@@ -21,6 +21,10 @@ export type InboundMessage = {
   readonly channelName?: string | null;
   /** The server's name, when the message is in a server; absent or null otherwise. */
   readonly guildName?: string | null;
+  /** The sender's display name, when the source knows it; absent or null when unknown. */
+  readonly authorName?: string | null;
+  /** When the message was sent, as an ISO timestamp; absent or null when unknown. */
+  readonly sentAt?: string | null;
   /** The parent channel of a thread, or null for a channel that is not a thread. */
   readonly parentChannelId: string | null;
   readonly isDirect: boolean;

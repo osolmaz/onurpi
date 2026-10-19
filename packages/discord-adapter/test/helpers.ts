@@ -17,6 +17,7 @@ export const OTHER_CHANNEL = "500000000000000005";
 export function message(overrides: Partial<InboundMessage> = {}): InboundMessage {
   return {
     authorId: OWNER,
+    authorName: "onur",
     authorIsBot: false,
     channelId: CHANNEL,
     channelName: "general",
@@ -27,6 +28,7 @@ export function message(overrides: Partial<InboundMessage> = {}): InboundMessage
     isDirect: false,
     mentionsBot: true,
     parentChannelId: null,
+    sentAt: "2026-10-19T12:40:00.000Z",
     ...overrides,
   };
 }

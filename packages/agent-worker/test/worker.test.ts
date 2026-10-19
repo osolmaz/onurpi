@@ -81,6 +81,7 @@ class FakeDiscord implements DiscordTransport {
 function ping(id: string, content = `<@${BOT}> ping`): InboundMessage {
   return {
     authorId: OWNER,
+    authorName: "onur",
     authorIsBot: false,
     channelId: CHANNEL,
     content,
@@ -89,6 +90,7 @@ function ping(id: string, content = `<@${BOT}> ping`): InboundMessage {
     isDirect: false,
     mentionsBot: true,
     parentChannelId: null,
+    sentAt: "2026-10-19T12:40:00.000Z",
   };
 }
 
@@ -116,22 +118,12 @@ describe("startWorker", () => {
     const worker = await startWorker(config(), deps);
     expect(tokens).toEqual(["test-token"]);
 
-    discord.emit({
-      authorId: OWNER,
-      authorIsBot: false,
-      channelId: CHANNEL,
-      content: `<@${BOT}> ping`,
-      guildId: GUILD,
-      id: "600000000000000006",
-      isDirect: false,
-      mentionsBot: true,
-      parentChannelId: null,
-    });
+    discord.emit(ping("600000000000000006"));
     await worker.bridge.idle();
     await worker.stop();
 
     expect(discord.sent).toEqual([
-      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nping",
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\n[from onur at 2026-10-19T12:40:00.000Z]\nping",
     ]);
     expect(events).toEqual(["ready", "accepted", "answered"]);
     expect(discord.closed).toBe(true);
@@ -183,11 +175,11 @@ describe("startWorker", () => {
     await restarted.stop();
 
     expect(first.sent).toEqual([
-      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nping",
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\n[from onur at 2026-10-19T12:40:00.000Z]\nping",
     ]);
     expect(second.sent).toEqual([
-      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nwaiting",
-      "Echo: missed",
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\n[from onur at 2026-10-19T12:40:00.000Z]\nwaiting",
+      "Echo: [from onur at 2026-10-19T12:40:00.000Z]\nmissed",
     ]);
   });
 

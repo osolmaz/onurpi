@@ -22,6 +22,12 @@ const config = parseAdapterConfig(oneChannel());
 /** The context line the bridge prepends to a run's first prompt for the test channel. */
 const CONTEXT_TAG = `[discord: #general in Test Server, channel ${CHANNEL}]`;
 
+/** The sender line the bridge prepends to every prompt from the test helper's message. */
+const SENDER_TAG = "[from onur at 2026-10-19T12:40:00.000Z]";
+
+/** The prompt the bridge builds for the helper's default message with the given text. */
+const tagged = (text: string): string => `${CONTEXT_TAG}\n${SENDER_TAG}\n${text}`;
+
 function setup(
   agent = new FakeAgent(),
   ledger = new FakeLedger(),
@@ -128,7 +134,7 @@ describe("DiscordBridge", () => {
         busyMode: "steer",
         conversationKey: `discord:${CHANNEL}`,
         requestId: "discord:600000000000000006",
-        text: `${CONTEXT_TAG}\nhello`,
+        text: tagged("hello"),
       },
     ]);
     expect(transport.typing).toEqual([CHANNEL]);
@@ -137,7 +143,7 @@ describe("DiscordBridge", () => {
         channelId: CHANNEL,
         id: "sent-1",
         replyTo: "600000000000000006",
-        text: `Echo: ${CONTEXT_TAG}\nhello`,
+        text: `Echo: ${tagged("hello")}`,
       },
     ]);
     expect(events).toEqual(["accepted", "answered"]);
@@ -277,7 +283,7 @@ describe("DiscordBridge", () => {
     await bridge.idle();
 
     expect(events).toEqual(["accepted", "typing_failed", "answered"]);
-    expect(transport.posted[0]?.text).toBe(`Echo: ${CONTEXT_TAG}\nhello`);
+    expect(transport.posted[0]?.text).toBe(`Echo: ${tagged("hello")}`);
   });
 
   it("logs a reply that Discord refuses, without stopping", async () => {
@@ -368,7 +374,7 @@ describe("DiscordBridge after a restart", () => {
     const { bridge, events, transport } = setup(new FakeAgent(), ledger);
     await bridge.idle();
 
-    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
+    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${tagged("hello")}`]);
     expect(await ledger.pending()).toEqual([]);
     expect(events).toEqual(["resumed", "answered"]);
   });
@@ -409,8 +415,8 @@ describe("DiscordBridge after a restart", () => {
     await bridge.idle();
 
     expect(agent.requests.map((request) => request.text)).toEqual([
-      `${CONTEXT_TAG}\nmissed one`,
-      `${CONTEXT_TAG}\nmissed two`,
+      tagged("missed one"),
+      tagged("missed two"),
     ]);
     expect(await ledger.positions()).toEqual({ [CHANNEL]: "600000000000000008" });
   });
@@ -455,7 +461,7 @@ describe("DiscordBridge with reactions and progress", () => {
         channelId: CHANNEL,
         id: "sent-1",
         replyTo: "600000000000000006",
-        text: `Echo: ${CONTEXT_TAG}\nhello`,
+        text: `Echo: ${tagged("hello")}`,
       },
     ]);
     expect(transport.edits).toEqual([]);
@@ -479,7 +485,7 @@ describe("DiscordBridge with reactions and progress", () => {
         text: "Thinking\nbash: git status",
       },
     ]);
-    expect(transport.edits.map((edit) => edit.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
+    expect(transport.edits.map((edit) => edit.text)).toEqual([`Echo: ${tagged("hello")}`]);
     expect(transport.unreacted).toEqual([]);
   });
 
@@ -507,7 +513,7 @@ describe("DiscordBridge with reactions and progress", () => {
     transport.emit(message());
     await bridge.idle();
 
-    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
+    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${tagged("hello")}`]);
     expect(events).toEqual(["accepted", "react_failed", "answered"]);
   });
 
@@ -563,10 +569,10 @@ describe("DiscordBridge with reactions and progress", () => {
     transport.emit(message({ content: "q list the files", id: "700000000000000040" }));
     await bridge.idle();
 
-    expect(agent.requests[0]?.text).toBe(`${CONTEXT_TAG}\nlist the files`);
+    expect(agent.requests[0]?.text).toBe(tagged("list the files"));
     expect(agent.requests[0]?.busyMode).toBe("followUp");
     expect(transport.posted[0]?.replyTo).toBe("700000000000000040");
-    expect(transport.posted[0]?.text).toBe(`Echo: ${CONTEXT_TAG}\nlist the files`);
+    expect(transport.posted[0]?.text).toBe(`Echo: ${tagged("list the files")}`);
   });
 
   it("re-downloads attachments when it resumes an unanswered message", async () => {
