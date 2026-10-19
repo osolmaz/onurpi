@@ -302,7 +302,7 @@ describe("DiscordBridge with reactions and progress", () => {
         channelId: CHANNEL,
         id: "sent-1",
         replyTo: "600000000000000006",
-        text: "- Thinking\n- bash: git status",
+        text: "Thinking\nbash: git status",
       },
     ]);
     expect(transport.edits.map((edit) => edit.text)).toEqual(["Echo: hello"]);
@@ -321,7 +321,7 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(transport.edits.map((edit) => edit.text)).toEqual([
       "Sorry, I could not answer: the model is unreachable",
     ]);
-    expect(transport.posted.map((item) => item.text)).toEqual(["- Thinking"]);
+    expect(transport.posted.map((item) => item.text)).toEqual(["Thinking"]);
   });
 
   it("logs a failed reaction and still answers", async () => {

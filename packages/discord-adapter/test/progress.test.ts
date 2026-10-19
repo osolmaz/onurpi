@@ -35,10 +35,10 @@ describe("ProgressEditor", () => {
     expect(transport.posted[0]).toMatchObject({
       channelId: CHANNEL,
       replyTo: "600000000000000006",
-      text: "- bash: git status",
+      text: "bash: git status",
     });
     expect(transport.edits).toEqual([
-      { channelId: CHANNEL, id: "sent-1", text: "- bash: git status\n- Thinking" },
+      { channelId: CHANNEL, id: "sent-1", text: "bash: git status\nThinking" },
     ]);
   });
 
@@ -55,7 +55,7 @@ describe("ProgressEditor", () => {
         channelId: CHANNEL,
         id: "sent-1",
         replyTo: "600000000000000006",
-        text: "- first\n- second\n- third",
+        text: "first\nsecond\nthird",
       },
     ]);
     expect(transport.edits).toEqual([]);
@@ -63,7 +63,7 @@ describe("ProgressEditor", () => {
     progress.note("fourth");
     await vi.advanceTimersByTimeAsync(0);
     expect(transport.edits).toEqual([
-      { channelId: CHANNEL, id: "sent-1", text: "- first\n- second\n- third\n- fourth" },
+      { channelId: CHANNEL, id: "sent-1", text: "first\nsecond\nthird\nfourth" },
     ]);
 
     progress.note("fifth");
@@ -71,8 +71,8 @@ describe("ProgressEditor", () => {
     expect(transport.edits).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(PROGRESS_INTERVAL_MS);
     expect(transport.edits).toEqual([
-      { channelId: CHANNEL, id: "sent-1", text: "- first\n- second\n- third\n- fourth" },
-      { channelId: CHANNEL, id: "sent-1", text: "- first\n- second\n- third\n- fourth\n- fifth" },
+      { channelId: CHANNEL, id: "sent-1", text: "first\nsecond\nthird\nfourth" },
+      { channelId: CHANNEL, id: "sent-1", text: "first\nsecond\nthird\nfourth\nfifth" },
     ]);
   });
 
@@ -85,8 +85,8 @@ describe("ProgressEditor", () => {
     await settle();
 
     const last = transport.edits.at(-1);
-    expect(last?.text).toContain(`- step ${MAX_STATUS_NOTES + 1}`);
-    expect(last?.text).not.toContain("- step 0");
+    expect(last?.text).toContain(`step ${MAX_STATUS_NOTES + 1}`);
+    expect(last?.text).not.toContain("step 0");
     for (const edit of transport.edits) expect(edit.text.length).toBeLessThanOrEqual(1700);
   });
 
