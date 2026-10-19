@@ -122,6 +122,7 @@ describe("DiscordBridge", () => {
 
     expect(agent.requests).toEqual([
       {
+        busyMode: "steer",
         conversationKey: `discord:${CHANNEL}`,
         requestId: "discord:600000000000000006",
         text: "hello",
@@ -341,7 +342,12 @@ describe("DiscordBridge with an intercept", () => {
     await bridge.idle();
 
     expect(agent.requests).toEqual([
-      { conversationKey: "job:digest", requestId: "discord:600000000000000006", text: "approved" },
+      {
+        busyMode: "steer",
+        conversationKey: "job:digest",
+        requestId: "discord:600000000000000006",
+        text: "approved",
+      },
     ]);
     expect(transport.posted[0]?.replyTo).toBe("600000000000000006");
   });
@@ -496,5 +502,76 @@ describe("DiscordBridge with reactions and progress", () => {
 
     expect(transport.reacted).toEqual([]);
     expect(transport.unreacted).toEqual([]);
+  });
+  it("steers a message into the running answer and replies once to the newest message", async () => {
+    const gates: ((reply: AgentReply) => void)[] = [];
+    const { agent, bridge, events, transport } = setup(
+      new FakeAgent(
+        () =>
+          new Promise<AgentReply>((resolve) => {
+            gates.push(resolve);
+          }),
+      ),
+      new FakeLedger(),
+      new FakeTransport(),
+      { ackReaction: "\u{1F440}" },
+    );
+    transport.emit(message({ content: "hello", id: "700000000000000030" }));
+    transport.emit(message({ content: "also add charts", id: "700000000000000031" }));
+    await new Promise((resolve) => setImmediate(resolve));
+    for (const resolve of gates) resolve({ kind: "answer", text: "Echo: run" });
+    await bridge.idle();
+
+    expect(agent.requests.map((request) => request.requestId).sort()).toEqual([
+      "discord:700000000000000030",
+      "discord:700000000000000031",
+    ]);
+    expect(agent.requests[1]?.busyMode).toBe("steer");
+    expect(transport.posted).toEqual([
+      { channelId: CHANNEL, id: "sent-1", replyTo: "700000000000000031", text: "Echo: run" },
+    ]);
+    expect(transport.unreacted.map((item) => item.messageId)).toEqual([
+      "700000000000000030",
+      "700000000000000031",
+    ]);
+    expect(events).toEqual(["accepted", "accepted", "answered", "answered"]);
+  });
+
+  it("queues a message that starts with the queue keyword for its own answer", async () => {
+    const { agent, bridge, transport } = setup();
+    transport.emit(message({ content: "q list the files", id: "700000000000000040" }));
+    await bridge.idle();
+
+    expect(agent.requests[0]?.text).toBe("list the files");
+    expect(agent.requests[0]?.busyMode).toBe("followUp");
+    expect(transport.posted[0]?.replyTo).toBe("700000000000000040");
+    expect(transport.posted[0]?.text).toBe("Echo: list the files");
+  });
+
+  it("re-downloads attachments when it resumes an unanswered message", async () => {
+    const downloads: string[] = [];
+    const agent = new FakeAgent();
+    const transport = new FakeTransport();
+    const ledger = new FakeLedger();
+    const bridge = new DiscordBridge({
+      agent,
+      config: parseAdapterConfig(oneChannel()),
+      download: (att: InboundAttachment) => {
+        downloads.push(att.name);
+        return Promise.resolve(`/workspace/${att.name}`);
+      },
+      ledger,
+      log: () => undefined,
+      transport,
+    });
+    await ledger.accept(message({ attachments: [attachment()] }));
+    bridge.start();
+    await bridge.idle();
+
+    expect(downloads).toEqual(["photo.png"]);
+    expect(agent.requests[0]?.text).toContain("photo.png saved at /workspace/photo.png");
+    expect(agent.requests[0]?.attachments).toEqual([
+      { contentType: "image/png", name: "photo.png", path: "/workspace/photo.png" },
+    ]);
   });
 });

@@ -127,10 +127,10 @@ export class FakeLedger implements ReplyLedger {
 
 export class FakeAgent implements AgentPort {
   readonly requests: AgentRequest[] = [];
-  private readonly reply: (request: AgentRequest) => AgentReply;
+  private readonly reply: (request: AgentRequest) => AgentReply | Promise<AgentReply>;
 
   constructor(
-    reply: (request: AgentRequest) => AgentReply = (request) => ({
+    reply: (request: AgentRequest) => AgentReply | Promise<AgentReply> = (request) => ({
       kind: "answer",
       text: `Echo: ${request.text}`,
     }),
@@ -138,13 +138,13 @@ export class FakeAgent implements AgentPort {
     this.reply = reply;
   }
 
-  ask(
+  async ask(
     request: AgentRequest,
     onProgress?: (progress: { label: string }) => void,
   ): Promise<AgentReply> {
     this.requests.push(request);
     for (const label of this.progress) onProgress?.({ label });
-    return Promise.resolve(this.reply(request));
+    return this.reply(request);
   }
 
   /** Progress notes the next ask emits while it works. */

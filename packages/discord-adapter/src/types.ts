@@ -76,6 +76,8 @@ export type AgentRequest = {
   readonly text: string;
   /** The message's saved attachments. Absent means the message had none. */
   readonly attachments?: readonly SavedAttachment[];
+  /** What to do with this input while the conversation runs. Absent keeps the worker's default. */
+  readonly busyMode?: "steer" | "followUp";
 };
 
 /** One short note about what the agent is doing while it works on a request. */
