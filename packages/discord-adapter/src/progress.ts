@@ -63,7 +63,7 @@ export class ProgressEditor {
     }
     this.unsent.push(label);
     if (Date.now() - this.lastEdit >= this.options.intervalMs) {
-      void this.enqueue(() => this.flush());
+      void this.enqueue(() => this.flush()).catch(() => undefined);
     } else {
       this.scheduleFlush();
     }
@@ -103,7 +103,7 @@ export class ProgressEditor {
     this.scheduled = setTimeout(
       () => {
         this.scheduled = undefined;
-        void this.enqueue(() => this.flush());
+        void this.enqueue(() => this.flush()).catch(() => undefined);
       },
       Math.max(0, this.options.intervalMs - elapsed),
     );

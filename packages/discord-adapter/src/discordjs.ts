@@ -99,8 +99,11 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
     },
     unreact: async (channelId, messageId, emoji) => {
       const message = await (await sendable(client, channelId)).messages.fetch(messageId);
-      const reaction = message.reactions.cache.find((item) => item.emoji.name === emoji);
-      await reaction?.remove();
+      // Removes the bot's own reaction, which needs only Add Reactions; the emoji-wide route needs
+      // Manage Messages, which the bot does not have.
+      await message.reactions.cache
+        .find((item) => item.emoji.name === emoji)
+        ?.users.remove(botUserId);
     },
   };
 }
