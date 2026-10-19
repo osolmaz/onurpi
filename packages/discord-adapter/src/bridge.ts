@@ -164,9 +164,11 @@ export class DiscordBridge {
   ): Promise<void> {
     const [first, ...rest] = splitForDiscord(answer);
     if (editor?.started) {
-      if (!(await editor.finish(first ?? answer))) {
-        await this.transport.send(message.channelId, first ?? answer, message.id);
-      }
+      const edited = await editor.finish(first ?? answer).catch((error: unknown) => {
+        this.log("progress_failed", { message: message.id, error: String(error) });
+        return false;
+      });
+      if (!edited) await this.transport.send(message.channelId, first ?? answer, message.id);
     } else {
       await this.transport.send(message.channelId, first ?? answer, message.id);
     }
