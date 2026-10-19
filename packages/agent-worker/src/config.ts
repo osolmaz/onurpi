@@ -59,6 +59,8 @@ export type WorkerConfig = {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
     readonly messageContent: boolean;
+    /** The agent's discord tool. Admin actions (pin, delete, threads, reactions) wait for this flag. */
+    readonly agentTools?: { readonly admin?: boolean };
   };
 };
 
@@ -107,24 +109,47 @@ function parseModel(value: unknown): WorkerConfig["model"] {
   return { login, modelId, provider };
 }
 
-function parseDiscord(value: unknown): WorkerConfig["discord"] {
-  const discord = record(value, "discord");
-  const tokenEnv = text(discord["tokenEnv"] ?? "DISCORD_BOT_TOKEN", "discord.tokenEnv");
+/** The discord.agentTools section: which tool tiers are on. */
+function parseAgentTools(value: unknown): { admin?: boolean } {
+  const input = record(value, "discord.agentTools");
+  const admin = input["admin"] ?? false;
+  if (typeof admin !== "boolean") {
+    throw new Error("discord.agentTools.admin must be true or false");
+  }
+  return { admin };
+}
+
+/** The token's environment variable name, which must be a name and not a token. */
+function parseTokenEnv(value: unknown): string {
+  const tokenEnv = text(value ?? "DISCORD_BOT_TOKEN", "discord.tokenEnv");
   if (!/^[A-Z_][A-Z0-9_]*$/u.test(tokenEnv)) {
     throw new Error(
       "discord.tokenEnv must be an environment variable name such as DISCORD_BOT_TOKEN",
     );
   }
+  return tokenEnv;
+}
+
+function parseDiscord(value: unknown): WorkerConfig["discord"] {
+  const discord = record(value, "discord");
+  const tokenEnv = parseTokenEnv(discord["tokenEnv"]);
   const messageContent = discord["messageContent"] ?? false;
   if (typeof messageContent !== "boolean")
     throw new Error("discord.messageContent must be true or false");
+  const agentTools =
+    discord["agentTools"] === undefined ? undefined : parseAgentTools(discord["agentTools"]);
   const adapter = parseAdapterConfig(discord);
   if (!messageContent && answersWithoutMention(adapter)) {
     throw new Error(
       "discord.messageContent must be true when a channel answers without a mention, because Discord sends the bot the text of other messages only with the Message Content intent",
     );
   }
-  return { ...adapter, messageContent, tokenEnv };
+  return {
+    ...adapter,
+    messageContent,
+    tokenEnv,
+    ...(agentTools === undefined ? {} : { agentTools }),
+  };
 }
 
 function parseApprovals(value: unknown): WorkerConfig["approvals"] {

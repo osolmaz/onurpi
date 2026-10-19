@@ -30,6 +30,7 @@ import type {
 } from "@onurpi/discord-adapter";
 import { AntiRepeatWatcher, type AntiRepeatFeedback } from "./anti-repeat.ts";
 import type { WorkerConfig } from "./config.ts";
+import { createDiscordTool } from "./discord-tool.ts";
 import {
   approvalsExtension,
   approvalStore,
@@ -433,6 +434,19 @@ export async function openAgent(
     }),
   );
   registry.install(skillsExtension(config.workspace));
+  const chatKeyOf = async (conversationId: ConversationId): Promise<string | undefined> =>
+    (await harness.snapshot(ConversationKeys, context))?.keys[String(conversationId)];
+  registry.install(
+    defineExtension({
+      name: "discord",
+      tools: [
+        createDiscordTool({
+          config,
+          channelOf: (conversationId) => chatKeyOf(conversationId as ConversationId),
+        }),
+      ],
+    }),
+  );
   const storage = await openNodeSqliteStorage(config.storage);
   const env = ({ cwd = config.workspace }: { readonly cwd?: string }) =>
     new NodeExecutionEnv({ cwd });
@@ -475,8 +489,7 @@ export async function openAgent(
     close: () => harness.close(context),
     conversationFor,
     approvals: approvalStore(harness),
-    chatKeyOf: async (conversationId) =>
-      (await harness.snapshot(ConversationKeys, context))?.keys[String(conversationId)],
+    chatKeyOf,
     jobs: jobLedger(harness),
     ledger: discordLedger(harness),
     reset: async (key, handoff) => {
