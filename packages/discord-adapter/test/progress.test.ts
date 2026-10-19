@@ -76,6 +76,19 @@ describe("ProgressEditor", () => {
     ]);
   });
 
+  it("drops a note that repeats the previous one", async () => {
+    const transport = new FakeTransport();
+    const { editor: progress } = editor(transport, 0);
+    progress.note("✍️ Writing");
+    await settle();
+    progress.note("✍️ Writing");
+    progress.note("✍️ Writing");
+    await settle();
+
+    expect(transport.posted[0]?.text).toBe("✍️ Writing");
+    expect(transport.edits).toEqual([]);
+  });
+
   it("shows the newest notes and keeps the text under Discord's limit", async () => {
     const transport = new FakeTransport();
     const { editor: progress } = editor(transport, 0);
