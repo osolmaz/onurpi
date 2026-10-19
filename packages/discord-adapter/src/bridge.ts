@@ -171,7 +171,7 @@ export class DiscordBridge {
         busyMode: "steer",
         conversationKey: key,
         requestId: `discord:${message.id}`,
-        text: prompt,
+        text: `${this.senderTag(message)}\n${prompt}`,
       })
       .catch((error: unknown) => {
         this.log("agent_failed", { message: message.id, error: String(error) });
@@ -288,15 +288,20 @@ export class DiscordBridge {
   }
 
   /**
-   * The prompt with one context line saying where the message happened, so the transcript records
-   * the channel and server it belongs to. Only a run's first prompt carries it; steered messages
-   * reuse the run's prompt context.
+   * The prompt with the context lines saying where the message happened and who sent it, so the
+   * transcript records the channel, server, sender, and time. Only a run's first prompt carries
+   * the channel line; steered messages reuse the run's place and add their own sender line.
    */
   private withContext(message: InboundMessage, prompt: string): string {
     const place = message.isDirect
       ? "a direct message"
       : `#${message.channelName ?? message.channelId} in ${message.guildName ?? "a server"}`;
-    return `[discord: ${place}, channel ${message.channelId}]\n${prompt}`;
+    return `[discord: ${place}, channel ${message.channelId}]\n${this.senderTag(message)}\n${prompt}`;
+  }
+
+  /** The line saying who sent a message and when, on every prompt the message produces. */
+  private senderTag(message: InboundMessage): string {
+    return `[from ${message.authorName ?? message.authorId} at ${message.sentAt ?? "an unknown time"}]`;
   }
 
   /** Saves the message's attachments within the configured limits, with one note per file. */

@@ -26,6 +26,8 @@ function toInbound(message: Message, botUserId: string): InboundMessage {
     guildId: message.guildId,
     guildName: message.guild?.name ?? null,
     channelName: "name" in channel ? (channel.name ?? null) : null,
+    authorName: message.member?.displayName ?? message.author.username,
+    sentAt: message.createdAt.toISOString(),
     content: message.content,
     id: message.id,
     isDirect: channel.type === ChannelType.DM,
