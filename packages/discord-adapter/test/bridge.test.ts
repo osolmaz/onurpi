@@ -19,6 +19,9 @@ import {
 
 const config = parseAdapterConfig(oneChannel());
 
+/** The context line the bridge prepends to a run's first prompt for the test channel. */
+const CONTEXT_TAG = `[discord: #general in Test Server, channel ${CHANNEL}]`;
+
 function setup(
   agent = new FakeAgent(),
   ledger = new FakeLedger(),
@@ -125,12 +128,17 @@ describe("DiscordBridge", () => {
         busyMode: "steer",
         conversationKey: `discord:${CHANNEL}`,
         requestId: "discord:600000000000000006",
-        text: "hello",
+        text: `${CONTEXT_TAG}\nhello`,
       },
     ]);
     expect(transport.typing).toEqual([CHANNEL]);
     expect(transport.posted).toEqual([
-      { channelId: CHANNEL, id: "sent-1", replyTo: "600000000000000006", text: "Echo: hello" },
+      {
+        channelId: CHANNEL,
+        id: "sent-1",
+        replyTo: "600000000000000006",
+        text: `Echo: ${CONTEXT_TAG}\nhello`,
+      },
     ]);
     expect(events).toEqual(["accepted", "answered"]);
   });
@@ -269,7 +277,7 @@ describe("DiscordBridge", () => {
     await bridge.idle();
 
     expect(events).toEqual(["accepted", "typing_failed", "answered"]);
-    expect(transport.posted[0]?.text).toBe("Echo: hello");
+    expect(transport.posted[0]?.text).toBe(`Echo: ${CONTEXT_TAG}\nhello`);
   });
 
   it("logs a reply that Discord refuses, without stopping", async () => {
@@ -311,7 +319,7 @@ describe("DiscordBridge with an intercept", () => {
       agent,
       config,
       intercept: (_message, text) =>
-        Promise.resolve(text === "hello" ? { reply: "Handled." } : undefined),
+        Promise.resolve(text.endsWith("\nhello") ? { reply: "Handled." } : undefined),
       ledger,
       log: (event) => events.push(event),
       transport,
@@ -360,7 +368,7 @@ describe("DiscordBridge after a restart", () => {
     const { bridge, events, transport } = setup(new FakeAgent(), ledger);
     await bridge.idle();
 
-    expect(transport.posted.map((item) => item.text)).toEqual(["Echo: hello"]);
+    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
     expect(await ledger.pending()).toEqual([]);
     expect(events).toEqual(["resumed", "answered"]);
   });
@@ -400,7 +408,10 @@ describe("DiscordBridge after a restart", () => {
     const { agent, bridge } = setup(new FakeAgent(), ledger, transport);
     await bridge.idle();
 
-    expect(agent.requests.map((request) => request.text)).toEqual(["missed one", "missed two"]);
+    expect(agent.requests.map((request) => request.text)).toEqual([
+      `${CONTEXT_TAG}\nmissed one`,
+      `${CONTEXT_TAG}\nmissed two`,
+    ]);
     expect(await ledger.positions()).toEqual({ [CHANNEL]: "600000000000000008" });
   });
 
@@ -440,7 +451,12 @@ describe("DiscordBridge with reactions and progress", () => {
     await bridge.idle();
 
     expect(transport.posted).toEqual([
-      { channelId: CHANNEL, id: "sent-1", replyTo: "600000000000000006", text: "Echo: hello" },
+      {
+        channelId: CHANNEL,
+        id: "sent-1",
+        replyTo: "600000000000000006",
+        text: `Echo: ${CONTEXT_TAG}\nhello`,
+      },
     ]);
     expect(transport.edits).toEqual([]);
   });
@@ -463,7 +479,7 @@ describe("DiscordBridge with reactions and progress", () => {
         text: "Thinking\nbash: git status",
       },
     ]);
-    expect(transport.edits.map((edit) => edit.text)).toEqual(["Echo: hello"]);
+    expect(transport.edits.map((edit) => edit.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
     expect(transport.unreacted).toEqual([]);
   });
 
@@ -491,7 +507,7 @@ describe("DiscordBridge with reactions and progress", () => {
     transport.emit(message());
     await bridge.idle();
 
-    expect(transport.posted.map((item) => item.text)).toEqual(["Echo: hello"]);
+    expect(transport.posted.map((item) => item.text)).toEqual([`Echo: ${CONTEXT_TAG}\nhello`]);
     expect(events).toEqual(["accepted", "react_failed", "answered"]);
   });
 
@@ -519,7 +535,7 @@ describe("DiscordBridge with reactions and progress", () => {
     transport.emit(message({ content: "hello", id: "700000000000000030" }));
     transport.emit(message({ content: "also add charts", id: "700000000000000031" }));
     await new Promise((resolve) => setImmediate(resolve));
-    for (const resolve of gates) resolve({ kind: "answer", text: "Echo: run" });
+    for (const resolve of gates) resolve({ kind: "answer", text: `Echo: ${CONTEXT_TAG}\nrun` });
     await bridge.idle();
 
     expect(agent.requests.map((request) => request.requestId).sort()).toEqual([
@@ -528,7 +544,12 @@ describe("DiscordBridge with reactions and progress", () => {
     ]);
     expect(agent.requests[1]?.busyMode).toBe("steer");
     expect(transport.posted).toEqual([
-      { channelId: CHANNEL, id: "sent-1", replyTo: "700000000000000031", text: "Echo: run" },
+      {
+        channelId: CHANNEL,
+        id: "sent-1",
+        replyTo: "700000000000000031",
+        text: `Echo: ${CONTEXT_TAG}\nrun`,
+      },
     ]);
     expect(transport.unreacted.map((item) => item.messageId)).toEqual([
       "700000000000000030",
@@ -542,10 +563,10 @@ describe("DiscordBridge with reactions and progress", () => {
     transport.emit(message({ content: "q list the files", id: "700000000000000040" }));
     await bridge.idle();
 
-    expect(agent.requests[0]?.text).toBe("list the files");
+    expect(agent.requests[0]?.text).toBe(`${CONTEXT_TAG}\nlist the files`);
     expect(agent.requests[0]?.busyMode).toBe("followUp");
     expect(transport.posted[0]?.replyTo).toBe("700000000000000040");
-    expect(transport.posted[0]?.text).toBe("Echo: list the files");
+    expect(transport.posted[0]?.text).toBe(`Echo: ${CONTEXT_TAG}\nlist the files`);
   });
 
   it("re-downloads attachments when it resumes an unanswered message", async () => {
