@@ -259,7 +259,7 @@ export class DiscordBridge {
     entry: Run | undefined,
   ): Promise<void> {
     const saved = await this.saveAttachments(message);
-    const prompt = this.promptWithAttachments(text, saved);
+    const prompt = this.withContext(message, this.promptWithAttachments(text, saved));
     const interception = await this.intercept?.(message, prompt);
     if (interception === undefined || !("reply" in interception)) {
       await this.reply(
@@ -285,6 +285,18 @@ export class DiscordBridge {
     return saved.notes.length === 0
       ? text
       : `${text}\n\n<attachments>\n${saved.notes.join("\n")}\n</attachments>`;
+  }
+
+  /**
+   * The prompt with one context line saying where the message happened, so the transcript records
+   * the channel and server it belongs to. Only a run's first prompt carries it; steered messages
+   * reuse the run's prompt context.
+   */
+  private withContext(message: InboundMessage, prompt: string): string {
+    const place = message.isDirect
+      ? "a direct message"
+      : `#${message.channelName ?? message.channelId} in ${message.guildName ?? "a server"}`;
+    return `[discord: ${place}, channel ${message.channelId}]\n${prompt}`;
   }
 
   /** Saves the message's attachments within the configured limits, with one note per file. */
@@ -341,7 +353,7 @@ export class DiscordBridge {
       this.track(
         this.reply(
           message,
-          this.promptWithAttachments(text, saved),
+          this.withContext(message, this.promptWithAttachments(text, saved)),
           key,
           saved.attachments,
           this.registerRun(key, message),

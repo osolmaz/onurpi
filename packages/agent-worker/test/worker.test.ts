@@ -130,7 +130,9 @@ describe("startWorker", () => {
     await worker.bridge.idle();
     await worker.stop();
 
-    expect(discord.sent).toEqual(["Echo: ping"]);
+    expect(discord.sent).toEqual([
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nping",
+    ]);
     expect(events).toEqual(["ready", "accepted", "answered"]);
     expect(discord.closed).toBe(true);
   });
@@ -180,8 +182,13 @@ describe("startWorker", () => {
     await restarted.bridge.idle();
     await restarted.stop();
 
-    expect(first.sent).toEqual(["Echo: ping"]);
-    expect([...second.sent].sort()).toEqual(["Echo: missed", "Echo: waiting"]);
+    expect(first.sent).toEqual([
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nping",
+    ]);
+    expect(second.sent).toEqual([
+      "Echo: [discord: #400000000000000004 in a server, channel 400000000000000004]\nwaiting",
+      "Echo: missed",
+    ]);
   });
 
   it("posts the answer of a delivered prompt to the job's channel", async () => {
