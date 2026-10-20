@@ -20,13 +20,18 @@ export type Worker = {
 };
 
 export type WorkerDependencies = {
-  readonly connect: (token: string, messageContent: boolean) => Promise<DiscordTransport>;
+  readonly connect: (
+    token: string,
+    messageContent: boolean,
+    restProxy?: string,
+  ) => Promise<DiscordTransport>;
   readonly env: NodeJS.ProcessEnv;
   readonly log: BridgeLog;
 };
 
 export const defaultDependencies: WorkerDependencies = {
-  connect: (token, messageContent) => connectDiscord({ messageContent, token }),
+  connect: (token, messageContent, restProxy) =>
+    connectDiscord({ messageContent, token, ...(restProxy === undefined ? {} : { restProxy }) }),
   env: process.env,
   log: (event, details) => {
     console.log(JSON.stringify({ event, ...details, time: new Date().toISOString() }));
@@ -52,7 +57,11 @@ export async function startWorker(
   const agent = await openAgent(config, models.models, { approvals: desk });
   let transport: DiscordTransport;
   try {
-    transport = await dependencies.connect(token, config.discord.messageContent);
+    transport = await dependencies.connect(
+      token,
+      config.discord.messageContent,
+      config.discord.restProxy,
+    );
   } catch (error) {
     await agent.close();
     models.close();

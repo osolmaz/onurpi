@@ -22,11 +22,17 @@ network_policies:
   # r.jina.ai, which turns any page (including a Bing results page, for search) into markdown;
   # direct access to other hosts stays denied.
   # The host's general transcription service on the Tailscale IP: the worker POSTs voice
-  # notes to it when stt.url is set. Write access because transcription is a POST.
+  # notes to it when stt.url is set, and routes Discord REST calls through the discord relay
+  # (the relay adds the bot token that the L7 body handling would otherwise eat).
   stt_service:
     endpoints:
       - host: 100.119.251.79
         port: 8770
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+      - host: 100.119.251.79
+        port: 8771
         protocol: rest
         access: read-write
         enforcement: enforce

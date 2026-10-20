@@ -62,6 +62,8 @@ export type WorkerConfig = {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
     readonly messageContent: boolean;
+    /** Base URL of a host-side Discord REST relay. Requests carry no token; the relay adds it. */
+    readonly restProxy?: string;
     /** The agent's discord tool. Admin actions (pin, delete, threads, reactions) wait for this flag. */
     readonly agentTools?: { readonly admin?: boolean };
   };
@@ -147,12 +149,22 @@ function parseStt(value: unknown): { model?: string; url?: string } | false {
   };
 }
 
+/** The base URL of the Discord REST relay, when one is set. */
+function parseRestProxy(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^https?:\/\//u.test(value)) {
+    throw new Error("discord.restProxy must be an http(s) URL of a Discord REST relay");
+  }
+  return value;
+}
+
 function parseDiscord(value: unknown): WorkerConfig["discord"] {
   const discord = record(value, "discord");
   const tokenEnv = parseTokenEnv(discord["tokenEnv"]);
   const messageContent = discord["messageContent"] ?? false;
   if (typeof messageContent !== "boolean")
     throw new Error("discord.messageContent must be true or false");
+  const restProxy = parseRestProxy(discord["restProxy"]);
   const agentTools =
     discord["agentTools"] === undefined ? undefined : parseAgentTools(discord["agentTools"]);
   const adapter = parseAdapterConfig(discord);
@@ -165,6 +177,7 @@ function parseDiscord(value: unknown): WorkerConfig["discord"] {
     ...adapter,
     messageContent,
     tokenEnv,
+    ...(restProxy === undefined ? {} : { restProxy }),
     ...(agentTools === undefined ? {} : { agentTools }),
   };
 }

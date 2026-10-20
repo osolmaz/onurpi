@@ -1,3 +1,4 @@
+import type { ClientOptions } from "discord.js";
 import {
   ChannelType,
   Client,
@@ -13,7 +14,24 @@ export type DiscordTransportOptions = {
   readonly token: string;
   /** Request the privileged Message Content intent. It must be turned on in the Developer Portal. */
   readonly messageContent: boolean;
+  /**
+   * Base URL of a REST relay that adds the bot token. When set, every REST call goes through it
+   * instead of carrying the token (and its credential-rewrite middleware, which drops request
+   * bodies past the sandbox's L7 path). The gateway websocket still uses the token directly.
+   */
+  readonly restProxy?: string;
 };
+
+/** Rewrites one discord.js REST call to run through the relay without a credential header. */
+export function relayRequest(restProxy: string, url: string, init: RequestInit): Promise<Response> {
+  const marker = "https://discord.com/api/v10/";
+  if (!url.startsWith(marker)) {
+    throw new Error(`REST url does not carry the Discord API path: ${url}`);
+  }
+  const headers = new Headers(init.headers);
+  headers.delete("authorization");
+  return fetch(`${restProxy}/relay${url.slice(marker.length - 1)}`, { ...init, headers });
+}
 
 export type DiscordTransport = ChatTransport & { close(): Promise<void> };
 
@@ -66,7 +84,21 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
     GatewayIntentBits.DirectMessages,
     ...(options.messageContent ? [GatewayIntentBits.MessageContent] : []),
   ];
-  const client = new Client({ intents, partials: [Partials.Channel] });
+  const restProxy = options.restProxy;
+  const client = new Client({
+    intents,
+    partials: [Partials.Channel],
+    ...(restProxy === undefined
+      ? {}
+      : {
+          // discord.js routes every REST call through here; the relay adds the token host-side.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- discord.js types the rest options against its own undici copy
+          rest: {
+            makeRequest: (url, init) =>
+              relayRequest(restProxy, url, init as unknown as RequestInit),
+          } as NonNullable<ClientOptions["rest"]>,
+        }),
+  });
   const ready = new Promise<Client<true>>((resolve) => client.once(Events.ClientReady, resolve));
   await client.login(options.token);
   const readyClient = await ready;
@@ -80,7 +112,9 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
       });
     },
     send: async (channelId, text, replyTo) => {
-      console.log(JSON.stringify({ event: "transport_send", chars: text.length, head: text.slice(0, 60) }));
+      console.log(
+        JSON.stringify({ event: "transport_send", chars: text.length, head: text.slice(0, 60) }),
+      );
       const channel = await sendable(client, channelId);
       const sent = await channel.send({
         allowedMentions: { parse: [] },
@@ -109,23 +143,11 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
       );
     },
     edit: async (channelId, messageId, text) => {
-      console.log(JSON.stringify({ event: "transport_edit", chars: text.length, head: text.slice(0, 60) }));
-      // The gateway's L7 path mangles discord.js's own PATCHes (they answer 200 but the edit
-      // never applies), so message edits go through a plain REST call instead.
-      const response = await fetch(
-        `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bot ${options.token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ content: text, allowed_mentions: { parse: [] } }),
-        },
+      console.log(
+        JSON.stringify({ event: "transport_edit", chars: text.length, head: text.slice(0, 60) }),
       );
-      if (!response.ok) {
-        throw new Error(`message edit failed: ${response.status} ${await response.text()}`);
-      }
+      const message = await (await sendable(client, channelId)).messages.fetch(messageId);
+      await message.edit({ allowedMentions: { parse: [] }, content: text });
     },
     react: async (channelId, messageId, emoji) => {
       const message = await (await sendable(client, channelId)).messages.fetch(messageId);

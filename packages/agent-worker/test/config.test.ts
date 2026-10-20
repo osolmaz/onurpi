@@ -56,6 +56,20 @@ describe("parseWorkerConfig", () => {
     expect(config.discord.messageContent).toBe(true);
   });
 
+  it("keeps a rest relay url and rejects broken ones", () => {
+    const config = parseWorkerConfig(
+      { ...valid, discord: { ...discord, restProxy: "http://100.119.251.79:8771" } },
+      "/elsewhere",
+    );
+    expect(config.discord.restProxy).toBe("http://100.119.251.79:8771");
+    expect(() =>
+      parseWorkerConfig(
+        { ...valid, discord: { ...discord, restProxy: "not a url" } },
+        "/elsewhere",
+      ),
+    ).toThrow("discord.restProxy must be an http(s) URL");
+  });
+
   const valid = { discord, model: { provider: "echo" }, workspace: "/w" };
   it.each([
     [null, "config must be an object"],
