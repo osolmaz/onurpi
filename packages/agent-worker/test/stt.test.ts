@@ -1,7 +1,11 @@
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { annotateAttachment, DEFAULT_STT_MODEL } from "../src/attachments.ts";
 import { commandError, isAudioAttachment, transcribeAudio, whisperTranscript } from "../src/stt.ts";
+import type { WorkerConfig } from "../src/config.ts";
 
 describe("stt", () => {
   it("hears audio by content type or extension", () => {
@@ -75,5 +79,65 @@ describe("stt", () => {
     );
 
     expect(error.message).toBe("ffmpeg is not installed");
+  });
+
+  it("posts the audio to the general service when stt.url is set", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "stt-test-"));
+    const path = join(dir, "voice.ogg");
+    await writeFile(path, Buffer.alloc(8));
+    let received: { body?: unknown; type?: string | undefined } = {};
+    const fetchImpl = ((_input: RequestInfo | URL, init?: RequestInit) => {
+      received = {
+        body: init?.body,
+        type: init?.headers
+          ? String((init.headers as Record<string, string>)["Content-Type"])
+          : undefined,
+      };
+      return Promise.resolve(new Response('{"text": "from the service"}', { status: 200 }));
+    }) as typeof fetch;
+    const saved = { contentType: "audio/ogg", name: "voice.ogg", path };
+    const note = await annotateAttachment(
+      { stt: { url: "http://mac:9000/transcribe" } } as unknown as WorkerConfig,
+      saved,
+      () => Promise.resolve(""),
+      fetchImpl,
+    );
+
+    expect(received.type).toBe("application/octet-stream");
+    expect(received.body).toBeInstanceOf(Buffer);
+    expect(note).toBe("; transcribed as: \u201cfrom the service\u201d");
+  });
+
+  it("falls back to whisper-cli when the service is not configured", async () => {
+    const calls: string[] = [];
+    const note = await annotateAttachment(
+      {} as unknown as WorkerConfig,
+      { contentType: "audio/ogg", name: "voice.ogg", path: "/workspace/voice.ogg" },
+      (_path, modelPath) => {
+        calls.push(modelPath);
+        return Promise.resolve("local transcript");
+      },
+    );
+
+    expect(note).toBe("; transcribed as: \u201clocal transcript\u201d");
+    expect(calls).toEqual([`/app/models/${DEFAULT_STT_MODEL}`]);
+  });
+
+  it("reports a failed service instead of blocking the run", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "stt-test-"));
+    const path = join(dir, "voice.ogg");
+    await writeFile(path, Buffer.alloc(8));
+    const saved = { contentType: "audio/ogg", name: "voice.ogg", path };
+    const fetchImpl = (() =>
+      Promise.resolve(new Response("down", { status: 503 }))) as typeof fetch;
+    const note = await annotateAttachment(
+      { stt: { url: "http://mac:9000/transcribe" } } as unknown as WorkerConfig,
+      saved,
+      () => Promise.resolve(""),
+      fetchImpl,
+    );
+
+    expect(note).toContain("transcription failed");
+    expect(note).toContain("503");
   });
 });
