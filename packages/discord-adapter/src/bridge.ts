@@ -235,7 +235,7 @@ export class DiscordBridge {
       this.log("answered", {
         message: message.id,
         outcome: reply?.kind ?? "steered",
-        ...(reply?.kind === "answer" ? { chars: reply.text.length } : {}),
+        ...(reply?.kind === "answer" ? { chars: String(reply.text.length) } : {}),
       });
     }
     this.finishRun(key);
@@ -468,7 +468,11 @@ export class DiscordBridge {
       const answer =
         reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;
       await this.postAnswer(key, message, answer, editor, entry);
-      this.log("answered", { message: message.id, outcome: reply.kind, chars: reply.kind === "answer" ? reply.text.length : undefined });
+      this.log("answered", {
+        message: message.id,
+        outcome: reply.kind,
+        ...(reply.kind === "answer" ? { chars: String(reply.text.length) } : {}),
+      });
     } finally {
       if (entry !== undefined) {
         entry.finished = true;
