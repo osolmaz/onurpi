@@ -232,7 +232,11 @@ export class DiscordBridge {
           : `Sorry, I could not answer: ${reply.reason}`;
     if (answer !== undefined) {
       await this.postAnswer(key, message, answer, undefined, run);
-      this.log("answered", { message: message.id, outcome: reply?.kind ?? "steered" });
+      this.log("answered", {
+        message: message.id,
+        outcome: reply?.kind ?? "steered",
+        ...(reply?.kind === "answer" ? { chars: reply.text.length } : {}),
+      });
     }
     this.finishRun(key);
   }
@@ -464,7 +468,7 @@ export class DiscordBridge {
       const answer =
         reply.kind === "answer" ? reply.text : `Sorry, I could not answer: ${reply.reason}`;
       await this.postAnswer(key, message, answer, editor, entry);
-      this.log("answered", { message: message.id, outcome: reply.kind });
+      this.log("answered", { message: message.id, outcome: reply.kind, chars: reply.kind === "answer" ? reply.text.length : undefined });
     } finally {
       if (entry !== undefined) {
         entry.finished = true;
