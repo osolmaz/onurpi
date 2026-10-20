@@ -55,8 +55,9 @@ export type WorkerConfig = {
     /** Answers that mean "nothing to report": posted nowhere, but the delivery completes. */
     readonly suppress?: readonly string[];
   };
-  /** Voice notes and audio attachments get transcribed. Absent: the baked-in whisper.cpp model. `false`: off. */
-  readonly stt?: { readonly model?: string } | false;
+  /** Voice notes and audio attachments get transcribed: a `url` posts to the general service,
+   * absence uses the baked-in whisper.cpp, and `false` turns it off. */
+  readonly stt?: { readonly model?: string; readonly url?: string } | false;
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -132,11 +133,18 @@ function parseTokenEnv(value: unknown): string {
   return tokenEnv;
 }
 
-function parseStt(value: unknown): { model?: string } | false {
+function parseStt(value: unknown): { model?: string; url?: string } | false {
   if (value === false) return false;
   const input = record(value, "stt");
   const model = input["model"];
-  return { ...(model === undefined ? {} : { model: text(model, "stt.model") }) };
+  const url = input["url"];
+  if (url !== undefined && (typeof url !== "string" || !/^https?:\/\//u.test(url))) {
+    throw new Error("stt.url must be an http(s) URL of a transcription service");
+  }
+  return {
+    ...(model === undefined ? {} : { model: text(model, "stt.model") }),
+    ...(url === undefined ? {} : { url }),
+  };
 }
 
 function parseDiscord(value: unknown): WorkerConfig["discord"] {

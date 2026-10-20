@@ -3,7 +3,6 @@ import { join } from "node:path";
 import type { InboundAttachment, SavedAttachment } from "@onurpi/discord-adapter";
 import type { WorkerConfig } from "./config.ts";
 import { isAudioAttachment, transcribeAudio } from "./stt.ts";
-
 /** How long a saved attachment stays in the workspace before the sweep removes it. */
 export const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -29,23 +28,67 @@ export async function saveAttachment(
 
 /**
  * The extra note for one saved attachment: a voice note or audio file comes back with its
- * transcript, so the model hears the message before it answers. Everything else is silent.
+ * transcript, so the model hears the message before it answers. The general transcription service
+ * gets the file when one is configured; otherwise the baked-in whisper.cpp transcribes. Everything
+ * else is silent.
  */
+/** The configured STT: the general service's URL, if any, and the local whisper model's path. */
+function sttSettings(config: WorkerConfig): { localModel: string; serviceUrl?: string } {
+  if (config.stt === false) return { localModel: join(STT_MODELS_DIR, DEFAULT_STT_MODEL) };
+  const stt = typeof config.stt === "object" ? config.stt : {};
+  return {
+    localModel: join(STT_MODELS_DIR, stt.model ?? DEFAULT_STT_MODEL),
+    ...(stt.url === undefined ? {} : { serviceUrl: stt.url }),
+  };
+}
+
 export async function annotateAttachment(
   config: WorkerConfig,
   saved: SavedAttachment,
   transcribe: (path: string, modelPath: string) => Promise<string> = transcribeAudio,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<string | undefined> {
   if (config.stt === false) return undefined;
   if (!isAudioAttachment(saved.name, saved.contentType)) return undefined;
-  const model = join(STT_MODELS_DIR, config.stt?.model ?? DEFAULT_STT_MODEL);
+  const { localModel, serviceUrl } = sttSettings(config);
   try {
-    const text = await transcribe(saved.path, model);
+    const text = await transcribeViaService(saved.path, serviceUrl, fetchImpl).catch(
+      (error: unknown) => {
+        if (serviceUrl !== undefined) throw error;
+        return transcribe(saved.path, localModel);
+      },
+    );
     return text === ""
       ? "; transcribed as: (silence or unintelligible)"
       : `; transcribed as: \u201c${text}\u201d`;
   } catch (error) {
     return `; transcription failed (${(error as Error).message})`;
+  }
+}
+
+/** The transcript from the general transcription service: POST the file, read the text back. */
+async function transcribeViaService(
+  path: string,
+  url: string | undefined,
+  fetchImpl: typeof fetch,
+): Promise<string> {
+  if (url === undefined) return Promise.reject(new Error("no transcription service is configured"));
+  const audio = await import("node:fs/promises").then((fs) => fs.readFile(path));
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: audio,
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!response.ok) {
+    throw new Error(`the transcription service answered ${response.status}`);
+  }
+  const body = await response.text();
+  try {
+    const parsed = JSON.parse(body) as { text?: string; transcript?: string };
+    return (parsed.text ?? parsed.transcript ?? body).trim();
+  } catch {
+    return body.trim();
   }
 }
 
