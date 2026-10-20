@@ -80,6 +80,7 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
       });
     },
     send: async (channelId, text, replyTo) => {
+      console.log(JSON.stringify({ event: "transport_send", chars: text.length, head: text.slice(0, 60) }));
       const channel = await sendable(client, channelId);
       const sent = await channel.send({
         allowedMentions: { parse: [] },
@@ -108,6 +109,7 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
       );
     },
     edit: async (channelId, messageId, text) => {
+      console.log(JSON.stringify({ event: "transport_edit", chars: text.length, head: text.slice(0, 60) }));
       // The gateway's L7 path mangles discord.js's own PATCHes (they answer 200 but the edit
       // never applies), so message edits go through a plain REST call instead.
       const response = await fetch(
