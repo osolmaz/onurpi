@@ -10,7 +10,7 @@ RUN git clone --depth 1 --branch "${WHISPER_CPP_VERSION}" https://github.com/ggm
 RUN cmake -S /src -B /build -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON \
   && cmake --build /build --target whisper-cli -j"$(nproc)"
 RUN curl -fsSL -o /models/ggml-small.bin \
-  "https://huggingface.co/ggml-org/whisper.cpp/resolve/main/${WHISPER_MODEL}"
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${WHISPER_MODEL}"
 
 FROM node:22.22.0-trixie-slim
 
