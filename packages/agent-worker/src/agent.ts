@@ -13,6 +13,7 @@ import {
   defineExtension,
   Harness,
   section,
+  type EntryId,
   type SettledSubmissionRecord,
   watchEvents,
 } from "@earendil-works/pi-durable";
@@ -332,6 +333,31 @@ function shorten(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
+/** How long to wait between re-reads of an answer entry that has not grown text yet. */
+const ANSWER_RETRY_MS = 250;
+const ANSWER_RETRIES = 8;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Reads the answer entry for a settled submission. The settle event can outrun the entry's final
+ * content commit while the answer streams in, so an empty text is re-read briefly before it is
+ * taken at face value; a genuinely empty answer stays empty after the retries. Exported for tests.
+ */
+export async function answerOf(conversation: Conversation, answerId: EntryId): Promise<string> {
+  for (let attempt = 0; attempt <= ANSWER_RETRIES; attempt += 1) {
+    const entry = await conversation.commit((tx) => tx.entry(AssistantEntry, answerId), context);
+    const text = answerText(entry?.model?.[0]);
+    if (text.length > 0) return text;
+    if (attempt < ANSWER_RETRIES) await sleep(ANSWER_RETRY_MS);
+  }
+  return "";
+}
+
 /** Awaits one submission and turns its settled answer into a reply. */
 async function replyOf(
   conversation: Conversation,
@@ -341,11 +367,7 @@ async function replyOf(
   if (settled.type !== "input")
     throw new Error(`Pi Durable settled a ${settled.type} submission for an input`);
   if (settled.status !== "done") return { kind: "failed", reason: settled.reason };
-  const entry = await conversation.commit(
-    (tx) => tx.entry(AssistantEntry, settled.answer),
-    context,
-  );
-  return { kind: "answer", text: answerText(entry?.model?.[0]) };
+  return { kind: "answer", text: await answerOf(conversation, settled.answer) };
 }
 
 /**
