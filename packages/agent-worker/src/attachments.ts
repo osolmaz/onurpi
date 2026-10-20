@@ -7,7 +7,10 @@ import { isAudioAttachment, transcribeAudio } from "./stt.ts";
 /** How long a saved attachment stays in the workspace before the sweep removes it. */
 export const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-export const DEFAULT_STT_MODEL = "Xenova/whisper-small";
+export const DEFAULT_STT_MODEL = "ggml-small.bin";
+
+/** The image folder that holds the baked-in whisper.cpp models. */
+export const STT_MODELS_DIR = "/app/models";
 
 /** Downloads one Discord attachment into the workspace, where the agent's tools can read it. */
 export async function saveAttachment(
@@ -31,14 +34,13 @@ export async function saveAttachment(
 export async function annotateAttachment(
   config: WorkerConfig,
   saved: SavedAttachment,
-  transcribe: (path: string, model: string, cacheDir: string) => Promise<string> = transcribeAudio,
+  transcribe: (path: string, modelPath: string) => Promise<string> = transcribeAudio,
 ): Promise<string | undefined> {
   if (config.stt === false) return undefined;
   if (!isAudioAttachment(saved.name, saved.contentType)) return undefined;
-  const model = config.stt?.model ?? DEFAULT_STT_MODEL;
-  const cacheDir = join(config.workspace, ".agent-worker", "models");
+  const model = join(STT_MODELS_DIR, config.stt?.model ?? DEFAULT_STT_MODEL);
   try {
-    const text = await transcribe(saved.path, model, cacheDir);
+    const text = await transcribe(saved.path, model);
     return text === ""
       ? "; transcribed as: (silence or unintelligible)"
       : `; transcribed as: \u201c${text}\u201d`;
