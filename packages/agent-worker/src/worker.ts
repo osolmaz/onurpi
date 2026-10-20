@@ -4,7 +4,7 @@ import {
   type BridgeLog,
   type DiscordTransport,
 } from "@onurpi/discord-adapter";
-import { pruneAttachments, saveAttachment } from "./attachments.ts";
+import { pruneAttachments, saveAttachment, annotateAttachment } from "./attachments.ts";
 import { openAgent, type RunningAgent } from "./agent.ts";
 import { createCommandHandler } from "./commands.ts";
 import type { WorkerConfig } from "./config.ts";
@@ -64,6 +64,7 @@ export async function startWorker(
     command: createCommandHandler({ agent, config }),
     config: config.discord,
     download: (attachment) => saveAttachment(config.workspace, attachment),
+    annotate: (saved) => annotateAttachment(config, saved),
     intercept: desk.intercept,
     ledger: agent.ledger,
     log: dependencies.log,
