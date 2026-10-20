@@ -1,9 +1,13 @@
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { InboundAttachment } from "@onurpi/discord-adapter";
+import type { InboundAttachment, SavedAttachment } from "@onurpi/discord-adapter";
+import type { WorkerConfig } from "./config.ts";
+import { isAudioAttachment, transcribeAudio } from "./stt.ts";
 
 /** How long a saved attachment stays in the workspace before the sweep removes it. */
 export const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const DEFAULT_STT_MODEL = "Xenova/whisper-small";
 
 /** Downloads one Discord attachment into the workspace, where the agent's tools can read it. */
 export async function saveAttachment(
@@ -18,6 +22,29 @@ export async function saveAttachment(
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   await writeFile(path, Buffer.from(await response.arrayBuffer()));
   return path;
+}
+
+/**
+ * The extra note for one saved attachment: a voice note or audio file comes back with its
+ * transcript, so the model hears the message before it answers. Everything else is silent.
+ */
+export async function annotateAttachment(
+  config: WorkerConfig,
+  saved: SavedAttachment,
+  transcribe: (path: string, model: string, cacheDir: string) => Promise<string> = transcribeAudio,
+): Promise<string | undefined> {
+  if (config.stt === false) return undefined;
+  if (!isAudioAttachment(saved.name, saved.contentType)) return undefined;
+  const model = config.stt?.model ?? DEFAULT_STT_MODEL;
+  const cacheDir = join(config.workspace, ".agent-worker", "models");
+  try {
+    const text = await transcribe(saved.path, model, cacheDir);
+    return text === ""
+      ? "; transcribed as: (silence or unintelligible)"
+      : `; transcribed as: \u201c${text}\u201d`;
+  } catch (error) {
+    return `; transcription failed (${(error as Error).message})`;
+  }
 }
 
 /**

@@ -3,7 +3,7 @@
 FROM node:22.22.0-trixie-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates curl gh git jq python3 ripgrep \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl ffmpeg gh git jq python3 ripgrep \
   && rm -rf /var/lib/apt/lists/*
 
 # The workload runs as uid 1001, the owner of the mounted host workspace.

@@ -48,7 +48,10 @@ export type BridgeOptions = {
   /** Sees each accepted message first, for commands such as approvals. */
   readonly intercept?: (message: InboundMessage, text: string) => Promise<Interception | undefined>;
   /** Saves one attachment where the agent's tools can read it, and returns its path. */
+  /** Downloads one attachment into the workspace. Without it, attachments are noted but skipped. */
   readonly download?: (attachment: InboundAttachment) => Promise<string>;
+  /** Extra note text for one saved attachment, such as a voice note's transcript. */
+  readonly annotate?: (saved: SavedAttachment) => Promise<string | undefined>;
   /**
    * Answers an owner's `/command` before the agent runs, returning the reply text, or undefined
    * when the word is unknown and the message should flow on as ordinary text.
@@ -77,6 +80,7 @@ export class DiscordBridge {
   private readonly typingIntervalMs: number;
   private readonly intercept: BridgeOptions["intercept"];
   private readonly download: BridgeOptions["download"];
+  private readonly annotate: BridgeOptions["annotate"];
   private readonly command: BridgeOptions["command"];
   private readonly pending = new Set<Promise<void>>();
   /** Whether the last answered turn in a conversation came from a bot, not a person. */
@@ -95,6 +99,7 @@ export class DiscordBridge {
     this.typingIntervalMs = options.typingIntervalMs ?? TYPING_INTERVAL_MS;
     this.intercept = options.intercept;
     this.download = options.download;
+    this.annotate = options.annotate;
     this.command = options.command;
   }
 
@@ -378,7 +383,8 @@ export class DiscordBridge {
     try {
       const path = await download(attachment);
       const saved = { contentType: attachment.contentType, name: attachment.name, path };
-      return { note: `${attachment.name} saved at ${path}`, saved };
+      const extra = (await this.annotate?.(saved)) ?? "";
+      return { note: `${attachment.name} saved at ${path}${extra}`, saved };
     } catch (error) {
       return { note: `${attachment.name}: download failed (${String(error)})` };
     }

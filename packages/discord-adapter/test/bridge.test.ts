@@ -598,6 +598,30 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(events).toEqual(["commanded"]);
   });
 
+  it("appends an annotator's note to a saved attachment's note", async () => {
+    const agent = new FakeAgent();
+    const transport = new FakeTransport();
+    const ledger = new FakeLedger();
+    const bridge = new DiscordBridge({
+      agent,
+      annotate: (saved): Promise<string | undefined> =>
+        Promise.resolve(
+          saved.name.endsWith(".ogg") ? `; transcribed as: \u201chello\u201d` : undefined,
+        ),
+      config: parseAdapterConfig(oneChannel()),
+      download: (): Promise<string> => Promise.resolve("/workspace/voice.ogg"),
+      ledger,
+      log: () => undefined,
+      transport,
+    });
+    await ledger.accept(message({ attachments: [attachment({ name: "voice.ogg" })] }));
+    bridge.start();
+    await bridge.idle();
+
+    expect(agent.requests[0]?.text).toContain("voice.ogg saved at /workspace/voice.ogg");
+    expect(agent.requests[0]?.text).toContain("transcribed as: \u201chello\u201d");
+  });
+
   it("re-downloads attachments when it resumes an unanswered message", async () => {
     const downloads: string[] = [];
     const agent = new FakeAgent();

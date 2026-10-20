@@ -55,6 +55,8 @@ export type WorkerConfig = {
     /** Answers that mean "nothing to report": posted nowhere, but the delivery completes. */
     readonly suppress?: readonly string[];
   };
+  /** Voice notes and audio attachments get transcribed. Absent: whisper-small. `false`: off. */
+  readonly stt?: { readonly model?: string } | false;
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
     readonly tokenEnv: string;
@@ -130,6 +132,13 @@ function parseTokenEnv(value: unknown): string {
   return tokenEnv;
 }
 
+function parseStt(value: unknown): { model?: string } | false {
+  if (value === false) return false;
+  const input = record(value, "stt");
+  const model = input["model"];
+  return { ...(model === undefined ? {} : { model: text(model, "stt.model") }) };
+}
+
 function parseDiscord(value: unknown): WorkerConfig["discord"] {
   const discord = record(value, "discord");
   const tokenEnv = parseTokenEnv(discord["tokenEnv"]);
@@ -200,6 +209,7 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
           },
         }),
     model: parseModel(input["model"]),
+    ...(input["stt"] === undefined ? {} : { stt: parseStt(input["stt"]) }),
     storage,
     workspace,
   };
