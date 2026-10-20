@@ -108,8 +108,22 @@ export async function connectDiscord(options: DiscordTransportOptions): Promise<
       );
     },
     edit: async (channelId, messageId, text) => {
-      const message = await (await sendable(client, channelId)).messages.fetch(messageId);
-      await message.edit({ allowedMentions: { parse: [] }, content: text });
+      // The gateway's L7 path mangles discord.js's own PATCHes (they answer 200 but the edit
+      // never applies), so message edits go through a plain REST call instead.
+      const response = await fetch(
+        `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bot ${options.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content: text, allowed_mentions: { parse: [] } }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error(`message edit failed: ${response.status} ${await response.text()}`);
+      }
     },
     react: async (channelId, messageId, emoji) => {
       const message = await (await sendable(client, channelId)).messages.fetch(messageId);
