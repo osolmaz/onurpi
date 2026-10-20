@@ -55,7 +55,7 @@ export type WorkerConfig = {
     /** Answers that mean "nothing to report": posted nowhere, but the delivery completes. */
     readonly suppress?: readonly string[];
   };
-  /** Voice notes and audio attachments get transcribed. Absent: whisper-small. `false`: off. */
+  /** Voice notes and audio attachments get transcribed. Absent: the baked-in whisper.cpp model. `false`: off. */
   readonly stt?: { readonly model?: string } | false;
   readonly discord: AdapterConfig & {
     /** Name of the environment variable that holds the bot token. The token never goes in this file. */
