@@ -21,6 +21,17 @@ network_policies:
   # The owner's site is readable directly. Free web browsing goes through the public reader
   # r.jina.ai, which turns any page (including a Bing results page, for search) into markdown;
   # direct access to other hosts stays denied.
+  # The host's general transcription service on the Tailscale IP: the worker POSTs voice
+  # notes to it when stt.url is set. Write access because transcription is a POST.
+  stt_service:
+    endpoints:
+      - host: 100.119.251.79
+        port: 8770
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+    binaries:
+      - path: /usr/local/bin/node
   web_reads:
     endpoints:
       - host: r.jina.ai
