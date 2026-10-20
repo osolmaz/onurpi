@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { afterEach, describe, expect, it } from "vitest";
-import { openAgent, type RunningAgent } from "../src/agent.ts";
+import { openAgent, answerOf, type RunningAgent } from "../src/agent.ts";
 import { parseWorkerConfig, type WorkerConfig } from "../src/config.ts";
 import { echoProvider } from "../src/models.ts";
+import type { Conversation, EntryId } from "@earendil-works/pi-durable";
 
 const folders: string[] = [];
 const agents: RunningAgent[] = [];
@@ -158,5 +159,21 @@ describe("openAgent", () => {
 
     const second = await open(config);
     expect(await second.jobs.posted("job:digest@2026-10-18T01:00:00.000Z")).toBe(true);
+  });
+});
+
+describe("answerOf", () => {
+  it("re-reads the answer entry while its text is still streaming in", async () => {
+    const entry = (text: string) => ({
+      kind: "pi.assistant",
+      id: 779,
+      model: [{ role: "assistant", content: [{ type: "text", text }] }],
+    });
+    const reads: string[] = ["", ""];
+    const conversation = {
+      commit: () => Promise.resolve(entry(reads.shift() ?? "late text")),
+    } as unknown as Conversation;
+
+    expect(await answerOf(conversation, 779 as EntryId)).toBe("late text");
   });
 });
