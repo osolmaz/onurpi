@@ -41,19 +41,28 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
    applies the tracked values. Rerun the sync afterwards.
    If the converge changed tracked files, commit them on their own, for example
    `chore(settings): sync tracked Pi configuration`. The final push sends that commit to `main`.
-3. Pick the target version. Run `npm view @earendil-works/pi-coding-agent version` and check
-   `@earendil-works/pi-ai` and `@earendil-works/pi-tui` as well. The three packages release in
-   lockstep. Keep them on the same version.
-4. Bump every exact pin of the three packages to the target version. Search with
-   `grep -rn '"@earendil-works/pi-' --include=package.json packages` from the repository root.
+3. Pick the target version. Run `npm view @earendil-works/pi-coding-agent version` and check the
+   other packages of the release train: `@earendil-works/pi-ai`, `pi-tui`, `pi-durable`, `chord`,
+   `pi-codemode`, `pi-agent-core`, `pi-mcp`, and `pi-telemetry`. They release in lockstep. Keep
+   them on the same version.
+4. Bump every exact pin of the lockstep packages to the target version. Search with
+   `grep -rn '"@earendil-works/' --include=package.json packages` from the repository root.
    Change only exact pins such as `"1.0.0"`. Leave peerDependency ranges (`"*"`, `">="`) alone.
    One package may pin Pi in `dependencies` rather than `devDependencies`; bump it too, because
-   the whole workspace tracks one Pi version.
-5. Refresh the install. Run `npm install` in the repository root. Then run
-   `npm install-scripts ls`. If a package with a native build lost its `build` output (for
-   example `@homebridge/node-pty-prebuilt-multiarch`, which breaks `packages/restart` e2e
-   tests), approve its script with `npm install-scripts approve <package>` and run
+   the whole workspace tracks one Pi version. `packages/agent-worker` pins `pi-durable` and
+   `chord`: after a `pi-durable` bump, read its `CHANGELOG.md` and adapt the package to the
+   breaking changes, for example the required `checkpointWhen` predicate on every document
+   definition in 1.4.0.
+5. Refresh the install. Run `npm install` in the repository root. Then verify each package with
+   a native build still loads, for example by spawning a PTY through
+   `@homebridge/node-pty-prebuilt-multiarch` from `packages/restart`; its prebuilds cover this
+   machine, so a missing `build` directory is usually harmless. If a native build did lose its
+   output, approve its script with `npm install-scripts approve <package>` and run
    `npm rebuild <package>`.
+   If `npm install` keeps materializing a stale version for a pin you bumped, delete the stale
+   directories under the package's `node_modules` and the matching stale `packages/<name>/...`
+   entries in `package-lock.json`, then rerun `npm install` and confirm with
+   `npm ls <package> --all`.
 6. Update the installed Pi binary. Run `pi update --self`. If it cannot update, install the
    exact version directly: `npm install -g @earendil-works/pi-coding-agent@<version>`. On a
    global npm install, `pi update --self` may only recommend the pi.dev installer; the explicit
@@ -96,5 +105,5 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
   errors about a missing `ExtensionAPI` member mean a package still resolves a stale nested
   copy of `pi-coding-agent`; a pin you missed usually causes it. Fix the pin, rerun
   `npm install`, and recheck.
-- `@osolmaz/pi-workflows` is pinned separately from the Pi trio. Update it only when a release
-  exists and the task asks for it.
+- `@osolmaz/pi-workflows` and its `pi-server` dependency follow their own version train, outside
+  the lockstep set. Update them only when a release exists and the task asks for it.
