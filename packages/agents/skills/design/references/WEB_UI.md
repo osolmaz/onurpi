@@ -32,6 +32,21 @@ Put a few related inputs, such as a search box and two filters, on one line, ali
 bottom edge with their labels above them. Wrap them only when the width runs out. Do not split
 the filters of one view into separate rows or blocks.
 
+## Spacing
+
+Balance the spacing. Use one gutter value, as a CSS variable, for every outer edge: the sidebar, each page and each
+full-height view. Do not give each area its own padding; uneven paddings are the usual cause of edges that do not line
+up. The first rows of the sidebar and of the page start at the same height, and an element at a corner sits as far from
+the top as from the side. A heading's line height adds empty space above its letters, so trim it
+(`text-box: trim-both cap alphabetic`) or set a tight line height, and do not add stray margins to one control. Keep
+the gutter in folded and narrow states too: a folded sidebar keeps the gutter around its buttons, and a menu that opens
+from it is not cut off by its edge.
+
+Measure the spacing in the browser: read the positions of the corner elements, compare them, and add a check for them
+to the browser test. Do not judge spacing from a screenshot alone.
+
+Put app settings, such as the theme, in a Settings menu at the bottom of the side panel, not as loose buttons.
+
 ## Responsive behavior
 
 Use content-driven layout and flexible widths. Allow long names and translated
