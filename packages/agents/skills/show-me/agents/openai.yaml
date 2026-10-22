@@ -1,0 +1,4 @@
+interface:
+  display_name: "Show me"
+  short_description: "Show the actual thing, word for word, before any explanation"
+  default_prompt: "Use $show-me to show the exact thing instead of describing it."

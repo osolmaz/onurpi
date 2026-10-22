@@ -33,8 +33,8 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(52);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(52);
+    expect(skills).toHaveLength(53);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(53);
     expect(skills.map((skill) => skill.skillId)).toContain("design");
     expect(skills.map((skill) => skill.skillId)).toContain("ts-defaults");
     for (const removed of ["3d-modeling", "demo-video", "video-editing", "plot-graph"]) {
@@ -46,6 +46,7 @@ describe("@onurpi/agents package", () => {
     expect(skills.map((skill) => skill.skillId)).not.toContain("paid-compute-launch");
     expect(skills.map((skill) => skill.skillId)).not.toContain("browse-x-posts");
     expect(skills.map((skill) => skill.skillId)).toContain("bro");
+    expect(skills.map((skill) => skill.skillId)).toContain("show-me");
     expect(skills.map((skill) => skill.skillId)).toContain("find-sota");
     expect(skills.map((skill) => skill.skillId)).not.toContain("autodoc-legacy");
     expect(skills.map((skill) => skill.skillId)).not.toContain("autoimplement-legacy");
@@ -71,6 +72,7 @@ describe("@onurpi/agents package", () => {
       "plain-writing",
       "practical-significance",
       "semver",
+      "show-me",
       "simpledoc",
       "write-readme",
     ];
@@ -93,7 +95,7 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(52);
+    expect(topLevelSkillFiles).toHaveLength(53);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
   });
 
