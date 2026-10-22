@@ -15,6 +15,23 @@ Avoid a generic SaaS card grid. Use cards only when the content contains real
 repeated units. A table, list, article, or ordinary form often expresses the task
 more clearly. Do not invent branding, logos, or a palette to fill empty space.
 
+Show only what the user needs for the task. Do not add counters or summary statistics,
+such as "284 tasks in 8 datasets" or "58 attempts", unless the user asks for them. Do not add
+page metadata that nobody acts on: a "last read" or "updated at" time, a source count, a link
+to generated data, or a note on how the page works. Show a status message only when it needs
+attention, such as an error.
+
+## Controls
+
+A dropdown's caret must work out of the box in every theme and browser. Leave a native
+`<select>` unstyled, or set `appearance: none` and draw the caret yourself: a chevron in the
+theme's text color, with room on the right so that the value never runs under it, and the
+native caret restored in forced-colors mode. Check every dropdown in each theme.
+
+Put a few related inputs, such as a search box and two filters, on one line, aligned at the
+bottom edge with their labels above them. Wrap them only when the width runs out. Do not split
+the filters of one view into separate rows or blocks.
+
 ## Responsive behavior
 
 Use content-driven layout and flexible widths. Allow long names and translated
