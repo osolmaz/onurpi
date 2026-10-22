@@ -54,6 +54,7 @@ const ChatConversation = defineDocFamily<{ conversationId: ConversationId | 0 },
   kind: "agent-worker.chat-conversation",
   scope: "session",
   version: 1,
+  checkpointWhen: () => false,
 });
 
 /**
@@ -101,6 +102,7 @@ const DiscordLedger = defineDoc<{
   kind: "agent-worker.discord-ledger",
   scope: "session",
   version: 1,
+  checkpointWhen: () => false,
 });
 
 function discordLedger(harness: Harness): ReplyLedger {
@@ -139,6 +141,7 @@ const JobPosts = defineDoc<{ posted: Record<string, string> }>({
   kind: "agent-worker.job-posts",
   scope: "session",
   version: 1,
+  checkpointWhen: () => false,
 });
 
 function jobLedger(harness: Harness): JobLedger {
@@ -160,6 +163,7 @@ const ConversationKeys = defineDoc<{ keys: Record<string, string> }>({
   kind: "agent-worker.conversation-keys",
   scope: "session",
   version: 1,
+  checkpointWhen: () => false,
 });
 
 export type RunningAgent = AgentPort & {

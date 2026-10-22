@@ -34,6 +34,7 @@ export const Approvals = defineDoc<{ next: number; requests: Record<string, Appr
   kind: "agent-worker.approvals",
   scope: "session",
   version: 1,
+  checkpointWhen: () => false,
 });
 
 export type ApprovalRequest = {
