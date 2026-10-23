@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: ts-defaults
-description: Use when selecting, reviewing, or standardizing libraries and infrastructure for a TypeScript or JavaScript project, including package managers, runtimes, HTTP servers, Effect, validation, databases, ORMs, queues, testing, linting, building, CLIs, authentication, logging, WebSockets, and monorepos. Provides production-oriented default choices while preserving deliberate existing project decisions.
+description: Use when selecting, reviewing, or standardizing libraries and infrastructure for a TypeScript or JavaScript project, including package managers, runtimes, HTTP servers, Effect, validation, databases, ORMs, queues, testing, linting, building, CLIs, authentication, logging, WebSockets, monorepos, and browser UIs (React, styling, components, icons, routing, data fetching). Provides production-oriented default choices while preserving deliberate existing project decisions.
 ---
 
 # TypeScript/JavaScript Defaults
@@ -57,7 +57,34 @@ existing choice creates a concrete correctness, security, or maintenance issue.
 | Monorepo | pnpm workspaces + `turborepo` | Use a single package when tasks do not need caching or a pipeline. |
 | OpenAPI | `@fastify/swagger` + Zod schemas | Keep handwritten transport for streaming/proxy routes generation cannot preserve. |
 | Internal RPC | `tRPC`/`oRPC` for same-repo client+server | Use plain REST/JSON when clients are external or non-TS. |
-| Browser client | Vite | Use Next.js/React Router framework mode when SSR routing is the product. |
+| Browser UI | React 19 single-page app on Vite | Use Next.js or React Router framework mode when server rendering or SEO is the product; keep a coherent existing framework. |
+| Styling | Tailwind CSS v4, with theme tokens as CSS variables | Use plain CSS or CSS modules for a small static page with no design system. |
+| UI components | shadcn/ui copied into the repo, on Radix primitives, with `clsx` + `tailwind-merge` (`cn`) | Use Radix primitives directly when only a few accessible widgets are needed. |
+| Icons | `lucide-react` | Use the icon set a mandated design system ships. |
+| Client routing | TanStack Router, with search params validated by Zod | Keep React Router in an existing React Router app. |
+| Server state | TanStack Query | Keep SWR in an existing SWR app; never hand-roll a fetch cache beside either. |
+| Client state | React state and context; `zustand` for state shared across pages | Do not add a store for state that one component or the URL can hold. |
+| Forms | `react-hook-form` + `@hookform/resolvers` (Zod) | Use plain controlled inputs for a one- or two-field form. |
+| Tables and long lists | TanStack Table (headless) + TanStack Virtual | Use a plain `<table>` for small, static lists. |
+| Markdown | `react-markdown` + `remark-gfm`, raw HTML off | Use `markdown-it` outside React. |
+| Toasts | `sonner` | Use the design system's notification component when it has one. |
+| Charts | Recharts (the shadcn/ui chart base) | Use ECharts or visx for heavy or highly custom charts. |
+| UI tests | Vitest + Testing Library on happy-dom; Playwright for browser end-to-end | Add Storybook only when a shared component library is the product. |
+| UI lint | `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` | — |
+
+## Browser UI Defaults
+
+- Keep every view's state in the URL: path params for the resource, search params for its view state (the open
+  file, tab, filters). A reload or a shared link must show the same screen. Browser storage holds only
+  preferences and drafts.
+- Read server data only through the query layer: cache keys per resource, stale-while-revalidate, prefetch on
+  hover or focus for the next likely view, and invalidation after every write.
+- Show loading as skeletons in the shape of the content, from one shared component; no spinners or "Loading…"
+  text as the main state. Respect `prefers-reduced-motion`.
+- Validate every API response with the same Zod schemas as the server.
+- Use one component set and one icon set. Build dialogs, menus, tabs, tooltips and selects on the accessible
+  primitives, with visible focus, full keyboard use, and 4.5:1 text contrast in each theme.
+- Define colors as CSS variables with a dark and a light value; components never hard-code a color.
 
 ## Effect Defaults
 
