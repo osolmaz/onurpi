@@ -1,0 +1,43 @@
+# Google Workspace login for the agent worker's `gws` CLI. The gateway keeps the OAuth client
+# secret and refresh token and refreshes the access token; the sandbox sees only a placeholder
+# in GOOGLE_WORKSPACE_CLI_TOKEN, which gws sends as its bearer token.
+#   openshell profile import -f google-workspace.yaml
+# No scopes are requested on refresh, so the access token keeps the scopes of the original grant.
+id: google-workspace
+display_name: Google Workspace
+description: Google OAuth login for gws, refreshed by the gateway
+category: other
+inference_capable: false
+credentials:
+  - name: access_token
+    description: Google OAuth access token
+    env_vars: [GOOGLE_WORKSPACE_CLI_TOKEN]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+    refresh:
+      strategy: oauth2_refresh_token
+      token_url: https://oauth2.googleapis.com/token
+      refresh_before: "600s"
+      max_lifetime: "3600s"
+      material:
+        - name: client_id
+          description: Google OAuth client id
+          required: true
+        - name: client_secret
+          description: Google OAuth client secret
+          required: true
+          secret: true
+        - name: refresh_token
+          description: Google OAuth refresh token
+          required: true
+          secret: true
+endpoints:
+  - host: "*.googleapis.com"
+    port: 443
+    protocol: rest
+    access: full
+    enforcement: enforce
+binaries:
+  - /home/agent/.local/bin/gws
+  - /usr/local/bin/gws

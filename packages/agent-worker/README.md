@@ -101,9 +101,10 @@ node --import jiti/register packages/agent-worker/src/cli.ts mounts --runtime po
 and a file gets `/dev/null`. Use it for a secrets folder that lives in the workspace.
 
 The `openshell` folder holds the sandbox image (`build-image.sh` builds it from the committed tree),
-the network policy, and three provider profiles: `discord-bot`, `chatgpt-codex`, whose access token
-the gateway refreshes, and `agent-github`, a narrow GitHub token with repository administration
-denied.
+the network policy, and four provider profiles: `discord-bot`, `chatgpt-codex`, whose access token
+the gateway refreshes, `agent-github`, a narrow GitHub token with repository administration denied,
+and `google-workspace`, a Google OAuth login for the image's `gws` CLI whose access token the
+gateway also refreshes.
 
 Host folders work only when the gateway has `enable_bind_mounts = true` and
 `allow_driver_config = true`. Named volumes work with the default gateway settings.

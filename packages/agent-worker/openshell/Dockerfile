@@ -19,6 +19,23 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl ffmpeg gh git jq python3 ripgrep \
   && rm -rf /var/lib/apt/lists/*
 
+# Google Workspace CLI, pinned to release archives with known SHA256 values. The
+# google-workspace provider profile supplies its login, so the image holds no credential.
+ARG GWS_VERSION=0.22.5
+RUN arch="$(uname -m)" \
+  && case "${arch}" in \
+    aarch64) sha=94490295d9580e1e88574e715a0a162991747d12d62f8c7b8dcc8268b6c1cea0 ;; \
+    x86_64) sha=de78ecdbd2f1a84cca0063a7ecbc440240fc14b6ebccbb17f4646b792a8c5c1f ;; \
+    *) echo "unsupported architecture: ${arch}" >&2; exit 1 ;; \
+  esac \
+  && asset="google-workspace-cli-${arch}-unknown-linux-gnu.tar.gz" \
+  && curl -fsSL -o "/tmp/${asset}" \
+    "https://github.com/googleworkspace/cli/releases/download/v${GWS_VERSION}/${asset}" \
+  && echo "${sha}  /tmp/${asset}" | sha256sum -c - \
+  && mkdir /tmp/gws && tar xf "/tmp/${asset}" -C /tmp/gws \
+  && install -m 0755 "$(find /tmp/gws -type f -name gws | head -1)" /usr/local/bin/gws \
+  && rm -rf /tmp/gws "/tmp/${asset}"
+
 # The workload runs as uid 1001, the owner of the mounted host workspace.
 RUN useradd --uid 1001 --create-home --shell /bin/bash agent
 
