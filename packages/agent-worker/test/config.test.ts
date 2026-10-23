@@ -27,7 +27,7 @@ describe("parseWorkerConfig", () => {
         ownerIds: [OWNER],
         tokenEnv: "DISCORD_BOT_TOKEN",
       },
-      model: { login: "codex-switcher", modelId: "echo", provider: "echo" },
+      model: { modelId: "echo", provider: "echo" },
       storage: "/srv/agent/work/agent.sqlite",
       workspace: "/srv/agent/work",
     });
@@ -38,7 +38,7 @@ describe("parseWorkerConfig", () => {
       {
         discord: { ...discord, messageContent: true, tokenEnv: "AGENT_BOT_TOKEN" },
         agentDir: "pi",
-        model: { login: "openshell", modelId: "gpt-6.1-sol", provider: "openai-codex" },
+        model: { modelId: "gpt-6.1-sol", provider: "openai-codex" },
         storage: "/data/agent.sqlite",
         workspace: "/sandbox/work",
       },
@@ -47,11 +47,7 @@ describe("parseWorkerConfig", () => {
     expect(config.storage).toBe("/data/agent.sqlite");
     expect(config.workspace).toBe("/sandbox/work");
     expect(config.agentDir).toBe("/elsewhere/pi");
-    expect(config.model).toEqual({
-      login: "openshell",
-      modelId: "gpt-6.1-sol",
-      provider: "openai-codex",
-    });
+    expect(config.model).toEqual({ modelId: "gpt-6.1-sol", provider: "openai-codex" });
     expect(config.discord.tokenEnv).toBe("AGENT_BOT_TOKEN");
     expect(config.discord.messageContent).toBe(true);
   });
@@ -83,11 +79,6 @@ describe("parseWorkerConfig", () => {
       "approvals.held must be a list of regular expressions",
     ],
     [{ ...valid, approvals: { channelId: "x" } }, "approvals.channelId[0] must be a Discord id"],
-    [{ ...valid, model: { login: "keychain", provider: "echo" } }, "model.login must be one of"],
-    [
-      { ...valid, model: { login: "openshell", provider: "echo" } },
-      "model.login applies only to the openai-codex provider",
-    ],
     [
       { ...valid, discord: { ...discord, tokenEnv: "my token" } },
       "discord.tokenEnv must be an environment variable",

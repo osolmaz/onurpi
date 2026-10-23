@@ -39,9 +39,8 @@ This document is the canonical plan for the agent worker and its Discord adapter
 ## Pi Durable in short
 
 Pi Durable is a library, not a program, and is marked experimental: its API changes without notice
-between releases. The worker pins version 1.2.0, the Pi release that the rest of OnurPi uses, so it
-can use the codex-switcher provider. The `pi` CLI does not use it. The worker described here is the
-program that uses it.
+between releases. The worker pins the Pi release that the rest of OnurPi uses. The `pi` CLI does not
+use Pi Durable. The worker described here is the program that uses it.
 
 Everything Durable does is an atomic commit to storage before anyone sees it. A conversation is a
 list of immutable entries. Work runs as tasks that save a checkpoint at every step: `pi.generation`
@@ -227,9 +226,9 @@ with SQLite's backup command, never a plain file copy while the worker runs.
 
 Phases 1 to 4 have code in OnurPi; what was verified live is listed with each phase.
 
-- **Phase 1.** The worker, the Discord adapter, Pi's instructions, the ChatGPT subscription through
-  codex-switcher, per-channel access rules, and the reply ledger. A worker killed with SIGKILL
-  during a `bash` call posted exactly one reply after a restart.
+- **Phase 1.** The worker, the Discord adapter, Pi's instructions, the ChatGPT subscription,
+  per-channel access rules, and the reply ledger. A worker killed with SIGKILL during a `bash` call
+  posted exactly one reply after a restart.
 - **Phase 2.** The sandbox image, the network policy, and the `discord-bot` and `chatgpt-codex`
   provider profiles. Inside the sandbox, Codex reads placeholders through a JWT-shaped wrapper, and
   the gateway refreshes the access token. The workspace is mounted at `/sandbox/work`, because
@@ -279,9 +278,9 @@ extensions a week of use shows necessary.
 - **Discord through the proxy.** The Discord gateway sends the bot token inside a WebSocket message,
   and OpenShell replaces placeholders in WebSocket text only when that is turned on. The proxy also
   terminates TLS with a sandbox certificate authority that Node.js must trust. Phase 2 tests both.
-- **Subscription login in the sandbox.** The `openai-codex` logins are OAuth tokens that the
-  codex-switcher provider refreshes in its file on the host. Phase 2 decides how the sandbox gets
-  them as an OpenShell provider without a copy of the refresh token.
+- **Subscription login in the sandbox.** Resolved in Phase 2: the `chatgpt-codex` OpenShell provider
+  holds the Codex OAuth login, and the gateway refreshes it. The sandbox sees only placeholders. The
+  worker supports no other Codex login, since the host account switcher is retired.
 - **Gateway user and runtime.** The gateway's runtime decides what its host user needs. Docker
   access is equal to root, so that user must run no agent. Rootless Podman 5 avoids that. The
   MicroVM runtime does not support mounts, so it does not fit this plan. The owner sets this up, not

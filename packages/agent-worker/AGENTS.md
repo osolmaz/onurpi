@@ -1,8 +1,7 @@
 # @onurpi/agent-worker
 
 - Pin Pi Durable, Pi AI, and Chord to exact versions. Their APIs change between releases. Keep them
-  on the Pi release that the rest of OnurPi uses, so codex-switcher's provider types and run-time
-  objects match the worker's.
+  on the Pi release that the rest of OnurPi uses.
 - Commit every answer before it is returned. Never post a reply from state that is not stored.
 - Keep the worker the only process that opens the SQLite file.
 - Read tokens and keys only from environment variables. Never write them to the configuration, the

@@ -20,7 +20,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                               |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager             |
 | [`@onurpi/restart`](packages/restart/)                                   | Full Pi process restart on the exact persisted session                |
-| [`@onurpi/codex-switcher`](packages/codex-switcher/)                     | Usage-aware Codex account profiles and fallback routing               |
 | [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                      |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                        |
 | [`@onurpi/infinite-retry`](packages/infinite-retry/)                     | Infinite capped retries with `Alt+R` manual wake                      |
@@ -66,9 +65,8 @@ Extensions that need no OnurPi-specific integration load directly from a pinned 
 | [`anti-repeat`](packages/anti-repeat/)           | [`osolmaz/pi-anti-repeat`](https://github.com/osolmaz/pi-anti-repeat) at `f5406c3`     |
 
 Codex compaction has a single owner: `pi-codex-compaction` handles the built-in `openai-codex`
-provider natively. The Codex switcher keeps that provider identity while changing its account
-credential. `reliable-compaction` passes `openai-codex` through and keeps covering every other
-model. See the
+provider natively. `reliable-compaction` passes `openai-codex` through and keeps covering every
+other model. See the
 [package README](packages/pi-codex-compaction/README.md#compaction-ownership-in-onurpi).
 
 Demo Mode stays inactive unless `PI_DEMO_MODE=1` is set. Regrafter stays out of ordinary prompts

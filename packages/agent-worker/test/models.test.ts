@@ -1,16 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MODEL_PROVIDERS } from "../src/config.ts";
 import { echoProvider, workerModels } from "../src/models.ts";
 import { codexTokenAlias, openshellCodexCredentials } from "../src/openshell.ts";
-
-const folders: string[] = [];
-
-afterEach(() => {
-  for (const folder of folders.splice(0)) rmSync(folder, { force: true, recursive: true });
-});
 
 describe("echoProvider", () => {
   it("always has an answer ready", () => {
@@ -18,25 +9,19 @@ describe("echoProvider", () => {
   });
 });
 
+const placeholders = {
+  CODEX_AUTH_ACCESS_TOKEN: "openshell:resolve:env:s1:CODEX_AUTH_ACCESS_TOKEN",
+  CODEX_AUTH_ACCOUNT_ID: "openshell:resolve:env:s2:CODEX_AUTH_ACCOUNT_ID",
+};
+
 describe("workerModels", () => {
   it.each(MODEL_PROVIDERS)("sets up the %s provider without a network call", (provider) => {
-    const agentDir = mkdtempSync(join(tmpdir(), "agent-worker-pi-"));
-    folders.push(agentDir);
-    const created = workerModels(
-      { login: "codex-switcher", modelId: "test-model", provider },
-      agentDir,
-    );
-    expect(created.models.getProvider(provider)?.id).toBe(provider);
-    created.close();
+    const models = workerModels({ modelId: "test-model", provider }, placeholders);
+    expect(models.getProvider(provider)?.id).toBe(provider);
   });
 });
 
 describe("the openshell Codex login", () => {
-  const placeholders = {
-    CODEX_AUTH_ACCESS_TOKEN: "openshell:resolve:env:s1:CODEX_AUTH_ACCESS_TOKEN",
-    CODEX_AUTH_ACCOUNT_ID: "openshell:resolve:env:s2:CODEX_AUTH_ACCOUNT_ID",
-  };
-
   it("wraps the access token placeholder in the JWT shape OpenShell resolves", () => {
     const alias = codexTokenAlias(
       placeholders.CODEX_AUTH_ACCESS_TOKEN,
@@ -62,12 +47,8 @@ describe("the openshell Codex login", () => {
   });
 
   it("gives Pi AI the wrapped token as the API key, without a refresh", async () => {
-    const created = workerModels(
-      { login: "openshell", modelId: "gpt-6.1-sol", provider: "openai-codex" },
-      "/none",
-      placeholders,
-    );
-    const auth = await created.models.getAuth("openai-codex");
+    const models = workerModels({ modelId: "gpt-6.1-sol", provider: "openai-codex" }, placeholders);
+    const auth = await models.getAuth("openai-codex");
     expect(auth?.auth.apiKey).toBe(
       codexTokenAlias(placeholders.CODEX_AUTH_ACCESS_TOKEN, placeholders.CODEX_AUTH_ACCOUNT_ID),
     );

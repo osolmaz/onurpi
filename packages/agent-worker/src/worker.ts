@@ -52,9 +52,9 @@ export async function startWorker(
       `Set the Discord bot token in the environment variable ${config.discord.tokenEnv}`,
     );
   }
-  const models = workerModels(config.model, config.agentDir, dependencies.env);
+  const models = workerModels(config.model, dependencies.env);
   const desk = new ApprovalDesk(dependencies.log, config.approvals.channelId);
-  const agent = await openAgent(config, models.models, { approvals: desk });
+  const agent = await openAgent(config, models, { approvals: desk });
   let transport: DiscordTransport;
   try {
     transport = await dependencies.connect(
@@ -64,7 +64,6 @@ export async function startWorker(
     );
   } catch (error) {
     await agent.close();
-    models.close();
     throw error;
   }
   desk.attach(agent, transport);
@@ -105,7 +104,6 @@ export async function startWorker(
     await desk.idle();
     await transport.close();
     await agent.close();
-    models.close();
   };
   return { agent, bridge, stop };
 }

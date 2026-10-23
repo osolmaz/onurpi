@@ -10,7 +10,6 @@ import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
-import { createProvider } from "@onurpi/codex-switcher/provider";
 import type { ModelProvider, WorkerConfig } from "./config.ts";
 import { openshellCodexCredentials } from "./openshell.ts";
 
@@ -34,12 +33,6 @@ export function echoProvider(): ReturnType<typeof fauxProvider> {
   return echo;
 }
 
-export type WorkerModels = {
-  readonly models: Models;
-  /** Releases what the provider holds, such as the Codex account router. */
-  close(): void;
-};
-
 const KEY_PROVIDERS = {
   anthropic: anthropicProvider,
   echo: () => echoProvider().provider,
@@ -49,31 +42,20 @@ const KEY_PROVIDERS = {
 } as const satisfies Record<Exclude<ModelProvider, "openai-codex">, () => unknown>;
 
 /**
- * Models with the one configured provider. `openai-codex` uses the ChatGPT subscription through
- * the codex-switcher provider, which reads the logins in `agentDir` in place, with the
- * same lock and account order as Pi. The other hosted providers read their key from the
+ * Models with the one configured provider. `openai-codex` uses the ChatGPT subscription of the
+ * OpenShell provider attached to the sandbox. The other hosted providers read their key from the
  * environment.
  */
 export function workerModels(
   model: WorkerConfig["model"],
-  agentDir: string,
   env: NodeJS.ProcessEnv = process.env,
-): WorkerModels {
-  if (model.provider === "openai-codex" && model.login === "openshell") {
-    const sandboxed = createModels({ credentials: openshellCodexCredentials(env) });
-    sandboxed.setProvider(openaiCodexProvider());
-    return { close: () => undefined, models: sandboxed };
+): Models {
+  if (model.provider === "openai-codex") {
+    const models = createModels({ credentials: openshellCodexCredentials(env) });
+    models.setProvider(openaiCodexProvider());
+    return models;
   }
   const models = createModels();
-  if (model.provider !== "openai-codex") {
-    models.setProvider(KEY_PROVIDERS[model.provider]());
-    return { close: () => undefined, models };
-  }
-  const codex = createProvider({
-    agentDir,
-    nativeProvider: openaiCodexProvider(),
-    providerId: "openai-codex",
-  });
-  models.setProvider(codex.provider);
-  return { close: codex.close, models };
+  models.setProvider(KEY_PROVIDERS[model.provider]());
+  return models;
 }

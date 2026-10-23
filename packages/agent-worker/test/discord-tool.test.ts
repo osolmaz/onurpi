@@ -17,7 +17,7 @@ function stubFetch(replies: Record<string, Reply>): {
   fetchImpl: typeof fetch;
 } {
   const calls: { path: string; init: RequestInit }[] = [];
-  const impl = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const impl = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const path = url.replace("https://discord.com/api/v10", "");
     calls.push({ init: init ?? {}, path });

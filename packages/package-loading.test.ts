@@ -208,13 +208,11 @@ describe("OnurPi package loading", () => {
     );
   });
 
-  it("loads Codex routing, native content, and text fallback in order", () => {
+  it("loads native Codex compaction before the text fallback", () => {
     const extensions = resourceManifest()["extensions"];
     if (!Array.isArray(extensions)) throw new Error("Expected extension entries");
-    const switcher = extensions.indexOf("./packages/codex-switcher/index.ts");
     const codex = extensions.indexOf("./packages/pi-codex-compaction/index.ts");
-    expect(switcher).toBeGreaterThanOrEqual(0);
-    expect(switcher).toBeLessThan(codex);
+    expect(codex).toBeGreaterThanOrEqual(0);
     expect(codex).toBeLessThan(extensions.indexOf("./packages/reliable-compaction/index.ts"));
     expect(extensions).not.toContain("./packages/context-window-policy/index.ts");
   });

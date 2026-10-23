@@ -1,6 +1,6 @@
 #!/usr/bin/env -S node --import jiti/register
-// jiti is the loader Pi uses for extensions. It maps the `.js` imports in codex-switcher's
-// dependencies to their `.ts` files, which plain Node does not do.
+// jiti is the loader Pi uses for extensions. It runs TypeScript syntax in the workspace packages,
+// such as constructor parameter properties, that Node's type stripping does not.
 import { parseArgs } from "node:util";
 import { readFile } from "node:fs/promises";
 import { loadWorkerConfig } from "./config.ts";
