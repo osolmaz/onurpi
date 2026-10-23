@@ -53,14 +53,17 @@ export type BridgeOptions = {
   /** Extra note text for one saved attachment, such as a voice note's transcript. */
   readonly annotate?: (saved: SavedAttachment) => Promise<string | undefined>;
   /**
-   * Answers an owner's `/command` before the agent runs, returning the reply text, or undefined
-   * when the word is unknown and the message should flow on as ordinary text.
+   * Answers an owner's `/command` before the agent runs: `names` are the words it handles, so the
+   * bridge can put the eyes on before a slow one starts, and `run` returns the reply text, or
+   * undefined when the message should flow on as ordinary text.
    */
-  readonly command?: (
-    message: InboundMessage,
-    text: string,
-    busy: boolean,
-  ) => Promise<string | undefined>;
+  readonly command?: BridgeCommand;
+};
+
+/** The owner's command handler: the words it answers, and the answer to one message. */
+export type BridgeCommand = {
+  readonly names: readonly string[];
+  run(message: InboundMessage, text: string, busy: boolean): Promise<string | undefined>;
 };
 
 /**
@@ -151,22 +154,37 @@ export class DiscordBridge {
     );
   }
 
+  /** The command word a message names, with a bare `stop` meaning `/stop`, or undefined. */
+  private commandWord(command: BridgeCommand, text: string): string | undefined {
+    const word = text.trim().toLowerCase();
+    if (word === "stop") return "stop";
+    const name = /^\/([a-z-]+)/.exec(word)?.[1];
+    return name !== undefined && command.names.includes(name) ? name : undefined;
+  }
+
   /**
    * Runs an owner's `/command` — or a bare `stop`, which means the same as `/stop` — through the
-   * handler and answers it at once, without the eyes and without the agent. False when the message
-   * is not a command this bridge handles, so it flows on through the ordinary verdict.
+   * handler and answers it at once, without the agent. The eyes go on before the command runs, so a
+   * slow one such as `/compact` shows the message was picked up, and come off with the answer. False
+   * when the word is not one the handler names, so the message flows on through the ordinary verdict
+   * and the agent's own turn acknowledges it.
    */
   private async ownerCommand(message: InboundMessage, key: string, text: string): Promise<boolean> {
     const command = this.command;
-    const word = text.trim().toLowerCase();
     if (command === undefined || !this.config.ownerIds.includes(message.authorId)) return false;
-    const commandText = word === "stop" ? "/stop" : text;
-    if (!commandText.startsWith("/")) return false;
-    const answer = await command(message, commandText, this.runs.has(key));
-    if (answer === undefined) return false;
+    const name = this.commandWord(command, text);
+    if (name === undefined) return false;
+    const commandText = name === "stop" ? "/stop" : text;
+    await this.acknowledge(message);
+    const answer = await command.run(message, commandText, this.runs.has(key));
+    if (answer === undefined) {
+      await this.dismiss(message);
+      return false;
+    }
     this.log("commanded", { message: message.id, channel: message.channelId });
     await this.ledger.seen(message.channelId, message.id);
     await this.transport.send(message.channelId, answer, message.id);
+    await this.dismiss(message);
     await this.ledger.answered(message.id);
     this.botTurns.set(key, this.isBotTurn(message));
     return true;

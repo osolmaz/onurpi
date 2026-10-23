@@ -575,29 +575,6 @@ describe("DiscordBridge with reactions and progress", () => {
     expect(transport.posted[0]?.text).toBe(`Echo: ${tagged("list the files")}`);
   });
 
-  it("answers an owner's command before the agent, without the eyes", async () => {
-    const { agent, bridge, events, ledger, transport } = setup(
-      new FakeAgent(),
-      new FakeLedger(),
-      new FakeTransport(),
-      {},
-      {
-        command: (_message: unknown, text: string): Promise<string | undefined> =>
-          Promise.resolve(text === "/status" ? "model: test" : undefined),
-      },
-    );
-    transport.emit(message({ content: `<@${BOT}> /status`, id: "700000000000000050" }));
-    await bridge.idle();
-
-    expect(agent.requests).toEqual([]);
-    expect(transport.posted).toEqual([
-      { channelId: CHANNEL, id: "sent-1", replyTo: "700000000000000050", text: "model: test" },
-    ]);
-    expect(transport.reacted).toEqual([]);
-    expect(await ledger.pending()).toEqual([]);
-    expect(events).toEqual(["commanded"]);
-  });
-
   it("appends an annotator's note to a saved attachment's note", async () => {
     const agent = new FakeAgent();
     const transport = new FakeTransport();
@@ -651,24 +628,90 @@ describe("DiscordBridge with reactions and progress", () => {
 });
 
 describe("DiscordBridge owner commands", () => {
+  it("answers an owner's command before the agent, with the eyes on until the answer", async () => {
+    const { agent, bridge, events, ledger, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      { ackReaction: "\u{1F440}" },
+      {
+        command: {
+          names: ["status"],
+          run: (_message: unknown, text: string): Promise<string | undefined> =>
+            Promise.resolve(text === "/status" ? "model: test" : undefined),
+        },
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> /status`, id: "700000000000000050" }));
+    await bridge.idle();
+
+    expect(agent.requests).toEqual([]);
+    expect(transport.posted).toEqual([
+      { channelId: CHANNEL, id: "sent-1", replyTo: "700000000000000050", text: "model: test" },
+    ]);
+    expect(transport.reacted).toEqual([
+      { channelId: CHANNEL, emoji: "\u{1F440}", messageId: "700000000000000050" },
+    ]);
+    expect(transport.unreacted).toEqual([
+      { channelId: CHANNEL, emoji: "\u{1F440}", messageId: "700000000000000050" },
+    ]);
+    expect(await ledger.pending()).toEqual([]);
+    expect(events).toEqual(["commanded"]);
+  });
+
+  it("puts the eyes on before a slow command finishes, such as a compaction", async () => {
+    let finish: (answer: string) => void = () => undefined;
+    const { bridge, transport } = setup(
+      new FakeAgent(),
+      new FakeLedger(),
+      new FakeTransport(),
+      { ackReaction: "\u{1F440}" },
+      {
+        command: {
+          names: ["compact"],
+          run: (): Promise<string | undefined> =>
+            new Promise<string>((resolve) => {
+              finish = resolve;
+            }),
+        },
+      },
+    );
+    transport.emit(message({ content: `<@${BOT}> /compact`, id: "700000000000000055" }));
+    await new Promise((settle) => setImmediate(settle));
+
+    expect(transport.reacted).toEqual([
+      { channelId: CHANNEL, emoji: "\u{1F440}", messageId: "700000000000000055" },
+    ]);
+    expect(transport.posted).toHaveLength(0);
+    finish("Compacted: 315 messages \u2192 64.");
+    await bridge.idle();
+    expect(transport.unreacted).toEqual([
+      { channelId: CHANNEL, emoji: "\u{1F440}", messageId: "700000000000000055" },
+    ]);
+  });
+
   it("aborts on a bare stop from an owner, without the agent", async () => {
     const { agent, bridge, events, transport } = setup(
       new FakeAgent(),
       new FakeLedger(),
       new FakeTransport(),
-      {},
+      { ackReaction: "\u{1F440}" },
       {
-        command: (_message: unknown, text: string): Promise<string | undefined> =>
-          Promise.resolve(
-            text === "/stop" ? "Stopped; the answer so far stays in the transcript." : undefined,
-          ),
+        command: {
+          names: ["stop"],
+          run: (_message: unknown, text: string): Promise<string | undefined> =>
+            Promise.resolve(
+              text === "/stop" ? "Stopped; the answer so far stays in the transcript." : undefined,
+            ),
+        },
       },
     );
     transport.emit(message({ content: `<@${BOT}> STOP`, id: "700000000000000053" }));
     await bridge.idle();
 
     expect(agent.requests).toEqual([]);
-    expect(transport.reacted).toEqual([]);
+    expect(transport.reacted.map((one) => one.messageId)).toEqual(["700000000000000053"]);
+    expect(transport.unreacted.map((one) => one.messageId)).toEqual(["700000000000000053"]);
     expect(transport.posted[0]?.text).toBe("Stopped; the answer so far stays in the transcript.");
     expect(events).toEqual(["commanded"]);
   });
@@ -680,7 +723,10 @@ describe("DiscordBridge owner commands", () => {
       new FakeTransport(),
       {},
       {
-        command: (): Promise<string | undefined> => Promise.resolve("aborted"),
+        command: {
+          names: ["stop"],
+          run: (): Promise<string | undefined> => Promise.resolve("aborted"),
+        },
       },
     );
     transport.emit(message({ content: `<@${BOT}> stop doing that`, id: "700000000000000054" }));
@@ -690,14 +736,17 @@ describe("DiscordBridge owner commands", () => {
     expect(agent.requests[0]?.text).toBe(tagged("stop doing that"));
   });
 
-  it("lets an unknown command flow to the agent as ordinary text", async () => {
+  it("lets an unknown command flow to the agent as ordinary text, with one acknowledgment", async () => {
     const { agent, bridge, transport } = setup(
       new FakeAgent(),
       new FakeLedger(),
       new FakeTransport(),
-      {},
+      { ackReaction: "\u{1F440}" },
       {
-        command: (): Promise<string | undefined> => Promise.resolve(undefined),
+        command: {
+          names: ["stop"],
+          run: (): Promise<string | undefined> => Promise.resolve(undefined),
+        },
       },
     );
     transport.emit(message({ content: `<@${BOT}> /frobnicate`, id: "700000000000000052" }));
@@ -705,5 +754,6 @@ describe("DiscordBridge owner commands", () => {
 
     expect(agent.requests).toHaveLength(1);
     expect(agent.requests[0]?.text).toBe(tagged("/frobnicate"));
+    expect(transport.unreacted.map((one) => one.messageId)).toEqual(["700000000000000052"]);
   });
 });

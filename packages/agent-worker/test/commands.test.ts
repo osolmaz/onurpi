@@ -47,7 +47,11 @@ describe("commands", () => {
   it("resets the session, queueing a handoff message when one is given", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    const answer = await handler({ channelId: "400000000000000004" }, "/new start fresh", false);
+    const answer = await handler.run(
+      { channelId: "400000000000000004" },
+      "/new start fresh",
+      false,
+    );
     expect(answer).toBe("New session; your message is its first.");
     expect(agent.resetCalls).toEqual(["discord:400000000000000004:start fresh"]);
   });
@@ -55,7 +59,7 @@ describe("commands", () => {
   it("tells the truth about a reset that waits for the running turn", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    const answer = await handler({ channelId: "400000000000000004" }, "/new", true);
+    const answer = await handler.run({ channelId: "400000000000000004" }, "/new", true);
     expect(agent.resetCalls).toEqual(["discord:400000000000000004:"]);
     expect(answer).toBe("New session queued; it starts when the current turn finishes.");
   });
@@ -64,7 +68,11 @@ describe("commands", () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
     expect(
-      await handler({ channelId: "400000000000000004" }, "/compact keep the deploy steps", false),
+      await handler.run(
+        { channelId: "400000000000000004" },
+        "/compact keep the deploy steps",
+        false,
+      ),
     ).toBe("Compacted: 12 messages \u2192 2.");
     expect(agent.compactCalls).toEqual(["discord:400000000000000004:keep the deploy steps"]);
   });
@@ -72,7 +80,7 @@ describe("commands", () => {
   it("says the summary lands later when /compact arrives mid-turn", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    expect(await handler({ channelId: "400000000000000004" }, "/compact", true)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/compact", true)).toBe(
       "Compacted: 12 messages \u2192 2. The summary lands when this turn finishes.",
     );
     expect(agent.compactCalls).toEqual(["discord:400000000000000004:"]);
@@ -86,7 +94,7 @@ describe("commands", () => {
       reason: "nothing old enough to summarize",
     });
     const handler = createCommandHandler({ agent, config });
-    expect(await handler({ channelId: "400000000000000004" }, "/compact", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/compact", false)).toBe(
       "Nothing compacted: nothing old enough to summarize.",
     );
   });
@@ -94,7 +102,7 @@ describe("commands", () => {
   it("aborts the running turn on /stop", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    const answer = await handler({ channelId: "400000000000000004" }, "/stop", true);
+    const answer = await handler.run({ channelId: "400000000000000004" }, "/stop", true);
     expect(answer).toBe("Stopped; the answer so far stays in the transcript.");
     expect(agent.abortCalls).toEqual(["discord:400000000000000004"]);
   });
@@ -102,13 +110,13 @@ describe("commands", () => {
   it("reports the model, the run state, and the transcript's size on /status", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    expect(await handler({ channelId: "400000000000000004" }, "/status", true)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/status", true)).toBe(
       "model: openai-codex/gpt-6.1-sol\nstate: working\ncontext: 3 messages (4 entries)",
     );
-    expect(await handler({ channelId: "400000000000000004" }, "/model", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/model", false)).toBe(
       "openai-codex/gpt-6.1-sol",
     );
-    expect(await handler({ channelId: "400000000000000004" }, "/context", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/context", false)).toBe(
       "3 model messages over 4 transcript entries.",
     );
   });
@@ -116,10 +124,10 @@ describe("commands", () => {
   it("aborts the running turn on /stop and says when nothing is running", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    expect(await handler({ channelId: "400000000000000004" }, "/stop", true)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/stop", true)).toBe(
       "Stopped; the answer so far stays in the transcript.",
     );
-    expect(await handler({ channelId: "400000000000000004" }, "/stop", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/stop", false)).toBe(
       "Nothing is running.",
     );
     expect(agent.abortCalls).toEqual(["discord:400000000000000004", "discord:400000000000000004"]);
@@ -127,7 +135,7 @@ describe("commands", () => {
 
   it("lists the commands, the model, and the pi runtime on /help", async () => {
     const handler = createCommandHandler({ agent: fakeAgent(), config });
-    const help = await handler({ channelId: "400000000000000004" }, "/help", false);
+    const help = await handler.run({ channelId: "400000000000000004" }, "/help", false);
     expect(help).toContain("/new [message]");
     expect(help).toContain("/stop");
     expect(help).toContain("openai-codex/gpt-6.1-sol");
@@ -137,10 +145,10 @@ describe("commands", () => {
   it("returns undefined for an unknown word, so the message flows on to the agent", async () => {
     const agent = fakeAgent();
     const handler = createCommandHandler({ agent, config });
-    expect(await handler({ channelId: "400000000000000004" }, "/frobnicate now", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "/frobnicate now", false)).toBe(
       undefined,
     );
-    expect(await handler({ channelId: "400000000000000004" }, "just talking", false)).toBe(
+    expect(await handler.run({ channelId: "400000000000000004" }, "just talking", false)).toBe(
       undefined,
     );
     expect(agent.resetCalls).toEqual([]);

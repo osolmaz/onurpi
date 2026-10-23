@@ -114,24 +114,29 @@ function commandTable(
 }
 
 /**
- * The slash command handler: answers an owner's `/command` before the agent runs. An unknown word
- * returns undefined, so the message flows on to the agent as ordinary text.
+ * The slash command handler: the words it answers, and the answer to one message. An unknown word
+ * returns undefined from `run`, so the message flows on to the agent as ordinary text.
  */
-export function createCommandHandler({
-  agent,
-  config,
-}: CommandDependencies): (
-  message: CommandMessage,
-  text: string,
-  busy: boolean,
-) => Promise<string | undefined> {
+export type CommandHandler = {
+  readonly names: readonly string[];
+  run(message: CommandMessage, text: string, busy: boolean): Promise<string | undefined>;
+};
+
+/**
+ * The slash command handler: answers an owner's `/command` before the agent runs. `names` lists the
+ * words it handles, so the bridge can acknowledge a slow one as soon as it arrives.
+ */
+export function createCommandHandler({ agent, config }: CommandDependencies): CommandHandler {
   const commands = commandTable(agent, config);
-  return async (message, text, busy) => {
-    const command = /^\/([a-z-]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
-    if (command?.[1] === undefined) return undefined;
-    const run = commands[command[1]];
-    if (run === undefined) return undefined;
-    const argument = (command[2] ?? "").trim();
-    return run(argument, { busy, key: `discord:${message.channelId}` });
+  return {
+    names: Object.keys(commands),
+    run: async (message, text, busy) => {
+      const command = /^\/([a-z-]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
+      if (command?.[1] === undefined) return undefined;
+      const execute = commands[command[1]];
+      if (execute === undefined) return undefined;
+      const argument = (command[2] ?? "").trim();
+      return execute(argument, { busy, key: `discord:${message.channelId}` });
+    },
   };
 }
