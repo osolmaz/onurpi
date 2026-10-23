@@ -9,6 +9,7 @@ import {
 import { huggingfaceProvider } from "@earendil-works/pi-ai/providers/huggingface";
 import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex";
+import { opencodeGoProvider } from "@earendil-works/pi-ai/providers/opencode-go";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import type { ModelProvider, WorkerConfig } from "./config.ts";
 import { openshellCodexCredentials } from "./openshell.ts";
@@ -38,6 +39,7 @@ const KEY_PROVIDERS = {
   echo: () => echoProvider().provider,
   huggingface: huggingfaceProvider,
   openai: openaiProvider,
+  "opencode-go": opencodeGoProvider,
   openrouter: openrouterProvider,
 } as const satisfies Record<Exclude<ModelProvider, "openai-codex">, () => unknown>;
 

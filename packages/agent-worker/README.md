@@ -29,11 +29,12 @@ The agent loads its instructions as Pi does: the `AGENTS.md` in the Pi agent fol
 `AGENTS.md` or `CLAUDE.md` per folder from the root down to the workspace. The Pi agent folder is
 `~/.pi/agent` unless `agentDir` names another one. The files are read again for every answer.
 
-The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
-`openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs no
-key. `openai-codex` uses the ChatGPT subscription of the `chatgpt-codex` OpenShell provider attached
-to the sandbox, so it runs only inside the sandbox. For the other hosted providers, Pi AI reads the
-key from its usual environment variable, such as `ANTHROPIC_API_KEY` or `HF_TOKEN`.
+The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, `opencode-go`,
+or `openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs
+no key. `openai-codex` uses the ChatGPT subscription of the `chatgpt-codex` OpenShell provider
+attached to the sandbox, so it runs only inside the sandbox. For the other hosted providers, Pi AI
+reads the key from its usual environment variable, such as `ANTHROPIC_API_KEY`, `HF_TOKEN`, or
+`OPENCODE_API_KEY`.
 
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the

@@ -15,6 +15,7 @@ export const MODEL_PROVIDERS = [
   "huggingface",
   "openai",
   "openai-codex",
+  "opencode-go",
   "openrouter",
 ] as const;
 
