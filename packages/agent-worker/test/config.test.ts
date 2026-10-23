@@ -14,6 +14,13 @@ afterEach(() => {
 });
 
 describe("parseWorkerConfig", () => {
+  it("accepts a model from the OpenCode Go provider", () => {
+    const model = { modelId: "deepseek-v4.1-flash", provider: "opencode-go" };
+    expect(parseWorkerConfig({ discord, model, workspace: "/w" }, "/srv/agent").model).toEqual(
+      model,
+    );
+  });
+
   it("resolves paths against the base folder and fills in defaults", () => {
     expect(
       parseWorkerConfig({ discord, model: { provider: "echo" }, workspace: "work" }, "/srv/agent"),
