@@ -19,8 +19,8 @@ network_policies:
   # primary artifacts, the model-release watch reads Hugging Face and GitHub, and the ACP draft
   # tracker reads the protocol site and GitHub. Reads only; writes go through the GitHub provider.
   # The owner's site is readable directly. Free web browsing goes through the public reader
-  # r.jina.ai, which turns any page (including a Bing results page, for search) into markdown;
-  # direct access to other hosts stays denied.
+  # r.jina.ai, which turns any page (including a Bing results page, for search) into markdown.
+  # OpenShell has no rule for every host, so `open_web_reads` below lists common sites by name.
   # The host's general transcription service on the Tailscale IP: the worker POSTs voice
   # notes to it when stt.url is set, and routes Discord REST calls through the discord relay
   # (the relay adds the bot token that the L7 body handling would otherwise eat).
@@ -81,6 +81,1774 @@ network_policies:
         access: read-only
         enforcement: enforce
       - host: agentclientprotocol.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/bin/git
+      - path: /usr/local/bin/node
+  # Read-only access to common sites, so tools can fetch pages directly. Each domain is listed
+  # with and without its subdomains, because `*.example.com` does not match `example.com`.
+  open_web_reads:
+    endpoints:
+      - host: google.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.google.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: googleusercontent.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.googleusercontent.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gstatic.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gstatic.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bing.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bing.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: duckduckgo.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.duckduckgo.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: brave.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.brave.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: kagi.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.kagi.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: yahoo.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.yahoo.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wikipedia.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wikipedia.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wikimedia.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wikimedia.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wikidata.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wikidata.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wiktionary.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wiktionary.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wikisource.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wikisource.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: archive.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.archive.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: archive.ph
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.archive.ph"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: stackoverflow.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.stackoverflow.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: stackexchange.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.stackexchange.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: superuser.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.superuser.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: serverfault.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.serverfault.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: askubuntu.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.askubuntu.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: mathoverflow.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.mathoverflow.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: quora.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.quora.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: githubusercontent.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.githubusercontent.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: githubassets.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.githubassets.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: github.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.github.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gitlab.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gitlab.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gitlab.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gitlab.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bitbucket.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bitbucket.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: codeberg.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.codeberg.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: sourceforge.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.sourceforge.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: npmjs.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.npmjs.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: pypi.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.pypi.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: pythonhosted.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.pythonhosted.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: crates.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.crates.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: docs.rs
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.docs.rs"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: rust-lang.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.rust-lang.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: go.dev
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.go.dev"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: golang.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.golang.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: python.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.python.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nodejs.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nodejs.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: mozilla.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.mozilla.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: w3.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.w3.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: whatwg.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.whatwg.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: readthedocs.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.readthedocs.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: readthedocs.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.readthedocs.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gitbook.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gitbook.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: docker.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.docker.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: kubernetes.io
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.kubernetes.io"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: apache.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.apache.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gnu.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gnu.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: kernel.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.kernel.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: debian.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.debian.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ubuntu.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ubuntu.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: archlinux.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.archlinux.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: fedoraproject.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.fedoraproject.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: brew.sh
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.brew.sh"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: jsdelivr.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.jsdelivr.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: unpkg.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.unpkg.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: cloudflare.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.cloudflare.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: vercel.app
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.vercel.app"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: vercel.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.vercel.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: netlify.app
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.netlify.app"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: pages.dev
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.pages.dev"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: herokuapp.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.herokuapp.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: cloudfront.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.cloudfront.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: openai.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.openai.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: anthropic.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.anthropic.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: claude.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.claude.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: google.dev
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.google.dev"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: deepmind.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.deepmind.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: mistral.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.mistral.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: deepseek.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.deepseek.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: x.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.x.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: meta.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.meta.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: llama.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.llama.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: together.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.together.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: groq.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.groq.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nvidia.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nvidia.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: pytorch.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.pytorch.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: tensorflow.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.tensorflow.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: kaggle.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.kaggle.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: paperswithcode.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.paperswithcode.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: openrouter.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.openrouter.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ollama.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ollama.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: lmarena.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.lmarena.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: artificialanalysis.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.artificialanalysis.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: modal.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.modal.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: replicate.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.replicate.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wandb.ai
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wandb.ai"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: semanticscholar.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.semanticscholar.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: openreview.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.openreview.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: aclanthology.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.aclanthology.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: acm.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.acm.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ieee.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ieee.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nature.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nature.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: science.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.science.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: sciencedirect.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.sciencedirect.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: springer.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.springer.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: biorxiv.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.biorxiv.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: medrxiv.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.medrxiv.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: researchgate.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.researchgate.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ssrn.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ssrn.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nih.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nih.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: plos.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.plos.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: x.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.x.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: twitter.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.twitter.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: twimg.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.twimg.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: reddit.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.reddit.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: redd.it
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.redd.it"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: redditmedia.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.redditmedia.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ycombinator.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ycombinator.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: lobste.rs
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.lobste.rs"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: medium.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.medium.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: substack.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.substack.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: dev.to
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.dev.to"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: hashnode.dev
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.hashnode.dev"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: youtube.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.youtube.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: youtu.be
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.youtu.be"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ytimg.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ytimg.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: linkedin.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.linkedin.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bsky.app
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bsky.app"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: mastodon.social
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.mastodon.social"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: threads.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.threads.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nytimes.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nytimes.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bbc.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bbc.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bbc.co.uk
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bbc.co.uk"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: reuters.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.reuters.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: apnews.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.apnews.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: theguardian.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.theguardian.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bloomberg.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bloomberg.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ft.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ft.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wsj.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wsj.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: economist.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.economist.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: theverge.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.theverge.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: techcrunch.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.techcrunch.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: arstechnica.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.arstechnica.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wired.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wired.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: cnbc.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.cnbc.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: cnn.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.cnn.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: washingtonpost.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.washingtonpost.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: axios.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.axios.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: politico.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.politico.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: semafor.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.semafor.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: theinformation.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.theinformation.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: spiegel.de
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.spiegel.de"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: zeit.de
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.zeit.de"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: faz.net
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.faz.net"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: sueddeutsche.de
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.sueddeutsche.de"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: tagesschau.de
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.tagesschau.de"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: dw.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.dw.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: amazon.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.amazon.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: amazon.de
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.amazon.de"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ebay.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ebay.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: apple.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.apple.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: microsoft.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.microsoft.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: imdb.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.imdb.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: wolframalpha.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.wolframalpha.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: openstreetmap.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.openstreetmap.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: notion.site
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.notion.site"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: marketwatch.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.marketwatch.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: investing.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.investing.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: sec.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.sec.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: federalreserve.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.federalreserve.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: europa.eu
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.europa.eu"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: worldbank.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.worldbank.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: imf.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.imf.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: oecd.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.oecd.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: tradingeconomics.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.tradingeconomics.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: lme.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.lme.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: cmegroup.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.cmegroup.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: statista.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.statista.com"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: ourworldindata.org
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.ourworldindata.org"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: nasa.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.nasa.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: census.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.census.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: bls.gov
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.bls.gov"
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: gov.uk
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+      - host: "*.gov.uk"
         port: 443
         protocol: rest
         access: read-only
