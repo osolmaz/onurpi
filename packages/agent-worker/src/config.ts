@@ -20,28 +20,16 @@ export const MODEL_PROVIDERS = [
 
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
-export const CODEX_LOGINS = ["codex-switcher", "openshell"] as const;
-
-export type CodexLogin = (typeof CODEX_LOGINS)[number];
-
 export type WorkerConfig = {
   /** Folder the agent works in. Its tools act here. */
   readonly workspace: string;
-  /**
-   * Pi agent folder. As in Pi, its `AGENTS.md` is the global instructions file, and the
-   * `openai-codex` provider uses the codex-switcher logins kept here.
-   */
+  /** Pi agent folder. As in Pi, its `AGENTS.md` is the global instructions file. */
   readonly agentDir: string;
   /** SQLite file that holds the agent's conversations and work. */
   readonly storage: string;
   readonly model: {
     readonly provider: ModelProvider;
     readonly modelId: string;
-    /**
-     * Where the `openai-codex` login comes from: the codex-switcher logins in `agentDir` on a host,
-     * or the placeholders of an attached OpenShell provider inside a sandbox.
-     */
-    readonly login: CodexLogin;
   };
   /**
    * Tool calls that wait for the owner's approval in Discord: `bash` commands that match a pattern.
@@ -93,10 +81,6 @@ function isProvider(value: string): value is ModelProvider {
   return (MODEL_PROVIDERS as readonly string[]).includes(value);
 }
 
-function isLogin(value: unknown): value is CodexLogin {
-  return CODEX_LOGINS.some((login) => login === value);
-}
-
 function parseModel(value: unknown): WorkerConfig["model"] {
   const model = record(value, "model");
   const provider = text(model["provider"], "model.provider");
@@ -104,14 +88,7 @@ function parseModel(value: unknown): WorkerConfig["model"] {
     throw new Error(`model.provider must be one of: ${MODEL_PROVIDERS.join(", ")}`);
   }
   const modelId = provider === "echo" ? "echo" : text(model["modelId"], "model.modelId");
-  const login = model["login"] ?? "codex-switcher";
-  if (!isLogin(login)) {
-    throw new Error(`model.login must be one of: ${CODEX_LOGINS.join(", ")}`);
-  }
-  if (login !== "codex-switcher" && provider !== "openai-codex") {
-    throw new Error("model.login applies only to the openai-codex provider");
-  }
-  return { login, modelId, provider };
+  return { modelId, provider };
 }
 
 /** The discord.agentTools section: which tool tiers are on. */

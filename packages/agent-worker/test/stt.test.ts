@@ -86,7 +86,7 @@ describe("stt", () => {
     const path = join(dir, "voice.ogg");
     await writeFile(path, Buffer.alloc(8));
     let received: { body?: unknown; type?: string | undefined } = {};
-    const fetchImpl = ((_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchImpl = ((_input: string | URL | Request, init?: RequestInit) => {
       received = {
         body: init?.body,
         type: init?.headers

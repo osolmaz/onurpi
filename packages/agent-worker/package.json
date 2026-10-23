@@ -26,7 +26,6 @@
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-coding-agent": "1.4.0",
     "@earendil-works/pi-durable": "^1.3.0",
-    "@onurpi/codex-switcher": "0.2.1",
     "@onurpi/discord-adapter": "0.1.0",
     "jiti": "2.7.0",
     "pi-anti-repeat": "0.2.1"

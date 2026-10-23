@@ -31,10 +31,9 @@ The agent loads its instructions as Pi does: the `AGENTS.md` in the Pi agent fol
 
 The model `provider` is `echo`, `anthropic`, `huggingface`, `openai`, `openai-codex`, or
 `openrouter`, and `modelId` names the model. The `echo` model answers `Echo: <message>` and needs no
-key. `openai-codex` uses a ChatGPT subscription through the codex-switcher provider: it reads the
-logins that codex-switcher keeps in the Pi agent folder, in place and with the same lock as Pi. For
-the other hosted providers, Pi AI reads the key from its usual environment variable, such as
-`ANTHROPIC_API_KEY` or `HF_TOKEN`.
+key. `openai-codex` uses the ChatGPT subscription of the `chatgpt-codex` OpenShell provider attached
+to the sandbox, so it runs only inside the sandbox. For the other hosted providers, Pi AI reads the
+key from its usual environment variable, such as `ANTHROPIC_API_KEY` or `HF_TOKEN`.
 
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the
@@ -50,10 +49,10 @@ From the repository root, after `npm install`:
 node --import jiti/register packages/agent-worker/src/cli.ts run --config /path/to/config.json
 ```
 
-`jiti` is the loader that Pi uses for extensions. The worker needs it because codex-switcher's
-dependencies import `.ts` files by `.js` paths. The bot token must be in the environment variable
-that `tokenEnv` names. The worker prints one JSON line per event and stops cleanly on Ctrl-C after
-running answers finish.
+`jiti` is the loader that Pi uses for extensions. The worker needs it because the workspace packages
+use TypeScript syntax, such as constructor parameter properties, that Node's type stripping does not
+run. The bot token must be in the environment variable that `tokenEnv` names. The worker prints one
+JSON line per event and stops cleanly on Ctrl-C after running answers finish.
 
 ## Scheduled prompts
 

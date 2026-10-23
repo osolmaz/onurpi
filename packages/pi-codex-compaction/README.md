@@ -11,9 +11,7 @@ When the active model uses the built-in `openai-codex` provider with the `openai
 API, the extension serves Pi's manual, threshold, and overflow compaction events as a
 `session_before_compact` provider. It sends the finalized Responses history to the official Codex
 endpoint with a trailing `compaction_trigger`, stores the returned opaque `compaction` item in Pi's
-real `CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary. The
-Codex switcher overrides that same provider in place, so direct compaction requests use the account
-leased to the current agent run.
+real `CompactionEntry.details`, and lets Pi rebuild the active transcript from that boundary.
 
 The extension never triggers compaction itself. It registers no `turn_end`, `agent_settled`, or
 `session_compact` handlers, never calls `ctx.abort()` or `ctx.compact()` for its own lifecycle, and
@@ -52,8 +50,6 @@ call and its result or into another active branch.
 
 ## Compaction ownership in OnurPi
 
-- **`@onurpi/codex-switcher`** keeps the built-in `openai-codex` provider identity while it changes
-  the active account.
 - **Pi's native scheduler** owns manual, threshold, and overflow timing. The normal compaction
   settings put the default Codex threshold at 90%.
 - **`@onurpi/pi-codex-compaction`** owns the remote native checkpoint and compaction content for the

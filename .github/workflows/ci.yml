@@ -60,12 +60,6 @@ jobs:
       - name: Check @onurpi/skill-slug package with Slophammer
         working-directory: packages/skill-slug
         run: npm run slophammer
-      - name: Check @onurpi/codex-switcher package
-        working-directory: packages/codex-switcher
-        run: npm run check
-      - name: Check @onurpi/codex-switcher package with Slophammer
-        working-directory: packages/codex-switcher
-        run: npm run slophammer
       - name: Check @onurpi/nyan-mode package
         working-directory: packages/nyan-mode
         run: npm run check
@@ -227,9 +221,6 @@ jobs:
         run: npm run mutate
       - name: Mutate @onurpi/prompt-queue package
         working-directory: packages/prompt-queue
-        run: npm run mutate
-      - name: Mutate @onurpi/codex-switcher package
-        working-directory: packages/codex-switcher
         run: npm run mutate
       - name: Mutate @onurpi/reliable-compaction package
         working-directory: packages/reliable-compaction

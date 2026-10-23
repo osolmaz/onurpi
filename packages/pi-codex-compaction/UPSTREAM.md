@@ -60,8 +60,7 @@ The review covered `package.json`, `README.md`, `LICENSE`, `config.ts`, `index.t
 - **Endpoint allowlist for credentials** (see above) — new behavior, deliberately stricter than
   upstream.
 - Resolves the built-in `openai-codex` credential through Pi's normal request auth path after the
-  endpoint guard. The Codex switcher overrides that provider in place and exposes its leased account
-  through the same auth path.
+  endpoint guard.
 - Bounded HTTP error bodies in error messages (300 characters).
 - Added test coverage for credential/base-URL safety, model-mismatched checkpoints, auth resolution
   failure, and non-Codex pass-through of every hook.
