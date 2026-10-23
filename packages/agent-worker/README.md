@@ -36,6 +36,20 @@ attached to the sandbox, so it runs only inside the sandbox. For the other hoste
 reads the key from its usual environment variable, such as `ANTHROPIC_API_KEY`, `HF_TOKEN`, or
 `OPENCODE_API_KEY`.
 
+`compaction` bounds the transcript. Pi Durable summarizes an old prefix of the context when a
+request would cross a threshold, keeping the recent part verbatim. `contextCeiling` is the largest
+request the agent may send: it caps the model's context window, so the thresholds follow from it.
+The other fields are `enabled`, `reserveTokens` (room kept for the answer, 16384 by default),
+`keepRecentTokens` (the recent context a summary keeps, 20000 by default), and `backgroundTokens`
+(how far below the blocking threshold a background compaction starts, 32768 by default).
+
+```json
+"compaction": { "contextCeiling": 272000 }
+```
+
+Owners can also send `/compact [note]` to summarize on demand, with an optional note that steers the
+summary.
+
 The `discord` part says who the agent answers and where, as the
 [discord-adapter README](../discord-adapter/README.md) describes. Its `tokenEnv` names the
 environment variable that holds the bot token, which is `DISCORD_BOT_TOKEN` by default. The token

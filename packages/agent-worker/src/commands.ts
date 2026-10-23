@@ -8,7 +8,7 @@ import { listWorkspaceSkills } from "./skills.ts";
 
 /** What the command handler needs: the agent's lifecycle methods and the config. */
 export type CommandDependencies = {
-  readonly agent: Pick<RunningAgent, "reset" | "abort" | "inspect">;
+  readonly agent: Pick<RunningAgent, "reset" | "abort" | "inspect" | "compact">;
   readonly config: WorkerConfig;
 };
 
@@ -43,6 +43,7 @@ function helpText(config: WorkerConfig, model: string): string {
     "/stop \u2014 abort the running turn; the partial answer stays",
     "/status \u2014 model, state, and context size",
     "/context \u2014 the transcript's size",
+    "/compact [note] \u2014 summarize the old part of the transcript; a note steers the summary",
     "/model \u2014 the model in use",
     "/jobs \u2014 the scheduled deliveries",
     "/skills \u2014 the installed skills",
@@ -76,6 +77,12 @@ function commandTable(
     context: async (_argument, target) => {
       const size = await agent.inspect(target.key);
       return `${size.messages} model messages over ${size.entries} transcript entries.`;
+    },
+    compact: async (argument, target) => {
+      const result = await agent.compact(target.key, argument === "" ? undefined : argument);
+      if (!result.compacted) return `Nothing compacted: ${result.reason}.`;
+      const note = target.busy ? " The summary lands when this turn finishes." : "";
+      return `Compacted: ${result.before} messages \u2192 ${result.after}.${note}`;
     },
     jobs: (_argument) => Promise.resolve(inboxNames()),
     model: () => Promise.resolve(model()),

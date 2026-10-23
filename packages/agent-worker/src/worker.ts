@@ -12,6 +12,11 @@ import { ApprovalDesk } from "./desk.ts";
 import { Inbox } from "./inbox.ts";
 import { workerModels } from "./models.ts";
 
+/** The compaction ceiling from the config, kept out of `startWorker`'s own decisions. */
+function contextCeilingOf(config: WorkerConfig): number | undefined {
+  return config.compaction?.contextCeiling;
+}
+
 export type Worker = {
   readonly agent: RunningAgent;
   readonly bridge: DiscordBridge;
@@ -52,7 +57,7 @@ export async function startWorker(
       `Set the Discord bot token in the environment variable ${config.discord.tokenEnv}`,
     );
   }
-  const models = workerModels(config.model, dependencies.env);
+  const models = workerModels(config.model, dependencies.env, contextCeilingOf(config));
   const desk = new ApprovalDesk(dependencies.log, config.approvals.channelId);
   const agent = await openAgent(config, models, { approvals: desk });
   let transport: DiscordTransport;

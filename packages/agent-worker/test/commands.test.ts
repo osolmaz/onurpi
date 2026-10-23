@@ -3,17 +3,32 @@ import { describe, expect, it } from "vitest";
 import { createCommandHandler } from "../src/commands.ts";
 import type { WorkerConfig } from "../src/config.ts";
 
-type Agent = Pick<import("../src/agent.ts").RunningAgent, "reset" | "abort" | "inspect">;
+type Agent = Pick<
+  import("../src/agent.ts").RunningAgent,
+  "reset" | "abort" | "inspect" | "compact"
+>;
 
-function fakeAgent(): Agent & { resetCalls: string[]; abortCalls: string[] } {
+function fakeAgent(
+  outcome: import("../src/agent.ts").CompactionOutcome = {
+    after: 2,
+    before: 12,
+    compacted: true,
+  },
+): Agent & { resetCalls: string[]; abortCalls: string[]; compactCalls: string[] } {
   const resetCalls: string[] = [];
   const abortCalls: string[] = [];
+  const compactCalls: string[] = [];
   return {
     abortCalls,
     abort: (key: string) => {
       abortCalls.push(key);
       return Promise.resolve();
     },
+    compact: (key: string, instructions?: string) => {
+      compactCalls.push(`${key}:${instructions ?? ""}`);
+      return Promise.resolve(outcome);
+    },
+    compactCalls,
     inspect: () => Promise.resolve({ entries: 4, messages: 3 }),
     resetCalls,
     reset: (key: string, handoff?: string) => {
@@ -43,6 +58,37 @@ describe("commands", () => {
     const answer = await handler({ channelId: "400000000000000004" }, "/new", true);
     expect(agent.resetCalls).toEqual(["discord:400000000000000004:"]);
     expect(answer).toBe("New session queued; it starts when the current turn finishes.");
+  });
+
+  it("compacts the transcript on /compact, passing a note along", async () => {
+    const agent = fakeAgent();
+    const handler = createCommandHandler({ agent, config });
+    expect(
+      await handler({ channelId: "400000000000000004" }, "/compact keep the deploy steps", false),
+    ).toBe("Compacted: 12 messages \u2192 2.");
+    expect(agent.compactCalls).toEqual(["discord:400000000000000004:keep the deploy steps"]);
+  });
+
+  it("says the summary lands later when /compact arrives mid-turn", async () => {
+    const agent = fakeAgent();
+    const handler = createCommandHandler({ agent, config });
+    expect(await handler({ channelId: "400000000000000004" }, "/compact", true)).toBe(
+      "Compacted: 12 messages \u2192 2. The summary lands when this turn finishes.",
+    );
+    expect(agent.compactCalls).toEqual(["discord:400000000000000004:"]);
+  });
+
+  it("reports why nothing was compacted", async () => {
+    const agent = fakeAgent({
+      after: 12,
+      before: 12,
+      compacted: false,
+      reason: "nothing old enough to summarize",
+    });
+    const handler = createCommandHandler({ agent, config });
+    expect(await handler({ channelId: "400000000000000004" }, "/compact", false)).toBe(
+      "Nothing compacted: nothing old enough to summarize.",
+    );
   });
 
   it("aborts the running turn on /stop", async () => {

@@ -5,6 +5,7 @@ import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   type AgentEvent,
+  type CompactionResult,
   type Conversation,
   type ConversationId,
   createRegistry,
@@ -12,9 +13,11 @@ import {
   defineDocFamily,
   defineExtension,
   Harness,
+  type HarnessSettings,
   section,
   type EntryId,
   type SettledSubmissionRecord,
+  type TaskOutcome,
   watchEvents,
 } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -183,7 +186,21 @@ export type RunningAgent = AgentPort & {
   abort(key: string): Promise<void>;
   /** The active transcript's size, in entries and model messages. */
   inspect(key: string): Promise<{ entries: number; messages: number }>;
+  /**
+   * Summarizes the conversation's old prefix, keeping the recent context verbatim. Resolves once the
+   * summary is placed, or once the compaction fails or finds nothing to compact.
+   */
+  compact(key: string, instructions?: string): Promise<CompactionOutcome>;
   close(): Promise<void>;
+};
+
+/** What a compaction did: the transcript sizes around it, and whether it placed a summary. */
+export type CompactionOutcome = {
+  readonly before: number;
+  readonly after: number;
+  readonly compacted: boolean;
+  /** Why no summary was placed, when `compacted` is false. */
+  readonly reason?: string;
 };
 
 /**
@@ -403,6 +420,74 @@ function isImage(attachment: SavedAttachment): boolean {
   return (attachment.contentType ?? "").startsWith("image/");
 }
 
+/** Room kept free for the answer when the config does not say. */
+const DEFAULT_RESERVE_TOKENS = 16384;
+
+/**
+ * The harness settings for this worker. `compaction.contextCeiling` is applied to the model's window
+ * in `workerModels`, so the thresholds below are measured against the ceiling rather than the
+ * provider's own limit.
+ */
+function harnessSettings(config: WorkerConfig): HarnessSettings {
+  const compaction = config.compaction;
+  if (compaction === undefined) return {};
+  return {
+    compaction: {
+      ...(compaction.enabled === undefined ? {} : { enabled: compaction.enabled }),
+      reserveTokens: compaction.reserveTokens ?? DEFAULT_RESERVE_TOKENS,
+      ...(compaction.keepRecentTokens === undefined
+        ? {}
+        : { keepRecentTokens: compaction.keepRecentTokens }),
+      ...(compaction.backgroundTokens === undefined
+        ? {}
+        : { backgroundTokens: compaction.backgroundTokens }),
+    },
+  };
+}
+
+/** Why a compaction task ended without placing a summary. */
+function failureText(outcome: TaskOutcome<CompactionResult>): string {
+  switch (outcome.status) {
+    case "completed":
+      return "the compaction did not finish";
+    case "failed":
+    case "faulted":
+      return outcome.error.message;
+    case "aborted":
+      return outcome.reason ?? "the compaction was aborted";
+    case "orphaned":
+      return outcome.reason;
+  }
+}
+
+/**
+ * Summarizes a conversation's old prefix and reports the sizes around it. The task lands its summary
+ * at once when the conversation is idle, or at the next boundary when a turn is running.
+ */
+async function compactConversation(
+  harness: Harness,
+  conversationId: ConversationId,
+  instructions: string | undefined,
+  context: Context,
+): Promise<CompactionOutcome> {
+  const conversation = await harness.conversation(conversationId, context);
+  if (conversation === undefined) throw new Error("the conversation is missing");
+  const before = (await conversation.context(context)).messages.length;
+  const task = await conversation.compact(
+    instructions === undefined || instructions.length === 0 ? undefined : instructions,
+    context,
+  );
+  const outcome = (await harness.waitForTask(task, context)).state.outcome;
+  const after = (await conversation.context(context)).messages.length;
+  if (outcome.status !== "completed") {
+    return { after, before, compacted: false, reason: failureText(outcome) };
+  }
+  const placed = outcome.result;
+  return placed.entryId !== undefined || placed.submissionId !== undefined
+    ? { after, before, compacted: true }
+    : { after, before, compacted: false, reason: "nothing old enough to summarize" };
+}
+
 async function askAgent(ask: AskAgent): Promise<AgentReply> {
   const { agent, conversationFor, harness, request, watchListener, watchers } = ask;
   const conversationId = await conversationFor(request.conversationKey);
@@ -476,7 +561,8 @@ export async function openAgent(
   const storage = await openNodeSqliteStorage(config.storage);
   const env = ({ cwd = config.workspace }: { readonly cwd?: string }) =>
     new NodeExecutionEnv({ cwd });
-  const harness = await Harness.open(storage, { env, models, registry }, context);
+  const settings = harnessSettings(config);
+  const harness = await Harness.open(storage, { env, models, registry, settings }, context);
   harness.resume();
   const agent = {
     cwd: config.workspace,
@@ -531,6 +617,8 @@ export async function openAgent(
       if (conversation === undefined) throw new Error(`the conversation for ${key} is missing`);
       await conversation.abort(context);
     },
+    compact: async (key, instructions) =>
+      compactConversation(harness, await conversationFor(key), instructions, context),
     inspect: async (key) => {
       const conversation = await harness.conversation(await conversationFor(key), context);
       if (conversation === undefined) throw new Error(`the conversation for ${key} is missing`);

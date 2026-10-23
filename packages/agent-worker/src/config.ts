@@ -21,6 +21,22 @@ export const MODEL_PROVIDERS = [
 
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
+/**
+ * When the transcript is summarized. `contextCeiling` caps the request size: the agent compacts
+ * before it sends a request that would cross it, whatever the model's own window is.
+ */
+export type CompactionSettings = {
+  readonly enabled?: boolean;
+  /** Room kept free for the answer. Defaults to 16384 tokens. */
+  readonly reserveTokens?: number;
+  /** Approximate size of the recent context a summary keeps verbatim. Defaults to 20000 tokens. */
+  readonly keepRecentTokens?: number;
+  /** How far below the blocking threshold a background compaction starts; 0 disables it. */
+  readonly backgroundTokens?: number;
+  /** Largest request the agent may send, in tokens. Compaction runs before the request instead. */
+  readonly contextCeiling?: number;
+};
+
 export type WorkerConfig = {
   /** Folder the agent works in. Its tools act here. */
   readonly workspace: string;
@@ -37,6 +53,8 @@ export type WorkerConfig = {
    * Cards for conversations that are not a Discord channel go to `channelId`.
    */
   readonly approvals: { readonly held: readonly RegExp[]; readonly channelId?: string };
+  /** When the transcript is summarized. Without it, the harness defaults apply. */
+  readonly compaction?: CompactionSettings;
   /** Scheduled prompts that the host scheduler delivers, with the channels they may post to. */
   readonly inbox?: {
     readonly folder: string;
@@ -111,6 +129,37 @@ function parseTokenEnv(value: unknown): string {
     );
   }
   return tokenEnv;
+}
+
+/** A token count from the config: a whole number, 0 or more. */
+function tokens(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${path} must be a number of tokens`);
+  }
+  return Math.floor(value);
+}
+
+function parseCompaction(value: unknown): CompactionSettings {
+  const input = record(value, "compaction");
+  const enabled = input["enabled"];
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    throw new Error("compaction.enabled must be true or false");
+  }
+  const count = (key: keyof CompactionSettings): number | undefined => {
+    const raw = input[key];
+    return raw === undefined ? undefined : tokens(raw, `compaction.${key}`);
+  };
+  const reserveTokens = count("reserveTokens");
+  const keepRecentTokens = count("keepRecentTokens");
+  const backgroundTokens = count("backgroundTokens");
+  const contextCeiling = count("contextCeiling");
+  return {
+    ...(enabled === undefined ? {} : { enabled }),
+    ...(reserveTokens === undefined ? {} : { reserveTokens }),
+    ...(keepRecentTokens === undefined ? {} : { keepRecentTokens }),
+    ...(backgroundTokens === undefined ? {} : { backgroundTokens }),
+    ...(contextCeiling === undefined ? {} : { contextCeiling }),
+  };
 }
 
 function parseStt(value: unknown): { model?: string; url?: string } | false {
@@ -193,6 +242,9 @@ export function parseWorkerConfig(value: unknown, base: string): WorkerConfig {
   return {
     agentDir,
     approvals: parseApprovals(input["approvals"]),
+    ...(input["compaction"] === undefined
+      ? {}
+      : { compaction: parseCompaction(input["compaction"]) }),
     discord: parseDiscord(input["discord"]),
     ...(inbox === undefined
       ? {}

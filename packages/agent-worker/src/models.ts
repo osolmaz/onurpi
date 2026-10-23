@@ -1,4 +1,5 @@
 import type { Message, Models, UserMessage } from "@earendil-works/pi-ai";
+import type { Provider } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
 import {
@@ -44,20 +45,50 @@ const KEY_PROVIDERS = {
 } as const satisfies Record<Exclude<ModelProvider, "openai-codex">, () => unknown>;
 
 /**
+ * The provider with every chat model's window capped at `ceiling`. The agent's compaction thresholds
+ * and its context estimates are both measured against the window, so a cap here bounds the request
+ * size wherever the window is read. `maxTokens` shrinks with it, so a capped model cannot reserve an
+ * answer larger than its whole window.
+ */
+function cappedProvider<T extends Provider>(provider: T, ceiling: number | undefined): T {
+  if (ceiling === undefined) return provider;
+  return {
+    ...provider,
+    getModels: () => provider.getModels().map((model) => capModel(model, ceiling)),
+    ...(provider.getAllModels === undefined
+      ? {}
+      : {
+          getAllModels: () =>
+            (provider.getAllModels?.() ?? []).map((model) => capModel(model, ceiling)),
+        }),
+  };
+}
+
+/** One model with its window lowered to `ceiling`, leaving models that already fit untouched. */
+function capModel<M extends object>(model: M, ceiling: number): M {
+  const sized = model as { readonly contextWindow?: number; readonly maxTokens?: number };
+  if (sized.contextWindow === undefined || sized.contextWindow <= ceiling) return model;
+  return sized.maxTokens === undefined
+    ? { ...model, contextWindow: ceiling }
+    : { ...model, contextWindow: ceiling, maxTokens: Math.min(sized.maxTokens, ceiling) };
+}
+
+/**
  * Models with the one configured provider. `openai-codex` uses the ChatGPT subscription of the
  * OpenShell provider attached to the sandbox. The other hosted providers read their key from the
- * environment.
+ * environment. A `ceiling` caps every model's context window.
  */
 export function workerModels(
   model: WorkerConfig["model"],
   env: NodeJS.ProcessEnv = process.env,
+  ceiling?: number,
 ): Models {
   if (model.provider === "openai-codex") {
     const models = createModels({ credentials: openshellCodexCredentials(env) });
-    models.setProvider(openaiCodexProvider());
+    models.setProvider(cappedProvider(openaiCodexProvider(), ceiling));
     return models;
   }
   const models = createModels();
-  models.setProvider(KEY_PROVIDERS[model.provider]());
+  models.setProvider(cappedProvider(KEY_PROVIDERS[model.provider](), ceiling));
   return models;
 }

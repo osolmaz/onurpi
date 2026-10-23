@@ -6,7 +6,7 @@ import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/provid
 import { afterEach, describe, expect, it } from "vitest";
 import { openAgent, answerOf, type RunningAgent } from "../src/agent.ts";
 import { parseWorkerConfig, type WorkerConfig } from "../src/config.ts";
-import { echoProvider } from "../src/models.ts";
+import { echoProvider, workerModels } from "../src/models.ts";
 import type { Conversation, EntryId } from "@earendil-works/pi-durable";
 
 const folders: string[] = [];
@@ -17,7 +17,7 @@ afterEach(async () => {
   for (const folder of folders.splice(0)) rmSync(folder, { force: true, recursive: true });
 });
 
-function workspace(): WorkerConfig {
+function workspace(extra: Record<string, unknown> = {}): WorkerConfig {
   const folder = mkdtempSync(join(tmpdir(), "agent-worker-"));
   folders.push(folder);
   mkdirSync(join(folder, "pi-agent"));
@@ -28,6 +28,7 @@ function workspace(): WorkerConfig {
       discord: { ownerIds: ["200000000000000002"] },
       model: { provider: "echo" },
       workspace: "workspace",
+      ...extra,
     },
     folder,
   );
@@ -59,6 +60,43 @@ describe("openAgent", () => {
     expect(await agent.ask({ ...request, requestId: "discord:2", text: "and again" })).toEqual({
       kind: "answer",
       text: "Echo: and again",
+    });
+  });
+
+  it("caps the model window at the compaction ceiling, so the harness compacts before it", () => {
+    const models = workerModels({ modelId: "echo", provider: "echo" }, {}, 2000);
+    const model = models.getModel("echo", "echo");
+    expect(model?.contextWindow).toBe(2000);
+    expect(model?.maxTokens).toBeLessThanOrEqual(2000);
+    expect(models.getModel("echo", "echo")?.id).toBe("echo");
+  });
+
+  it("leaves a model whose window already fits the ceiling alone", () => {
+    const model = workerModels({ modelId: "echo", provider: "echo" }, {}, 1_000_000).getModel(
+      "echo",
+      "echo",
+    );
+    expect(model?.contextWindow).toBe(128000);
+  });
+
+  it("summarizes the old transcript on compact(), and says when it cannot", async () => {
+    const config = workspace({ compaction: { keepRecentTokens: 40 } });
+    const agent = await open(config);
+    for (let turn = 0; turn < 4; turn += 1) {
+      await agent.ask({
+        ...request,
+        requestId: `discord:${String(turn)}`,
+        text: `turn ${String(turn)} ${"word ".repeat(60)}`,
+      });
+    }
+    const before = await agent.inspect(request.conversationKey);
+    const outcome = await agent.compact(request.conversationKey, "keep the turn numbers");
+    expect(outcome).toMatchObject({ before: before.messages, compacted: true });
+    expect(outcome.after).toBeLessThan(before.messages);
+
+    const empty = await open(workspace({ compaction: { keepRecentTokens: 40 } }));
+    expect(await empty.compact("discord:400000000000000004")).toMatchObject({
+      compacted: false,
     });
   });
 

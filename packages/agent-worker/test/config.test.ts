@@ -21,6 +21,42 @@ describe("parseWorkerConfig", () => {
     );
   });
 
+  it("reads the compaction block, and rejects token counts that are not numbers", () => {
+    const config = parseWorkerConfig(
+      {
+        compaction: {
+          backgroundTokens: 0,
+          contextCeiling: 272000,
+          enabled: true,
+          keepRecentTokens: 20000,
+          reserveTokens: 16384,
+        },
+        discord,
+        model: { provider: "echo" },
+        workspace: "/w",
+      },
+      "/srv/agent",
+    );
+    expect(config.compaction).toEqual({
+      backgroundTokens: 0,
+      contextCeiling: 272000,
+      enabled: true,
+      keepRecentTokens: 20000,
+      reserveTokens: 16384,
+    });
+    expect(() =>
+      parseWorkerConfig(
+        {
+          compaction: { contextCeiling: "272000" },
+          discord,
+          model: { provider: "echo" },
+          workspace: "/w",
+        },
+        "/srv/agent",
+      ),
+    ).toThrow("compaction.contextCeiling must be a number of tokens");
+  });
+
   it("resolves paths against the base folder and fills in defaults", () => {
     expect(
       parseWorkerConfig({ discord, model: { provider: "echo" }, workspace: "work" }, "/srv/agent"),
