@@ -39,5 +39,4 @@ endpoints:
     access: full
     enforcement: enforce
 binaries:
-  - /home/agent/.local/bin/gws
   - /usr/local/bin/gws
