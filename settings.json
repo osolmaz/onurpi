@@ -30,9 +30,9 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "defaultProvider": "huggingface",
-  "defaultModel": "zai-org/GLM-5.3-Flash:fireworks-ai",
-  "defaultThinkingLevel": "xhigh",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "defaultThinkingLevel": "high",
   "terminal": {
     "showImages": false,
     "images": false
