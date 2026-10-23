@@ -1,0 +1,23 @@
+# OpenCode Go API key for the agent worker's opencode-go models, such as deepseek-v4.1-flash. The
+# gateway keeps the key and the sandbox sees only a placeholder.
+#   openshell profile import -f opencode-go.yaml
+#   openshell provider create --name bob-opencode --type opencode-go --credential OPENCODE_API_KEY
+id: opencode-go
+display_name: OpenCode Go
+description: OpenCode Go inference API key
+category: agent
+inference_capable: true
+credentials:
+  - name: api_key
+    description: OpenCode Go API key, sent as a bearer token
+    env_vars: [OPENCODE_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+endpoints:
+  - host: opencode.ai
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries: [/usr/local/bin/node]
