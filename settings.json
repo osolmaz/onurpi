@@ -1,4 +1,7 @@
 {
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "theme": "onur-dark",
   "packages": [
     "npm:pi-web-access@0.44.0",
     "npm:pi-huggingface-oauth@0.5.0",
@@ -30,24 +33,21 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "defaultProvider": "opencode-go",
-  "defaultModel": "deepseek-v4.1-flash",
   "defaultThinkingLevel": "high",
-  "terminal": {
-    "showImages": false,
-    "images": false
-  },
-  "outputPad": 0,
-  "tuiMode": "fullscreen",
-  "theme": "onur-dark",
-  "markdown": {
-    "codeBlockIndent": ""
-  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 27200,
     "keepRecentTokens": 20000
   },
-  "defaultTools": ["+codemode"],
-  "hideThinkingBlock": false
+  "markdown": {
+    "codeBlockIndent": ""
+  },
+  "outputPad": 0,
+  "terminal": {
+    "showImages": false,
+    "images": false
+  },
+  "tuiMode": "fullscreen",
+  "hideThinkingBlock": false,
+  "defaultTools": ["+codemode"]
 }
