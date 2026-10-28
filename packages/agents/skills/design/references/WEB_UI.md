@@ -15,6 +15,18 @@ Avoid a generic SaaS card grid. Use cards only when the content contains real
 repeated units. A table, list, article, or ordinary form often expresses the task
 more clearly. Do not invent branding, logos, or a palette to fill empty space.
 
+Give the user one thing to focus on at a time. A screen serves one step of the work: remove every element that
+the step does not need, such as site navigation, side panels, status lines and secondary actions, while the user
+fills a form, answers a question or works on one item. Bring an element back when the next step needs it.
+
+Do not add helper text. No subtitle or explaining sentence under a heading, no hint line such as "press Enter to
+send", no placeholder that explains a field, and no description under a choice whose label is already clear. A label
+of a few words is enough; keep the accessible name for screen readers. When you review an interface, delete text and
+elements before you add any.
+
+Panes of one workspace share one background and reach the edges of the viewport. Separate them with a border, not
+with a different fill inset by margins of another color.
+
 Show only what the user needs for the task. Do not add counters or summary statistics,
 such as "284 tasks in 8 datasets" or "58 attempts", unless the user asks for them. Do not add
 page metadata that nobody acts on: a "last read" or "updated at" time, a source count, a link
