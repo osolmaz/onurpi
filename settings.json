@@ -3,7 +3,7 @@
   "defaultModel": "deepseek-v4.1-flash",
   "theme": "onur-dark",
   "packages": [
-    "npm:pi-web-access@0.44.0",
+    "npm:pi-web-access@0.46.0",
     "npm:pi-huggingface-oauth@0.5.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
