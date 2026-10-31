@@ -1,9 +1,10 @@
 # Demo video
 
 Make a short film from real product behavior or recorded experiment results.
-Apply the [shared theme](THEME.md), with Yodel Grotesk for new film typography.
-Preserve the source product's renderer and its assets, including their palette. Use the defaults
-without routine style questions; ask when evidence or rights block correct work.
+Apply the [shared theme](THEME.md), with Yodel Grotesk for new film typography,
+in the dark or light mode that the user picks before you start.
+Preserve the source product's renderer and its assets, including their palette. Apart from the
+mode, use the defaults without routine style questions; ask when evidence or rights block correct work.
 
 ## Format and presentation
 

@@ -20,7 +20,8 @@ A successful script or export does not establish visual quality.
 
 Identify the medium and intended audience. Establish the source material and delivery format.
 Read [the shared theme](references/THEME.md), then the relevant domain reference.
-Use the defaults without asking routine style questions. Ask when evidence,
+Use the defaults without asking routine style questions. The one exception is a
+new video, whose dark or light mode the user picks before you start. Ask when evidence,
 rights, required tools, or conflicting instructions prevent correct work.
 
 | Task | Read |

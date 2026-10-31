@@ -28,6 +28,10 @@ beige. An existing product or embedding page supplies its own background when
 source fidelity applies. Do not ask for a background choice when the defaults
 already answer it.
 
+A video has no default mode. Before you make a new video, ask the user whether
+it is dark or light, unless the request already says, and keep that mode for
+later edits of the video.
+
 Use neutral colors without an invented brand accent. Use plain presentation surfaces without gradients or shadows. Avoid glow.
 Separate content with whitespace and alignment, adding functional borders when useful. Do not add a decorative header, footer, logo strip,
 or ornamental progress bar.
