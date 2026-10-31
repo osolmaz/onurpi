@@ -117,9 +117,13 @@ and a file gets `/dev/null`. Use it for a secrets folder that lives in the works
 
 The `openshell` folder holds the sandbox image (`build-image.sh` builds it from the committed tree),
 the network policy, and four provider profiles: `discord-bot`, `chatgpt-codex`, whose access token
-the gateway refreshes, `agent-github`, a narrow GitHub token with repository administration denied,
-and `google-workspace`, a Google OAuth login for the image's `gws` CLI whose access token the
-gateway also refreshes.
+the gateway refreshes, `google-workspace`, a Google OAuth login for the image's `gws` CLI whose
+access token the gateway also refreshes, and `opencode-go`.
+
+The sandbox holds no GitHub token. `unyolo setup` connects it to the unYOLO GitHub broker: it
+creates an `unyolo-github-<connection>` provider that holds the broker client secret and writes the
+sandbox environment for stock `gh` and `git`. Create the sandbox with that provider and that
+environment.
 
 Host folders work only when the gateway has `enable_bind_mounts = true` and
 `allow_driver_config = true`. Named volumes work with the default gateway settings.
