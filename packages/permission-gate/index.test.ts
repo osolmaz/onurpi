@@ -20,10 +20,11 @@ type Harness = {
   commands: Map<string, Handler>;
   select: ReturnType<typeof vi.fn>;
   notify: ReturnType<typeof vi.fn>;
+  options: { signal?: AbortSignal } | undefined;
   context: ExtensionContext;
 };
 
-function createHarness(choice?: string, hasUI = true): Harness {
+function createHarness(choice?: string, hasUI = true, signal?: AbortSignal): Harness {
   const handlers = new Map<string, Handler[]>();
   const commands = new Map<string, Handler>();
   const select = vi.fn(() => Promise.resolve(choice));
@@ -37,9 +38,22 @@ function createHarness(choice?: string, hasUI = true): Harness {
     }),
     getAllTools: vi.fn(() => [{ name: "clip", annotations: { readOnlyHint: true } }]),
   } as unknown as ExtensionAPI;
-  const context = { hasUI, ui: { select, notify } } as unknown as ExtensionContext;
+  const context = { hasUI, signal, ui: { select, notify } } as unknown as ExtensionContext;
   permissionGate(pi);
-  return { pi, handlers, commands, select, notify, context };
+  return {
+    pi,
+    handlers,
+    commands,
+    select,
+    notify,
+    options: select.mock.calls.length > 0 ? undefined : undefined,
+    context,
+  };
+}
+
+function selectOptions(harness: Harness): unknown {
+  const call = harness.select.mock.calls[0] as unknown[] | undefined;
+  return call?.[2];
 }
 
 function event(
@@ -87,27 +101,21 @@ describe("initialGateEnabled", () => {
 });
 
 describe("permission gate", () => {
-  it("registers the command and the hooks", () => {
+  it("registers the command and the tool call hook", () => {
     const harness = createHarness();
     expect(harness.commands.has(COMMAND_NAME)).toBe(true);
-    for (const name of [
-      "tool_call",
-      "session_start",
-      "session_before_switch",
-      "session_before_fork",
-    ]) {
-      expect(harness.handlers.get(name)).toHaveLength(1);
-    }
+    expect(harness.handlers.get("tool_call")).toHaveLength(1);
+    expect([...harness.handlers.keys()]).toEqual(["tool_call"]);
   });
 
   it("asks before a write and blocks on deny", async () => {
     const harness = createHarness("Deny");
     const result = await toolCall(harness, event("write", { path: "a.txt" }));
-    expect(harness.select).toHaveBeenCalledWith("Allow this call?\n\nwrite: a.txt", [
-      "Allow once",
-      "Always allow write in this session",
-      "Deny",
-    ]);
+    expect(harness.select).toHaveBeenCalledWith(
+      "Allow this call?\n\nwrite: a.txt",
+      ["Deny", "Allow once"],
+      undefined,
+    );
     expect(result).toEqual({ block: true, reason: "write was not approved, so it did not run." });
   });
 
@@ -123,7 +131,14 @@ describe("permission gate", () => {
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toBeUndefined();
   });
 
-  it("covers nested calls once the parent is approved", async () => {
+  it("hands the abort signal to the dialog", async () => {
+    const controller = new AbortController();
+    const harness = createHarness("Deny", true, controller.signal);
+    await toolCall(harness, event("write", { path: "a.txt" }));
+    expect(selectOptions(harness)).toEqual({ signal: controller.signal });
+  });
+
+  it("asks again for a call nested inside an approved call", async () => {
     const harness = createHarness("Allow once");
     await toolCall(harness, event("codemode", { code: "1" }, { toolCallId: "call-1" }));
     const nested = await toolCall(
@@ -131,17 +146,17 @@ describe("permission gate", () => {
       event("bash", { command: "ls" }, { toolCallId: "call-1/0", parentToolCallId: "call-1" }),
     );
     expect(nested).toBeUndefined();
-    expect(harness.select).toHaveBeenCalledTimes(1);
+    expect(harness.select).toHaveBeenCalledTimes(2);
   });
 
-  it("stops asking for a tool allowed for the session", async () => {
-    const harness = createHarness("Always allow bash in this session");
+  it("every call asks again, including the same tool", async () => {
+    const harness = createHarness("Allow once");
     await toolCall(harness, event("bash", { command: "ls" }));
-    expect(await toolCall(harness, event("bash", { command: "pwd" }))).toBeUndefined();
-    expect(harness.select).toHaveBeenCalledTimes(1);
+    await toolCall(harness, event("bash", { command: "pwd" }));
+    expect(harness.select).toHaveBeenCalledTimes(2);
   });
 
-  it("passes read-only calls without a dialog", async () => {
+  it("passes local reads without a dialog", async () => {
     const harness = createHarness("Deny");
     expect(await toolCall(harness, event("read", { path: "a.txt" }))).toBeUndefined();
     expect(await toolCall(harness, event("clip", { text: "x" }))).toBeUndefined();
@@ -182,27 +197,39 @@ describe("permission gate", () => {
     await command(harness, "maybe");
     expect(harness.notify).toHaveBeenCalledWith("Usage: /gate [on|off|status]", "error");
   });
-
-  it("forgets session approvals when a session starts", async () => {
-    const harness = createHarness("Always allow bash in this session");
-    await toolCall(harness, event("bash", { command: "ls" }));
-    harness.handlers.get("session_start")?.[0]?.();
-    await toolCall(harness, event("bash", { command: "pwd" }));
-    expect(harness.select).toHaveBeenCalledTimes(2);
-  });
 });
 
-describe("status lines", () => {
-  it("does not use a status, widget, footer, or header surface", () => {
-    const dir = join(dirname(fileURLToPath(import.meta.url)), "");
-    const files = [
-      join(dir, "index.ts"),
-      ...readdirSync(join(dir, "src")).map((name) => join(dir, "src", name)),
-    ];
-    const forbidden = ["setStatus", "setWidget", "setFooter", "setHeader", "setWorkingMessage"];
-    for (const file of files) {
+describe("side effects", () => {
+  const forbidden = [
+    "setStatus",
+    "setWidget",
+    "setFooter",
+    "setHeader",
+    "setWorkingMessage",
+    "appendEntry",
+    "sendMessage",
+    "setTitle",
+    "writeFileSync",
+    "appendFileSync",
+  ];
+
+  function sourceFiles(): string[] {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const sources = readdirSync(join(dir, "src"))
+      .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+      .map((name) => join(dir, "src", name));
+    return [join(dir, "index.ts"), ...sources];
+  }
+
+  it("uses no interface, session, or disk write surface", () => {
+    for (const file of sourceFiles()) {
       const text = readFileSync(file, "utf8");
       for (const name of forbidden) expect(text).not.toContain(name);
     }
+  });
+
+  it("covers every production file", () => {
+    const names = sourceFiles().map((file) => file.split("/").at(-1));
+    expect(names).toEqual(["index.ts", "command.ts", "gate-state.ts", "policy.ts", "summary.ts"]);
   });
 });

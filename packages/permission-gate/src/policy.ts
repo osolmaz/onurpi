@@ -1,8 +1,9 @@
 import type { GateState } from "./gate-state.ts";
 
 /**
- * Built-in and extension tools that only read state. They pass without a prompt so the gate does
- * not interrupt inspection work. Tools that declare `readOnlyHint` pass too.
+ * Tools that only read local state. They pass without a dialog so the gate does not interrupt
+ * inspection work. The list covers local reads only: a tool that reaches the network is gated,
+ * because a call that leaves the machine can carry private data out.
  */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "read",
@@ -12,14 +13,16 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "todo",
   "update_plan",
   "list_sessions",
-  "web_search",
-  "source_check",
-  "fetch_content",
-  "get_search_content",
 ]);
 
 /** Polls and empty writes to a live session are reads; input written to it is not. */
 export const WRITE_STDIN_TOOL = "write_stdin";
+
+/** The declared hints of a tool, as Pi reports them in `getAllTools()`. */
+export type ToolHints = {
+  readOnlyHint?: boolean | undefined;
+  destructiveHint?: boolean | undefined;
+};
 
 export type GateDecision =
   { action: "pass" } | { action: "ask" } | { action: "block"; reason: string };
@@ -28,8 +31,7 @@ export type GateDecisionInput = {
   state: GateState;
   toolName: string;
   input: Record<string, unknown>;
-  readOnlyHint: boolean | undefined;
-  parentToolCallId: string | undefined;
+  hints: ToolHints | undefined;
   hasUI: boolean;
 };
 
@@ -39,24 +41,24 @@ export const NO_UI_REASON = [
 ].join(" ");
 
 /**
- * Decide what happens to one tool call. Pure: the caller owns the state and the prompt.
+ * Decide what happens to one tool call. Pure: the caller owns the state, the dialog, and the
+ * blocking reason.
  */
 export function decide(input: GateDecisionInput): GateDecision {
   if (!input.state.enabled) return { action: "pass" };
-  if (isCoveredByApproval(input)) return { action: "pass" };
   if (isReadOnly(input)) return { action: "pass" };
   if (input.hasUI) return { action: "ask" };
   return { action: "block", reason: NO_UI_REASON };
 }
 
-function isCoveredByApproval(input: GateDecisionInput): boolean {
-  if (input.state.allowedTools.has(input.toolName)) return true;
-  const parent = input.parentToolCallId;
-  return parent !== undefined && input.state.approvedCalls.has(parent);
-}
-
+/**
+ * A declared hint wins over the name list, so a tool that declares `readOnlyHint: false` or
+ * `destructiveHint: true` is gated even when its name matches a local read.
+ */
 function isReadOnly(input: GateDecisionInput): boolean {
-  if (input.readOnlyHint === true) return true;
+  const hints = input.hints;
+  if (hints?.destructiveHint === true) return false;
+  if (hints?.readOnlyHint !== undefined) return hints.readOnlyHint;
   if (READ_ONLY_TOOLS.has(input.toolName)) return true;
   return input.toolName === WRITE_STDIN_TOOL && !sendsInput(input.input);
 }

@@ -8,8 +8,7 @@ function gateInput(overrides: Partial<GateDecisionInput> = {}): GateDecisionInpu
     state: createGateState(true),
     toolName: "write",
     input: { path: "notes.txt" },
-    readOnlyHint: undefined,
-    parentToolCallId: undefined,
+    hints: undefined,
     hasUI: true,
     ...overrides,
   };
@@ -21,45 +20,38 @@ describe("decide", () => {
     expect(decide(input)).toEqual({ action: "pass" });
   });
 
-  it("asks before a call that changes state", () => {
+  it("asks before a call that writes", () => {
     expect(decide(gateInput())).toEqual({ action: "ask" });
   });
 
-  it("passes a listed read-only tool", () => {
+  it("passes a local read", () => {
     expect(decide(gateInput({ toolName: "read", input: { path: "a.txt" } }))).toEqual({
       action: "pass",
     });
   });
 
   it("passes a tool that declares readOnlyHint", () => {
-    expect(decide(gateInput({ toolName: "clip", readOnlyHint: true }))).toEqual({ action: "pass" });
-  });
-
-  it("still asks when readOnlyHint is false or missing", () => {
-    expect(decide(gateInput({ toolName: "clip", readOnlyHint: false }))).toEqual({ action: "ask" });
-    expect(decide(gateInput({ toolName: "clip", readOnlyHint: undefined }))).toEqual({
-      action: "ask",
-    });
-  });
-
-  it("passes a tool the user allowed for the session", () => {
-    const state = createGateState(true);
-    state.allowedTools.add("bash");
-    expect(decide(gateInput({ state, toolName: "bash", input: { command: "ls" } }))).toEqual({
+    expect(decide(gateInput({ toolName: "clip", hints: { readOnlyHint: true } }))).toEqual({
       action: "pass",
     });
   });
 
-  it("passes a nested call inside an approved parent call", () => {
-    const state = createGateState(true);
-    state.approvedCalls.add("call-1");
-    expect(decide(gateInput({ state, parentToolCallId: "call-1" }))).toEqual({ action: "pass" });
+  it("gates a local read that declares readOnlyHint false", () => {
+    expect(decide(gateInput({ toolName: "read", hints: { readOnlyHint: false } }))).toEqual({
+      action: "ask",
+    });
   });
 
-  it("asks for a nested call with an unknown parent", () => {
-    const state = createGateState(true);
-    state.approvedCalls.add("call-1");
-    expect(decide(gateInput({ state, parentToolCallId: "call-2" }))).toEqual({ action: "ask" });
+  it("gates a local read that declares destructiveHint", () => {
+    expect(decide(gateInput({ toolName: "read", hints: { destructiveHint: true } }))).toEqual({
+      action: "ask",
+    });
+  });
+
+  it("gates a call that reaches the network", () => {
+    expect(
+      decide(gateInput({ toolName: "fetch_content", input: { url: "https://x.test" } })),
+    ).toEqual({ action: "ask" });
   });
 
   it("passes a write_stdin poll", () => {
@@ -76,7 +68,7 @@ describe("decide", () => {
     expect(decide(gateInput({ hasUI: false }))).toEqual({ action: "block", reason: NO_UI_REASON });
   });
 
-  it("passes read-only calls without a UI", () => {
+  it("passes local reads without a UI", () => {
     expect(decide(gateInput({ hasUI: false, toolName: "read" }))).toEqual({ action: "pass" });
   });
 });
