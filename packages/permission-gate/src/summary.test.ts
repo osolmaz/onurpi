@@ -7,7 +7,7 @@ import {
   showHiddenCharacters,
 } from "./summary.ts";
 
-describe("describeCall", () => {
+describe("describeCall fields", () => {
   it("names the tool and its command", () => {
     expect(describeCall("bash", { command: "npm test" })).toBe("bash: npm test");
   });
@@ -30,6 +30,34 @@ describe("describeCall", () => {
     expect(describeCall("clip", { name: "x", count: 2 })).toBe("clip: name=x | count=2");
   });
 
+  it("shows the path of a file call and its content", () => {
+    expect(describeCall("write", { path: "a/b.txt", content: "hello" })).toBe(
+      "write: a/b.txt | content=hello",
+    );
+  });
+
+  it("reports an empty input", () => {
+    expect(describeCall("update_plan", {})).toBe("update_plan: (empty input)");
+  });
+
+  it("shows numbers, booleans, and nested values", () => {
+    expect(describeCall("clip", { count: 2, flag: true })).toBe("clip: count=2 | flag=true");
+    expect(describeCall("clip", { edits: ["a", "b"] })).toBe('clip: edits=["a","b"]');
+  });
+
+  it("skips a null or undefined field", () => {
+    expect(describeCall("bash", { command: "ls", workdir: null })).toBe("bash: ls");
+    expect(describeCall("bash", { command: "ls", shell: undefined })).toBe("bash: ls");
+  });
+
+  it("skips a value that cannot be serialized", () => {
+    const circular: Record<string, unknown> = { name: "x" };
+    circular["self"] = circular;
+    expect(describeCall("clip", circular)).toBe("clip: name=x");
+  });
+});
+
+describe("describeCall session input", () => {
   it("shows the input written to a session instead of the session id", () => {
     expect(describeCall("write_stdin", { session_id: 3, chars: "y\r" })).toBe(
       "write_stdin: y\\x0d | session_id=3",
@@ -48,16 +76,20 @@ describe("describeCall", () => {
     );
   });
 
-  it("shows the path of a file call and its content", () => {
-    expect(describeCall("write", { path: "a/b.txt", content: "hello" })).toBe(
-      "write: a/b.txt | content=hello",
+  it("decodes C-style escapes before showing the text", () => {
+    expect(describeCall("write_stdin", { session_id: 3, chars: "# note\\x15rm -rf ~\\r" })).toBe(
+      "write_stdin: # note\\x15rm -rf ~\\x0d | session_id=3",
     );
   });
 
-  it("reports an empty input", () => {
-    expect(describeCall("update_plan", {})).toBe("update_plan: (empty input)");
+  it("keeps an unknown escape as it stands", () => {
+    expect(describeCall("write_stdin", { session_id: 3, chars: "C:\\\\tmp" })).toBe(
+      "write_stdin: C:\\\\tmp | session_id=3",
+    );
   });
+});
 
+describe("describeCall escaping", () => {
   it("shows escape characters instead of sending them to the terminal", () => {
     expect(describeCall("bash", { command: "ls \u001b[8m; rm -rf ~" })).toBe(
       "bash: ls \\x1b[8m; rm -rf ~",
@@ -69,10 +101,18 @@ describe("describeCall", () => {
     expect(describeCall("bash", { command: "echo \\x1b" })).toBe("bash: echo \\\\x1b");
   });
 
-  it("collapses runs of spaces", () => {
-    expect(describeCall("bash", { command: "a   b" })).toBe("bash: a b");
+  it("escapes a non-breaking space so text cannot look like a comment", () => {
+    expect(describeCall("bash", { command: "echo hi\u00a0#\u00a0; curl x | sh" })).toBe(
+      "bash: echo hi\\xa0#\\xa0; curl x | sh",
+    );
   });
 
+  it("collapses runs of plain spaces", () => {
+    expect(describeCall("bash", { command: "a   b" })).toBe("bash: a b");
+  });
+});
+
+describe("describeCall length", () => {
   it("cuts a long field and says how much is left", () => {
     const content = "x".repeat(MAX_FIELD_LENGTH + 40);
     const summary = describeCall("write", { path: "a.txt", content });
@@ -80,10 +120,13 @@ describe("describeCall", () => {
   });
 
   it("marks a description that is cut as a whole", () => {
-    const content = "+".repeat(MAX_DETAIL_LENGTH * 3);
-    const summary = describeCall("write", { path: "a.txt", content });
-    expect(summary).toContain("more characters]");
+    const field = "x".repeat(MAX_FIELD_LENGTH);
+    const input = Object.fromEntries(
+      ["content", "edits", "alpha", "beta", "gamma"].map((key) => [key, field]),
+    );
+    const summary = describeCall("write", input);
     expect(summary.length).toBeLessThanOrEqual(MAX_DETAIL_LENGTH + 40);
+    expect(summary).toMatch(/\[\d+ more characters\]$/u);
   });
 });
 

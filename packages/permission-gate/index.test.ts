@@ -275,6 +275,8 @@ describe("side effects", () => {
       "index.ts",
       "approval.ts",
       "command.ts",
+      "dialog-queue.ts",
+      "escapes.ts",
       "gate-state.ts",
       "policy.ts",
       "summary.ts",

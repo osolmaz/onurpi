@@ -1,25 +1,25 @@
 import { truncateToWidth, wrapTextWithAnsi, type Component } from "@earendil-works/pi-tui";
 
 /**
- * Ignore an allow key that arrives right after the dialog opens, so a message the user was already
- * typing cannot approve a call.
+ * Ignore an allow key that arrives right after the dialog opens or right after the previous key, so
+ * a message the user is still typing cannot approve a call.
  */
 export const TYPED_AHEAD_GUARD_MS = 350;
 
 export type DialogKeyAction = "allow" | "deny" | "ignore";
 
 /**
- * Map one input byte to a dialog action. Only the letter keys act: Enter, a space, or a stray
- * character does nothing, so typed-ahead text cannot approve a call.
+ * Map one input byte to a dialog action, given the time since the last key. Only the letter keys
+ * act: Enter, a space, or a stray character does nothing. A deny always counts.
  */
 export function decideFromKey(
   data: string,
-  elapsedMs: number,
+  quietMs: number,
   guardMs: number = TYPED_AHEAD_GUARD_MS,
 ): DialogKeyAction {
   if (data === "n" || data === "N") return "deny";
   if (data !== "y" && data !== "Y") return "ignore";
-  return elapsedMs >= guardMs ? "allow" : "ignore";
+  return quietMs >= guardMs ? "allow" : "ignore";
 }
 
 /** Text styling, passed in so this module does not depend on Pi's theme types. */
@@ -48,6 +48,7 @@ export const DIALOG_HINT = "y allow once - n or escape deny";
 export function createApprovalComponent(options: ApprovalDialogOptions): Component {
   let cachedWidth: number | undefined;
   let cachedLines: string[] | undefined;
+  let lastInputAt = options.openedAt;
 
   const invalidate = (): void => {
     cachedWidth = undefined;
@@ -67,11 +68,13 @@ export function createApprovalComponent(options: ApprovalDialogOptions): Compone
       return cachedLines;
     },
     handleInput(data: string): void {
+      const quietMs = options.now() - lastInputAt;
+      lastInputAt = options.now();
       if (options.matchesCancel(data)) {
         options.done(false);
         return;
       }
-      const action = decideFromKey(data, options.now() - options.openedAt);
+      const action = decideFromKey(data, quietMs);
       if (action === "allow") options.done(true);
       if (action === "deny") options.done(false);
     },

@@ -1,3 +1,5 @@
+import { decodeEscapes } from "./escapes.ts";
+
 /** Longest part shown for one input field, and for the whole description. */
 export const MAX_FIELD_LENGTH = 400;
 export const MAX_DETAIL_LENGTH = 1200;
@@ -12,7 +14,8 @@ const OTHER_KEYS = ["shell", "workdir", "session_id", "content", "edits", "url",
  * Characters that can hide text from the user or move the cursor: controls, format characters,
  * line and paragraph separators, and every code point that Unicode says a renderer may ignore.
  */
-const HIDDEN_CHARACTERS = /\\|[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
+const HIDDEN_CHARACTERS =
+  /\\|[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Zs}\p{Default_Ignorable_Code_Point}\u2800]/gu;
 
 /**
  * Describe one call for the approval dialog. Every value the model sent is shown, so an approval
@@ -26,9 +29,11 @@ export function describeCall(toolName: string, input: Record<string, unknown>): 
 
 /** Replace every hidden character and every backslash with a visible escape. */
 export function showHiddenCharacters(text: string): string {
-  return text.replace(HIDDEN_CHARACTERS, (character) =>
-    character === "\\" ? "\\\\" : escapeCharacter(character),
-  );
+  return text.replace(HIDDEN_CHARACTERS, (character) => {
+    if (character === "\\") return "\\\\";
+    if (character === " ") return character;
+    return escapeCharacter(character);
+  });
 }
 
 function escapeCharacter(character: string): string {
@@ -60,8 +65,19 @@ function orderedKeys(input: Record<string, unknown>): string[] {
   return [...known, ...rest];
 }
 
+/** Input that the caller decodes before it acts on it, so the dialog must show the result. */
+const DECODERS: Readonly<Record<string, (value: string) => string>> = {
+  chars: decodeEscapes,
+  chars_b64: decodeBase64,
+};
+
 function fieldText(key: string, value: unknown): string {
-  if (key === "chars_b64" && typeof value === "string") return decodeBase64(value);
+  const text = rawText(value);
+  const decoder = DECODERS[key];
+  return decoder === undefined ? text : decoder(text);
+}
+
+function rawText(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (value === undefined || value === null) return "";

@@ -9,6 +9,7 @@ import type {
 
 import { createApprovalComponent } from "./src/approval.ts";
 import { GATE_USAGE, gateStatusText, parseGateCommand } from "./src/command.ts";
+import { createDialogQueue, type DialogQueue } from "./src/dialog-queue.ts";
 import { createGateState, setGateEnabled, toggleGate, type GateState } from "./src/gate-state.ts";
 import { decide, type ToolHints } from "./src/policy.ts";
 import { describeCall } from "./src/summary.ts";
@@ -37,8 +38,9 @@ export const APPROVAL_OPTIONS: readonly string[] = [DENY, ALLOW_ONCE];
 
 export default function permissionGate(pi: ExtensionAPI): void {
   const state = createGateState(initialGateEnabled(process.env));
+  const dialogs = createDialogQueue();
 
-  pi.on("tool_call", (event, ctx) => handleToolCall(pi, state, event, ctx));
+  pi.on("tool_call", (event, ctx) => handleToolCall(pi, dialogs, state, event, ctx));
 
   pi.registerCommand(COMMAND_NAME, {
     description: "Toggle the approval gate (on, off, status)",
@@ -51,6 +53,7 @@ export default function permissionGate(pi: ExtensionAPI): void {
 
 async function handleToolCall(
   pi: ExtensionAPI,
+  dialogs: DialogQueue,
   state: GateState,
   event: ToolCallEvent,
   ctx: ExtensionContext,
@@ -68,7 +71,8 @@ async function handleToolCall(
   if (decision.action === "block") return { block: true, reason: decision.reason };
   if (decision.action === "pass") return undefined;
 
-  const approved = await askApproval(ctx, describeCall(toolName, input));
+  const summary = describeCall(toolName, input);
+  const approved = await dialogs.run(() => askApproval(ctx, summary));
   if (!approved) {
     return { block: true, reason: `${toolName} was not approved, so it did not run.` };
   }
