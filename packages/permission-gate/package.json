@@ -24,10 +24,12 @@
     "check": "npm run format && npm run lint && npm run typecheck && npm run test && npm run coverage && npm run dry"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=1.4.0"
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "1.4.0",
+    "@earendil-works/pi-tui": "1.4.0",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.4",
     "@vitest/coverage-v8": "5.0.2",

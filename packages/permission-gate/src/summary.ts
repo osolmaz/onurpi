@@ -1,74 +1,95 @@
-/** Longest part of a call description shown in the approval prompt. */
+/** Longest part shown for one input field, and for the whole description. */
+export const MAX_FIELD_LENGTH = 400;
 export const MAX_DETAIL_LENGTH = 1200;
 
-/**
- * Input words that identify a call well enough to approve it. The order matters: the first word
- * with a usable value wins, so a session id never hides the text written to that session.
- */
-const DETAIL_KEYS = [
-  "command",
-  "cmd",
-  "code",
-  "chars",
-  "chars_b64",
-  "path",
-  "file_path",
-  "session_id",
-] as const;
+/** The field that identifies a call, in the order that the caller reads it. */
+const PRIMARY_KEYS = ["command", "cmd", "code", "chars", "chars_b64", "path", "file_path"] as const;
+
+/** Fields that say what happens to the primary value, or which process it reaches. */
+const OTHER_KEYS = ["shell", "workdir", "session_id", "content", "edits", "url", "query"] as const;
 
 /**
- * Characters that can hide text from the user or move the cursor: C0 and C1 controls, and the
- * bidirectional and zero-width characters that reverse or hide what follows. The ranges are built
- * from code points so this file holds no control character of its own.
+ * Characters that can hide text from the user or move the cursor: controls, format characters,
+ * line and paragraph separators, and every code point that Unicode says a renderer may ignore.
  */
-const HIDDEN_RANGES: readonly (readonly [number, number])[] = [
-  [0x00, 0x1f],
-  [0x7f, 0x9f],
-  [0x200b, 0x200f],
-  [0x202a, 0x202e],
-  [0x2060, 0x2064],
-  [0xfeff, 0xfeff],
-];
+const HIDDEN_CHARACTERS = /\\|[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
 
-const HIDDEN_CHARACTERS = new RegExp(`[${HIDDEN_RANGES.map(characterClassRange).join("")}]`, "gu");
-
-function characterClassRange([start, end]: readonly [number, number]): string {
-  return `${String.fromCodePoint(start)}-${String.fromCodePoint(end)}`;
-}
-
+/**
+ * Describe one call for the approval dialog. Every value the model sent is shown, so an approval
+ * covers what the user saw, and the primary value comes first.
+ */
 export function describeCall(toolName: string, input: Record<string, unknown>): string {
-  const detail = collapse(showHiddenCharacters(detailOf(input)));
-  if (detail === "") return toolName;
-  return `${toolName}: ${truncate(detail)}`;
+  const parts = fieldParts(input);
+  if (parts.length === 0) return `${toolName}: (empty input)`;
+  return `${toolName}: ${truncate(collapse(parts.join(" | ")))}`;
 }
 
-/** Replace every hidden character with a visible escape, so the dialog shows what will run. */
+/** Replace every hidden character and every backslash with a visible escape. */
 export function showHiddenCharacters(text: string): string {
-  return text.replace(HIDDEN_CHARACTERS, escapeCharacter);
+  return text.replace(HIDDEN_CHARACTERS, (character) =>
+    character === "\\" ? "\\\\" : escapeCharacter(character),
+  );
 }
 
 function escapeCharacter(character: string): string {
   const code = character.codePointAt(0) ?? 0;
-  const width = code <= 0xff ? 2 : 4;
-  const prefix = code <= 0xff ? "\\x" : "\\u";
-  return `${prefix}${code.toString(16).padStart(width, "0")}`;
+  if (code <= 0xff) return `\\x${code.toString(16).padStart(2, "0")}`;
+  if (code <= 0xffff) return `\\u${code.toString(16).padStart(4, "0")}`;
+  return `\\u{${code.toString(16)}}`;
 }
 
-function detailOf(input: Record<string, unknown>): string {
-  for (const key of DETAIL_KEYS) {
-    const value = input[key];
-    if (typeof value === "string" && value.trim() !== "") return value;
-    if (typeof value === "number") return String(value);
+function fieldParts(input: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+  for (const [index, key] of orderedKeys(input).entries()) {
+    const value = fieldText(key, input[key]);
+    if (value === "") continue;
+    const shown = showHiddenCharacters(cutField(value));
+    parts.push(unlabelled(index, key) ? shown : `${key}=${shown}`);
   }
-  return stringifyInput(input);
+  return parts;
 }
 
-function stringifyInput(input: Record<string, unknown>): string {
+/** The first field stays unlabelled only when it is the value that names the call. */
+function unlabelled(index: number, key: string): boolean {
+  return index === 0 && (PRIMARY_KEYS as readonly string[]).includes(key);
+}
+
+function orderedKeys(input: Record<string, unknown>): string[] {
+  const known: string[] = [...PRIMARY_KEYS, ...OTHER_KEYS].filter((key) => key in input);
+  const rest = Object.keys(input).filter((key) => !known.includes(key));
+  return [...known, ...rest];
+}
+
+function fieldText(key: string, value: unknown): string {
+  if (key === "chars_b64" && typeof value === "string") return decodeBase64(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value === undefined || value === null) return "";
+  return stringifyValue(value);
+}
+
+/** Base64 input is what gets written to the session, so show the text it stands for. */
+function decodeBase64(value: string): string {
+  if (value === "") return "";
   try {
-    return JSON.stringify(input);
+    return Buffer.from(value, "base64").toString("utf8");
+  } catch {
+    return value;
+  }
+}
+
+function stringifyValue(value: unknown): string {
+  try {
+    return JSON.stringify(value);
   } catch {
     return "";
   }
+}
+
+function cutField(text: string): string {
+  if (text.length <= MAX_FIELD_LENGTH) return text;
+  const rest = text.length - MAX_FIELD_LENGTH;
+  return `${text.slice(0, MAX_FIELD_LENGTH)}... [${String(rest)} more characters]`;
 }
 
 function collapse(text: string): string {
@@ -77,5 +98,6 @@ function collapse(text: string): string {
 
 function truncate(text: string): string {
   if (text.length <= MAX_DETAIL_LENGTH) return text;
-  return `${text.slice(0, MAX_DETAIL_LENGTH)}... [truncated]`;
+  const rest = text.length - MAX_DETAIL_LENGTH;
+  return `${text.slice(0, MAX_DETAIL_LENGTH)}... [${String(rest)} more characters]`;
 }

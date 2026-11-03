@@ -7,15 +7,16 @@ import type {
   ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent";
 
+import { createApprovalComponent } from "./src/approval.ts";
 import { GATE_USAGE, gateStatusText, parseGateCommand } from "./src/command.ts";
 import { createGateState, setGateEnabled, toggleGate, type GateState } from "./src/gate-state.ts";
 import { decide, type ToolHints } from "./src/policy.ts";
 import { describeCall } from "./src/summary.ts";
 
 /**
- * Approval gate for Pi. It asks before a tool call that is not a local read, keeps the answer in
- * process memory, and reports state only through `ctx.ui.notify`. It never writes a status line,
- * a widget, a footer, a header, or a session entry.
+ * Approval gate for Pi. It asks before a tool call that is not a local read, keeps only the on or
+ * off switch in process memory, and reports the switch through `ctx.ui.notify`. It never writes a
+ * status line, a widget, a footer, a header, or a session entry.
  */
 
 export const COMMAND_NAME = "gate";
@@ -31,7 +32,7 @@ export function initialGateEnabled(env: Readonly<Record<string, string | undefin
   return !OFF_VALUES.has(value);
 }
 
-/** Deny is the first option, so an accidental Enter or "j" cannot approve a call. */
+/** In a selector, Deny comes first, so a stray Enter denies instead of allowing. */
 export const APPROVAL_OPTIONS: readonly string[] = [DENY, ALLOW_ONCE];
 
 export default function permissionGate(pi: ExtensionAPI): void {
@@ -74,7 +75,32 @@ async function handleToolCall(
   return undefined;
 }
 
+/**
+ * Keep the whole call description in front of the user, and accept only the letter keys, so a
+ * message typed ahead cannot approve a call.
+ */
 async function askApproval(ctx: ExtensionContext, summary: string): Promise<boolean> {
+  if (ctx.mode !== "tui") return askWithSelector(ctx, summary);
+
+  const openedAt = Date.now();
+  return ctx.ui.custom<boolean>((_tui, theme, keybindings, done) =>
+    createApprovalComponent({
+      summary,
+      text: {
+        title: (text) => theme.fg("accent", text),
+        body: (text) => text,
+        hint: (text) => theme.fg("dim", text),
+      },
+      matchesCancel: (data) => keybindings.matches(data, "tui.select.cancel"),
+      now: Date.now,
+      openedAt,
+      done,
+    }),
+  );
+}
+
+/** RPC and other dialog-capable modes have no custom component, so they answer by label. */
+async function askWithSelector(ctx: ExtensionContext, summary: string): Promise<boolean> {
   const signal = ctx.signal;
   const options = signal === undefined ? undefined : { signal };
   const choice = await ctx.ui.select(
@@ -91,7 +117,11 @@ function hintsOf(pi: ExtensionAPI, toolName: string): ToolHints | undefined {
   const tool = pi.getAllTools().find((candidate) => candidate.name === toolName);
   const annotations: ToolAnnotations | undefined = tool?.annotations;
   if (annotations === undefined) return undefined;
-  return { readOnlyHint: annotations.readOnlyHint, destructiveHint: annotations.destructiveHint };
+  return {
+    readOnlyHint: annotations.readOnlyHint,
+    destructiveHint: annotations.destructiveHint,
+    openWorldHint: annotations.openWorldHint,
+  };
 }
 
 function runCommand(state: GateState, args: string, ctx: ExtensionCommandContext): void {

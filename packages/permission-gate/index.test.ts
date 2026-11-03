@@ -14,46 +14,70 @@ import { NO_UI_REASON } from "./src/policy.ts";
 
 type Handler = (...args: never[]) => unknown;
 
+type HarnessOptions = {
+  choice?: string | undefined;
+  hasUI?: boolean | undefined;
+  mode?: "tui" | "rpc" | "print" | "json" | undefined;
+  signal?: AbortSignal | undefined;
+  key?: string | undefined;
+};
+
 type Harness = {
   pi: ExtensionAPI;
   handlers: Map<string, Handler[]>;
   commands: Map<string, Handler>;
   select: ReturnType<typeof vi.fn>;
   notify: ReturnType<typeof vi.fn>;
-  options: { signal?: AbortSignal } | undefined;
+  custom: ReturnType<typeof vi.fn>;
   context: ExtensionContext;
 };
 
-function createHarness(choice?: string, hasUI = true, signal?: AbortSignal): Harness {
+const TOOLS = [
+  { name: "clip", annotations: { readOnlyHint: true, openWorldHint: false } },
+  { name: "read", annotations: { destructiveHint: true } },
+];
+
+function createHarness(options: HarnessOptions = {}): Harness {
   const handlers = new Map<string, Handler[]>();
   const commands = new Map<string, Handler>();
-  const select = vi.fn(() => Promise.resolve(choice));
+  const select = vi.fn(() => Promise.resolve(options.choice));
   const notify = vi.fn();
+  const custom = vi.fn(
+    (
+      factory: (
+        tui: unknown,
+        theme: unknown,
+        keybindings: unknown,
+        done: (result: boolean) => void,
+      ) => { handleInput(data: string): void },
+    ) =>
+      new Promise<boolean>((resolve) => {
+        const theme = { fg: (_color: string, text: string) => text };
+        const keybindings = { matches: (data: string) => data === "\u001b" };
+        const component = factory({}, theme, keybindings, resolve);
+        if (options.key !== undefined) component.handleInput(options.key);
+      }),
+  );
+
   const pi = {
     on: vi.fn((event: string, handler: Handler) => {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
     }),
-    registerCommand: vi.fn((name: string, options: { handler: Handler }) => {
-      commands.set(name, options.handler);
+    registerCommand: vi.fn((name: string, commandOptions: { handler: Handler }) => {
+      commands.set(name, commandOptions.handler);
     }),
-    getAllTools: vi.fn(() => [{ name: "clip", annotations: { readOnlyHint: true } }]),
+    getAllTools: vi.fn(() => TOOLS),
   } as unknown as ExtensionAPI;
-  const context = { hasUI, signal, ui: { select, notify } } as unknown as ExtensionContext;
-  permissionGate(pi);
-  return {
-    pi,
-    handlers,
-    commands,
-    select,
-    notify,
-    options: select.mock.calls.length > 0 ? undefined : undefined,
-    context,
-  };
-}
 
-function selectOptions(harness: Harness): unknown {
-  const call = harness.select.mock.calls[0] as unknown[] | undefined;
-  return call?.[2];
+  const context = {
+    mode: options.mode ?? "rpc",
+    hasUI: options.hasUI ?? true,
+    signal: options.signal,
+    ui: { select, notify, custom },
+  } as unknown as ExtensionContext;
+
+  permissionGate(pi);
+  return { pi, handlers, commands, select, notify, custom, context };
 }
 
 function event(
@@ -108,8 +132,8 @@ describe("permission gate", () => {
     expect([...harness.handlers.keys()]).toEqual(["tool_call"]);
   });
 
-  it("asks before a write and blocks on deny", async () => {
-    const harness = createHarness("Deny");
+  it("asks with a selector outside the TUI", async () => {
+    const harness = createHarness({ choice: "Deny" });
     const result = await toolCall(harness, event("write", { path: "a.txt" }));
     expect(harness.select).toHaveBeenCalledWith(
       "Allow this call?\n\nwrite: a.txt",
@@ -119,27 +143,37 @@ describe("permission gate", () => {
     expect(result).toEqual({ block: true, reason: "write was not approved, so it did not run." });
   });
 
+  it("hands the abort signal to the selector", async () => {
+    const controller = new AbortController();
+    const harness = createHarness({ choice: "Deny", signal: controller.signal });
+    await toolCall(harness, event("write", { path: "a.txt" }));
+    expect(harness.select.mock.calls[0]?.[2]).toEqual({ signal: controller.signal });
+  });
+
   it("blocks when the dialog is dismissed", async () => {
-    const harness = createHarness(undefined);
+    const harness = createHarness({ choice: undefined });
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toMatchObject({
       block: true,
     });
   });
 
   it("runs the call after allow once", async () => {
-    const harness = createHarness("Allow once");
+    const harness = createHarness({ choice: "Allow once" });
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toBeUndefined();
   });
 
-  it("hands the abort signal to the dialog", async () => {
-    const controller = new AbortController();
-    const harness = createHarness("Deny", true, controller.signal);
-    await toolCall(harness, event("write", { path: "a.txt" }));
-    expect(selectOptions(harness)).toEqual({ signal: controller.signal });
+  it("uses the component dialog in the TUI and denies on n", async () => {
+    const harness = createHarness({ mode: "tui", key: "n" });
+    expect(await toolCall(harness, event("write", { path: "a.txt" }))).toEqual({
+      block: true,
+      reason: "write was not approved, so it did not run.",
+    });
+    expect(harness.custom).toHaveBeenCalledTimes(1);
+    expect(harness.select).not.toHaveBeenCalled();
   });
 
   it("asks again for a call nested inside an approved call", async () => {
-    const harness = createHarness("Allow once");
+    const harness = createHarness({ choice: "Allow once" });
     await toolCall(harness, event("codemode", { code: "1" }, { toolCallId: "call-1" }));
     const nested = await toolCall(
       harness,
@@ -149,22 +183,29 @@ describe("permission gate", () => {
     expect(harness.select).toHaveBeenCalledTimes(2);
   });
 
-  it("every call asks again, including the same tool", async () => {
-    const harness = createHarness("Allow once");
+  it("asks every time, including for the same tool", async () => {
+    const harness = createHarness({ choice: "Allow once" });
     await toolCall(harness, event("bash", { command: "ls" }));
     await toolCall(harness, event("bash", { command: "pwd" }));
     expect(harness.select).toHaveBeenCalledTimes(2);
   });
 
   it("passes local reads without a dialog", async () => {
-    const harness = createHarness("Deny");
-    expect(await toolCall(harness, event("read", { path: "a.txt" }))).toBeUndefined();
+    const harness = createHarness({ choice: "Deny" });
+    expect(await toolCall(harness, event("grep", { pattern: "x" }))).toBeUndefined();
     expect(await toolCall(harness, event("clip", { text: "x" }))).toBeUndefined();
     expect(harness.select).not.toHaveBeenCalled();
   });
 
+  it("asks for a read tool that declares destructiveHint", async () => {
+    const harness = createHarness({ choice: "Deny" });
+    expect(await toolCall(harness, event("read", { path: "a.txt" }))).toMatchObject({
+      block: true,
+    });
+  });
+
   it("blocks without an interactive UI", async () => {
-    const harness = createHarness("Allow once", false);
+    const harness = createHarness({ choice: "Allow once", hasUI: false });
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toEqual({
       block: true,
       reason: NO_UI_REASON,
@@ -173,7 +214,7 @@ describe("permission gate", () => {
   });
 
   it("toggles the gate with the command", async () => {
-    const harness = createHarness("Deny");
+    const harness = createHarness({ choice: "Deny" });
     await command(harness, "off");
     expect(harness.notify).toHaveBeenLastCalledWith(
       expect.stringContaining("Permission gate: off"),
@@ -230,6 +271,13 @@ describe("side effects", () => {
 
   it("covers every production file", () => {
     const names = sourceFiles().map((file) => file.split("/").at(-1));
-    expect(names).toEqual(["index.ts", "command.ts", "gate-state.ts", "policy.ts", "summary.ts"]);
+    expect(names).toEqual([
+      "index.ts",
+      "approval.ts",
+      "command.ts",
+      "gate-state.ts",
+      "policy.ts",
+      "summary.ts",
+    ]);
   });
 });
