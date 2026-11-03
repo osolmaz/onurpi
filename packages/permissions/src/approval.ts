@@ -8,17 +8,22 @@ export const TYPED_AHEAD_GUARD_MS = 350;
 
 export type DialogKeyAction = "allow" | "deny" | "ignore";
 
+/** Enter arrives as a carriage return or a line feed, depending on the terminal. */
+const ALLOW_KEYS: ReadonlySet<string> = new Set(["y", "Y", "\r", "\n"]);
+const DENY_KEYS: ReadonlySet<string> = new Set(["n", "N"]);
+
 /**
- * Map one input byte to a dialog action, given the time since the last key. Only the letter keys
- * act: Enter, a space, or a stray character does nothing. A deny always counts.
+ * Map one input byte to a dialog action, given the time since the last key. Enter and the letter y
+ * allow, n denies, and any other key does nothing. A deny always counts, and an allow waits for a
+ * quiet moment.
  */
 export function decideFromKey(
   data: string,
   quietMs: number,
   guardMs: number = TYPED_AHEAD_GUARD_MS,
 ): DialogKeyAction {
-  if (data === "n" || data === "N") return "deny";
-  if (data !== "y" && data !== "Y") return "ignore";
+  if (DENY_KEYS.has(data)) return "deny";
+  if (!ALLOW_KEYS.has(data)) return "ignore";
   return quietMs >= guardMs ? "allow" : "ignore";
 }
 
@@ -39,7 +44,7 @@ export type ApprovalDialogOptions = {
 };
 
 export const DIALOG_TITLE = "Allow this call?";
-export const DIALOG_HINT = "y allow once - n or escape deny";
+export const DIALOG_HINT = "enter or y allow once - n or escape deny";
 
 /**
  * Build the approval dialog. It shows the whole call description, wrapped to the terminal width,

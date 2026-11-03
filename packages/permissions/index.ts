@@ -8,27 +8,28 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import { createApprovalComponent } from "./src/approval.ts";
-import { GATE_USAGE, gateStatusText, parseGateCommand } from "./src/command.ts";
+import { USAGE, statusText, parseCommand } from "./src/command.ts";
 import { createDialogQueue, type DialogQueue } from "./src/dialog-queue.ts";
-import { createGateState, setGateEnabled, toggleGate, type GateState } from "./src/gate-state.ts";
+import { createPermissionState, setEnabled, toggle, type PermissionState } from "./src/state.ts";
 import { decide, type ToolHints } from "./src/policy.ts";
 import { describeCall } from "./src/summary.ts";
 
 /**
- * Approval gate for Pi. It is off at startup, asks before a tool call that is not a local read when
- * it is on, keeps only that switch in process memory, and reports the switch through
- * `ctx.ui.notify`. It never writes a status line, a widget, a footer, a header, or a session entry.
+ * Permissions for Pi. They are off at startup, ask before a tool call that is not a local read when
+ * they are on, keep only that switch in process memory, and report the switch through
+ * `ctx.ui.notify`. Nothing here writes a status line, a widget, a footer, a header, or a session
+ * entry.
  */
 
-export const COMMAND_NAME = "gate";
-export const ENV_VAR = "PI_PERMISSION_GATE";
+export const COMMAND_NAME = "permissions";
+export const ENV_VAR = "PI_PERMISSIONS";
 
 const DENY = "Deny";
 const ALLOW_ONCE = "Allow once";
 const ON_VALUES: ReadonlySet<string> = new Set(["on", "true", "1", "yes"]);
 
-/** The gate is off unless the environment turns it on for this process. */
-export function initialGateEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+/** Permissions are off unless the environment turns them on for this process. */
+export function initialEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
   const value = (env[ENV_VAR] ?? "").trim().toLowerCase();
   return ON_VALUES.has(value);
 }
@@ -36,14 +37,14 @@ export function initialGateEnabled(env: Readonly<Record<string, string | undefin
 /** In a selector, Deny comes first, so a stray Enter denies instead of allowing. */
 export const APPROVAL_OPTIONS: readonly string[] = [DENY, ALLOW_ONCE];
 
-export default function permissionGate(pi: ExtensionAPI): void {
-  const state = createGateState(initialGateEnabled(process.env));
+export default function permissions(pi: ExtensionAPI): void {
+  const state = createPermissionState(initialEnabled(process.env));
   const dialogs = createDialogQueue();
 
   pi.on("tool_call", (event, ctx) => handleToolCall(pi, dialogs, state, event, ctx));
 
   pi.registerCommand(COMMAND_NAME, {
-    description: "Toggle the approval gate (on, off, status)",
+    description: "Turn the check on or off, or report it (on, off, status)",
     handler: (args, ctx) => {
       runCommand(state, args, ctx);
       return Promise.resolve();
@@ -54,7 +55,7 @@ export default function permissionGate(pi: ExtensionAPI): void {
 async function handleToolCall(
   pi: ExtensionAPI,
   dialogs: DialogQueue,
-  state: GateState,
+  state: PermissionState,
   event: ToolCallEvent,
   ctx: ExtensionContext,
 ): Promise<ToolCallEventResult | undefined> {
@@ -80,8 +81,8 @@ async function handleToolCall(
 }
 
 /**
- * Keep the whole call description in front of the user, and accept only the letter keys, so a
- * message typed ahead cannot approve a call.
+ * Keep the whole call description in front of the user. Enter and y allow, n and escape deny, and a
+ * quiet moment is required before an allow, so a message typed ahead cannot approve a call.
  */
 async function askApproval(ctx: ExtensionContext, summary: string): Promise<boolean> {
   if (ctx.mode !== "tui") return askWithSelector(ctx, summary);
@@ -128,14 +129,14 @@ function hintsOf(pi: ExtensionAPI, toolName: string): ToolHints | undefined {
   };
 }
 
-function runCommand(state: GateState, args: string, ctx: ExtensionCommandContext): void {
-  const action = parseGateCommand(args);
+function runCommand(state: PermissionState, args: string, ctx: ExtensionCommandContext): void {
+  const action = parseCommand(args);
   if (action === "invalid") {
-    ctx.ui.notify(GATE_USAGE, "error");
+    ctx.ui.notify(USAGE, "error");
     return;
   }
-  if (action === "on") setGateEnabled(state, true);
-  if (action === "off") setGateEnabled(state, false);
-  if (action === "toggle") toggleGate(state);
-  ctx.ui.notify(gateStatusText(state), "info");
+  if (action === "on") setEnabled(state, true);
+  if (action === "off") setEnabled(state, false);
+  if (action === "toggle") toggle(state);
+  ctx.ui.notify(statusText(state), "info");
 }

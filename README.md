@@ -29,7 +29,7 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/plan-checklist`](packages/plan-checklist/)                     | Branch-aware model task plan with live progress                       |
 | [`@onurpi/unified-exec`](packages/unified-exec/)                         | Persistent shell and PTY sessions with race-free completion wake      |
 | [`@onurpi/command-guard`](packages/command-guard/)                       | Fail-closed checks for destructive shell commands                     |
-| [`@onurpi/permission-gate`](packages/permission-gate/)                   | Ask before a tool call that is not read-only, with a session toggle   |
+| [`@onurpi/permissions`](packages/permissions/)                           | Ask before a tool call that is not read-only, with a session toggle   |
 | [`@onurpi/yarp`](packages/yarp/)                                         | Prunes long output from supported developer commands                  |
 | [`@onurpi/pi-must-win`](packages/pi-must-win/)                           | Pi attribution and Unified Exec integration                           |
 | [`@onurpi/workflows`](packages/workflows/)                               | Pinned workflow command and control tool                              |

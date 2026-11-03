@@ -1,5 +1,5 @@
 export default {
-  mutate: ["src/command.ts", "src/gate-state.ts", "src/policy.ts", "src/summary.ts"],
+  mutate: ["src/command.ts", "src/state.ts", "src/policy.ts", "src/summary.ts"],
   testRunner: "vitest",
   checkers: ["typescript"],
   tsconfigFile: "tsconfig.json",

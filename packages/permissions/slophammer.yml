@@ -15,7 +15,7 @@ typescript:
   mutation:
     targets:
       - src/command.ts
-      - src/gate-state.ts
+      - src/state.ts
       - src/policy.ts
       - src/summary.ts
   dependency_boundaries:

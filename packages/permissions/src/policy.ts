@@ -1,9 +1,9 @@
-import type { GateState } from "./gate-state.ts";
+import type { PermissionState } from "./state.ts";
 
 /**
- * Tools that only read local state. They pass without a dialog so the gate does not interrupt
- * inspection work. The list covers local reads only: a tool that reaches the network is gated,
- * because a call that leaves the machine can carry private data out.
+ * Tools that only read local state. They pass without a dialog, so a permission check does not
+ * interrupt inspection work. The list covers local reads only: a tool that reaches the network is
+ * checked too, because a call that leaves the machine can carry private data out.
  */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "read",
@@ -25,11 +25,10 @@ export type ToolHints = {
   openWorldHint?: boolean | undefined;
 };
 
-export type GateDecision =
-  { action: "pass" } | { action: "ask" } | { action: "block"; reason: string };
+export type Decision = { action: "pass" } | { action: "ask" } | { action: "block"; reason: string };
 
-export type GateDecisionInput = {
-  state: GateState;
+export type DecisionInput = {
+  state: PermissionState;
   toolName: string;
   input: Record<string, unknown>;
   hints: ToolHints | undefined;
@@ -37,15 +36,15 @@ export type GateDecisionInput = {
 };
 
 export const NO_UI_REASON = [
-  "The approval gate is on and this run has no interactive UI, so Pi did not approve this call.",
-  "It did not run. Turn the gate off with /gate off, or start Pi without PI_PERMISSION_GATE=on.",
+  "Permissions are on and this run has no interactive UI, so Pi did not approve this call.",
+  "It did not run. Turn them off with /permissions off, or start Pi without PI_PERMISSIONS=on.",
 ].join(" ");
 
 /**
  * Decide what happens to one tool call. Pure: the caller owns the state, the dialog, and the
  * blocking reason.
  */
-export function decide(input: GateDecisionInput): GateDecision {
+export function decide(input: DecisionInput): Decision {
   if (!input.state.enabled) return { action: "pass" };
   if (isReadOnly(input)) return { action: "pass" };
   if (input.hasUI) return { action: "ask" };
@@ -54,10 +53,10 @@ export function decide(input: GateDecisionInput): GateDecision {
 
 /**
  * A declared hint wins over the name list, so a tool that declares `readOnlyHint: false` or
- * `destructiveHint: true` is gated even when its name matches a local read. Pi's docs say a missing
+ * `destructiveHint: true` is checked even when its name matches a local read. Pi's docs say a missing
  * `openWorldHint` means the tool may reach the network, so only `openWorldHint: false` may pass.
  */
-function isReadOnly(input: GateDecisionInput): boolean {
+function isReadOnly(input: DecisionInput): boolean {
   const hints = input.hints;
   if (hints?.destructiveHint === true) return false;
   if (hints?.readOnlyHint !== undefined) {

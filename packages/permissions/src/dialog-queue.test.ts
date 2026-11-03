@@ -15,12 +15,12 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 describe("createDialogQueue", () => {
   it("runs one task at a time, in order", async () => {
     const queue = createDialogQueue();
-    const gate = deferred();
+    const held = deferred();
     const started: string[] = [];
 
     const first = queue.run(async () => {
       started.push("first");
-      await gate.promise;
+      await held.promise;
       return "a";
     });
     const second = queue.run(() => {
@@ -31,7 +31,7 @@ describe("createDialogQueue", () => {
     await Promise.resolve();
     expect(started).toEqual(["first"]);
 
-    gate.resolve();
+    held.resolve();
     expect(await first).toBe("a");
     expect(await second).toBe("b");
     expect(started).toEqual(["first", "second"]);

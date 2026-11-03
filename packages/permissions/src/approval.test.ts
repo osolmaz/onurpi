@@ -24,8 +24,17 @@ describe("decideFromKey", () => {
     expect(decideFromKey("N", 10)).toBe("deny");
   });
 
+  it("allows on Enter after the guard", () => {
+    expect(decideFromKey("\r", TYPED_AHEAD_GUARD_MS)).toBe("allow");
+    expect(decideFromKey("\n", TYPED_AHEAD_GUARD_MS)).toBe("allow");
+  });
+
+  it("ignores Enter that arrives inside the guard", () => {
+    expect(decideFromKey("\r", TYPED_AHEAD_GUARD_MS - 1)).toBe("ignore");
+  });
+
   it("ignores every other key", () => {
-    for (const data of ["", "\r", "\n", " ", "j", "k", "a"]) {
+    for (const data of ["", " ", "j", "k", "a", "\u001b[A"]) {
       expect(decideFromKey(data, 10_000)).toBe("ignore");
     }
   });
@@ -61,6 +70,7 @@ describe("createApprovalComponent", () => {
   it("shows the title, the whole call, and the key hint", () => {
     const { component } = createHarness();
     expect(render(component)).toEqual([DIALOG_TITLE, "bash: npm test", DIALOG_HINT]);
+    expect(DIALOG_HINT).toContain("enter");
   });
 
   it("wraps a long call instead of cutting it", () => {
@@ -78,7 +88,11 @@ describe("createApprovalComponent", () => {
     expect(render(component)).toBe(first);
   });
 
-  it("allows on y and denies on n", () => {
+  it("allows on Enter or y and denies on n", () => {
+    const enter = createHarness();
+    press(enter.component, "\r");
+    expect(enter.done).toHaveBeenCalledWith(true);
+
     const allow = createHarness();
     press(allow.component, "y");
     expect(allow.done).toHaveBeenCalledWith(true);

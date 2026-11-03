@@ -35,7 +35,7 @@
       "./packages/context-budget/index.ts",
       "./packages/focus-mode/index.ts",
       "./packages/context-ceiling/index.ts",
-      "./packages/permission-gate/index.ts",
+      "./packages/permissions/index.ts",
       "./packages/command-guard/index.ts"
     ],
     "skills": [

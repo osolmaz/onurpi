@@ -1,8 +1,8 @@
 {
-  "name": "@onurpi/permission-gate",
+  "name": "@onurpi/permissions",
   "version": "0.1.0",
   "private": true,
-  "description": "Ask before non-read-only tool calls in the Pi coding agent, with a session toggle",
+  "description": "Ask before non-read-only tool calls when the user turns it on, with a session toggle",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

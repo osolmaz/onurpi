@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import permissionGate, { COMMAND_NAME, ENV_VAR, initialGateEnabled } from "./index.ts";
+import permissions, { COMMAND_NAME, ENV_VAR, initialEnabled } from "./index.ts";
 import { NO_UI_REASON } from "./src/policy.ts";
 
 type Handler = (...args: never[]) => unknown;
@@ -20,8 +20,8 @@ type HarnessOptions = {
   mode?: "tui" | "rpc" | "print" | "json" | undefined;
   signal?: AbortSignal | undefined;
   key?: string | undefined;
-  /** The gate starts off, so most tests turn it on the way a user would before the first call. */
-  gateOn?: boolean | undefined;
+  /** Permissions start off, so most tests turn them on the way a user would. */
+  enabled?: boolean | undefined;
 };
 
 type Harness = {
@@ -78,8 +78,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     ui: { select, notify, custom },
   } as unknown as ExtensionContext;
 
-  vi.stubEnv(ENV_VAR, options.gateOn === false ? "" : "on");
-  permissionGate(pi);
+  vi.stubEnv(ENV_VAR, options.enabled === false ? "" : "on");
+  permissions(pi);
   return { pi, handlers, commands, select, notify, custom, context };
 }
 
@@ -115,25 +115,25 @@ function command(harness: Harness, args: string): Promise<void> {
   return Promise.resolve(handler?.(...([args, context] as never[])) as Promise<void>);
 }
 
-describe("initialGateEnabled", () => {
+describe("initialEnabled", () => {
   it("is off by default", () => {
-    expect(initialGateEnabled({})).toBe(false);
+    expect(initialEnabled({})).toBe(false);
   });
 
   it("reads the on values", () => {
     for (const value of ["on", "ON", " true ", "1", "yes"]) {
-      expect(initialGateEnabled({ [ENV_VAR]: value })).toBe(true);
+      expect(initialEnabled({ [ENV_VAR]: value })).toBe(true);
     }
   });
 
   it("stays off for other values", () => {
     for (const value of ["off", "0", "maybe", " "]) {
-      expect(initialGateEnabled({ [ENV_VAR]: value })).toBe(false);
+      expect(initialEnabled({ [ENV_VAR]: value })).toBe(false);
     }
   });
 });
 
-describe("permission gate", () => {
+describe("permissions", () => {
   it("registers the command and the tool call hook", () => {
     const harness = createHarness();
     expect(harness.commands.has(COMMAND_NAME)).toBe(true);
@@ -142,14 +142,14 @@ describe("permission gate", () => {
   });
 
   it("starts off, so a write runs without a dialog", async () => {
-    const harness = createHarness({ gateOn: false, choice: "Deny" });
+    const harness = createHarness({ enabled: false, choice: "Deny" });
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toBeUndefined();
     expect(harness.select).not.toHaveBeenCalled();
     expect(harness.custom).not.toHaveBeenCalled();
   });
 
   it("starts asking after the command turns it on", async () => {
-    const harness = createHarness({ gateOn: false, choice: "Deny" });
+    const harness = createHarness({ enabled: false, choice: "Deny" });
     await command(harness, "on");
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toMatchObject({
       block: true,
@@ -238,11 +238,11 @@ describe("permission gate", () => {
     expect(harness.select).not.toHaveBeenCalled();
   });
 
-  it("toggles the gate with the command", async () => {
+  it("toggles permissions with the command", async () => {
     const harness = createHarness({ choice: "Deny" });
     await command(harness, "off");
     expect(harness.notify).toHaveBeenLastCalledWith(
-      expect.stringContaining("Permission gate: off"),
+      expect.stringContaining("Permissions: off"),
       "info",
     );
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toBeUndefined();
@@ -250,7 +250,7 @@ describe("permission gate", () => {
 
     await command(harness, "");
     expect(harness.notify).toHaveBeenLastCalledWith(
-      expect.stringContaining("Permission gate: on"),
+      expect.stringContaining("Permissions: on"),
       "info",
     );
     expect(await toolCall(harness, event("write", { path: "a.txt" }))).toMatchObject({
@@ -261,7 +261,7 @@ describe("permission gate", () => {
   it("reports usage for an unknown word", async () => {
     const harness = createHarness();
     await command(harness, "maybe");
-    expect(harness.notify).toHaveBeenCalledWith("Usage: /gate [on|off|status]", "error");
+    expect(harness.notify).toHaveBeenCalledWith("Usage: /permissions [on|off|status]", "error");
   });
 });
 
@@ -302,8 +302,8 @@ describe("side effects", () => {
       "command.ts",
       "dialog-queue.ts",
       "escapes.ts",
-      "gate-state.ts",
       "policy.ts",
+      "state.ts",
       "summary.ts",
     ]);
   });

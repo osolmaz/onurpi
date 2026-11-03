@@ -1,29 +1,28 @@
-# Permission Gate
+# Permissions
 
 Ask before a tool call that can change something, when you want that, and turn it off again.
 
 ## Start it
 
-The gate is off when Pi starts, and tool calls run as they always do.
+Permissions are off when Pi starts, and tool calls run as they always do.
 
 ```
-/gate on       start asking
-/gate off      stop asking
-/gate          toggle and report the new state
-/gate status   report the state
+/permissions on       start asking
+/permissions off      stop asking
+/permissions          toggle and report the new state
+/permissions status   report the state
 ```
 
-To start a session with the gate already on, set `PI_PERMISSION_GATE` to `on`, `true`, `1`, or
-`yes`:
+To start a session with the check already on, set `PI_PERMISSIONS` to `on`, `true`, `1`, or `yes`:
 
 ```bash
-PI_PERMISSION_GATE=on pi
+PI_PERMISSIONS=on pi
 ```
 
-Any other value, or no value at all, leaves the gate off.
+Any other value, or no value at all, leaves the check off.
 
-The gate keeps only the on or off switch, in process memory. A new session, a fork, a resume, a
-reload, or a new Pi process starts with the gate off unless the environment turns it on.
+Only that on or off switch is kept, in process memory. A new session, a fork, a resume, a reload, or
+a new Pi process starts with the check off unless the environment turns it on.
 
 ## When it is on
 
@@ -33,13 +32,13 @@ Before a tool call that is not a local read, Pi shows a dialog with the whole ca
 >
 > bash: npm test
 >
-> y allow once - n or escape deny
+> enter or y allow once - n or escape deny
 
-- `y` runs this call only. The next call asks again, even for the same tool.
+- Enter or `y` runs this call only. The next call asks again, even for the same tool.
 - `n` or escape blocks the call and tells the model that it did not run.
-- Every other key does nothing, so Enter and a stray letter cannot approve a call.
-- An allow key is ignored until 350 milliseconds pass with no other key, so a message that the user
-  is still typing cannot approve anything.
+- Every other key does nothing, so a stray letter cannot approve a call.
+- An allow is ignored until 350 milliseconds pass with no other key, so a message that the user is
+  still typing cannot approve anything. A deny always counts.
 - Only one dialog exists at a time. A script that starts several calls at once waits its turn, so a
   key meant for one dialog cannot answer another.
 
@@ -76,16 +75,16 @@ script's call asks with its own words.
 ## Runs without an interactive dialog
 
 Print and JSON runs cannot approve a call, and RPC runs can only answer when the client answers
-extension UI requests. If the gate is on and nobody can answer, the gate blocks the call and gives
-the model a reason that names the environment variable, so the run fails loudly instead of running
-the call. The gate is off by default, so this only applies to a run that turned it on.
+extension UI requests. If the check is on and nobody can answer, the call is blocked and the model
+gets a reason that names the environment variable, so the run fails loudly instead of running the
+call. The check is off by default, so this only applies to a run that turned it on.
 
-The gate writes no status line, widget, footer, header, or session entry, so it adds nothing to the
-interface except the dialog and the answer to `/gate`.
+This package writes no status line, widget, footer, header, or session entry, so it adds nothing to
+the interface except the dialog and the answer to `/permissions`.
 
 ## Limits
 
-The gate is a supervision aid, not a security boundary. It cannot judge whether an approved command
-is safe, and code inside an approved call runs with the permissions of the Pi process. Use
+This is a supervision aid, not a security boundary. It cannot judge whether an approved command is
+safe, and code inside an approved call runs with the permissions of the Pi process. Use
 `@onurpi/command-guard` for commands that must never run, and an isolated environment for work that
 must not reach your files.
