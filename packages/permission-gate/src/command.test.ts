@@ -28,19 +28,12 @@ describe("parseGateCommand", () => {
 });
 
 describe("gateStatusText", () => {
-  it("reports the on state and the allowed tools", () => {
-    const state = createGateState(true);
-    state.allowedTools.add("write");
-    state.allowedTools.add("bash");
-    expect(gateStatusText(state)).toBe(
-      `${GATE_ON_TEXT}\nAllowed for this session without asking: bash, write.`,
-    );
+  it("reports the on state", () => {
+    expect(gateStatusText(createGateState(true))).toBe(GATE_ON_TEXT);
   });
 
-  it("reports the off state with no allowed tools", () => {
-    expect(gateStatusText(createGateState(false))).toBe(
-      `${GATE_OFF_TEXT}\nAllowed for this session without asking: none.`,
-    );
+  it("reports the off state", () => {
+    expect(gateStatusText(createGateState(false))).toBe(GATE_OFF_TEXT);
   });
 });
 

@@ -2,37 +2,28 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
+  ToolAnnotations,
   ToolCallEvent,
   ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent";
 
 import { GATE_USAGE, gateStatusText, parseGateCommand } from "./src/command.ts";
-import {
-  allowToolForSession,
-  approveCall,
-  createGateState,
-  resetSession,
-  setGateEnabled,
-  toggleGate,
-  type GateState,
-} from "./src/gate-state.ts";
-import { decide } from "./src/policy.ts";
+import { createGateState, setGateEnabled, toggleGate, type GateState } from "./src/gate-state.ts";
+import { decide, type ToolHints } from "./src/policy.ts";
 import { describeCall } from "./src/summary.ts";
 
 /**
- * Approval gate for Pi. It asks before a tool call that is not read-only, keeps the answer in
+ * Approval gate for Pi. It asks before a tool call that is not a local read, keeps the answer in
  * process memory, and reports state only through `ctx.ui.notify`. It never writes a status line,
- * a widget, or a session entry.
+ * a widget, a footer, a header, or a session entry.
  */
 
 export const COMMAND_NAME = "gate";
 export const ENV_VAR = "PI_PERMISSION_GATE";
 
-const ALLOW_ONCE = "Allow once";
 const DENY = "Deny";
+const ALLOW_ONCE = "Allow once";
 const OFF_VALUES: ReadonlySet<string> = new Set(["off", "false", "0", "no"]);
-
-export type Approval = { allowed: boolean; remember: boolean };
 
 /** The gate is on unless the environment turns it off for this process. */
 export function initialGateEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
@@ -40,20 +31,13 @@ export function initialGateEnabled(env: Readonly<Record<string, string | undefin
   return !OFF_VALUES.has(value);
 }
 
+/** Deny is the first option, so an accidental Enter or "j" cannot approve a call. */
+export const APPROVAL_OPTIONS: readonly string[] = [DENY, ALLOW_ONCE];
+
 export default function permissionGate(pi: ExtensionAPI): void {
   const state = createGateState(initialGateEnabled(process.env));
 
   pi.on("tool_call", (event, ctx) => handleToolCall(pi, state, event, ctx));
-
-  pi.on("session_start", () => {
-    resetSession(state);
-  });
-  pi.on("session_before_switch", () => {
-    resetSession(state);
-  });
-  pi.on("session_before_fork", () => {
-    resetSession(state);
-  });
 
   pi.registerCommand(COMMAND_NAME, {
     description: "Toggle the approval gate (on, off, status)",
@@ -76,41 +60,38 @@ async function handleToolCall(
     state,
     toolName,
     input,
-    readOnlyHint: readOnlyHintOf(pi, toolName),
-    parentToolCallId: event.parentToolCallId,
+    hints: hintsOf(pi, toolName),
     hasUI: ctx.hasUI,
   });
 
   if (decision.action === "block") return { block: true, reason: decision.reason };
   if (decision.action === "pass") return undefined;
 
-  const approval = await askApproval(ctx, toolName, describeCall(toolName, input));
-  if (!approval.allowed) {
+  const approved = await askApproval(ctx, describeCall(toolName, input));
+  if (!approved) {
     return { block: true, reason: `${toolName} was not approved, so it did not run.` };
   }
-  if (approval.remember) allowToolForSession(state, toolName);
-  approveCall(state, event.toolCallId);
   return undefined;
 }
 
-async function askApproval(
-  ctx: ExtensionContext,
-  toolName: string,
-  summary: string,
-): Promise<Approval> {
-  const remember = `Always allow ${toolName} in this session`;
+async function askApproval(ctx: ExtensionContext, summary: string): Promise<boolean> {
+  const signal = ctx.signal;
+  const options = signal === undefined ? undefined : { signal };
   const choice = await ctx.ui.select(
     `Allow this call?
 
 ${summary}`,
-    [ALLOW_ONCE, remember, DENY],
+    [...APPROVAL_OPTIONS],
+    options,
   );
-  return { allowed: choice === ALLOW_ONCE || choice === remember, remember: choice === remember };
+  return choice === ALLOW_ONCE;
 }
 
-function readOnlyHintOf(pi: ExtensionAPI, toolName: string): boolean | undefined {
+function hintsOf(pi: ExtensionAPI, toolName: string): ToolHints | undefined {
   const tool = pi.getAllTools().find((candidate) => candidate.name === toolName);
-  return tool?.annotations?.readOnlyHint;
+  const annotations: ToolAnnotations | undefined = tool?.annotations;
+  if (annotations === undefined) return undefined;
+  return { readOnlyHint: annotations.readOnlyHint, destructiveHint: annotations.destructiveHint };
 }
 
 function runCommand(state: GateState, args: string, ctx: ExtensionCommandContext): void {
