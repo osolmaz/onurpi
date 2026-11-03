@@ -1,37 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@earendil-works/pi-durable";
 import { progressOf } from "../src/agent.ts";
+import type { ViewEvent } from "../src/view-events.ts";
 
-function thinkingDelta(): AgentEvent {
-  return {
-    type: "message_update",
-    changes: [{ type: "thinking_delta", contentIndex: 0, delta: " " }],
-    usage: { cost: { total: 0 }, tokens: { input: 0, output: 0 } },
-  } as unknown as AgentEvent;
+function thinkingDelta(): ViewEvent {
+  return { type: "thinking_delta", delta: " " };
 }
 
-function textDelta(): AgentEvent {
-  return {
-    type: "message_update",
-    changes: [{ type: "text_delta", contentIndex: 0, delta: " " }],
-    usage: { cost: { total: 0 }, tokens: { input: 0, output: 0 } },
-  } as unknown as AgentEvent;
+function textDelta(): ViewEvent {
+  return { type: "text_delta" };
 }
 
-function toolStart(name: string, args: Record<string, unknown>): AgentEvent {
-  return {
-    type: "tool_execution_start",
-    toolName: name,
-    args,
-    toolCallId: "t1",
-  } as unknown as AgentEvent;
+function toolStart(name: string, args: Record<string, unknown>): ViewEvent {
+  return { type: "tool_execution_start", toolName: name, args };
 }
 
-function messageEnd(model: unknown): AgentEvent {
+function messageEnd(model: unknown): ViewEvent {
   return {
     type: "message_end",
     entry: { id: 1, conversationId: 1, kind: "message", model },
-  } as unknown as AgentEvent;
+  } as unknown as ViewEvent;
 }
 
 describe("progressOf", () => {
@@ -79,9 +66,7 @@ describe("progressOf", () => {
   });
 
   it("ignores events with nothing to show", () => {
-    expect(
-      progressOf([{ type: "run_start", inputs: [] } as unknown as AgentEvent]),
-    ).toBeUndefined();
+    expect(progressOf([{ type: "run_start" }])).toBeUndefined();
     expect(
       progressOf([messageEnd([{ role: "user", content: [{ type: "text", text: "hi" }] }])]),
     ).toBeUndefined();

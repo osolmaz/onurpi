@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type, type Static } from "typebox";
 
 export const UPDATE_PLAN_TOOL_NAME = "update_plan";
@@ -21,10 +20,20 @@ export type NormalizedPlanUpdate = Readonly<{
   snapshot: PlanSnapshot;
 }>;
 
+/**
+ * One of `values`, as a TypeBox schema whose static type is the union of its literals.
+ *
+ * Pi 1.5.0 stopped producing TypeBox schemas from `StringEnum()`, and the tool definition that
+ * `registerTool()` takes still requires one, so the enum is built here.
+ */
+function stringEnum<const T extends readonly string[]>(values: T) {
+  return Type.Unsafe<T[number]>({ enum: [...values], type: "string" });
+}
+
 const PlanStepParameters = Type.Object(
   {
     step: Type.String({ minLength: 1, maxLength: MAX_STEP_LENGTH }),
-    status: StringEnum(PLAN_STATUSES),
+    status: stringEnum(PLAN_STATUSES),
   },
   { additionalProperties: false },
 );

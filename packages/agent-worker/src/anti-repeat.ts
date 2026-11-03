@@ -1,8 +1,9 @@
 import type { Message } from "@earendil-works/pi-ai";
-import type { AgentEvent, EntryRecord, MessageChange } from "@earendil-works/pi-durable";
+import type { EntryRecord } from "@earendil-works/pi-durable";
 import { correctionText } from "pi-anti-repeat";
 import { RepeatDetector, isContinuationPrompt } from "pi-anti-repeat/core";
 import type { Detection, DetectorOptions } from "pi-anti-repeat/core";
+import type { ViewEvent } from "./view-events.ts";
 
 /**
  * The Anti-Repeat policy for this worker, as the Pi extension's default policy: correct the first
@@ -18,8 +19,8 @@ export type AntiRepeatFeedback = {
 /**
  * Feeds one conversation's Durable events to `pi-anti-repeat/core` and carries out the policy.
  *
- * The plan's wiring: the worker watches the conversation with `watchEvents` and feeds the
- * `thinking_delta` events and the finished runs to the detector. A detection during a streamed
+ * The plan's wiring: the worker watches the conversation view and feeds its derived events to the
+ * detector: the streamed reasoning deltas and the finished runs. A detection during a streamed
  * response asks the caller to abort the run, as the Pi extension cuts the response off, and a run
  * that such a detection aborted is discarded instead of counted. One watcher per conversation; all
  * state stays in memory.
@@ -50,8 +51,8 @@ export class AntiRepeatWatcher {
     this.turn = { messages: [], toolResults: [] };
   }
 
-  /** Feeds one batch of watched events; returns the first policy decision it makes. */
-  feed(events: readonly AgentEvent[]): AntiRepeatFeedback | null {
+  /** Feeds one batch of derived events; returns the first policy decision it makes. */
+  feed(events: readonly ViewEvent[]): AntiRepeatFeedback | null {
     for (const event of events) {
       const feedback = this.feedOne(event);
       if (feedback !== null) return feedback;
@@ -59,12 +60,12 @@ export class AntiRepeatWatcher {
     return null;
   }
 
-  private feedOne(event: AgentEvent): AntiRepeatFeedback | null {
+  private feedOne(event: ViewEvent): AntiRepeatFeedback | null {
     return this.feedBoundary(event) ?? this.feedAccumulation(event);
   }
 
   /** Run boundaries, where the detectors compare finished runs. */
-  private feedBoundary(event: AgentEvent): AntiRepeatFeedback | null {
+  private feedBoundary(event: ViewEvent): AntiRepeatFeedback | null {
     if (event.type === "run_start") return this.onRunStart();
     if (event.type === "turn_end") return this.closeTurn();
     if (event.type === "run_end") return this.closeRun();
@@ -72,8 +73,9 @@ export class AntiRepeatWatcher {
   }
 
   /** Streamed reasoning and the per-turn message record. */
-  private feedAccumulation(event: AgentEvent): AntiRepeatFeedback | null {
-    if (event.type === "message_update") return this.onMessageUpdate(event.changes);
+  private feedAccumulation(event: ViewEvent): AntiRepeatFeedback | null {
+    if (event.type === "thinking_start") return this.onThinkingStart();
+    if (event.type === "thinking_delta") return this.onThinkingDelta(event.delta);
     if (event.type === "message_end") return this.onMessageEnd(event.entry);
     if (event.type === "tool_execution_end") return this.onToolEnd(event.entry);
     return null;
@@ -88,15 +90,14 @@ export class AntiRepeatWatcher {
     return null;
   }
 
-  private onMessageUpdate(changes: readonly MessageChange[]): AntiRepeatFeedback | null {
-    for (const change of changes) {
-      if (change.type === "thinking_start") this.detector.startReasoning();
-      if (change.type === "thinking_delta") {
-        const detection = this.detector.observeReasoning(change.delta);
-        if (detection !== null) return this.decide(detection, true);
-      }
-    }
+  private onThinkingStart(): AntiRepeatFeedback | null {
+    this.detector.startReasoning();
     return null;
+  }
+
+  private onThinkingDelta(delta: string): AntiRepeatFeedback | null {
+    const detection = this.detector.observeReasoning(delta);
+    return detection === null ? null : this.decide(detection, true);
   }
 
   private onMessageEnd(entry: EntryRecord): AntiRepeatFeedback | null {

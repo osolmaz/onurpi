@@ -1,5 +1,17 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type, type Static } from "typebox";
+
+/**
+ * One of `values`, as a TypeBox schema whose static type is the union of its literals.
+ *
+ * Pi 1.5.0 stopped producing TypeBox schemas from `StringEnum()`, and the tool definition that
+ * `registerTool()` takes still requires one, so the enum is built here.
+ */
+function stringEnum<const T extends readonly string[]>(
+  values: T,
+  options: { readonly description?: string } = {},
+) {
+  return Type.Unsafe<T[number]>({ enum: [...values], type: "string", ...options });
+}
 
 import {
   DEFAULT_EXEC_YIELD_MS,
@@ -41,7 +53,7 @@ export const ExecCommandParameters = Type.Object({
     }),
   ),
   on_exit: Type.Optional(
-    StringEnum(["none", "wake"] as const, {
+    stringEnum(["none", "wake"] as const, {
       description:
         '"none" (default): poll manually. "wake": send one follow-up on an unobserved exit, only when the human explicitly requests auto-resume.',
     }),
@@ -74,7 +86,7 @@ export const WriteStdinParameters = Type.Object({
 
 export const SetOnExitParameters = Type.Object({
   session_id: Type.Number({ description: "Session id from exec_command." }),
-  on_exit: StringEnum(["none", "wake"] as const, {
+  on_exit: stringEnum(["none", "wake"] as const, {
     description:
       '"none": disarm wake without killing. "wake": arm auto-resume for a running session.',
   }),

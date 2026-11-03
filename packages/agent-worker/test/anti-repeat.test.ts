@@ -146,15 +146,10 @@ describe("AntiRepeatWatcher", () => {
       reasoning: { windowWords: 8, repeats: 3, matchedWindows: 1, sampleRate: 1 },
     });
     watcher.onNewInput("think about the puzzle");
-    watcher.feed([{ type: "run_start" } as never]);
-    watcher.feed([{ changes: [{ type: "thinking_start" }], type: "message_update" } as never]);
+    watcher.feed([{ type: "run_start" }]);
+    watcher.feed([{ type: "thinking_start" }]);
     const phrase = "the answer must be forty two widgets for the customer order today ";
-    const feedback = watcher.feed([
-      {
-        changes: [{ delta: phrase.repeat(3), type: "thinking_delta" }],
-        type: "message_update",
-      } as never,
-    ]);
+    const feedback = watcher.feed([{ delta: phrase.repeat(3), type: "thinking_delta" }]);
     expect(feedback).toMatchObject({ action: "correct", activeResponse: true });
   });
 });

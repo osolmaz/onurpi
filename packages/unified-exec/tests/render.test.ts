@@ -132,6 +132,8 @@ function makeContext<TArgs>(
     isError: false,
     durationMs: undefined,
     outputPad: 0,
+    keyText: (keybinding) => keybinding,
+    keyHint: (keybinding, description) => `${keybinding} ${description}`,
     invalidate: () => undefined,
   };
 }

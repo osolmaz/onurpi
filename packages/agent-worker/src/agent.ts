@@ -4,7 +4,6 @@ import type { ImageContent, Message, Models, UserMessage } from "@earendil-works
 import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
-  type AgentEvent,
   type CompactionResult,
   type Conversation,
   type ConversationId,
@@ -18,7 +17,6 @@ import {
   type EntryId,
   type SettledSubmissionRecord,
   type TaskOutcome,
-  watchEvents,
 } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -43,6 +41,7 @@ import {
 } from "./approvals.ts";
 import type { JobLedger } from "./inbox.ts";
 import { skillsExtension } from "./skills.ts";
+import { ConversationViewBridge, type ViewEvent } from "./view-events.ts";
 
 const context = BACKGROUND_CONTEXT;
 
@@ -227,7 +226,7 @@ type AskAgent = {
     watcher: AntiRepeatWatcher,
     seen: { feedback: AntiRepeatFeedback | null },
     onProgress?: ProgressSink,
-  ) => (events: readonly AgentEvent[]) => Promise<void>;
+  ) => (events: readonly ViewEvent[]) => Promise<void>;
   readonly watchers: Map<ConversationId, AntiRepeatWatcher>;
 };
 
@@ -245,7 +244,7 @@ function watchListener(
   watcher: AntiRepeatWatcher,
   seen: { feedback: AntiRepeatFeedback | null },
   onProgress?: ProgressSink,
-): (events: readonly AgentEvent[]) => Promise<void> {
+): (events: readonly ViewEvent[]) => Promise<void> {
   let aborting = false;
   return async (events) => {
     seen.feedback ??= watcher.feed(events);
@@ -265,33 +264,20 @@ function watchListener(
  * the label names what the agent is doing now: thinking, writing, a tool call, or the text of an
  * intermediate answer.
  */
-export function progressOf(events: readonly AgentEvent[]): string | undefined {
+export function progressOf(events: readonly ViewEvent[]): string | undefined {
   let label: string | undefined;
   for (const event of events) label = progressOfEvent(event, label);
   return label;
 }
 
 /** The label one event contributes, on top of what earlier events in its batch already said. */
-function progressOfEvent(event: AgentEvent, previous: string | undefined): string | undefined {
+function progressOfEvent(event: ViewEvent, previous: string | undefined): string | undefined {
   if (event.type === "tool_execution_start") return toolLabel(event.toolName, event.args);
-  if (event.type === "message_update") return changeLabel(event.changes, previous);
+  if (event.type === "thinking_start" || event.type === "thinking_delta")
+    return "\u{1F4AD} Thinking";
+  if (event.type === "text_delta") return "\u270D\uFE0F Writing";
   if (event.type === "message_end") return assistantText(event.entry) ?? previous;
   return previous;
-}
-
-/** The newest activity one in-flight message shows: thinking, or writing its answer. */
-function changeLabel(
-  changes: readonly { readonly type: string }[],
-  previous: string | undefined,
-): string | undefined {
-  let updated = previous;
-  for (const change of changes) {
-    if (change.type === "thinking_start" || change.type === "thinking_delta")
-      updated = "\u{1F4AD} Thinking";
-    else if (change.type === "text_start" || change.type === "text_delta")
-      updated = "\u270D\uFE0F Writing";
-  }
-  return updated;
 }
 
 /** The first line of an intermediate assistant answer, shortened. */
@@ -497,9 +483,13 @@ async function askAgent(ask: AskAgent): Promise<AgentReply> {
   const watcher = watcherFor(watchers, conversationId);
   watcher.onNewInput(request.text);
 
-  const watch = await watchEvents(harness, conversationId, context);
+  const bridge = new ConversationViewBridge();
+  const watch = await conversation.watch(context);
   const seen: { feedback: AntiRepeatFeedback | null } = { feedback: null };
-  watch.start(watchListener(conversation, watcher, seen, ask.onProgress));
+  const listener = watchListener(conversation, watcher, seen, ask.onProgress);
+  watch.start(async (call) => {
+    if (call.kind === "value") await listener(bridge.diff(call.value));
+  });
   const reply = await replyOf(
     conversation,
     await conversation.submit(
