@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { unescapeChars } from "../../unified-exec/src/unescape.ts";
 import { decodeEscapes } from "./escapes.ts";
 
 describe("decodeEscapes", () => {
@@ -40,8 +41,28 @@ describe("decodeEscapes", () => {
     expect(decodeEscapes("\\u12")).toBe("\\u12");
   });
 
-  it("keeps a code point above the Unicode range as a question mark", () => {
-    expect(decodeEscapes("\\u{110000}")).toBe("?");
+  it("keeps a code point above the Unicode range as it stands", () => {
+    expect(decodeEscapes("\\u{110000}")).toBe("\\u{110000}");
+  });
+
+  it("agrees with the Unified Exec decoder on every edge case", () => {
+    const cases = [
+      "plain",
+      "\\\\",
+      "\\n",
+      "\\r",
+      "\\x41",
+      "\\x1",
+      "\\xzz",
+      "\\u0041",
+      "\\u12",
+      "\\u{1f600}",
+      "\\u{110000}",
+      "\\q",
+      "end\\",
+      "C:\\\\tmp",
+    ];
+    for (const text of cases) expect(decodeEscapes(text)).toBe(unescapeChars(text));
   });
 
   it("keeps an unknown escape and its backslash", () => {

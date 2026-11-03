@@ -1,11 +1,33 @@
 # Permission Gate
 
-Ask before a tool call that can change something, and switch the gate on or off inside a session.
+Ask before a tool call that can change something, when you want that, and turn it off again.
 
-## What it does
+## Start it
 
-The gate is on when Pi starts. Before a tool call that is not a local read, Pi shows a dialog with
-the whole call in it:
+The gate is off when Pi starts, and tool calls run as they always do.
+
+```
+/gate on       start asking
+/gate off      stop asking
+/gate          toggle and report the new state
+/gate status   report the state
+```
+
+To start a session with the gate already on, set `PI_PERMISSION_GATE` to `on`, `true`, `1`, or
+`yes`:
+
+```bash
+PI_PERMISSION_GATE=on pi
+```
+
+Any other value, or no value at all, leaves the gate off.
+
+The gate keeps only the on or off switch, in process memory. A new session, a fork, a resume, a
+reload, or a new Pi process starts with the gate off unless the environment turns it on.
+
+## When it is on
+
+Before a tool call that is not a local read, Pi shows a dialog with the whole call in it:
 
 > Allow this call?
 >
@@ -51,35 +73,15 @@ send a local file out.
 A call that a script makes inside another tool does not inherit the approval of the outer call. The
 script's call asks with its own words.
 
-## Turn it off and on
+## Runs without an interactive dialog
 
-```
-/gate          toggle and report the new state
-/gate off      stop asking
-/gate on       start asking again
-/gate status   report the state
-```
-
-The gate keeps only the on or off switch, in process memory. A new session, a fork, a resume, a
-reload, or a new Pi process starts with the gate on.
+Print and JSON runs cannot approve a call, and RPC runs can only answer when the client answers
+extension UI requests. If the gate is on and nobody can answer, the gate blocks the call and gives
+the model a reason that names the environment variable, so the run fails loudly instead of running
+the call. The gate is off by default, so this only applies to a run that turned it on.
 
 The gate writes no status line, widget, footer, header, or session entry, so it adds nothing to the
 interface except the dialog and the answer to `/gate`.
-
-## Runs without a dialog
-
-Print and JSON runs cannot approve a call, and RPC runs can only answer when the client answers
-extension UI requests. Without an answer, the gate blocks the call and gives the model a reason that
-names the environment variable, so the run fails loudly instead of running the call.
-
-Start a run that must not ask with the gate off:
-
-```bash
-PI_PERMISSION_GATE=off pi -p "your prompt"
-```
-
-`PI_PERMISSION_GATE` accepts `off`, `false`, `0`, and `no`. Any other value, or no value at all,
-leaves the gate on.
 
 ## Limits
 

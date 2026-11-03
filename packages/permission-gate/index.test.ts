@@ -7,7 +7,7 @@ import type {
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import permissionGate, { COMMAND_NAME, ENV_VAR, initialGateEnabled } from "./index.ts";
 import { NO_UI_REASON } from "./src/policy.ts";
@@ -20,6 +20,8 @@ type HarnessOptions = {
   mode?: "tui" | "rpc" | "print" | "json" | undefined;
   signal?: AbortSignal | undefined;
   key?: string | undefined;
+  /** The gate starts off, so most tests turn it on the way a user would before the first call. */
+  gateOn?: boolean | undefined;
 };
 
 type Harness = {
@@ -76,9 +78,14 @@ function createHarness(options: HarnessOptions = {}): Harness {
     ui: { select, notify, custom },
   } as unknown as ExtensionContext;
 
+  vi.stubEnv(ENV_VAR, options.gateOn === false ? "" : "on");
   permissionGate(pi);
   return { pi, handlers, commands, select, notify, custom, context };
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function event(
   toolName: string,
@@ -109,18 +116,20 @@ function command(harness: Harness, args: string): Promise<void> {
 }
 
 describe("initialGateEnabled", () => {
-  it("is on by default", () => {
-    expect(initialGateEnabled({})).toBe(true);
+  it("is off by default", () => {
+    expect(initialGateEnabled({})).toBe(false);
   });
 
-  it("reads the off values", () => {
-    for (const value of ["off", "OFF", " false ", "0", "no"]) {
-      expect(initialGateEnabled({ [ENV_VAR]: value })).toBe(false);
+  it("reads the on values", () => {
+    for (const value of ["on", "ON", " true ", "1", "yes"]) {
+      expect(initialGateEnabled({ [ENV_VAR]: value })).toBe(true);
     }
   });
 
-  it("stays on for other values", () => {
-    expect(initialGateEnabled({ [ENV_VAR]: "on" })).toBe(true);
+  it("stays off for other values", () => {
+    for (const value of ["off", "0", "maybe", " "]) {
+      expect(initialGateEnabled({ [ENV_VAR]: value })).toBe(false);
+    }
   });
 });
 
@@ -130,6 +139,22 @@ describe("permission gate", () => {
     expect(harness.commands.has(COMMAND_NAME)).toBe(true);
     expect(harness.handlers.get("tool_call")).toHaveLength(1);
     expect([...harness.handlers.keys()]).toEqual(["tool_call"]);
+  });
+
+  it("starts off, so a write runs without a dialog", async () => {
+    const harness = createHarness({ gateOn: false, choice: "Deny" });
+    expect(await toolCall(harness, event("write", { path: "a.txt" }))).toBeUndefined();
+    expect(harness.select).not.toHaveBeenCalled();
+    expect(harness.custom).not.toHaveBeenCalled();
+  });
+
+  it("starts asking after the command turns it on", async () => {
+    const harness = createHarness({ gateOn: false, choice: "Deny" });
+    await command(harness, "on");
+    expect(await toolCall(harness, event("write", { path: "a.txt" }))).toMatchObject({
+      block: true,
+    });
+    expect(harness.select).toHaveBeenCalledTimes(1);
   });
 
   it("asks with a selector outside the TUI", async () => {
