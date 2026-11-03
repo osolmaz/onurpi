@@ -36,13 +36,13 @@ type Harness = {
   done: ReturnType<typeof vi.fn>;
 };
 
-function createHarness(summary = "bash: npm test", now = 10_000): Harness {
+function createHarness(summary = "bash: npm test", now = 10_000, clock?: () => number): Harness {
   const done = vi.fn();
   const component = createApprovalComponent({
     summary,
     text: { title: (text) => text, body: (text) => text, hint: (text) => text },
     matchesCancel: (data) => data === "\u001b",
-    now: () => now,
+    now: clock ?? (() => now),
     openedAt: 0,
     done,
   });
@@ -101,5 +101,19 @@ describe("createApprovalComponent", () => {
     const harness = createHarness("bash: npm test", 0);
     press(harness.component, "y");
     expect(harness.done).not.toHaveBeenCalled();
+  });
+
+  it("restarts the guard after every key, so typing through it cannot approve", () => {
+    let time = 0;
+    const harness = createHarness("bash: npm test", 0, () => time);
+    press(harness.component, "y");
+    time = TYPED_AHEAD_GUARD_MS - 1;
+    press(harness.component, "o");
+    time += TYPED_AHEAD_GUARD_MS - 1;
+    press(harness.component, "y");
+    expect(harness.done).not.toHaveBeenCalled();
+    time += TYPED_AHEAD_GUARD_MS;
+    press(harness.component, "y");
+    expect(harness.done).toHaveBeenCalledWith(true);
   });
 });

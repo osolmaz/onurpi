@@ -15,22 +15,33 @@ the whole call in it:
 
 - `y` runs this call only. The next call asks again, even for the same tool.
 - `n` or escape blocks the call and tells the model that it did not run.
-- Every other key does nothing. Enter and a stray letter cannot approve a call, and an allow key is
-  ignored for the first 350 milliseconds, so a message typed just before the dialog opened cannot
-  approve anything.
-- Outside the terminal interface, Pi shows a selector with `Deny` first and `Allow once` second, and
-  the dialog follows an abort.
+- Every other key does nothing, so Enter and a stray letter cannot approve a call.
+- An allow key is ignored until 350 milliseconds pass with no other key, so a message that the user
+  is still typing cannot approve anything.
+- Only one dialog exists at a time. A script that starts several calls at once waits its turn, so a
+  key meant for one dialog cannot answer another.
 
-The dialog shows every field the model sent, primary value first and the rest as `field=value`, so
-an approval covers what the user saw. That includes the shell, the working directory, and the text
-written to a session. Base64 input appears as the text it stands for.
+Outside the terminal interface, Pi shows a selector with `Deny` first and `Allow once` second, and
+the selector follows an abort. A dialog that nobody answers keeps waiting, which is the same as the
+dialog staying on screen.
 
-Control characters, format characters, and every code point that Unicode says a renderer may ignore
-appear as escapes such as `\x1b` and `\u{202e}`. A backslash appears as `\\`, so escaped text cannot
-pass for typed text.
+## What the dialog shows
 
-Local reads pass without a dialog: `read`, `grep`, `find`, `ls`, `todo`, `update_plan`,
-`list_sessions`, and a `write_stdin` poll with no input.
+Every field the model sent appears, primary value first and the rest as `field=value`. That includes
+the shell, the working directory, the file content, and the text written to a session.
+
+- Base64 input appears as the text it stands for.
+- Session input is decoded the way Unified Exec decodes it, so `\x15` and `\r` appear as the control
+  characters that reach the session.
+- Control characters, format characters, every Unicode space except the plain space, and every code
+  point that a renderer may ignore appear as escapes such as `\x1b`, `\u00a0`, and `\u{202e}`.
+- A backslash appears as `\\`, so escaped text cannot pass for typed text.
+- A long value is cut and marked with the number of characters that the approval still covers.
+
+## What passes without a dialog
+
+Local reads: `read`, `grep`, `find`, `ls`, `todo`, `update_plan`, `list_sessions`, and a
+`write_stdin` poll with no input.
 
 A tool declaration wins over that list. A call passes on its declarations only when it declares
 `readOnlyHint: true`, `openWorldHint: false`, and no `destructiveHint`. So a tool that reaches the
@@ -39,9 +50,6 @@ send a local file out.
 
 A call that a script makes inside another tool does not inherit the approval of the outer call. The
 script's call asks with its own words.
-
-A long value is cut and marked with the number of characters that the approval still covers, so a
-hidden tail cannot look harmless.
 
 ## Turn it off and on
 
@@ -56,14 +64,13 @@ The gate keeps only the on or off switch, in process memory. A new session, a fo
 reload, or a new Pi process starts with the gate on.
 
 The gate writes no status line, widget, footer, header, or session entry, so it adds nothing to the
-interface except the dialog and the answer to `/gate`. The selector that non-terminal modes use
-reports the program status `question`.
+interface except the dialog and the answer to `/gate`.
 
 ## Runs without a dialog
 
-Print and JSON runs cannot approve a call. RPC mode can, when its client answers extension UI
-requests. The gate blocks a call that needs approval and gives the model a reason that names the
-environment variable.
+Print and JSON runs cannot approve a call, and RPC runs can only answer when the client answers
+extension UI requests. Without an answer, the gate blocks the call and gives the model a reason that
+names the environment variable, so the run fails loudly instead of running the call.
 
 Start a run that must not ask with the gate off:
 
