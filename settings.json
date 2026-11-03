@@ -51,7 +51,6 @@
   "defaultTools": ["+codemode"],
   "hideThinkingBlock": false,
   "extensionChangelogVersions": {
-    "{\"source\":\"npm:pi-web-access@0.46.0\",\"scope\":\"user\"}": "0.46.0",
-    "{\"source\":\"npm:pi-huggingface-oauth@0.5.0\",\"scope\":\"user\"}": "0.5.0"
+    "{\"source\":\"npm:pi-web-access@0.46.0\",\"scope\":\"user\"}": "0.46.0"
   }
 }
