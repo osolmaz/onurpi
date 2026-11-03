@@ -84,6 +84,7 @@ describe("decide", () => {
 
   it("blocks instead of asking when there is no interactive UI", () => {
     expect(decide(gateInput({ hasUI: false }))).toEqual({ action: "block", reason: NO_UI_REASON });
+    expect(NO_UI_REASON).toContain("/gate off");
   });
 
   it("passes local reads without a UI", () => {

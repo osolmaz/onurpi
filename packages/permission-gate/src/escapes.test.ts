@@ -1,76 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { unescapeChars } from "../../unified-exec/src/unescape.ts";
 import { decodeEscapes } from "./escapes.ts";
 
+/**
+ * The expected values match Unified Exec's decoder, which is what `write_stdin` uses before it
+ * writes to a session. They are written out here so this package stays independent of that one.
+ */
+const CASES: readonly (readonly [string, string])[] = [
+  ["plain", "plain"],
+  ["\\\\", "\\"],
+  ['\\"', '"'],
+  ["\\'", "'"],
+  ["\\n", "\n"],
+  ["\\r", "\r"],
+  ["\\t", "\t"],
+  ["\\b", "\b"],
+  ["\\f", "\f"],
+  ["\\v", "\v"],
+  ["\\0", "\0"],
+  ["\\a", "\x07"],
+  ["\\e", "\x1b"],
+  ["\\x41", "A"],
+  ["\\x1", "\\x1"],
+  ["\\xzz", "\\xzz"],
+  ["\\u0041", "A"],
+  ["\\u12", "\\u12"],
+  ["\\u{1f600}", "\u{1f600}"],
+  ["\\u{110000}", "\\u{110000}"],
+  ["\\u{}", "\\u{}"],
+  ["\\u{zz}", "\\u{zz}"],
+  ["\\u{1234567}", "\\u{1234567}"],
+  ["\\u{41", "\\u{41"],
+  ["\\q", "\\q"],
+  ["end\\", "end\\"],
+  ["C:\\\\tmp", "C:\\tmp"],
+];
+
 describe("decodeEscapes", () => {
+  it("decodes or keeps each case the way Unified Exec does", () => {
+    for (const [input, expected] of CASES)
+      expect([input, decodeEscapes(input)]).toEqual([input, expected]);
+  });
+
   it("returns text without a backslash unchanged", () => {
     expect(decodeEscapes("plain")).toBe("plain");
-  });
-
-  it("decodes the simple escapes", () => {
-    expect(decodeEscapes("\\\\")).toBe("\\");
-    expect(decodeEscapes('\\"')).toBe('"');
-    expect(decodeEscapes("\\'")).toBe("'");
-    expect(decodeEscapes("\\n")).toBe("\n");
-    expect(decodeEscapes("\\r")).toBe("\r");
-    expect(decodeEscapes("\\t")).toBe("\t");
-    expect(decodeEscapes("\\b")).toBe("\b");
-    expect(decodeEscapes("\\f")).toBe("\f");
-    expect(decodeEscapes("\\v")).toBe("\v");
-    expect(decodeEscapes("\\0")).toBe("\0");
-    expect(decodeEscapes("\\a")).toBe("\x07");
-    expect(decodeEscapes("\\e")).toBe("\x1b");
-  });
-
-  it("decodes a hex byte and a four-digit code point", () => {
-    expect(decodeEscapes("\\x41")).toBe("A");
-    expect(decodeEscapes("\\u0041")).toBe("A");
-    expect(decodeEscapes("\\u{1f600}")).toBe("\u{1f600}");
-  });
-
-  it("keeps a short hex byte as it stands", () => {
-    expect(decodeEscapes("\\x1")).toBe("\\x1");
-  });
-
-  it("keeps a non-hex byte as it stands", () => {
-    expect(decodeEscapes("\\xzz")).toBe("\\xzz");
-  });
-
-  it("keeps a short code point as it stands", () => {
-    expect(decodeEscapes("\\u12")).toBe("\\u12");
-  });
-
-  it("keeps a code point above the Unicode range as it stands", () => {
-    expect(decodeEscapes("\\u{110000}")).toBe("\\u{110000}");
-  });
-
-  it("agrees with the Unified Exec decoder on every edge case", () => {
-    const cases = [
-      "plain",
-      "\\\\",
-      "\\n",
-      "\\r",
-      "\\x41",
-      "\\x1",
-      "\\xzz",
-      "\\u0041",
-      "\\u12",
-      "\\u{1f600}",
-      "\\u{110000}",
-      "\\q",
-      "end\\",
-      "C:\\\\tmp",
-    ];
-    for (const text of cases) expect(decodeEscapes(text)).toBe(unescapeChars(text));
-  });
-
-  it("keeps an unknown escape and its backslash", () => {
-    expect(decodeEscapes("C:\\\\Users")).toBe("C:\\Users");
-    expect(decodeEscapes("\\q")).toBe("\\q");
-  });
-
-  it("keeps a trailing backslash", () => {
-    expect(decodeEscapes("end\\")).toBe("end\\");
   });
 });

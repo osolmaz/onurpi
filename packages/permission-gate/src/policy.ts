@@ -38,7 +38,7 @@ export type GateDecisionInput = {
 
 export const NO_UI_REASON = [
   "The approval gate is on and this run has no interactive UI, so Pi did not approve this call.",
-  "It did not run. Start Pi with PI_PERMISSION_GATE=off when a run needs no approval.",
+  "It did not run. Turn the gate off with /gate off, or start Pi without PI_PERMISSION_GATE=on.",
 ].join(" ");
 
 /**
