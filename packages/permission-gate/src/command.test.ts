@@ -32,8 +32,9 @@ describe("gateStatusText", () => {
     expect(gateStatusText(createGateState(true))).toBe(GATE_ON_TEXT);
   });
 
-  it("reports the off state", () => {
+  it("reports the off state and says how to turn the gate on", () => {
     expect(gateStatusText(createGateState(false))).toBe(GATE_OFF_TEXT);
+    expect(GATE_OFF_TEXT).toContain("/gate on");
   });
 });
 

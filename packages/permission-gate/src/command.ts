@@ -6,7 +6,8 @@ export const GATE_USAGE = "Usage: /gate [on|off|status]";
 
 export const GATE_ON_TEXT =
   "Permission gate: on. Pi asks before each call that is not a local read.";
-export const GATE_OFF_TEXT = "Permission gate: off. Tool calls run without asking.";
+export const GATE_OFF_TEXT =
+  "Permission gate: off. Tool calls run without asking. Turn it on with /gate on.";
 
 export function parseGateCommand(args: string): GateCommandAction {
   const words = args

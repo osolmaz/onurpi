@@ -59,14 +59,13 @@ function decodeHexByte(text: string, index: number): Decoded {
 function decodeCodePoint(text: string, index: number): Decoded {
   const braced = /^\{([0-9a-f]{1,6})\}/iu.exec(text.slice(index + 2));
   if (braced?.[1] !== undefined) {
-    return { text: fromCodePoint(braced[1]), length: 2 + braced[0].length };
+    const code = Number.parseInt(braced[1], 16);
+    if (code <= 0x10ffff) {
+      return { text: String.fromCodePoint(code), length: 2 + braced[0].length };
+    }
+    return { text: "\\u", length: 2 };
   }
   const digits = text.slice(index + 2, index + 6);
   if (digits.length !== 4 || !HEX_DIGITS.test(digits)) return { text: "\\u", length: 2 };
-  return { text: fromCodePoint(digits), length: 6 };
-}
-
-function fromCodePoint(digits: string): string {
-  const code = Number.parseInt(digits, 16);
-  return code <= 0x10ffff ? String.fromCodePoint(code) : "?";
+  return { text: String.fromCharCode(Number.parseInt(digits, 16)), length: 6 };
 }

@@ -15,9 +15,9 @@ import { decide, type ToolHints } from "./src/policy.ts";
 import { describeCall } from "./src/summary.ts";
 
 /**
- * Approval gate for Pi. It asks before a tool call that is not a local read, keeps only the on or
- * off switch in process memory, and reports the switch through `ctx.ui.notify`. It never writes a
- * status line, a widget, a footer, a header, or a session entry.
+ * Approval gate for Pi. It is off at startup, asks before a tool call that is not a local read when
+ * it is on, keeps only that switch in process memory, and reports the switch through
+ * `ctx.ui.notify`. It never writes a status line, a widget, a footer, a header, or a session entry.
  */
 
 export const COMMAND_NAME = "gate";
@@ -25,12 +25,12 @@ export const ENV_VAR = "PI_PERMISSION_GATE";
 
 const DENY = "Deny";
 const ALLOW_ONCE = "Allow once";
-const OFF_VALUES: ReadonlySet<string> = new Set(["off", "false", "0", "no"]);
+const ON_VALUES: ReadonlySet<string> = new Set(["on", "true", "1", "yes"]);
 
-/** The gate is on unless the environment turns it off for this process. */
+/** The gate is off unless the environment turns it on for this process. */
 export function initialGateEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
   const value = (env[ENV_VAR] ?? "").trim().toLowerCase();
-  return !OFF_VALUES.has(value);
+  return ON_VALUES.has(value);
 }
 
 /** In a selector, Deny comes first, so a stray Enter denies instead of allowing. */
