@@ -30,14 +30,26 @@ describe("decide", () => {
     });
   });
 
-  it("passes a tool that declares readOnlyHint", () => {
+  it("passes a tool that declares a closed, read-only domain", () => {
+    expect(
+      decide(gateInput({ toolName: "clip", hints: { readOnlyHint: true, openWorldHint: false } })),
+    ).toEqual({ action: "pass" });
+  });
+
+  it("asks when a read-only tool leaves its domain unknown", () => {
     expect(decide(gateInput({ toolName: "clip", hints: { readOnlyHint: true } }))).toEqual({
-      action: "pass",
+      action: "ask",
     });
   });
 
-  it("gates a local read that declares readOnlyHint false", () => {
-    expect(decide(gateInput({ toolName: "read", hints: { readOnlyHint: false } }))).toEqual({
+  it("asks when a read-only tool declares an open world", () => {
+    expect(
+      decide(gateInput({ toolName: "clip", hints: { readOnlyHint: true, openWorldHint: true } })),
+    ).toEqual({ action: "ask" });
+  });
+
+  it("gates a tool that declares openWorldHint and nothing else", () => {
+    expect(decide(gateInput({ toolName: "clip", hints: { openWorldHint: true } }))).toEqual({
       action: "ask",
     });
   });
@@ -46,6 +58,12 @@ describe("decide", () => {
     expect(decide(gateInput({ toolName: "read", hints: { destructiveHint: true } }))).toEqual({
       action: "ask",
     });
+  });
+
+  it("gates a local read that declares readOnlyHint false", () => {
+    expect(
+      decide(gateInput({ toolName: "read", hints: { readOnlyHint: false, openWorldHint: false } })),
+    ).toEqual({ action: "ask" });
   });
 
   it("gates a call that reaches the network", () => {

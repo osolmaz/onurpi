@@ -22,6 +22,7 @@ export const WRITE_STDIN_TOOL = "write_stdin";
 export type ToolHints = {
   readOnlyHint?: boolean | undefined;
   destructiveHint?: boolean | undefined;
+  openWorldHint?: boolean | undefined;
 };
 
 export type GateDecision =
@@ -53,12 +54,15 @@ export function decide(input: GateDecisionInput): GateDecision {
 
 /**
  * A declared hint wins over the name list, so a tool that declares `readOnlyHint: false` or
- * `destructiveHint: true` is gated even when its name matches a local read.
+ * `destructiveHint: true` is gated even when its name matches a local read. Pi's docs say a missing
+ * `openWorldHint` means the tool may reach the network, so only `openWorldHint: false` may pass.
  */
 function isReadOnly(input: GateDecisionInput): boolean {
   const hints = input.hints;
   if (hints?.destructiveHint === true) return false;
-  if (hints?.readOnlyHint !== undefined) return hints.readOnlyHint;
+  if (hints?.readOnlyHint !== undefined) {
+    return hints.readOnlyHint && hints.openWorldHint === false;
+  }
   if (READ_ONLY_TOOLS.has(input.toolName)) return true;
   return input.toolName === WRITE_STDIN_TOOL && !sendsInput(input.input);
 }
