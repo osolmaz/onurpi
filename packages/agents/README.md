@@ -46,12 +46,12 @@ its tests, or generated tracked files.
 ## Skill visibility
 
 The skill catalog in each prompt is a cost. A small, always visible core covers the work that the
-harness must recognize without help: the safety and money skills, the prose and release skills, and
-`herdr`. Every other skill carries `disable-model-invocation: true` in its frontmatter. Such a skill
-stays installed, stays loadable with `/skill:<name>`, and costs no prompt space. Add the flag to a
-new low-use skill instead of deleting it, and remove the flag when the harness must apply the skill
-without being asked. Skills that come from an npm dependency, like the Pi Workflows entry points,
-are excluded with `!` globs in the package manifest that loads them.
+harness must recognize without help: the safety and money skills, the prose and release skills,
+`data-model`, and `herdr`. Every other skill carries `disable-model-invocation: true` in its
+frontmatter. Such a skill stays installed, stays loadable with `/skill:<name>`, and costs no prompt
+space. Add the flag to a new low-use skill instead of deleting it, and remove the flag when the
+harness must apply the skill without being asked. Skills that come from an npm dependency, like the
+Pi Workflows entry points, are excluded with `!` globs in the package manifest that loads them.
 
 ## Design skill
 

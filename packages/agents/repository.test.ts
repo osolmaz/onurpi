@@ -61,6 +61,7 @@ describe("@onurpi/agents package", () => {
 
     const alwaysVisible = [
       "bro",
+      "data-model",
       "extending-pi",
       "herdr",
       "kill-ai-smell",
