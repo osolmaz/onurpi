@@ -1,4 +1,12 @@
+import type { QueueItemMode } from "./queue-model.ts";
+
 export type SubmitDecision = "ignore" | "directive" | "pass" | "enqueue";
+
+/** While the agent is busy, enter captures the prompt as a steering message. */
+export const ENTER_MODE: QueueItemMode = "steer";
+
+/** While the agent is busy, tab captures the prompt as a queued follow-up. */
+export const TAB_MODE: QueueItemMode = "queue";
 
 /**
  * Slash commands and bash directives must go through Pi's own submission
@@ -23,7 +31,7 @@ export function decideSubmit(text: string, busy: boolean): SubmitDecision {
 }
 
 /**
- * Decide whether an explicit queue keypress (tab for steer, alt+enter for
+ * Decide whether an explicit queue keypress (tab or alt+enter, both for a
  * follow-up) should capture the editor content.
  */
 export function decideForcedEnqueue(

@@ -2,7 +2,13 @@ import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 
 import type { QueueItemMode } from "./queue-model.ts";
-import { decideForcedEnqueue, decideSubmit, shouldOpenManagerOnUp } from "./submit-policy.ts";
+import {
+  decideForcedEnqueue,
+  decideSubmit,
+  ENTER_MODE,
+  shouldOpenManagerOnUp,
+  TAB_MODE,
+} from "./submit-policy.ts";
 
 export type QueueEditorHooks = {
   /** True while the agent is running (streaming, retrying, or continuing). */
@@ -19,7 +25,7 @@ export type QueueEditorHooks = {
 
 /**
  * Prompt editor that reroutes submissions while the agent is busy:
- * enter captures a queued follow-up, tab captures a steering message, and
+ * enter captures a steering message, tab captures a queued follow-up, and
  * up (on an empty editor) or alt+up opens the queue manager. Slash and bash
  * commands always fall through to Pi's built-in handling.
  */
@@ -60,7 +66,7 @@ export class QueuePromptEditor extends CustomEditor {
       this.hooks.openManager();
       return true;
     }
-    if (this.bindings.matches(data, "tui.input.tab")) return this.submitForced("steer");
+    if (this.bindings.matches(data, "tui.input.tab")) return this.submitForced(TAB_MODE);
     if (this.bindings.matches(data, "app.message.followUp")) return this.submitForced("queue");
     return false;
   }
@@ -114,7 +120,7 @@ export class QueuePromptEditor extends CustomEditor {
     this.hooks.recordHistory(text);
     if (forced !== undefined || decision === "enqueue") {
       this.addToHistory(text);
-      this.hooks.enqueue(text, forced ?? "queue");
+      this.hooks.enqueue(text, forced ?? ENTER_MODE);
       return;
     }
     this.hooks.onDirectSubmit();

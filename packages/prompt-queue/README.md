@@ -10,8 +10,8 @@ edited, reordered, or deleted before they are sent.
 
 | Key      | While the agent runs                                   | While idle                  |
 | -------- | ------------------------------------------------------ | --------------------------- |
-| `Enter`  | Queue the prompt as a follow-up                        | Send the prompt immediately |
-| `Tab`    | Queue the prompt as a steering message                 | Default tab behavior        |
+| `Enter`  | Queue the prompt as a steering message                 | Send the prompt immediately |
+| `Tab`    | Queue the prompt as a follow-up                        | Default tab behavior        |
 | `Up`     | Open the queue and history manager (empty editor only) | Same                        |
 | `Alt+Up` | Open the queue and history manager                     | Same                        |
 

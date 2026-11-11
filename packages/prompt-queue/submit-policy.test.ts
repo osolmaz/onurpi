@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { decideForcedEnqueue, decideSubmit, shouldOpenManagerOnUp } from "./submit-policy.ts";
+import {
+  decideForcedEnqueue,
+  decideSubmit,
+  ENTER_MODE,
+  shouldOpenManagerOnUp,
+  TAB_MODE,
+} from "./submit-policy.ts";
+
+describe("key modes", () => {
+  it("steers on enter and queues a follow-up on tab", () => {
+    expect(ENTER_MODE).toBe("steer");
+    expect(TAB_MODE).toBe("queue");
+  });
+});
 
 describe("decideSubmit", () => {
   it("ignores blank submissions", () => {
