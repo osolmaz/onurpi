@@ -87,7 +87,6 @@
   },
   "allowScripts": {
     "@google/genai@2.21.0": true,
-    "@homebridge/node-pty-prebuilt-multiarch@0.13.1": true,
     "@homebridge/node-pty-prebuilt-multiarch@0.14.1": true,
     "esbuild@0.28.2": true,
     "protobufjs@7.6.6": true,

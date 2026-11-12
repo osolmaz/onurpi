@@ -56,7 +56,7 @@ TUI peer minimum is now 0.86.1; OnurPi uses 0.87.0 for development.
 - **Background resources:** It owns child processes, timers, output streams, and PTYs. Session
   shutdown terminates owned processes and clears completion scheduling.
 - **Native code:** PTY mode uses the optional, exactly pinned
-  `@homebridge/node-pty-prebuilt-multiarch@0.13.1`. Pipe mode works when the optional module is
+  `@homebridge/node-pty-prebuilt-multiarch@0.14.1`. Pipe mode works when the optional module is
   unavailable.
 
 ## Native PTY audit
@@ -65,11 +65,11 @@ The optional PTY package was audited separately because it loads native code and
 installation lifecycle.
 
 - npm tarball integrity:
-  `sha512-ccQ60nMcbEGrQh0U9E6x0ajW9qJNeazpcM/9CH6J8leyNtJgb+gu24WTBAfBUVeO486ZhscnaxLEITI2HXwhow==`
-- Repository tag: `v0.13.1`, commit `507b670ecd022c8538f35f10d5f13cf3e175005e`
-- Published: July 3, 2025
+  `sha512-JaaTsATWPkOhm/cM2t+IjA2lztDFkoWQYU5VS8ThTsa9VbKhHwp83Cww4t8X/BH0k4Q8cWqvOKmYoGrlwLVhbA==`
+- Repository tag: `v0.14.1`, commit `6a00bd846ed797f7266e130800b33b33bf6aff1e`
+- Published: July 23, 2026
 - License: MIT
-- Supported Node range: 18 through 24
+- Supported Node range: 20 through 26
 - Runtime behavior: loads the ABI-, platform-, architecture-, and libc-specific `pty.node`; it does
   not perform network requests or access credential stores.
 - Install behavior: first loads and tests a bundled prebuild. If no usable bundled prebuild exists,
@@ -77,9 +77,11 @@ installation lifecycle.
   npm's tarball-integrity boundary. If that fails, `node-gyp` compiles the bundled source.
   `postinstall` removes unexpected build artifacts and, on Windows, copies the bundled ConPTY files
   into the release directory.
-- Local verification: Node 22 ABI 127 on Linux arm64 loaded the bundled prebuild and passed the real
-  TTY integration test. The loaded binary's SHA-256 was
-  `664296c69e47f0313b2da6f8e2b352b55df1648255d047ac54bb16e6a096fe72`.
+- Local verification: on this repository's machines, the bundled prebuild loaded and passed the real
+  TTY integration test on Linux arm64 with Node 22 (0.13.1, loaded binary SHA-256
+  `664296c69e47f0313b2da6f8e2b352b55df1648255d047ac54bb16e6a096fe72`) and on macOS arm64 with Node
+  26 (0.14.1, `pty.node` SHA-256
+  `74f1a7b0af0d3cfb1f5978256e46dfb36d4b749ee8e9c3756b52c181b7967b3d`).
 - `npm audit` reported no advisory in the PTY package or its `prebuild-install` dependency chain.
   The workspace's reported advisories were in unrelated Pi development dependencies.
 
@@ -89,6 +91,12 @@ boundary; Unified Exec reports a clear error instead of silently changing execut
 native module cannot load.
 
 ## Local changes
+
+- Moved the optional PTY provider from `@homebridge/node-pty-prebuilt-multiarch@0.13.1` to `0.14.1`,
+  the same pin `packages/restart` uses, so one deduped copy serves both. 0.13.1 declared Node 18
+  through 24, and npm drops an optional dependency whose engine range excludes the running Node
+  version, so on Node 26 the module was never installed and `tty: true` failed without a visible
+  install error.
 
 - Renamed the private package to `@onurpi/unified-exec` and integrated it with OnurPi's package, CI,
   coverage, and Slophammer conventions.
