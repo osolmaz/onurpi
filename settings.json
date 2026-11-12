@@ -1,6 +1,9 @@
 {
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash",
+  "theme": "onur-dark",
   "packages": [
-    "npm:pi-web-access@0.46.0",
+    "npm:pi-web-access@0.47.0",
     "npm:pi-huggingface-oauth@0.5.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
@@ -31,27 +34,26 @@
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
   ],
-  "defaultProvider": "opencode-go",
-  "defaultModel": "deepseek-v4.1-flash",
   "defaultThinkingLevel": "high",
-  "terminal": {
-    "showImages": false,
-    "images": false
-  },
-  "outputPad": 0,
-  "tuiMode": "fullscreen",
-  "theme": "onur-dark",
-  "markdown": {
-    "codeBlockIndent": ""
-  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 27200,
     "keepRecentTokens": 20000
   },
+  "markdown": {
+    "codeBlockIndent": ""
+  },
+  "outputPad": 0,
+  "terminal": {
+    "showImages": false,
+    "images": false
+  },
+  "tuiMode": "fullscreen",
+  "hideThinkingBlock": true,
   "defaultTools": ["+codemode"],
-  "hideThinkingBlock": false,
   "extensionChangelogVersions": {
-    "{\"source\":\"npm:pi-web-access@0.46.0\",\"scope\":\"user\"}": "0.46.0"
+    "{\"source\":\"npm:pi-web-access@0.46.0\",\"scope\":\"user\"}": "0.46.0",
+    "{\"source\":\"npm:pi-huggingface-oauth@0.5.0\",\"scope\":\"user\"}": "0.5.0",
+    "{\"source\":\"npm:pi-web-access@0.47.0\",\"scope\":\"user\"}": "0.47.0"
   }
 }
