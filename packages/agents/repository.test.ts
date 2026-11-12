@@ -33,10 +33,11 @@ describe("@onurpi/agents package", () => {
 
   it("contains the intended unique skills and excludes externally owned skills", () => {
     const skills = discoverSkills(join(packageRoot, "skills"));
-    expect(skills).toHaveLength(53);
-    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(53);
+    expect(skills).toHaveLength(54);
+    expect(new Set(skills.map((skill) => skill.skillId)).size).toBe(54);
     expect(skills.map((skill) => skill.skillId)).toContain("design");
     expect(skills.map((skill) => skill.skillId)).toContain("ts-defaults");
+    expect(skills.map((skill) => skill.skillId)).toContain("rust-defaults");
     for (const removed of ["3d-modeling", "demo-video", "video-editing", "plot-graph"]) {
       expect(skills.map((skill) => skill.skillId)).not.toContain(removed);
     }
@@ -96,7 +97,7 @@ describe("@onurpi/agents package", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(packageRoot, "skills", entry.name, "SKILL.md"))
       .filter(existsSync);
-    expect(topLevelSkillFiles).toHaveLength(53);
+    expect(topLevelSkillFiles).toHaveLength(54);
     expect(topLevelSkillFiles).not.toContain(sandboxSkill);
   });
 
