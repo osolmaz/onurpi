@@ -5,10 +5,10 @@ description:
   Use only when the human explicitly asks to call or use a senior expert model, specifically Claude
   Fable, GPT-6 Astra, or GPT-6.1 Sol through Codex, for review, research, planning, or
   implementation. These models are very expensive to run, so use them sparingly even when
-  authorized. Default to ACPX's local Claude adapter for Claude Fable, use ACPX's Cursor adapter
-  when the human explicitly requests Cursor, and use ACPX's Codex adapter for GPT-6 Astra. Always
-  select the model explicitly, use long timeouts and suitable permissions, preserve substantial work
-  in persistent sessions, and verify results locally.
+  authorized. Start the model as an interactive session in a Herdr Core terminal (`hc`) that the
+  human can watch and steer; do not use ACPX or a one-shot print mode. Always select the model
+  explicitly, give the session a narrow task and written limits, carry messages yourself, and verify
+  results locally.
 ---
 
 # Ask Senpai
@@ -18,131 +18,116 @@ GPT-6.1 Sol through Codex. Do not infer permission from the task type, difficult
 failed local attempts, available budget, or potential usefulness. If the human did not explicitly
 request one of these models, do not invoke it; continue the work yourself or ask first.
 
-Both models are very expensive to run. Use them sparingly in general, including when the human has
-authorized them. Keep the scope and number of calls no larger than the request requires. Never
-launch parallel calls unless the human explicitly asks for parallel calls.
+These models are very expensive to run. Use them sparingly in general, including when the human has
+authorized them. Keep the scope and number of sessions no larger than the request requires. Never
+start parallel sessions unless the human explicitly asks for them.
 
-## Adapter Selection
+## Why a Herdr Core terminal
 
-- Claude Fable: use ACPX's `claude` adapter by default. Use ACPX's `cursor` adapter only when the
-  human explicitly asks to run Fable through Cursor in the current request.
-- OpenAI models (GPT-6 Astra, GPT-6.1 Sol): use ACPX's `codex` adapter. Use it only when the human
-  asks for Codex, OpenAI, or one of these models by name.
+The senior model runs as a normal interactive agent session in a terminal that `hc` keeps alive.
+The human can open that terminal, read every step, and type into it. The session keeps its
+conversation, so a follow-up question or new data goes to the same session. A hidden one-shot
+call gives none of this, and a command that runs inside your own shell dies when your turn is
+interrupted.
 
-Do not infer an adapter or model preference from task difficulty, quota errors, adapter
-availability, or an earlier request. Never silently switch adapters or models.
+Read the `herdr` skill first. It needs `HC_TERMINAL_ID`; if you are not inside Herdr Core, say so
+and stop. Do not fall back to ACPX or to a print mode on your own.
 
-## Required Invocation
+## Adapter selection
 
-Always pass `acpx`, the adapter, and the model explicitly. Run from the target repository or pass
-`--cwd <repo>`.
+- Claude Fable: the `claude` CLI.
+- OpenAI models (GPT-6 Astra, GPT-6.1 Sol): the `codex` CLI. Use it only when the human asks for
+  Codex, OpenAI, or one of these models by name.
+- Cursor: only when the human explicitly asks to run the model through Cursor in the current
+  request. Start the Cursor agent CLI in a terminal in the same way.
 
-### Default: Claude Fable through local Claude Code
+Do not infer an adapter or model preference from task difficulty, quota errors, CLI availability,
+or an earlier request. Never silently switch adapters or models.
 
-For a short or ordinary task, use a 30-minute timeout:
+## Start the session
 
-```bash
-acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5-1 \
-  --approve-reads --non-interactive-permissions deny \
-  claude exec "$PROMPT"
-```
-
-For a very long task, use a 12-hour timeout and a named persistent session:
-
-```bash
-acpx --cwd "$REPO" --timeout 43200 claude sessions ensure --name senpai-fable
-acpx --cwd "$REPO" --timeout 43200 \
-  --model claude-fable-5-1 \
-  --approve-reads --non-interactive-permissions deny \
-  claude -s senpai-fable "$PROMPT"
-```
+Give the session its own working folder: the target repository, or a separate Git worktree of it
+when the model may write files. Write the task to a file first, so that the same text can be sent
+again after an interruption.
 
 ### GPT-6 Astra through Codex
 
-Use the bare advertised model id `gpt-6-astra`:
-
 ```bash
-acpx --cwd "$REPO" --timeout 1800 \
-  --model gpt-6-astra \
-  --approve-reads --non-interactive-permissions deny \
-  codex exec "$PROMPT"
+hc run --bg --keep --name senpai-astra --cwd "$REPO" -- \
+  codex --no-daemon -m gpt-6-astra --approve-for-me
+hc wait senpai-astra
+hc read --lines 40 senpai-astra        # resolve a trust or update dialog before you send
+hc send senpai-astra "$(cat "$PROMPT_FILE")"
 ```
 
-For a very long task, use a 12-hour timeout and a named persistent session:
+- `--no-daemon` keeps Codex's commands inside the `hc` terminal.
+- Decline an update dialog of the CLI unless the human asked for the update.
+- Select reasoning effort in the Codex configuration or with the session's own command, not as a
+  suffix of the model id.
+
+### Claude Fable through Claude Code
 
 ```bash
-acpx --cwd "$REPO" --timeout 43200 codex sessions ensure --name senpai-codex
-acpx --cwd "$REPO" --timeout 43200 \
-  --model gpt-6-astra \
-  --approve-reads --non-interactive-permissions deny \
-  codex -s senpai-codex "$PROMPT"
+hc run --bg --keep --name senpai-fable --cwd "$REPO" -- \
+  claude --model claude-fable-5-2
+hc wait senpai-fable
+hc send senpai-fable "$(cat "$PROMPT_FILE")"
 ```
 
-The Codex adapter advertises bare model ids. It rejects an effort suffix such as
-`gpt-6-astra[xhigh]` with `did not advertise that model`, and its error message lists the ids it
-does advertise. Select reasoning effort separately, either in the Codex configuration or as a
-session option:
+### Model ids
+
+Pass the bare model id that the CLI advertises, such as `gpt-6-astra`. When the human names a model
+that the CLI rejects, try the exact requested id once, then report the ids that the CLI lists and
+ask which one to use; do not substitute silently. Check the list again after a CLI update before
+you assume that a new release is unavailable.
+
+### Continue an earlier session
+
+A session that is still live takes a new message with `hc send`. For a session that ended, resume
+its conversation in a new terminal instead of starting from nothing:
 
 ```bash
-acpx --cwd "$REPO" codex set reasoning_effort xhigh
+hc run --bg --keep --name senpai-astra --cwd "$REPO" -- \
+  codex resume "$SESSION_ID" --no-daemon -m gpt-6-astra --approve-for-me
+hc run --bg --keep --name senpai-fable --cwd "$REPO" -- \
+  claude --model claude-fable-5-2 --resume "$SESSION_ID"
 ```
-
-### OpenAI model ids
-
-The adapter advertises a fixed id list and no `-fast` or `-pro` variants. As of Codex CLI 0.159.2
-the advertised ids are `gpt-6-sol`, `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`,
-`gpt-daybreak-blue-latest`, and `gpt-5.5`. GPT-6.1 Sol (`gpt-6.1-sol`) is the newest OpenAI release
-and the default of pi's OpenAI Codex provider, but the adapter does not advertise it yet and rejects
-it with the list above. When the human names a model the adapter does not advertise, try the exact
-requested id once, then report the advertised list and ask which id to use instead; do not
-substitute silently. Recheck the advertised list after Codex CLI updates before assuming a new
-release is unavailable.
-
-### Explicit Cursor override
-
-When the human explicitly requests Cursor, replace the adapter consistently in both session setup
-and invocation:
-
-```bash
-acpx --cwd "$REPO" --timeout 1800 \
-  --model claude-fable-5-1 \
-  --approve-reads --non-interactive-permissions deny \
-  cursor exec "$PROMPT"
-```
-
-For substantial Cursor work, use a named Cursor session:
-
-```bash
-acpx --cwd "$REPO" --timeout 43200 cursor sessions ensure --name senpai-fable
-acpx --cwd "$REPO" --timeout 43200 \
-  --model claude-fable-5-1 \
-  --approve-reads --non-interactive-permissions deny \
-  cursor -s senpai-fable "$PROMPT"
-```
-
-Use 12 hours for deep repository audits, large implementations, long test loops, or work where
-restarting would lose substantial progress. Do not use a shorter ACPX timeout merely because the
-calling tool polls more frequently; keep polling the running process until ACPX exits.
 
 ## Permissions
 
-- For review, research, or planning, use `--approve-reads` with `--non-interactive-permissions deny`
-  and tell the model not to edit files.
-- For implementation, use `--approve-all` only when the human explicitly authorized the model to
-  make delegated edits and execute commands.
-- ACPX permission modes are mutually exclusive.
+- For review, research, or planning, tell the model in the task not to edit files, and start it in
+  a mode that asks before it writes.
+- For implementation, or for research in which the model must run its own scripts, use the CLI's
+  automatic approval mode with its sandbox (`--approve-for-me` for Codex) only when the human
+  authorized the model to edit and to run commands. Never start a session without a sandbox or with
+  all approvals bypassed unless the human orders exactly that.
+- If the permission system of your own session refuses the start, do not work around it. Report
+  the refusal and give the human the command to run.
+- Write the limits into the task itself: the folder it may write to, the commands it may run, no
+  commit or push, no network, and the project's own rules.
 
-## Working Rules
+## Carry the messages
 
-- Reconfirm that the human explicitly requested the model before every new session or additional
-  call.
+You are the messenger between the senior model and the rest of the work.
+
+- Wait with `hc wait senpai-astra`, never with sleep or polling. Read the screen before you
+  summarize anything.
+- When the session is `blocked` on its own dialog or question, read it. Answer a question about
+  the task from facts that you have or can get; pass a question that only the human can decide to
+  the human. Do not guess.
+- When the model asks for data, get it from the session or person that owns it and send it as a
+  message or as a file in the model's folder.
+- Ask for long answers as a file in its folder, and read that file.
+- Leave the terminal open when the work may continue. Close it only when the human says so or the
+  task is done and its results are saved.
+
+## Working rules
+
+- Reconfirm that the human explicitly requested the model before every new session.
 - State the task, scope, constraints, expected evidence, and output format.
-- Omit low `--max-turns` limits unless the human explicitly requests one.
-- For substantial work, prefer a named session so interrupted output can be recovered with
-  `acpx claude sessions history <name>` by default, `acpx codex sessions history <name>` for GPT-6
-  Astra, or `acpx cursor sessions history <name>` when Cursor was explicitly requested.
-- Treat the answer as advisory. Verify findings, edits, and tests locally before acting on or
-  reporting them.
-- If ACPX rejects the model identifier, read the models the selected adapter advertises, use its
-  exact identifier, and do not silently fall back to another model or adapter.
+- Ask the model to guard its own result: to separate the data it selects on from the data it tests
+  on, to count what it tried, and to say what stays open.
+- Treat the answer as advisory. Verify findings, edits, and tests yourself, with your own check,
+  before you act on them or report them.
+- Results that the project keeps go into the repository through its normal path; files in a
+  temporary worktree are not saved.
