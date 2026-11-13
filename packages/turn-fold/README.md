@@ -2,7 +2,7 @@
 
 Compact transcript rendering and on-demand history for the Pi coding agent.
 
-`@onurpi/turn-fold` keeps Pi's working line and the latest three activity rows visible during a run. Earlier activity becomes one summary row below the user message. When the run stops, that row begins with `Worked for`. Tool rows and intermediate assistant messages disappear, leaving the final response below the summary.
+`@onurpi/turn-fold` keeps Pi's working line and every activity row of the running turn visible. When the run stops, the tool rows and intermediate assistant messages collapse into one summary row below the user message that begins with `Worked for`, leaving the final response below it.
 
 Automatic compactions during a turn appear as `compacted` in the summary. Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a per-turn diffstat such as `3 files +42 −11`, followed by each edited absolute path and its cumulative counters. Interrupted runs retain their last partial response or an interruption message.
 

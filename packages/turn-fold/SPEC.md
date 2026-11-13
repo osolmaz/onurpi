@@ -40,7 +40,7 @@ Turn Fold MUST preserve the native user message and render its local timestamp a
 
 Every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
-Turn Fold MUST leave Pi's working and compaction status indicators under Pi's control. The working indicator remains visible while Pi is running and does not count toward the three-row activity limit.
+Turn Fold MUST leave Pi's working and compaction status indicators under Pi's control. The working indicator remains visible while Pi is running and is not an activity row.
 
 A summary line MUST fit the available terminal width. Turn Fold may truncate it with an ellipsis. Normal summary text uses the theme's warning color. Edit additions use `toolDiffAdded`, and edit deletions use `toolDiffRemoved`.
 
@@ -48,13 +48,13 @@ When an edit diffstat is present, Turn Fold MUST render every unique absolute fi
 
 ## Compact transcript while streaming
 
-The compact transcript shows at most the latest three activity rows in transcript order.
+The compact transcript shows every activity row of the running turn in transcript order. It keeps no earlier-activity summary while the turn streams, because the owner asked to see each message and tool row as it arrives.
 
-When a turn has more than three activity rows, Turn Fold MUST replace all older activity with one streaming summary line. The line appears directly after the user message and before the retained activity rows.
+The streaming summary remains part of the design for a finite activity limit. A finite limit would replace all older activity with one summary line directly after the user message and before the retained rows. With the current unlimited setting, no streaming summary line appears.
 
 The streaming summary reports the number of hidden earlier activities. It may also report cumulative tool and assistant-message counts. The counts cover the whole active turn, including hidden rows. Successful finalized edit results add the current edit diffstat. When the turn has an attached compaction, the summary also reports `compacted`, or the explicit count when more than one compaction occurred.
 
-Example:
+Example of the row that a finite limit would produce:
 
 ```text
 User message
@@ -70,7 +70,7 @@ latest activity 3
 Working...
 ```
 
-Turn Fold MUST invalidate existing transcript components whenever a new sequential activity changes the visible three-row window. Parallel tool rendering is not sufficient to verify this behavior.
+Turn Fold MUST invalidate existing transcript components whenever a new sequential activity adds a row. Parallel tool rendering is not sufficient to verify this behavior.
 
 ## Compact transcript after settlement
 
@@ -199,7 +199,7 @@ Turn Fold patches Pi's built-in transcript component renderers because supported
 
 A release is conforming only when automated or PTY tests verify all of the following:
 
-- Ten sequential tool calls show one streaming summary, the latest three activities, and Pi's working indicator.
+- Ten sequential tool calls show all ten activities, no earlier-activity summary, and Pi's working indicator.
 - User and every visible assistant timestamp render in local time without changing stored epoch values.
 - Settlement leaves the summary directly below the user message and one final content row below it.
 - Interruption retains partial output or `Operation interrupted` below an interrupted summary.

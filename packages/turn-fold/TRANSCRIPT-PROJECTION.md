@@ -59,9 +59,9 @@ Intermediate assistant entries, hidden tool-call source entries, and their tool 
 
 ## Compact active runs
 
-A reconstructed active run keeps its prompt and at most the latest three activity components. The projection also keeps the entries needed to construct those components. A retained tool component requires both its assistant tool-call entry and matching tool-result entry when the result exists.
+A reconstructed active run keeps its prompt and every activity component. The projection also keeps the entries needed to construct those components. A retained tool component requires both its assistant tool-call entry and matching tool-result entry when the result exists.
 
-When earlier activity exists, the first retained activity acts as the streaming-summary anchor. The component renderer emits the cached summary before its native content. If no activity can serve as an anchor, Turn Fold retains one existing compaction or assistant entry that can render the summary without changing session data.
+With the activity limit unlimited, no streaming-summary anchor is chosen. A finite `VISIBLE_ACTIVITY_LIMIT` in `fold-policy.ts` would keep only the newest activities, make the first retained activity the streaming-summary anchor, and let the component renderer emit the cached summary before its native content. If no activity could serve as an anchor, Turn Fold would retain one existing compaction or assistant entry that can render the summary without changing session data.
 
 Components added after replay form the live tail. Render-time folding remains responsible for that tail until Pi's next successful compaction rebuild or another existing supported refresh. Live-tail lookups MUST be constant time, and summary aggregation MUST happen only when an event changes the run. Turn Fold MUST NOT add another private replay trigger to enforce the projection budget between these refreshes.
 

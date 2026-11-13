@@ -1,3 +1,7 @@
+// The owner wants every activity of a running turn on screen, so nothing is folded away while
+// the turn streams. Set this to a finite count to bring the newest-N behavior back.
+export const VISIBLE_ACTIVITY_LIMIT = Number.POSITIVE_INFINITY;
+
 export type FoldDisplay =
   | "hidden"
   | "original"

@@ -429,7 +429,7 @@ it("timestamps skill-only user rows without duplicating timestamps", () => {
   expect(rendered.match(/09:11/gu)).toHaveLength(1);
 });
 
-it("compacts ten sequential tool calls while leaving the working line visible", () => {
+it("keeps ten sequential tool calls visible while leaving the working line visible", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const workingLine = new Text("◆ Working", 0, 0);
@@ -454,18 +454,24 @@ it("compacts ten sequential tool calls while leaving the working line visible", 
 
     const rendered = frame(transcript, workingLine);
     expect(rendered).toContain("◆ Working");
-    expect(toolNames(rendered)).toHaveLength(Math.min(index, 3));
-    if (index > 3) {
-      const hidden = index - 3;
-      expect(rendered).toContain(
-        `${String(hidden)} earlier ${hidden === 1 ? "activity" : "activities"}`,
-      );
-    }
+    expect(toolNames(rendered)).toHaveLength(index);
+    expect(rendered).not.toContain("earlier activit");
   }
 
   const activeFrame = frame(transcript, workingLine);
-  expect(activeFrame.indexOf("7 earlier activities")).toBeLessThan(activeFrame.indexOf("tool_8"));
-  expect(toolNames(activeFrame)).toEqual(["tool_8", "tool_9", "tool_10"]);
+  expect(activeFrame).not.toContain("earlier activit");
+  expect(toolNames(activeFrame)).toEqual([
+    "tool_1",
+    "tool_2",
+    "tool_3",
+    "tool_4",
+    "tool_5",
+    "tool_6",
+    "tool_7",
+    "tool_8",
+    "tool_9",
+    "tool_10",
+  ]);
 
   const finalMessage = assistantMessage(200, [{ text: "Final response", type: "text" }]);
   state.registerAssistantMessage(finalMessage);

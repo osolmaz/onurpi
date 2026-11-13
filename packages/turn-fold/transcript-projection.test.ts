@@ -188,7 +188,7 @@ describe("compact transcript projection", () => {
     ]);
   });
 
-  it("omits a parallel tool batch that cannot fit the active three-activity tail", () => {
+  it("keeps a parallel tool batch in an active run", () => {
     const entries: Entries = [
       user("user", 100),
       assistant("first", 110, [{ text: "First", type: "text" }]),
@@ -211,10 +211,15 @@ describe("compact transcript projection", () => {
       "first",
       "second",
       "third",
+      "batch",
+      "result-1",
+      "result-2",
+      "result-3",
+      "result-4",
     ]);
   });
 
-  it("keeps at most the latest three reconstructed activities for an active run", () => {
+  it("keeps every reconstructed activity of an active run", () => {
     const entries: Entries = [
       user("user", 100),
       assistant("first", 110, [{ text: "First", type: "text" }]),
@@ -228,6 +233,7 @@ describe("compact transcript projection", () => {
 
     expect(ids(project(entries, { activeRun: true }).displayEntries)).toEqual([
       "user",
+      "first",
       "tool-source",
       "tool-result",
       "second",

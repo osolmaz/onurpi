@@ -89,7 +89,7 @@ function editToolResult(
 }
 
 describe("compact streaming", () => {
-  it("shows only the latest three visible activity rows", () => {
+  it("shows every visible activity row of a running turn", () => {
     const state = new TurnFoldState();
     const components = [{}, {}, {}, {}];
 
@@ -103,11 +103,12 @@ describe("compact streaming", () => {
     });
 
     expect(components.map((component) => state.viewFor(component)?.display)).toEqual([
-      "streaming-summary",
+      "original",
       "original",
       "original",
       "original",
     ]);
+    expect(state.viewFor(components[0] ?? {})?.summary).toMatchObject({ hiddenActivities: 0 });
   });
 
   it("reuses cached layout and assistant snapshots across unchanged renders", () => {
@@ -229,9 +230,9 @@ describe("compact streaming", () => {
     state.registerToolStart("tool-live", 145);
     state.associateTool(tool, "tool-live");
 
-    expect(state.viewFor(first)?.display).toBe("streaming-summary");
+    expect(state.viewFor(first)?.display).toBe("original");
     expect(state.viewFor(first, 150)?.summary).toMatchObject({
-      hiddenActivities: 1,
+      hiddenActivities: 0,
       messages: 4,
       running: true,
       tools: 1,

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { CompactionVisibility } from "./compaction-visibility.ts";
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
-import { foldDisplay, type FoldDisplay } from "./fold-policy.ts";
+import { foldDisplay, VISIBLE_ACTIVITY_LIMIT, type FoldDisplay } from "./fold-policy.ts";
 import { historicalRunStarts, type RunBoundary } from "./run-boundary.ts";
 import {
   compactionGroupIndex,
@@ -21,8 +21,6 @@ import {
   numberField,
   stringField,
 } from "./turn-message.ts";
-
-const LIVE_ACTIVITY_LIMIT = 3;
 
 type ComponentKind = "assistant" | "compaction" | "tool";
 
@@ -597,14 +595,14 @@ export class TurnFoldState {
     const parts = this.collectLayoutParts(group);
     const hiddenActivities = Math.max(
       0,
-      group.visibleAssistantKeys.size + group.toolCallIds.size - LIVE_ACTIVITY_LIMIT,
+      group.visibleAssistantKeys.size + group.toolCallIds.size - VISIBLE_ACTIVITY_LIMIT,
     );
     const layout: GroupLayout = {
       failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
       fileDiff: group.editDiffs.summary((path) => resolve(this.workingDirectory, path)),
       finalAnchor: this.finalAnchor(group, parts),
       hiddenActivities,
-      recentActivities: new Set(parts.activities.slice(-LIVE_ACTIVITY_LIMIT)),
+      recentActivities: new Set(parts.activities.slice(-VISIBLE_ACTIVITY_LIMIT)),
       revision: group.revision,
       settledSummaryAnchor: group.components.keys().next().value,
       streamingSummaryAnchor: hiddenActivities > 0 ? parts.activities[0] : undefined,
