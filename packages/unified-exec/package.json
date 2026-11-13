@@ -37,7 +37,7 @@
     "typebox": "*"
   },
   "optionalDependencies": {
-    "@homebridge/node-pty-prebuilt-multiarch": "0.14.1"
+    "@homebridge/node-pty-prebuilt-multiarch": "0.15.0"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.5.2",

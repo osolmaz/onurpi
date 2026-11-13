@@ -56,7 +56,7 @@ TUI peer minimum is now 0.86.1; OnurPi uses 0.87.0 for development.
 - **Background resources:** It owns child processes, timers, output streams, and PTYs. Session
   shutdown terminates owned processes and clears completion scheduling.
 - **Native code:** PTY mode uses the optional, exactly pinned
-  `@homebridge/node-pty-prebuilt-multiarch@0.14.1`. Pipe mode works when the optional module is
+  `@homebridge/node-pty-prebuilt-multiarch@0.15.0`. Pipe mode works when the optional module is
   unavailable.
 
 ## Native PTY audit
@@ -65,38 +65,40 @@ The optional PTY package was audited separately because it loads native code and
 installation lifecycle.
 
 - npm tarball integrity:
-  `sha512-JaaTsATWPkOhm/cM2t+IjA2lztDFkoWQYU5VS8ThTsa9VbKhHwp83Cww4t8X/BH0k4Q8cWqvOKmYoGrlwLVhbA==`
-- Repository tag: `v0.14.1`, commit `6a00bd846ed797f7266e130800b33b33bf6aff1e`
-- Published: July 23, 2026
+  `sha512-kzcNCO8Ak4ozf3CV5Hynu3hnDdgRTYCZUYINs6uODH//a3AwSW9uMc/TVuGtpz+39sh9gPKIQdnKNX+t20fRtg==`
+- Repository tag: `v0.15.0`, commit `30b5d67b04b3a165288d16e0692c77c52b1d54ed`
+- Published: October 29, 2026
 - License: MIT
-- Supported Node range: 20 through 26
-- Runtime behavior: loads the ABI-, platform-, architecture-, and libc-specific `pty.node`; it does
-  not perform network requests or access credential stores.
-- Install behavior: first loads and tests a bundled prebuild. If no usable bundled prebuild exists,
-  `prebuild-install` may download a release asset from the dependency's GitHub release, outside
-  npm's tarball-integrity boundary. If that fails, `node-gyp` compiles the bundled source.
-  `postinstall` removes unexpected build artifacts and, on Windows, copies the bundled ConPTY files
-  into the release directory.
-- Local verification: on this repository's machines, the bundled prebuild loaded and passed the real
-  TTY integration test on Linux arm64 with Node 22 (0.13.1, loaded binary SHA-256
-  `664296c69e47f0313b2da6f8e2b352b55df1648255d047ac54bb16e6a096fe72`) and on macOS arm64 with Node
-  26 (0.14.1, `pty.node` SHA-256
-  `74f1a7b0af0d3cfb1f5978256e46dfb36d4b749ee8e9c3756b52c181b7967b3d`).
-- `npm audit` reported no advisory in the PTY package or its `prebuild-install` dependency chain.
-  The workspace's reported advisories were in unrelated Pi development dependencies.
+- Supported Node range: 20 and later (`engines.node` is `>=20.0.0`)
+- Runtime behavior: loads the platform-, architecture-, and libc-specific `pty.node` from the
+  bundled `prebuilds/` directory; it does not perform network requests or access credential stores.
+- Install behavior: the tarball ships prebuilds for 11 platform and architecture pairs.
+  `scripts/prebuild.js` only checks that the current platform's binary exists and loads, which
+  catches ABI and libc mismatches, and a failure falls back to `node-gyp rebuild` from the bundled
+  source. The package depends on nothing but `node-addon-api`, so no release asset is ever
+  downloaded from outside npm's tarball-integrity boundary. This is tighter than 0.14.1, which used
+  `prebuild-install` and could fetch a GitHub release asset.
+- Local verification: on Linux arm64 with Node 26.13.1, 0.15.0 loaded the bundled prebuild,
+  `prebuilds/linux-arm64/pty.node` with SHA-256
+  `03584704e36447db2e6329e417b46c20015040b242b757980060c2808d72e071`, and a real spawn of `/bin/sh`
+  returned `/dev/pts/0` with exit code 0. Earlier records: 0.13.1 on Linux arm64 with Node 22, and
+  0.14.1 on macOS arm64 with Node 26.
+- `npm audit` reported no advisory in the PTY package. The workspace's reported advisories were in
+  unrelated Pi development dependencies.
 
-A successful npm integrity check authenticates the package tarball, including bundled Linux
-prebuilds, but not a fallback GitHub download. PTY therefore remains optional and a separate trust
-boundary; Unified Exec reports a clear error instead of silently changing execution mode when the
-native module cannot load.
+A successful npm integrity check authenticates the package tarball, including its bundled prebuilds,
+and 0.15.0 has no download path for fallback binaries. PTY therefore remains optional and a separate
+trust boundary; Unified Exec reports a clear error instead of silently changing execution mode when
+the native module cannot load.
 
 ## Local changes
 
 - Moved the optional PTY provider from `@homebridge/node-pty-prebuilt-multiarch@0.13.1` to `0.14.1`,
-  the same pin `packages/restart` uses, so one deduped copy serves both. 0.13.1 declared Node 18
-  through 24, and npm drops an optional dependency whose engine range excludes the running Node
-  version, so on Node 26 the module was never installed and `tty: true` failed without a visible
-  install error.
+  then to `0.15.0`, keeping it on the same pin `packages/restart` uses so one deduped copy serves
+  both. 0.13.1 declared Node 18 through 24, and npm drops an optional dependency whose engine range
+  excludes the running Node version, so on Node 26 the module was never installed and `tty: true`
+  failed without a visible install error. 0.14.1 fixed that; 0.15.0 additionally bundles prebuilds
+  in the npm tarball instead of downloading them, and declares `>=20.0.0`.
 
 - Renamed the private package to `@onurpi/unified-exec` and integrated it with OnurPi's package, CI,
   coverage, and Slophammer conventions.
