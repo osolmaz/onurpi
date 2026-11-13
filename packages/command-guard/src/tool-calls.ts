@@ -6,6 +6,7 @@ import { checkCommand } from "./decision.ts";
 import { ExecutionCheckStore } from "./execution-check.ts";
 import { commandContext } from "./contexts.ts";
 import { isControlOnlyInput, resolveCommandInput } from "./events.ts";
+import type { GuardState } from "./state.ts";
 
 function block(reason: string): ToolCallEventResult {
   return { block: true, reason: `command guard: ${reason}` };
@@ -60,8 +61,10 @@ export function registerToolCallGuards(
   pi: ExtensionAPI,
   checks: ExecutionCheckStore,
   coverage: AdapterCoverage,
+  state: GuardState,
 ): void {
   pi.on("tool_call", async (event, ctx) => {
+    if (!state.enabled) return undefined;
     if (event.toolName === "exec_command") {
       return guardExecCommand(event, ctx, checks);
     }

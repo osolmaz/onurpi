@@ -7,6 +7,7 @@ import { commandContext } from "../src/contexts.ts";
 import { checkCommand } from "../src/decision.ts";
 import { ExecutionCheckStore } from "../src/execution-check.ts";
 import { withCommandGuardGuidance } from "../src/guidance.ts";
+import { createGuardState } from "../src/state.ts";
 import { shellStatus } from "../src/status.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -25,7 +26,7 @@ describe("shell availability", () => {
         return () => undefined;
       },
     };
-    registerShellGuards(pi, new ExecutionCheckStore());
+    registerShellGuards(pi, new ExecutionCheckStore(), createGuardState());
     expect(names).toEqual(platform === "win32" ? ["bash", "powershell"] : ["bash"]);
     expect(events).toEqual(["user_bash"]);
   });

@@ -15,6 +15,7 @@ import { AdapterCoverage } from "../src/adapters.ts";
 import { guardedOperations } from "../src/builtins.ts";
 import { checkCommand } from "../src/decision.ts";
 import { ExecutionCheckStore } from "../src/execution-check.ts";
+import { createGuardState } from "../src/state.ts";
 import { commandContext } from "../src/contexts.ts";
 import { guardExecCommand, guardWriteStdin } from "../src/tool-calls.ts";
 import {
@@ -54,7 +55,12 @@ describe("command decision", () => {
 describe("final shell operation", () => {
   it("delegates exact non-critical deletion but not a blocked command", async () => {
     const exec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const operations = guardedOperations({ exec }, "bash", new ExecutionCheckStore());
+    const operations = guardedOperations(
+      { exec },
+      "bash",
+      new ExecutionCheckStore(),
+      createGuardState(),
+    );
     const options = { onData: vi.fn(), env: process.env };
     await expect(operations.exec("rm -f file", directory, options)).resolves.toEqual({
       exitCode: 0,
@@ -62,7 +68,12 @@ describe("final shell operation", () => {
     expect(exec).toHaveBeenCalledOnce();
 
     const blockedExec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const blocked = guardedOperations({ exec: blockedExec }, "bash", new ExecutionCheckStore());
+    const blocked = guardedOperations(
+      { exec: blockedExec },
+      "bash",
+      new ExecutionCheckStore(),
+      createGuardState(),
+    );
     await expect(blocked.exec("rm -rf .", directory, options)).rejects.toThrow("command guard");
     expect(blockedExec).not.toHaveBeenCalled();
   });
@@ -181,7 +192,7 @@ describe("unified-exec final adapter", () => {
       guardContext(),
       checks,
     );
-    const stop = registerUnifiedExecGuards(checks);
+    const stop = registerUnifiedExecGuards(checks, createGuardState());
     try {
       const spawn = commandEnvironmentEvent(
         "registered",

@@ -91,11 +91,30 @@ The command shows active guarded tools, unsupported command tools that were disa
 one-use checks, platform support, and parser availability. A parser check does not prove that a
 shell command can execute. Status output does not show environment values or command contents.
 
+## Manual switch
+
+The owner can switch the guard off for the current session:
+
+```text
+/command-guard off
+/command-guard on
+```
+
+While it is off, every guarded route passes commands through unchecked: the `bash` and `powershell`
+oversions, direct `!` commands, `exec_command`, `write_stdin`, and the Unified Exec final checks.
+The extension also stops adding its guidance to the system prompt and stops disabling unsupported
+command tools. `/command-guard on` restores all of that.
+
+The switch is session-scoped. It always starts on, so a restart returns to a guarded session. No
+settings file, environment variable, project setting, model tool, or confirmation prompt can move
+it. Only a command the owner types moves it. When the switch is off, the status text says so, and
+the toast that confirms the change is a warning.
+
 A refusal applies to the checked command. After a parser, syntax, platform, or tool-availability
 failure, the agent should test one small, independent read-only command through an available guarded
 shell before reporting that command execution is unavailable. The extension includes this rule in
-model-visible guidance. It never permits rerouting a denied destructive action or disabling the
-guard.
+model-visible guidance while the switch is on. It never permits rerouting a denied destructive
+action.
 
 ## Limits
 

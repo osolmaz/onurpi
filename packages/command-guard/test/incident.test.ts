@@ -11,6 +11,7 @@ import {
 import { runFinalSpawnPolicies } from "@onurpi/unified-exec/command-policy";
 
 import { ExecutionCheckStore } from "../src/execution-check.ts";
+import { createGuardState } from "../src/state.ts";
 import { guardedOperations } from "../src/builtins.ts";
 import { commandContext } from "../src/contexts.ts";
 import { evaluateCommand } from "../src/policy.ts";
@@ -48,7 +49,12 @@ describe("HOME cleanup incident regression", () => {
 
   it("does not delegate the incident through the guarded built-in shell", async () => {
     const exec = vi.fn(() => Promise.resolve({ exitCode: 0 }));
-    const operations = guardedOperations({ exec }, "bash", new ExecutionCheckStore());
+    const operations = guardedOperations(
+      { exec },
+      "bash",
+      new ExecutionCheckStore(),
+      createGuardState(),
+    );
 
     await expect(
       operations.exec(INCIDENT, directory, {
@@ -77,7 +83,7 @@ describe("HOME cleanup incident regression", () => {
         checks,
       ),
     ).resolves.toBeUndefined();
-    const stop = registerUnifiedExecGuards(checks);
+    const stop = registerUnifiedExecGuards(checks, createGuardState());
     try {
       const finalRequest = commandEnvironmentEvent(
         "mutated",

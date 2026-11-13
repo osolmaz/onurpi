@@ -6,6 +6,7 @@ import {
 import { ExecutionCheckStore } from "./execution-check.ts";
 import { commandContext } from "./contexts.ts";
 import { isCommandEnvironmentEvent, isCommandInputEvent, isControlOnlyInput } from "./events.ts";
+import type { GuardState } from "./state.ts";
 
 function finalEnvironmentError(
   value: FinalCommandEnvironmentRequest,
@@ -57,9 +58,12 @@ export function handleCommandInput(value: unknown): void {
   }
 }
 
-export function registerUnifiedExecGuards(checks: ExecutionCheckStore): () => void {
+export function registerUnifiedExecGuards(
+  checks: ExecutionCheckStore,
+  state: GuardState,
+): () => void {
   return registerFinalCommandPolicy({
-    checkSpawn: (request) => finalEnvironmentError(request, checks),
-    checkInput: finalInputError,
+    checkSpawn: (request) => (state.enabled ? finalEnvironmentError(request, checks) : undefined),
+    checkInput: (request) => (state.enabled ? finalInputError(request) : undefined),
   });
 }
