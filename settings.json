@@ -1,7 +1,6 @@
 {
   "packages": [
     "npm:pi-web-access@0.47.0",
-    "npm:pi-huggingface-oauth@0.5.0",
     "../../repos/onurpi/packages/prompt-queue",
     "../../repos/onurpi/packages/restart",
     "../../repos/onurpi/packages/turn-fold",
