@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { CompactionVisibility } from "./compaction-visibility.ts";
 import { editDiffFromToolResult, type EditDiffSummary, TurnEditDiffs } from "./edit-diff-stat.ts";
 import type { CompactionReason, EphemeralCompactionAssociation } from "./ephemeral-compactions.ts";
-import { foldDisplay, VISIBLE_ACTIVITY_LIMIT, type FoldDisplay } from "./fold-policy.ts";
+import { foldDisplay, FOLD_POLICY, type FoldDisplay } from "./fold-policy.ts";
 import { historicalRunStarts, type RunBoundary } from "./run-boundary.ts";
 import {
   compactionGroupIndex,
@@ -456,6 +456,14 @@ export class TurnFoldState {
     });
     return { display, summary: this.summary(group, layout, now) };
   }
+
+  // The assistant row that carries the outcome of a turn, such as the interruption notice of an
+  // aborted run whose last message rendered nothing.
+  isFinalAnchorFor(component: object): boolean {
+    const groupId = this.componentInfo.get(component)?.groupId;
+    const group = groupId ? this.groups.get(groupId) : undefined;
+    return group ? this.layoutFor(group).finalAnchor === component : false;
+  }
   private queueLiveCompactionComponents(groupId: string | null): void {
     // Pi rebuilds the stored compaction row, then appends a second live row.
     this.pendingLiveCompactionGroups.push(groupId, groupId);
@@ -595,14 +603,14 @@ export class TurnFoldState {
     const parts = this.collectLayoutParts(group);
     const hiddenActivities = Math.max(
       0,
-      group.visibleAssistantKeys.size + group.toolCallIds.size - VISIBLE_ACTIVITY_LIMIT,
+      group.visibleAssistantKeys.size + group.toolCallIds.size - FOLD_POLICY.visibleActivityLimit,
     );
     const layout: GroupLayout = {
       failedTools: new Set([...group.failedToolCallIds, ...group.terminalErrorToolCallIds]).size,
       fileDiff: group.editDiffs.summary((path) => resolve(this.workingDirectory, path)),
       finalAnchor: this.finalAnchor(group, parts),
       hiddenActivities,
-      recentActivities: new Set(parts.activities.slice(-VISIBLE_ACTIVITY_LIMIT)),
+      recentActivities: new Set(parts.activities.slice(-FOLD_POLICY.visibleActivityLimit)),
       revision: group.revision,
       settledSummaryAnchor: group.components.keys().next().value,
       streamingSummaryAnchor: hiddenActivities > 0 ? parts.activities[0] : undefined,

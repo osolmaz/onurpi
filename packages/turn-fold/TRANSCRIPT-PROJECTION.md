@@ -47,15 +47,15 @@ Each replay MUST use one root-to-leaf branch snapshot. The replay integration pe
 
 Turn Fold MUST NOT load state from one branch snapshot while returning entries from another. If reduction or projection fails, the integration MUST replay Pi's own entry list unchanged and report one warning. It MUST NOT return a partial projection. Pi renders the newest compaction entry itself when it rebuilds the transcript after a compaction, so the integration MUST NOT add that entry when Pi omits it from the entries it offers.
 
-## Compact settled runs
+## Settled runs
 
-A settled run keeps its prompt row and one final display component. The final component follows the selection order in [SPEC.md](SPEC.md): terminal tool error, latest visible assistant content, final tool result, then the interruption fallback.
+A settled run keeps every row of its run in native rendering. The projection keeps the prompt, every activity entry, and the entries needed to rebuild them, so a reload shows the same rows as the live transcript. Attached compactions keep their rows, and the duplicate live compaction row stays hidden.
 
-When the final component is an assistant message, the projection keeps its original message entry. The patched assistant renderer emits the cached settled summary followed by the original final content.
+With `FOLD_SETTLED_TURNS` true, the run collapses instead. The projection then keeps its prompt and one final display component, selected in the order in [SPEC.md](SPEC.md): terminal tool error, latest visible assistant content, final tool result, then the interruption fallback. A retained assistant component renders the cached settled summary followed by the original final content. A retained tool component renders the cached settled summary followed by the native final tool output.
 
-When the final component is a tool result, the projection keeps the assistant entry containing that tool call and its matching tool-result entry. Pi therefore creates one complete `ToolExecutionComponent`. The patched tool renderer emits the cached settled summary followed by the native final tool output.
+Intermediate assistant entries, hidden tool-call source entries, and their tool results MUST stay out of the display projection while the fold is enabled. Their data remains available in the source snapshot and contributes to the summary.
 
-Intermediate assistant entries, hidden tool-call source entries, and their tool results MUST stay out of the display projection. Their data remains available in the source snapshot and contributes to the summary.
+The compact projection budget still applies. A run whose entries exceed the budget keeps only its prompt, with its remaining content available through the history explorer.
 
 ## Compact active runs
 

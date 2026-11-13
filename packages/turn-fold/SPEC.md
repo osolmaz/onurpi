@@ -14,11 +14,13 @@ An **activity row** is a visible assistant text or thinking row, or a tool execu
 
 An **attached compaction** is an automatic threshold or overflow compaction observed while a Turn Fold turn is active. Attached compaction state is ephemeral display state and is not an activity row or final content row. A manual compaction performed while Pi is idle is a **standalone compaction**.
 
-A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. A settled turn has a **settled summary line**, which begins with `Worked for`.
+A **summary line** is a synthetic row created by Turn Fold. A running turn may have a **streaming summary line**. When the settled fold is enabled, a settled turn has a **settled summary line**, which begins with `Worked for`.
+
+A **fold policy** is the pair of switches in `fold-policy.ts`. `VISIBLE_ACTIVITY_LIMIT` bounds how many activity rows stay visible while a turn runs, and `FOLD_SETTLED_TURNS` decides whether a settled turn collapses into a settled summary line. The shipped configuration is unlimited activity and no settled fold: every row stays visible from the first activity until the turn ends, and it stays visible afterward.
 
 An **edit diffstat** is the cumulative number of added and removed lines from successful finalized `edit` tool results in one turn, plus the number of unique edited files. Relative patch paths are resolved against Pi's working directory before display and deduplication. It describes edit operations. The final Git working-tree difference can be different.
 
-The **final content row** is the one assistant or tool row retained after a compact turn settles.
+The **final content row** is the last assistant or tool row of a turn. It carries the outcome of an aborted turn whose terminal row renders nothing.
 
 A **display unit** is one item in compact replay selection. A run unit contains its prompt, its compact assistant or tool representation, and every displayable pass-through entry owned by that run. A displayable pass-through entry with no run owner is a standalone unit.
 
@@ -38,7 +40,7 @@ If the newest or active run alone exceeds the complete component budget, Turn Fo
 
 Turn Fold MUST preserve the native user message and render its local timestamp as dim, right-aligned metadata on its bottom line. Every visible assistant message MUST show its local timestamp as dim, right-aligned metadata beneath its content. When a user row follows another turn, Turn Fold suppresses Pi's outer separator and keeps the user message's built-in top padding, so only one blank line remains. Timestamps use `HH:mm` for the current local date and `YYYY-MM-DD HH:mm` for older dates.
 
-Every summary line MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
+When a summary line appears, it MUST occupy the first Turn Fold-managed position after the user message. Activity and final content appear below the summary line. Turn Fold MUST NOT place a summary line below the final content row.
 
 Turn Fold MUST leave Pi's working and compaction status indicators under Pi's control. The working indicator remains visible while Pi is running and is not an activity row.
 
@@ -72,46 +74,51 @@ Working...
 
 Turn Fold MUST invalidate existing transcript components whenever a new sequential activity adds a row. Parallel tool rendering is not sufficient to verify this behavior.
 
-## Compact transcript after settlement
+## Settled turns
 
-A settled compact turn MUST show one settled summary line followed by one final content row. Tool rows and intermediate assistant rows disappear.
+With `FOLD_SETTLED_TURNS` false, a settled turn MUST keep every row in its native rendering. No settled summary line appears, and no tool row, intermediate assistant row, or attached compaction row disappears when the turn ends. Assistant rows keep the completion timestamp they carry while running.
+
+```text
+User message
+                              18:43
+
+● Reading src/a.ts · $ sed -n 1,40p src/a.ts
+
+● Editing 2 files · $ apply_patch
+
+Final assistant response
+                              18:44
+```
+
+A settled turn MUST hide only rows that no activity backs, such as the duplicate live compaction row that Pi emits beside a rebuilt compaction row. Every activity of the turn keeps its own row.
+
+An attached compaction keeps its own row and Pi's spacing. An aborted turn whose terminal assistant row renders nothing MUST show `Operation interrupted` for that row, including after reload. Terminal provider and tool failures keep their own failed rows, so the last failure and every earlier failure stay readable.
 
 ```text
 User message
 
-▶ Worked for 14s · 8 tools · 9 msgs · 2 files +12 −4
-  /workspace/project/src/a.ts +8 −1
-  /workspace/project/src/b.ts +4 −3
+● $ failing-tool
+  Error: provider failure
 
-Final assistant response
-                              18:43
+Operation interrupted
+                              18:44
 ```
 
-The settled summary reports elapsed time with compact units from seconds through weeks, omitting zero-valued units. It may include assistant-message and tool counts, failure and compaction counts, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
-
-The compact transcript MUST hide the original row for an attached compaction. If that row is the first Turn Fold-managed component, it may serve as the summary-line anchor. Turn Fold MUST also suppress Pi's outer spacer for a hidden or replaced attached compaction. Standalone compactions retain Pi's original row and spacing.
-
-The final content row is selected in this order:
+With `FOLD_SETTLED_TURNS` true, a settled turn collapses into one settled summary line followed by one final content row, and the last content row is selected in this order:
 
 1. The last terminal tool error when a provider ends on failed or incomplete tool calls.
 2. The latest assistant row with visible content or a terminal notice.
 3. The last tool result when no assistant row can represent the result.
 4. A generated fallback message when the turn has no displayable assistant or tool content.
 
-A normally completed turn should therefore retain the final assistant response. A tool-only turn retains its final tool result.
+A settled summary line reports elapsed time with compact units from seconds through weeks, omitting zero-valued units. It may include assistant-message and tool counts, failure and compaction counts, and output-token counts when those values are available. Successful finalized edit results add a compact item such as `3 files +42 −11` and the per-file rows described above. A single attached compaction appears as `compacted`; multiple attached compactions use an explicit count. Zero-valued optional counts may be omitted.
 
 ## Interrupted turns
 
-An interrupted compact turn MUST retain one final content row below the settled summary line.
-
-If Pi produced partial assistant text, that partial text is the final content row. If no partial text or tool result is available, Turn Fold renders `Operation interrupted` as the fallback.
-
-The settled summary includes `interrupted`. The fallback or partial response MUST remain visible after reload.
+An interrupted turn MUST show its partial assistant text, or `Operation interrupted` when its terminal row renders nothing. With `FOLD_SETTLED_TURNS` true, that row stays below one settled summary line that includes `interrupted`. With the fold disabled, the row appears in place among the rows of the turn. Either way, the fallback or partial response MUST remain visible after reload.
 
 ```text
 User message
-
-▶ Worked for 11s · 1 msg · interrupted
 
 Operation interrupted
                               18:43
@@ -119,9 +126,9 @@ Operation interrupted
 
 ## Failed turns
 
-Terminal provider and tool failures MUST leave a useful error row below the settled summary. When several pending tool calls fail together, Turn Fold retains the last failed tool row deterministically and counts every failure in the summary.
+Terminal provider and tool failures MUST keep their failed rows readable. When several pending tool calls fail together, every failure keeps its own row while the fold is disabled. With the fold enabled, Turn Fold retains the last failed tool row deterministically below the summary line and counts every failure in the summary.
 
-Stale partial assistant text MUST NOT replace a terminal tool error selected as the final content row.
+Stale partial assistant text MUST NOT replace a terminal tool error selected as the final content row of a folded turn.
 
 ## History explorer
 

@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import {
   AssistantMessageComponent,
   CompactionSummaryMessageComponent,
@@ -180,68 +178,13 @@ it("renders local user and completion times in transcript order", () => {
 
   const rendered = frame(transcript);
   expect(rendered.indexOf("Prompt")).toBeLessThan(rendered.indexOf("08:05"));
-  expect(rendered.indexOf("08:05")).toBeLessThan(rendered.indexOf("Worked for"));
-  expect(rendered).toContain("Worked for 1m · 1 msg");
-  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Final response"));
+  expect(rendered.indexOf("08:05")).toBeLessThan(rendered.indexOf("Final response"));
   expect(rendered.indexOf("Final response")).toBeLessThan(rendered.indexOf("08:06"));
+  expect(rendered).not.toContain("Worked for");
   expect(rendered).not.toContain("Ctrl+Shift+O");
 });
 
-it("renders per-file diffstats beside paths only in compact summaries", () => {
-  const workingDirectory = resolve("/workspace/project");
-  const expectedPath = resolve(workingDirectory, "src/example.ts");
-  const state = new TurnFoldState(workingDirectory);
-  const transcript = new Container();
-  restore = installRenderPatches(state, () => undefined);
-  const toolCaller = assistantMessage(110, [
-    {
-      arguments: { edits: [{ newText: "new", oldText: "old" }], path: "src/example.ts" },
-      id: "edit-live",
-      name: "edit",
-      type: "toolCall",
-    },
-  ]);
-  const final = assistantMessage(140, [{ text: "Final response", type: "text" }]);
-  const editResult = {
-    content: [{ text: "edited", type: "text" as const }],
-    details: {
-      patch: [
-        "--- src/example.ts",
-        "+++ src/example.ts",
-        "@@ -1,1 +1,2 @@",
-        "-old",
-        "+new",
-        "+added",
-        "",
-      ].join("\n"),
-    },
-    isError: false,
-    role: "toolResult" as const,
-    timestamp: 130,
-    toolCallId: "edit-live",
-    toolName: "edit",
-  };
-
-  state.loadHistory([
-    { message: { content: "Prompt", role: "user", timestamp: 100 }, type: "message" },
-    { message: toolCaller, type: "message" },
-    { message: editResult, type: "message" },
-    { message: final, timestamp: new Date(150).toISOString(), type: "message" },
-  ]);
-  transcript.addChild(new UserMessageComponent("Prompt", undefined, 0));
-  transcript.addChild(new AssistantMessageComponent(toolCaller, false, undefined, undefined, 0));
-  transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
-
-  const compact = frame(transcript);
-  expect(compact).toContain("1 file +2 −1");
-  const fileLine = compact.split("\n").find((line) => line.includes(expectedPath));
-  expect(fileLine).toContain("+2 −1");
-  expect(visibleWidth(fileLine ?? "")).toBeLessThanOrEqual(120);
-  expect(compact.indexOf("1 file +2 −1")).toBeLessThan(compact.indexOf(expectedPath));
-  expect(compact.indexOf(expectedPath)).toBeLessThan(compact.indexOf("Final response"));
-});
-
-it("timestamps every visible compact user and assistant message", () => {
+it("timestamps every user and assistant message", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -265,11 +208,11 @@ it("timestamps every visible compact user and assistant message", () => {
 
   const compact = frame(transcript);
   expect(compact.match(/08:01/gu)).toHaveLength(1);
-  expect(compact).not.toContain("08:02");
+  expect(compact.match(/08:02/gu)).toHaveLength(1);
   expect(compact.match(/08:03/gu)).toHaveLength(1);
 });
 
-it("folds an automatic compaction into the turn summary", () => {
+it("keeps an automatic compaction visible in the finished turn", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -309,14 +252,14 @@ it("folds an automatic compaction into the turn summary", () => {
   transcript.addChild(new AssistantMessageComponent(final, false, undefined, undefined, 0));
 
   const compact = frame(transcript);
-  expect(compact).toContain("Worked for <1s · 1 msg · compacted");
   expect(compact).toContain("Final response");
-  expect(compact).not.toContain("[compaction]");
-  expect(compact).not.toContain("Compacted from 12,345 tokens");
-  expect(compactionSpacer.render(120)).toEqual([]);
+  expect(compact).toContain("[compaction]");
+  expect(compact).toContain("Compacted from 12,345 tokens");
+  expect(compact).not.toContain("Worked for");
+  expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
-it("folds both compaction rows emitted after a live automatic compaction", () => {
+it("hides the duplicate live compaction row", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -335,9 +278,10 @@ it("folds both compaction rows emitted after a live automatic compaction", () =>
   state.settleActive(150);
 
   const compact = frame(transcript);
-  expect(compact).toContain("Worked for <1s · 1 msg · compacted");
-  expect(compact).not.toContain("[compaction]");
-  expect(rebuiltSpacer.render(120)).toEqual([]);
+  expect(compact.match(/\[compaction\]/gu)).toHaveLength(1);
+  expect(compact).toContain("Final response");
+  expect(compact).not.toContain("Worked for");
+  expect(rebuiltSpacer.render(120)).toEqual([""]);
   expect(liveSpacer.render(120)).toEqual([]);
 });
 
@@ -359,10 +303,9 @@ it("keeps a manual idle compaction as a standalone row", () => {
   transcript.addChild(compactionComponent(160));
 
   const rendered = frame(transcript);
-  expect(rendered).toContain("Worked for <1s · 1 msg");
-  expect(rendered).not.toContain("compacted");
   expect(rendered).toContain("[compaction]");
   expect(rendered).toContain("Compacted from 12,345 tokens");
+  expect(rendered).not.toContain("Worked for");
   expect(compactionSpacer.render(120)).toEqual([""]);
 });
 
@@ -429,7 +372,7 @@ it("timestamps skill-only user rows without duplicating timestamps", () => {
   expect(rendered.match(/09:11/gu)).toHaveLength(1);
 });
 
-it("keeps ten sequential tool calls visible while leaving the working line visible", () => {
+it("keeps ten sequential tool calls visible before and after the turn settles", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const workingLine = new Text("◆ Working", 0, 0);
@@ -486,13 +429,13 @@ it("keeps ten sequential tool calls visible while leaving the working line visib
   state.settleActive(250);
 
   const settledFrame = frame(transcript);
-  expect(toolNames(settledFrame)).toEqual([]);
+  expect(toolNames(settledFrame)).toHaveLength(10);
   expect(settledFrame).toContain("Final response");
-  expect(settledFrame).toContain("Worked for");
-  expect(settledFrame.indexOf("Worked for")).toBeLessThan(settledFrame.indexOf("Final response"));
+  expect(settledFrame).not.toContain("Worked for");
+  expect(settledFrame.indexOf("tool_10")).toBeLessThan(settledFrame.indexOf("Final response"));
 });
 
-it("chooses the final historical tool on the first replay frame", () => {
+it("replays every historical tool of a finished turn", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const ui = stoppedTui();
@@ -543,12 +486,12 @@ it("chooses the final historical tool on the first replay frame", () => {
   }
 
   const firstFrame = frame(transcript);
-  expect(toolNames(firstFrame)).toEqual(["tool_3"]);
-  expect(firstFrame.match(/Worked for/gu)).toHaveLength(1);
-  expect(firstFrame.indexOf("Worked for")).toBeLessThan(firstFrame.indexOf("tool_3"));
+  expect(toolNames(firstFrame)).toEqual(["tool_1", "tool_2", "tool_3"]);
+  expect(firstFrame).not.toContain("Worked for");
+  expect(firstFrame.indexOf("tool_3")).toBeLessThan(firstFrame.indexOf("result 3"));
 });
 
-it("renders an interruption fallback after the worked line", () => {
+it("renders an interruption fallback for an aborted turn", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   restore = installRenderPatches(state, () => undefined);
@@ -565,13 +508,12 @@ it("renders an interruption fallback after the worked line", () => {
 
   const rendered = frame(transcript);
   expect(rendered).toContain("Operation interrupted");
-  expect(rendered).toContain("Worked for");
-  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Operation interrupted"));
+  expect(rendered).not.toContain("Worked for");
   expect(transcript.render(8).every((line) => visibleWidth(line) <= 8)).toBe(true);
   expect(transcript.render(0)).toEqual([]);
 });
 
-it("keeps a pending tool error visible after the worked line", () => {
+it("keeps every pending tool error of a failed turn visible", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const ui = stoppedTui();
@@ -610,10 +552,9 @@ it("keeps a pending tool error visible after the worked line", () => {
   }
 
   const rendered = frame(transcript);
-  expect(rendered).not.toContain("Provider failure 1");
+  expect(rendered).toContain("Stale partial response");
+  expect(rendered).toContain("Provider failure 1");
   expect(rendered).toContain("Provider failure 2");
-  expect(rendered).not.toContain("Stale partial response");
-  expect(rendered).toContain("2 failures");
-  expect(rendered.indexOf("Worked for")).toBeLessThan(rendered.indexOf("Provider failure 2"));
+  expect(rendered).not.toContain("Worked for");
   expect(rendered).not.toContain("Operation interrupted");
 });

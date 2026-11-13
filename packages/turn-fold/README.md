@@ -2,9 +2,11 @@
 
 Compact transcript rendering and on-demand history for the Pi coding agent.
 
-`@onurpi/turn-fold` keeps Pi's working line and every activity row of the running turn visible. When the run stops, the tool rows and intermediate assistant messages collapse into one summary row below the user message that begins with `Worked for`, leaving the final response below it.
+`@onurpi/turn-fold` keeps Pi's working line and every activity row of the running turn visible, and a finished turn keeps every one of those rows too. No summary row replaces them, so a completed run reads top to bottom with its own tool output and intermediate messages.
 
-Automatic compactions during a turn appear as `compacted` in the summary. Manual compactions performed while Pi is idle keep Pi's original row. Successful `edit` tool results add a per-turn diffstat such as `3 files +42 −11`, followed by each edited absolute path and its cumulative counters. Interrupted runs retain their last partial response or an interruption message.
+Automatic compactions keep their own rows. Manual compactions performed while Pi is idle keep Pi's original row and spacing. Successful `edit` tool results still aggregate into a per-turn diffstat such as `3 files +42 −11`, with one row per edited absolute path, when the settled fold is enabled. Interrupted runs show their last partial response or an interruption message.
+
+The fold policy lives in `fold-policy.ts`. `VISIBLE_ACTIVITY_LIMIT` sets how many activity rows a running turn keeps, and `FOLD_SETTLED_TURNS` sets whether a finished turn collapses into a `Worked for` summary row. The shipped defaults are unlimited activity and no settled fold.
 
 The main transcript always stays compact. Full message history is available through a virtualized history explorer rendered inside Pi. The explorer takes over the full terminal as a borderless view with its own title and status rows, using Pi's documented overlay mechanism without margins. It starts with the newest three compaction windows, renders only viewport-near entries, and can load three older windows at a time without restarting Pi. Search, filters, direct jumps, and back or forward navigation make long histories easier to inspect.
 

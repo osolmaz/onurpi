@@ -1,7 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { historicalRunStarts } from "./run-boundary.ts";
-import { VISIBLE_ACTIVITY_LIMIT } from "./fold-policy.ts";
+import { FOLD_POLICY } from "./fold-policy.ts";
 import { assistantSnapshot, messageFromEntry, stringField } from "./turn-message.ts";
 
 export const DEFAULT_PROJECTED_COMPONENT_LIMIT = 512;
@@ -199,7 +199,7 @@ function finalToolCallId(run: ProjectedRun): string | undefined {
 
 function activeRunEntryIds(run: ProjectedRun, keep: Set<string>): Set<string> {
   const seenAssistants = new Set<ProjectedAssistant>();
-  let remainingActivities = VISIBLE_ACTIVITY_LIMIT;
+  let remainingActivities = FOLD_POLICY.visibleActivityLimit;
   for (let index = run.activities.length - 1; index >= 0; index -= 1) {
     const assistant = run.activities[index]?.assistant;
     if (!assistant || seenAssistants.has(assistant)) continue;

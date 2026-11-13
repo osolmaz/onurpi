@@ -474,7 +474,14 @@ function renderAssistantView(
   const view = state.viewFor(component);
   const timestamp = finiteNumber(lastMessage, "timestamp");
   if (!view || view.display === "original") {
-    return timestampAfterContent(original(), timestamp, width, theme);
+    const native = original();
+    // A row of a finished turn keeps its native rendering, but an aborted run whose final row is
+    // empty still reports the interruption.
+    const visible =
+      native.length === 0 && view?.summary.aborted === true && state.isFinalAnchorFor(component)
+        ? interruptionFallback(theme, width)
+        : native;
+    return timestampAfterContent(visible, timestamp, width, theme);
   }
   return renderFoldView(view.display, original, view.summary, width, theme, timestamp);
 }

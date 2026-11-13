@@ -20,14 +20,16 @@ describe("fold display policy", () => {
     expect(display()).toBe("hidden");
   });
 
-  it("shows the summary anchor before the final anchor after settlement", () => {
-    expect(display({ isSettledSummaryAnchor: true, settled: true })).toBe("settled-summary");
-    expect(display({ isFinalAnchor: true, settled: true })).toBe("settled-final");
+  it("keeps every settled row native and hides only the rows no activity backs", () => {
+    expect(display({ isSettledSummaryAnchor: true, settled: true })).toBe("original");
+    expect(display({ isFinalAnchor: true, settled: true })).toBe("original");
     expect(display({ isFinalAnchor: true, isSettledSummaryAnchor: true, settled: true })).toBe(
-      "settled-summary-final",
+      "original",
     );
+    expect(display({ isRecentActivity: true, settled: true })).toBe("original");
     expect(display({ isRecentActivity: true, isStreamingSummaryAnchor: true, settled: true })).toBe(
-      "hidden",
+      "original",
     );
+    expect(display({ settled: true })).toBe("hidden");
   });
 });

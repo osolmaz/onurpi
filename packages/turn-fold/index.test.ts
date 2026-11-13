@@ -682,7 +682,7 @@ describe("Turn Fold extension reload", () => {
     state.associateCompaction(compaction, { role: "compactionSummary", timestamp: 120 });
     state.associateAssistant(final, finalMessage);
     expect(state.viewFor(compaction)).toMatchObject({ summary: { compactions: 1 } });
-    expect(state.viewFor(final)?.display).toBe("settled-final");
+    expect(state.viewFor(final)?.display).toBe("original");
 
     await emit(
       second.handlers,

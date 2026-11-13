@@ -203,10 +203,10 @@ describe("compact streaming", () => {
     state.endAssistantMessage(finalMessage);
     state.settleActive(120);
 
-    expect(state.viewFor(first)?.display).toBe("settled-summary");
-    expect(state.viewFor(tool)?.display).toBe("hidden");
+    expect(state.viewFor(first)?.display).toBe("original");
+    expect(state.viewFor(tool)?.display).toBe("original");
     expect(state.viewFor(final, 120)).toMatchObject({
-      display: "settled-final",
+      display: "original",
       summary: { messages: 2, tools: 1 },
     });
   });
@@ -345,8 +345,8 @@ describe("edit diffstats", () => {
   });
 });
 
-describe("compact settled turns", () => {
-  it("hides all intermediate activity and keeps the last assistant message", () => {
+describe("settled turns", () => {
+  it("keeps every row of a finished turn in its native rendering", () => {
     const state = new TurnFoldState();
     const intermediate = {};
     const tool = {};
@@ -364,10 +364,10 @@ describe("compact settled turns", () => {
     registerAssistant(state, finalAssistant, final);
     state.settleActive(150);
 
-    expect(state.viewFor(intermediate)?.display).toBe("settled-summary");
-    expect(state.viewFor(tool)?.display).toBe("hidden");
+    expect(state.viewFor(intermediate)?.display).toBe("original");
+    expect(state.viewFor(tool)?.display).toBe("original");
     expect(state.viewFor(finalAssistant, 150)).toEqual({
-      display: "settled-final",
+      display: "original",
       summary: {
         aborted: false,
         compactions: 0,
@@ -392,9 +392,9 @@ describe("compact settled turns", () => {
     registerAssistant(state, interrupted, assistantMessage(120, [], "aborted"));
     state.abortActive(130);
 
-    expect(state.viewFor(prior)?.display).toBe("settled-summary");
+    expect(state.viewFor(prior)?.display).toBe("original");
     expect(state.viewFor(interrupted, 130)).toMatchObject({
-      display: "settled-final",
+      display: "original",
       summary: { aborted: true, durationMs: 30, running: false },
     });
   });
@@ -418,10 +418,10 @@ describe("compact settled turns", () => {
     registerAssistant(state, succeeded, success);
     state.settleActive(150);
 
-    expect(state.viewFor(failed)?.display).toBe("settled-summary");
-    expect(state.viewFor(failedTool)?.display).toBe("hidden");
+    expect(state.viewFor(failed)?.display).toBe("original");
+    expect(state.viewFor(failedTool)?.display).toBe("original");
     expect(state.viewFor(succeeded, 150)).toMatchObject({
-      display: "settled-final",
+      display: "original",
       summary: { aborted: false, messages: 2 },
     });
   });
@@ -437,8 +437,8 @@ describe("compact settled turns", () => {
     state.associateTool(tool, "tool-1");
     state.settleActive(130);
 
-    expect(state.viewFor(message)?.display).toBe("settled-summary-final");
-    expect(state.viewFor(tool)?.display).toBe("hidden");
+    expect(state.viewFor(message)?.display).toBe("original");
+    expect(state.viewFor(tool)?.display).toBe("original");
   });
 });
 
@@ -459,11 +459,11 @@ describe("ephemeral compactions", () => {
     state.settleActive(150);
 
     expect(state.viewFor(compaction, 150)).toMatchObject({
-      display: "settled-summary",
+      display: "original",
       summary: { compactions: 1 },
     });
     expect(state.viewFor(final, 150)).toMatchObject({
-      display: "settled-final",
+      display: "original",
       summary: { compactions: 1 },
     });
   });
@@ -616,8 +616,8 @@ describe("historical transcript", () => {
     state.associateAssistant(firstComponent, first);
     state.associateAssistant(secondComponent, second);
 
-    expect(state.viewFor(firstComponent)?.display).toBe("settled-summary-final");
-    expect(state.viewFor(secondComponent)?.display).toBe("settled-summary-final");
+    expect(state.viewFor(firstComponent)?.display).toBe("original");
+    expect(state.viewFor(secondComponent)?.display).toBe("original");
   });
 
   it("reconstructs turns and keeps each last assistant response", () => {
@@ -654,10 +654,10 @@ describe("historical transcript", () => {
     state.associateAssistant(firstFinal, firstDone);
     state.associateAssistant(secondFinal, secondDone);
 
-    expect(state.viewFor(firstIntermediate)?.display).toBe("settled-summary");
-    expect(state.viewFor(firstTool)?.display).toBe("hidden");
-    expect(state.viewFor(firstFinal)?.display).toBe("settled-final");
-    expect(state.viewFor(secondFinal)?.display).toBe("settled-summary-final");
+    expect(state.viewFor(firstIntermediate)?.display).toBe("original");
+    expect(state.viewFor(firstTool)?.display).toBe("original");
+    expect(state.viewFor(firstFinal)?.display).toBe("original");
+    expect(state.viewFor(secondFinal)?.display).toBe("original");
   });
 });
 
@@ -689,11 +689,11 @@ describe("historical compactions", () => {
     state.associateAssistant(final, message);
 
     expect(state.viewFor(compaction)).toMatchObject({
-      display: "settled-summary",
+      display: "original",
       summary: { compactions: 1 },
     });
     expect(state.viewFor(final)).toMatchObject({
-      display: "settled-final",
+      display: "original",
       summary: { compactions: 1 },
     });
   });
@@ -717,10 +717,10 @@ describe("historical compactions", () => {
     state.associateAssistant(final, message);
 
     expect(state.viewFor(compaction)).toMatchObject({
-      display: "settled-summary",
+      display: "original",
       summary: { compactions: 1 },
     });
-    expect(state.viewFor(final)?.display).toBe("settled-final");
+    expect(state.viewFor(final)?.display).toBe("original");
   });
 
   it("counts multiple automatic compactions without treating them as activity", () => {
@@ -756,11 +756,11 @@ describe("historical compactions", () => {
     state.associateAssistant(final, message);
 
     expect(state.viewFor(firstCompaction)).toMatchObject({
-      display: "settled-summary",
+      display: "original",
       summary: { compactions: 2, hiddenActivities: 0 },
     });
     expect(state.viewFor(secondCompaction)?.display).toBe("hidden");
-    expect(state.viewFor(final)?.display).toBe("settled-final");
+    expect(state.viewFor(final)?.display).toBe("original");
   });
 
   it("keeps compactions outside the process registry standalone", () => {
@@ -808,7 +808,7 @@ describe("historical compactions", () => {
 
     expect(state.viewFor(oldStandaloneCompaction)).toBeUndefined();
     expect(state.viewFor(compaction, 150)).toMatchObject({
-      display: "settled-summary",
+      display: "original",
       summary: { compactions: 1 },
     });
   });
@@ -854,7 +854,7 @@ describe("historical transcript timing and reload", () => {
     expect(state.viewFor(rebuilt)?.display).toBe("original");
     state.settleActive(120);
     expect(state.viewFor(rebuilt)).toMatchObject({
-      display: "settled-summary-final",
+      display: "original",
       summary: { fileDiff: { additions: 2, deletions: 1, files: 1 } },
     });
   });
