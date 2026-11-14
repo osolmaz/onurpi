@@ -14,11 +14,13 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
 | [`@onurpi/agents`](packages/agents/)                                     | Personal agent instructions, skills, and cross-harness sync           |
 | [`@onurpi/turn-fold`](packages/turn-fold/)                               | Bounded transcript replay and run-level folding                       |
+| [`@onurpi/sticky-prompt`](packages/sticky-prompt/)                       | Keeps the prompt of the visible turn at the top while scrolling       |
 | [`@onurpi/anti-repeat`](packages/anti-repeat/)                           | Detects and stops repeated work, including loops in streamed thinking |
 | [`@onurpi/live-stats`](packages/live-stats/)                             | Braille spinner, shimmering working line, and live response metrics   |
 | [`@onurpi/skill-slug`](packages/skill-slug/)                             | Invoke skills by typing their bare slug                               |
 | [`@onurpi/nyan-mode`](packages/nyan-mode/)                               | Animated bitmap Nyan Cat context runway                               |
 | [`@onurpi/prompt-queue`](packages/prompt-queue/)                         | Editable prompt queue, steer control, and history manager             |
+| [`@onurpi/interrupt-send`](packages/interrupt-send/)                     | `Ctrl+Enter` interrupts the run and sends the message at once         |
 | [`@onurpi/restart`](packages/restart/)                                   | Full Pi process restart on the exact persisted session                |
 | [`@onurpi/pi-codex-compaction`](packages/pi-codex-compaction/)           | OpenAI Codex native remote compaction (vendored)                      |
 | [`@onurpi/reliable-compaction`](packages/reliable-compaction/)           | Stable transport policy for context compaction                        |
