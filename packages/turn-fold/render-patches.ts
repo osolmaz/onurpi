@@ -334,12 +334,14 @@ function installUserSpacingPatches(state: TurnFoldState): RestoreRenderPatches {
   const patchedAddChild = function (this: Container, component: Child): void {
     const previous = this.children.at(-1);
     const beforePrevious = this.children.at(-2);
-    if (
-      previous instanceof Spacer &&
-      isUserRow(component) &&
-      !(beforePrevious !== undefined && isUserRow(beforePrevious))
-    ) {
-      suppressedSpacers.add(previous);
+    if (previous instanceof Spacer && isUserRow(component)) {
+      if (beforePrevious !== undefined && isUserRow(beforePrevious)) {
+        // Two messages in a row would otherwise show only their own background padding, which
+        // reads as one block. Keep the spacer and add a second blank line between them.
+        originalAddChild.call(this, new Spacer(1));
+      } else {
+        suppressedSpacers.add(previous);
+      }
     }
     if (previous instanceof Spacer && component instanceof CompactionSummaryMessageComponent) {
       const message: unknown = Reflect.get(component, "message");

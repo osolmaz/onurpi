@@ -156,7 +156,7 @@ it("keeps only the user message's built-in top padding", () => {
   expect(ordinarySpacer.render(40)).toEqual([""]);
 });
 
-it("keeps a blank line between two user messages so they do not blend", () => {
+it("keeps two blank lines between two user messages so they do not blend", () => {
   const state = new TurnFoldState();
   const transcript = new Container();
   const betweenSpacers = new Spacer(1);
@@ -167,6 +167,8 @@ it("keeps a blank line between two user messages so they do not blend", () => {
   transcript.addChild(new UserMessageComponent("Second prompt", undefined, 0));
 
   expect(betweenSpacers.render(40)).toEqual([""]);
+  const blankRuns = transcript.render(40).filter((line) => line === "");
+  expect(blankRuns).toHaveLength(2);
 });
 
 it("renders local user and completion times in transcript order", () => {
