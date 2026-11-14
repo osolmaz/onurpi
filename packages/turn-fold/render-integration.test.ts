@@ -156,6 +156,19 @@ it("keeps only the user message's built-in top padding", () => {
   expect(ordinarySpacer.render(40)).toEqual([""]);
 });
 
+it("keeps a blank line between two user messages so they do not blend", () => {
+  const state = new TurnFoldState();
+  const transcript = new Container();
+  const betweenSpacers = new Spacer(1);
+  restore = installRenderPatches(state, () => undefined);
+
+  transcript.addChild(new UserMessageComponent("First prompt", undefined, 0));
+  transcript.addChild(betweenSpacers);
+  transcript.addChild(new UserMessageComponent("Second prompt", undefined, 0));
+
+  expect(betweenSpacers.render(40)).toEqual([""]);
+});
+
 it("renders local user and completion times in transcript order", () => {
   const state = new TurnFoldState();
   const transcript = new Container();

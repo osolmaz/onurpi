@@ -333,7 +333,14 @@ function installUserSpacingPatches(state: TurnFoldState): RestoreRenderPatches {
 
   const patchedAddChild = function (this: Container, component: Child): void {
     const previous = this.children.at(-1);
-    if (previous instanceof Spacer && isUserRow(component)) suppressedSpacers.add(previous);
+    const beforePrevious = this.children.at(-2);
+    if (
+      previous instanceof Spacer &&
+      isUserRow(component) &&
+      !(beforePrevious !== undefined && isUserRow(beforePrevious))
+    ) {
+      suppressedSpacers.add(previous);
+    }
     if (previous instanceof Spacer && component instanceof CompactionSummaryMessageComponent) {
       const message: unknown = Reflect.get(component, "message");
       state.associateCompaction(component, message);
