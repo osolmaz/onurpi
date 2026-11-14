@@ -33,7 +33,6 @@
       "./packages/session-policy/index.ts",
       "./packages/image-budget/index.ts",
       "./packages/context-budget/index.ts",
-      "./packages/focus-mode/index.ts",
       "./packages/context-ceiling/index.ts",
       "./packages/permissions/index.ts",
       "./packages/sticky-prompt/index.ts",

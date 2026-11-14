@@ -38,7 +38,6 @@ adapt the parts they want. More of my work is available at [solmaz.io](https://s
 | [`@onurpi/theme`](packages/onur-theme/)                                  | Portable `onur-dark` Pi theme                                         |
 | [`@onurpi/image-budget`](packages/image-budget/)                         | Image re-encoding and eviction inside a request budget                |
 | [`@onurpi/claudishlint`](packages/claudishlint/)                         | One plain rewrite for dense, Claudish model prose (vendored, off)     |
-| [`@onurpi/focus-mode`](packages/focus-mode/)                             | Cap how many Pi agents work at the same time                          |
 
 [`@onurpi/pi-tui-kit`](packages/pi-tui-kit/) is a vendored library package (declarative Pi TUI
 menus), not a Pi extension; it backs `@onurpi/pi-usage` and is not loaded as a Pi resource.

@@ -23,7 +23,6 @@
     "../../repos/onurpi/packages/session-policy",
     "../../repos/onurpi/packages/image-budget",
     "../../repos/onurpi/packages/context-budget",
-    "../../repos/onurpi/packages/focus-mode",
     "../../repos/onurpi/packages/context-ceiling",
     "../../repos/onurpi/packages/permissions",
     "../../repos/onurpi/packages/sticky-prompt",
