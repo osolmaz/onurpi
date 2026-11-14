@@ -71,7 +71,17 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
    only. Then compare `pi list` with `npm view <package> version` for each npm source. A source
    pinned to an exact version, such as `npm:pi-web-access@0.34.0`, needs an explicit
    `pi install npm:<package>@<new-version>`.
-8. Verify that Pi starts. First check `pi --version` reports the target version. Then start the
+8. Remove the extensions that no longer belong to the installation, so the update ends with a
+   clean Pi. Compare the live list with the repository canon in `~/repos/onurpi/settings.json`:
+   an entry the canon no longer carries, or one whose path or npm package no longer exists, is
+   obsolete. Remove it with `pi remove <source>`, or edit `~/.pi/agent/settings.json` when the
+   stored relative path does not match. The settings converge is bidirectional and keeps a
+   live-only entry, so this step is explicit and belongs in every update. Then prune
+   `extensionChangelogVersions` in the live settings: keep only the keys whose `source` still
+   appears in `packages`, because a leftover key keeps announcing an extension that is gone.
+   Delete install directories under `~/.pi/npm` only for sources nothing references. Rerun
+   `npm run settings:sync` so its base matches, and report every removal in the update summary.
+9. Verify that Pi starts. First check `pi --version` reports the target version. Then start the
    real TUI inside the OnurPi checkout so the root manifest loads every extension:
 
    ```sh
@@ -80,7 +90,7 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
 
    Press `ctrl+o` to show the loaded resources. Confirm the footer shows the new version, the
    full extension and skill lists load, and no errors appear. Exit with `ctrl+c` or `ctrl+d`.
-9. Run the repository checks: `npm run check`, `npm run slophammer`, and `git diff --check`.
+10. Run the repository checks: `npm run check`, `npm run slophammer`, and `git diff --check`.
    ESLint can exceed the default 4 GB heap on this machine; rerun it with
    `NODE_OPTIONS=--max-old-space-size=8192 npm run lint`.
    Known failures on this machine that are not caused by a Pi bump: three ESLint errors in
@@ -89,10 +99,10 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
    `packages/context-ceiling/.github/workflows`. Before you attribute any failure to the bump,
    stash your changes with `git stash`, rerun the failing check on pristine `main`, and compare.
    Reinstall your changes with `git stash pop` afterwards.
-10. Commit and push. Use `chore(deps): adopt pi <version> across the workspace`. Per the
+11. Commit and push. Use `chore(deps): adopt pi <version> across the workspace`. Per the
    repository rules, a version update that adopts a reviewed upstream release goes straight to
    `main`: commit and `git push origin main`. Do not open a pull request.
-11. If instruction or skill sources changed in the same session, run `npm run sync` and
+12. If instruction or skill sources changed in the same session, run `npm run sync` and
     `npm run agents:check` so the installed copies match, then restart or reload the agent.
 
 ## Notes
@@ -100,7 +110,11 @@ agent configuration. It ends with proof that Pi starts and a push to OnurPi `mai
 - Updating the global binary while a Pi session runs is safe: the running process keeps its
   loaded bundle. New sessions pick up the new version.
 - The settings converge runs on every update, even when the Pi version does not change. It keeps
-  the tracked configuration and the live agent directory from drifting apart.
+  the tracked configuration and the live agent directory from drifting apart. It does not remove
+  anything, so an extension that leaves the canon stays installed until step 8 removes it.
+- A clean installation has three properties: the set of live `packages` equals the canon, every
+  entry resolves to a path or an npm package that exists, and no changelog record names a source
+  that is no longer listed.
 - The bump that moves the workspace pins can surface real API breaks in extensions. TypeScript
   errors about a missing `ExtensionAPI` member mean a package still resolves a stale nested
   copy of `pi-coding-agent`; a pin you missed usually causes it. Fix the pin, rerun
