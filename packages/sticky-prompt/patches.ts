@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, ScrollView } from "@earendil-works/pi-tui";
 
 import { headerSource, styledHeader } from "./header.ts";
-import { promptAt, promptSpans } from "./prompt-rows.ts";
+import { layoutWidth, promptAt, promptSpans, type PromptSpan } from "./prompt-rows.ts";
 
 /**
  * Pi TUI layout marker. It is a global symbol, so the extension reaches the same property as the
@@ -12,7 +12,10 @@ const LAYOUT_NODE = Symbol.for("@earendil-works/pi-tui/layout-node");
 
 export type RestorePromptHeaderPatches = () => void;
 
-type ScrollViewLike = { readonly scrollTop: number };
+type ScrollViewLike = {
+  readonly scrollTop: number;
+  scrollTo?: (scrollTop: number) => void;
+};
 type ScrollNode = { readonly component: object; readonly state: object };
 
 function isScrollViewLike(value: unknown): value is ScrollViewLike {
@@ -47,6 +50,12 @@ function headerAt(
   return source === undefined ? undefined : styledHeader(source, width, theme);
 }
 
+function promptRowAt(container: Container, row: number): PromptSpan | undefined {
+  const width = layoutWidth(container);
+  if (width === undefined) return undefined;
+  return promptSpans(container, width).find((span) => row >= span.start && row < span.end);
+}
+
 function withHeader(
   lines: readonly string[],
   header: string | undefined,
@@ -60,10 +69,12 @@ function withHeader(
 }
 
 /**
- * Replace the first visible transcript line with the prompt of the turn behind it.
+ * Replace the first visible transcript line with the prompt of the turn behind it, and scroll a
+ * clicked prompt to the top of the viewport.
  *
  * The layout engine draws the transcript from `scrollTop`, so overwriting the content line at that
  * index puts the header at the top of the viewport without changing any height or scroll range.
+ * Clicking a prompt row scrolls that prompt to the top, which is what the header stands for.
  */
 export function installPromptHeaderPatches(
   getTheme: () => Theme | undefined,
@@ -94,11 +105,37 @@ export function installPromptHeaderPatches(
     return withHeader(lines, header, scrollTop);
   };
 
+  const originalHandleMouse = containerPrototype.handleMouse;
+  const patchedHandleMouse: typeof originalHandleMouse = function (this: Container, event) {
+    const state = scrollByContent.get(this);
+    if (state !== undefined && event.type === "click") {
+      const span = promptRowAt(this, event.y);
+      if (span !== undefined) {
+        state.scrollTo?.(span.start);
+        return {
+          handled: true,
+          target: {
+            component: this,
+            height: event.height,
+            originX: 0,
+            originY: 0,
+            width: event.width,
+          },
+        };
+      }
+    }
+    return originalHandleMouse.call(this, event);
+  };
+
   scrollPrototype[LAYOUT_NODE] = patchedNode;
   containerPrototype.render = patchedRender;
+  containerPrototype.handleMouse = patchedHandleMouse;
 
   return () => {
     if (scrollPrototype[LAYOUT_NODE] === patchedNode) scrollPrototype[LAYOUT_NODE] = originalNode;
     if (containerPrototype.render === patchedRender) containerPrototype.render = originalRender;
+    if (containerPrototype.handleMouse === patchedHandleMouse) {
+      containerPrototype.handleMouse = originalHandleMouse;
+    }
   };
 }

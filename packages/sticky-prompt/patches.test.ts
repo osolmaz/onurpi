@@ -19,6 +19,22 @@ function lines(count: number, label = "content"): Text {
   );
 }
 
+function clickEvent(row: number): Parameters<Container["handleMouse"]>[0] {
+  return {
+    alt: false,
+    button: "left",
+    ctrl: false,
+    height: 10,
+    screenX: 0,
+    screenY: row,
+    shift: false,
+    type: "click",
+    width: WIDTH,
+    x: 0,
+    y: row,
+  };
+}
+
 function viewport(): { content: Container; scroll: ScrollView } {
   const content = new Container();
   content.addChild(lines(2));
@@ -112,6 +128,34 @@ describe("prompt header patches", () => {
       expect(patched).toEqual(plain);
       restore = installPromptHeaderPatches(() => undefined);
     }
+  });
+
+  it("scrolls a clicked prompt to the top of the viewport", () => {
+    const { content, scroll } = viewport();
+    restore = installPromptHeaderPatches(() => undefined);
+    register(scroll);
+    content.render(WIDTH);
+    const second = promptSpans(content, WIDTH)[1];
+    if (second === undefined) throw new Error("prompt span is missing");
+    const requested: number[] = [];
+    Reflect.set(scroll, "scrollTo", (scrollTop: number) => requested.push(scrollTop));
+
+    const result = content.handleMouse(clickEvent(second.start + 1));
+
+    expect(result?.handled).toBe(true);
+    expect(requested).toEqual([second.start]);
+  });
+
+  it("leaves a click outside every prompt to the transcript", () => {
+    const { content, scroll } = viewport();
+    restore = installPromptHeaderPatches(() => undefined);
+    register(scroll);
+    content.render(WIDTH);
+    const requested: number[] = [];
+    Reflect.set(scroll, "scrollTo", (scrollTop: number) => requested.push(scrollTop));
+
+    expect(content.handleMouse(clickEvent(0))).toBeUndefined();
+    expect(requested).toEqual([]);
   });
 
   it("ignores a scroll view whose content was never laid out", () => {

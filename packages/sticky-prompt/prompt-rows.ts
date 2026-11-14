@@ -40,6 +40,11 @@ function mouseLayout(container: object): MouseLayout | undefined {
   return { children: parsed, width };
 }
 
+/** Width of the container's last render, or undefined when it has not rendered yet. */
+export function layoutWidth(container: object): number | undefined {
+  return mouseLayout(container)?.width;
+}
+
 /** Line spans of the container's direct children from its last render at this width. */
 export function childSpans(container: object, width: number): readonly Span[] | undefined {
   const layout = mouseLayout(container);

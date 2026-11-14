@@ -8,6 +8,9 @@ the user message background and text colors. No header is drawn while any part o
 on screen, or while the next prompt is fewer than two blank rows below the top: the header and the
 message padding share one background, so a closer header reads as one block with that prompt.
 
+Clicking a prompt row scrolls that prompt to the top of the viewport, with the header hidden until
+it is three rows above the top.
+
 ## How it works
 
 The extension loads Pi's public TUI classes and patches two methods. It does not fork Pi and does
@@ -18,6 +21,8 @@ not need the extension API for rendering.
 2. `Container.prototype.render` renders the transcript as usual, reads the child line ranges that Pi
    already records for mouse dispatch, picks the prompt above the first visible line, and replaces
    that one content line with the header. Height and scroll range stay the same, so nothing shifts.
+3. `Container.prototype.handleMouse` passes every other event through, and turns a click on a prompt
+   row into a scroll to that prompt.
 
 `prompt-rows.ts` reads the spans, `header.ts` builds the row, and `patches.ts` installs and restores
 the patches. `/reload` restores nothing by itself; `session_shutdown` restores both prototypes.
