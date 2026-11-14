@@ -36,6 +36,7 @@
       "./packages/focus-mode/index.ts",
       "./packages/context-ceiling/index.ts",
       "./packages/permissions/index.ts",
+      "./packages/sticky-prompt/index.ts",
       "./packages/command-guard/index.ts"
     ],
     "skills": [

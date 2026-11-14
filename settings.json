@@ -26,6 +26,7 @@
     "../../repos/onurpi/packages/focus-mode",
     "../../repos/onurpi/packages/context-ceiling",
     "../../repos/onurpi/packages/permissions",
+    "../../repos/onurpi/packages/sticky-prompt",
     "../../repos/onurpi/packages/command-guard",
     "../../repos/onurpi/packages/agents",
     "../../repos/onurpi/packages/onur-theme"
