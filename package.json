@@ -35,6 +35,7 @@
       "./packages/context-budget/index.ts",
       "./packages/context-ceiling/index.ts",
       "./packages/permissions/index.ts",
+      "./packages/interrupt-send/index.ts",
       "./packages/sticky-prompt/index.ts",
       "./packages/command-guard/index.ts"
     ],
