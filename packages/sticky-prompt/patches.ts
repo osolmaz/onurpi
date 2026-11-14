@@ -1,8 +1,8 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, ScrollView } from "@earendil-works/pi-tui";
+import { UserMessageComponent, type Theme } from "@earendil-works/pi-coding-agent";
+import { Container, ScrollView, type TuiMouseEvent } from "@earendil-works/pi-tui";
 
 import { headerSource, styledHeader } from "./header.ts";
-import { layoutWidth, promptAt, promptSpans, type PromptSpan } from "./prompt-rows.ts";
+import { layoutWidth, promptAt, promptSpans } from "./prompt-rows.ts";
 
 /**
  * Pi TUI layout marker. It is a global symbol, so the extension reaches the same property as the
@@ -50,12 +50,6 @@ function headerAt(
   return source === undefined ? undefined : styledHeader(source, width, theme);
 }
 
-function promptRowAt(container: Container, row: number): PromptSpan | undefined {
-  const width = layoutWidth(container);
-  if (width === undefined) return undefined;
-  return promptSpans(container, width).find((span) => row >= span.start && row < span.end);
-}
-
 function withHeader(
   lines: readonly string[],
   header: string | undefined,
@@ -84,12 +78,38 @@ export function installPromptHeaderPatches(
   const originalNodeCall =
     typeof originalNode === "function" ? (originalNode as (this: unknown) => unknown) : undefined;
   const scrollByContent = new WeakMap<object, ScrollViewLike>();
+  const contents = new Set<WeakRef<Container>>();
+
+  const liveContents = (): { component: Container; state: ScrollViewLike }[] => {
+    const found: { component: Container; state: ScrollViewLike }[] = [];
+    for (const ref of contents) {
+      const component = ref.deref();
+      const state = component === undefined ? undefined : scrollByContent.get(component);
+      if (component === undefined || state === undefined) contents.delete(ref);
+      else found.push({ component, state });
+    }
+    return found;
+  };
+
+  /** Scroll view and prompt start for the prompt that owns a clicked component. */
+  const scrollTargetFor: ScrollTargetLookup = (component) => {
+    for (const entry of liveContents()) {
+      const width = layoutWidth(entry.component);
+      if (width === undefined) continue;
+      const span = promptSpans(entry.component, width).find(
+        (candidate) => candidate.component === component,
+      );
+      if (span !== undefined) return { start: span.start, state: entry.state };
+    }
+    return undefined;
+  };
 
   const patchedNode = function (this: unknown): unknown {
     const node = originalNodeCall?.call(this);
     const parsed = scrollNodeOf(node);
     if (parsed !== undefined && isScrollViewLike(parsed.state)) {
       scrollByContent.set(parsed.component, parsed.state);
+      if (parsed.component instanceof Container) contents.add(new WeakRef(parsed.component));
     }
     return node;
   };
@@ -105,13 +125,30 @@ export function installPromptHeaderPatches(
     return withHeader(lines, header, scrollTop);
   };
 
-  const originalHandleMouse = containerPrototype.handleMouse;
-  const patchedHandleMouse: typeof originalHandleMouse = function (this: Container, event) {
-    const state = scrollByContent.get(this);
-    if (state !== undefined && event.type === "click") {
-      const span = promptRowAt(this, event.y);
-      if (span !== undefined) {
-        state.scrollTo?.(span.start);
+  const restoreClick = installPromptClickPatch(scrollTargetFor);
+
+  scrollPrototype[LAYOUT_NODE] = patchedNode;
+  containerPrototype.render = patchedRender;
+
+  return () => {
+    if (scrollPrototype[LAYOUT_NODE] === patchedNode) scrollPrototype[LAYOUT_NODE] = originalNode;
+    if (containerPrototype.render === patchedRender) containerPrototype.render = originalRender;
+    restoreClick();
+  };
+}
+
+type ScrollTarget = { readonly start: number; readonly state: ScrollViewLike };
+type ScrollTargetLookup = (component: object) => ScrollTarget | undefined;
+
+/** Turn a click on a prompt into a scroll to that prompt, and leave every other event alone. */
+function installPromptClickPatch(findTarget: ScrollTargetLookup): RestorePromptHeaderPatches {
+  const userPrototype = UserMessageComponent.prototype;
+  const originalClick: unknown = Reflect.get(userPrototype, "handleMouse");
+  const patchedClick = function (this: UserMessageComponent, event: TuiMouseEvent): unknown {
+    if (event.type === "click") {
+      const target = findTarget(this);
+      if (target !== undefined) {
+        target.state.scrollTo?.(target.start);
         return {
           handled: true,
           target: {
@@ -124,18 +161,14 @@ export function installPromptHeaderPatches(
         };
       }
     }
-    return originalHandleMouse.call(this, event);
+    return typeof originalClick === "function"
+      ? Reflect.apply(originalClick, this, [event])
+      : undefined;
   };
-
-  scrollPrototype[LAYOUT_NODE] = patchedNode;
-  containerPrototype.render = patchedRender;
-  containerPrototype.handleMouse = patchedHandleMouse;
-
+  userPrototype.handleMouse = patchedClick as typeof userPrototype.handleMouse;
   return () => {
-    if (scrollPrototype[LAYOUT_NODE] === patchedNode) scrollPrototype[LAYOUT_NODE] = originalNode;
-    if (containerPrototype.render === patchedRender) containerPrototype.render = originalRender;
-    if (containerPrototype.handleMouse === patchedHandleMouse) {
-      containerPrototype.handleMouse = originalHandleMouse;
+    if (userPrototype.handleMouse === patchedClick) {
+      userPrototype.handleMouse = originalClick as typeof userPrototype.handleMouse;
     }
   };
 }

@@ -19,7 +19,11 @@ function lines(count: number, label = "content"): Text {
   );
 }
 
-function clickEvent(row: number): Parameters<Container["handleMouse"]>[0] {
+function pressEvent(): NonNullable<Parameters<UserMessageComponent["handleMouse"]>[0]> {
+  return { ...clickEvent(0), type: "press" };
+}
+
+function clickEvent(row: number): NonNullable<Parameters<UserMessageComponent["handleMouse"]>[0]> {
   return {
     alt: false,
     button: "left",
@@ -140,21 +144,23 @@ describe("prompt header patches", () => {
     const requested: number[] = [];
     Reflect.set(scroll, "scrollTo", (scrollTop: number) => requested.push(scrollTop));
 
-    const result = content.handleMouse(clickEvent(second.start + 1));
+    const result = (second.component as UserMessageComponent).handleMouse(clickEvent(0));
 
     expect(result?.handled).toBe(true);
     expect(requested).toEqual([second.start]);
   });
 
-  it("leaves a click outside every prompt to the transcript", () => {
+  it("leaves every other click to the prompt itself", () => {
     const { content, scroll } = viewport();
     restore = installPromptHeaderPatches(() => undefined);
     register(scroll);
     content.render(WIDTH);
+    const prompt = promptSpans(content, WIDTH)[0]?.component as UserMessageComponent | undefined;
+    if (prompt === undefined) throw new Error("prompt span is missing");
     const requested: number[] = [];
     Reflect.set(scroll, "scrollTo", (scrollTop: number) => requested.push(scrollTop));
 
-    expect(content.handleMouse(clickEvent(0))).toBeUndefined();
+    expect(prompt.handleMouse(pressEvent())).toBeUndefined();
     expect(requested).toEqual([]);
   });
 
