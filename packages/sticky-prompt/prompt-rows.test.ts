@@ -118,13 +118,23 @@ describe("promptAt", () => {
     [0, undefined],
     [1, undefined],
     [2, undefined],
-    [3, 2],
+    [3, undefined],
+    [4, 2],
     [8, 2],
-    [9, 2],
-    [10, 9],
+    [9, undefined],
+    [10, undefined],
+    [11, 9],
     [500, 9],
   ])("picks the prompt above line %i", (scrollTop, expectedStart) => {
     expect(promptAt(spans, scrollTop)?.start).toBe(expectedStart);
+  });
+
+  it("hides the header while any part of the prompt is still on screen", () => {
+    const prompt: PromptSpan[] = [{ component: {}, end: 4, start: 2 }];
+
+    expect(promptAt(prompt, 2)).toBeUndefined();
+    expect(promptAt(prompt, 3)).toBeUndefined();
+    expect(promptAt(prompt, 4)?.start).toBe(2);
   });
 
   it("ignores a non-finite scroll offset", () => {

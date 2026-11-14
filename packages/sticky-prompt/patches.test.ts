@@ -39,12 +39,12 @@ function register(scroll: ScrollView): void {
   if (typeof node === "function") (node as (this: ScrollView) => unknown).call(scroll);
 }
 
-/** First scroll position that hides the prompt's own first line. */
+/** First scroll position at which the prompt is fully above the viewport. */
 function firstScrollPastPrompt(content: Container, scroll: ScrollView, index: number): number {
   content.render(scroll.getContentWidth(WIDTH));
   const span = promptSpans(content, scroll.getContentWidth(WIDTH))[index];
   if (span === undefined) throw new Error("prompt span is missing");
-  return span.start + 1;
+  return span.end;
 }
 
 let restore: RestorePromptHeaderPatches | undefined;
@@ -93,6 +93,25 @@ describe("prompt header patches", () => {
     const rendered = content.render(WIDTH);
 
     expect(rendered[scrollTop]).toContain(`${PROMPT_MARK} second prompt`);
+  });
+
+  it("shows no header above a prompt that is still on screen", () => {
+    const { content, scroll } = viewport();
+    restore = installPromptHeaderPatches(() => undefined);
+    register(scroll);
+    content.render(scroll.getContentWidth(WIDTH));
+    const secondPrompt = promptSpans(content, scroll.getContentWidth(WIDTH))[1];
+    if (secondPrompt === undefined) throw new Error("prompt span is missing");
+
+    for (let scrollTop = secondPrompt.start; scrollTop < secondPrompt.end; scrollTop += 1) {
+      setScrollTop(scroll, scrollTop);
+      const patched = content.render(WIDTH);
+      restore();
+      restore = undefined;
+      const plain = content.render(WIDTH);
+      expect(patched).toEqual(plain);
+      restore = installPromptHeaderPatches(() => undefined);
+    }
   });
 
   it("ignores a scroll view whose content was never laid out", () => {

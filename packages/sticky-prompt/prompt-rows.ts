@@ -74,15 +74,22 @@ export function promptSpans(container: Container, width: number): readonly Promp
 }
 
 /**
- * Prompt of the turn at the top of the viewport: the last prompt whose own first line is above
- * `scrollTop`. Returns undefined while that prompt's row is still on screen, so no line is covered.
+ * Prompt of the turn at the top of the viewport: the last prompt that ended above `scrollTop`.
+ *
+ * Returns undefined while any part of a prompt is still on screen. That prompt supplies its own
+ * context, and a header on the row above it would read as part of the same block. Spans are walked
+ * in order, so the first one that reaches or passes the top row settles the answer.
  */
 export function promptAt(spans: readonly PromptSpan[], scrollTop: number): PromptSpan | undefined {
   if (!Number.isFinite(scrollTop)) return undefined;
   let chosen: PromptSpan | undefined;
   for (const span of spans) {
-    if (span.start >= scrollTop) continue;
-    if (chosen === undefined || span.start > chosen.start) chosen = span;
+    if (span.end <= scrollTop) {
+      chosen = span;
+      continue;
+    }
+    if (span.start > scrollTop) break;
+    return undefined;
   }
   return chosen;
 }
