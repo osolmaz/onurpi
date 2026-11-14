@@ -120,13 +120,24 @@ describe("promptAt", () => {
     [2, undefined],
     [3, undefined],
     [4, 2],
-    [8, 2],
+    [6, 2],
+    [8, undefined],
     [9, undefined],
     [10, undefined],
     [11, 9],
     [500, 9],
   ])("picks the prompt above line %i", (scrollTop, expectedStart) => {
     expect(promptAt(spans, scrollTop)?.start).toBe(expectedStart);
+  });
+
+  it("keeps two blank rows above the next prompt", () => {
+    const near: PromptSpan[] = [
+      { component: {}, end: 4, start: 2 },
+      { component: {}, end: 12, start: 8 },
+    ];
+
+    expect(promptAt(near, 5)?.start).toBe(2);
+    expect(promptAt(near, 6)).toBeUndefined();
   });
 
   it("hides the header while any part of the prompt is still on screen", () => {

@@ -4,9 +4,9 @@ Keeps the prompt of the turn at the top of the transcript in view while the tran
 
 The header row shows the last user prompt whose rows have all scrolled above the viewport, using
 
-the user message background and text colors. While any part of a prompt is still on screen, no
-header is drawn: that prompt supplies its own context, and a header directly above it would read as
-one continuous block with it.
+the user message background and text colors. No header is drawn while any part of a prompt is still
+on screen, or while the next prompt is fewer than two blank rows below the top: the header and the
+message padding share one background, so a closer header reads as one block with that prompt.
 
 ## How it works
 

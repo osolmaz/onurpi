@@ -73,12 +73,20 @@ export function promptSpans(container: Container, width: number): readonly Promp
   return found;
 }
 
+/** Blank rows the header keeps above the next prompt, so the two never read as one block. */
+const HEADER_GAP_ROWS = 2;
+
+function nearNextPrompt(spans: readonly PromptSpan[], scrollTop: number): boolean {
+  const next = spans.find((span) => span.start > scrollTop);
+  return next !== undefined && next.start - scrollTop <= HEADER_GAP_ROWS;
+}
+
 /**
  * Prompt of the turn at the top of the viewport: the last prompt that ended above `scrollTop`.
  *
- * Returns undefined while any part of a prompt is still on screen. That prompt supplies its own
- * context, and a header on the row above it would read as part of the same block. Spans are walked
- * in order, so the first one that reaches or passes the top row settles the answer.
+ * Returns undefined while any part of a prompt is still on screen, and also while the next prompt
+ * sits less than two blank rows below the top. Either way the header would read as part of that
+ * prompt, because the header and the message padding behind it share one background.
  */
 export function promptAt(spans: readonly PromptSpan[], scrollTop: number): PromptSpan | undefined {
   if (!Number.isFinite(scrollTop)) return undefined;
@@ -91,5 +99,7 @@ export function promptAt(spans: readonly PromptSpan[], scrollTop: number): Promp
     if (span.start > scrollTop) break;
     return undefined;
   }
+  if (chosen === undefined) return undefined;
+  if (nearNextPrompt(spans, scrollTop)) return undefined;
   return chosen;
 }
