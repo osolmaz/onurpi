@@ -49,9 +49,7 @@
     "reserveTokens": 27200,
     "keepRecentTokens": 20000
   },
-  "defaultTools": [
-    "+codemode"
-  ],
+  "defaultTools": ["+codemode"],
   "hideThinkingBlock": false,
   "extensionChangelogVersions": {
     "{\"source\":\"npm:pi-web-access@0.47.0\",\"scope\":\"user\"}": "0.47.0"
