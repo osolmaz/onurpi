@@ -33,6 +33,13 @@ Mirrors codex's `exec_command` + `write_stdin` tool surface, with small pi-flavo
   `set_on_exit` disarms or re-arms wake without killing the process (including coordinator
   tombstones after eviction); `list_sessions` and the running-session UI surface `wake_armed` /
   `[wake]`.
+- **A human steer ends a long wait.** Pi delivers a steering message only after the current tool
+  batch. When the human sends a steer during an attached wait, the wait returns at once with
+  `wait_status: interrupted_by_steer`, so that Pi can deliver the steer. The process keeps running
+  and an armed wake stays armed. See [Steering messages](#steering-messages).
+- **Structured results for codemode scripts.** All five tools declare an `outputSchema`. A codemode
+  script receives an object with `output` as a real multi-line string and typed fields such as
+  `exit_code` and `session_id`. See [Codemode](#codemode).
 - **Ctrl-C and other control bytes, not just stdin text.** `write_stdin` decodes C-style escapes
   (`\x03` Ctrl-C, `\x04` EOF, `\x1b[A` arrow-up, …) before writing, so the LLM can interrupt a stuck
 - **Compact, bounded output with complete recovery.** Every output-bearing result — including
@@ -142,6 +149,8 @@ Drives or polls an existing session.
 4. Combining wake with an observing `write_stdin` is safe: a completion observed directly by a tool
    result consumes the wake; a deadline or cancellation leaves the wake armed until disarmed or
    delivered.
+5. A result with `wait_status: interrupted_by_steer` ended early because the human sent a steering
+   message. Address the steer first, and poll the session again only if it is still relevant.
 
 **Never** use `yield_until` for REPLs, `sudo`, `ssh`, password prompts, dev servers, file watchers,
 debuggers, or any indefinite/interactive session — it is only for finite commands that exit on their
@@ -157,6 +166,31 @@ converted once to a duration, so later clock adjustments do not change an active
 | Env var                             | Default | Notes                                                                                                                                                                                  |
 | ----------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PI_UNIFIED_EXEC_MAX_EMPTY_POLL_MS` | unset   | Optional cap for empty relative `write_stdin` polls. Values above 290 seconds are allowed. Positive values below `5_000` are raised to `5_000`; invalid explicit values fail the call. |
+| `PI_UNIFIED_EXEC_STEER_INTERRUPT`   | on      | `0` turns off [steer interrupts](#steering-messages): a steer then waits until the current wait ends.                                                                                  |
+
+#### Steering messages
+
+Pi delivers a queued steering message only after the whole tool batch finishes, so a long attached
+wait would hold a human steer for the full wait. Unified Exec listens to Pi's `input` event. When a
+steer arrives and Pi's queue holds it (`ctx.hasPendingMessages()`), every attached wait of the batch
+returns early:
+
+- Relative and absolute empty polls, the initial `exec_command` window, and the window after a
+  `write_stdin` input return `wait_status: interrupted_by_steer`, the output gathered so far, the
+  live `session_id`, and a note for the model.
+- The process is not interrupted and keeps buffering output. An observation lease and an armed wake
+  behave as for a reached deadline. When the process exits at the same time, the exit wins.
+- A call that starts while a steer is queued returns at once. A nested codemode call throws instead,
+  so that a polling script ends and does not spin on instant returns.
+- When Pi delivers the queued message (`message_start` with a user message) or the run settles,
+  waits behave normally again.
+- Esc is unchanged: it cancels the wait and drains no output. Custom messages that an extension
+  queues with `sendMessage` fire no `input` event and do not end a wait.
+
+A steer that another extension holds in its own queue does not reach Pi during the batch and does
+not end a wait. `@onurpi/prompt-queue` keeps a typed prompt in its own queue while the agent runs
+and gives it to Pi at the end of the turn, so with that package a typed steer does not end a wait.
+RPC `steer` commands and steers that reach Pi directly do.
 
 #### Control bytes and escapes in `chars`
 
@@ -390,8 +424,8 @@ $ for i in {1..12}; do echo round $i; sleep 0.5; done (yield 2.5s · cwd: ~/proj
 ```
 
 **Absolute-wait footer** (while still attached) shows remaining time such as `2h40m later` (ISO
-deadline stays in tool details for the model). Cancelled waits mark `cancelled`; armed wakes may
-show `wake armed`.
+deadline stays in tool details for the model). Cancelled waits mark `cancelled`, waits that a human
+steer ended mark `steered`, and armed wakes may show `wake armed`.
 
 **set_on_exit:**
 
@@ -462,6 +496,9 @@ PREVIEW_LINES                = 5       (TUI preview lines before ctrl+o expand)
   turn can still drive it. For `yield_until` waits the cancelled call reports
   `wait_status: cancelled`, does not drain buffered output, and leaves an armed `on_exit: "wake"`
   eligible.
+- **Human steer**: ends the current call's wait like an early deadline. The call drains the buffered
+  output and reports `wait_status: interrupted_by_steer`; the session stays live. See
+  [Steering messages](#steering-messages).
 - **Absolute wait races**: if exit, cancellation, and deadline land almost simultaneously, actual
   process exit wins whenever the session is already terminal when the result is assembled.
 - **Session shutdown**: all live sessions are terminated with SIGTERM; after a 1s grace, survivors
@@ -490,6 +527,8 @@ src/
 ├── pty.ts                # node-pty loader + pipes fallback + Windows tree-kill
 ├── shell.ts              # shell selection & argv construction (Windows-aware)
 ├── render.ts             # renderCall / renderResult for the TUI
+├── script-result.ts      # output schemas and structured results for codemode scripts
+├── steer-gate.ts         # a queued human steer ends attached waits early
 └── unescape.ts           # C-style escape decoder for write_stdin `chars`
 ```
 
@@ -617,9 +656,30 @@ automatic send retries, and bounded sanitized wake content), wake + yield_until 
 collectOutputUntilDeadline (including bounded payloads with full metadata), SessionStore LRU,
 truncateTail, unescapeChars, raw byte input, signal-name mapping, pipe and PTY execution, log
 retention, spawn-failure diagnostics, EPIPE safety, shutdown escalation, streamed previews, Windows
-shell resolution and quoting, PTY loading, and the `/unified-exec-sessions` command.
+shell resolution and quoting, PTY loading, and the `/unified-exec-sessions` command. Steer tests
+cover the gate (confirmation against Pi's queue, delivery, stale counts, nested codemode calls,
+opt-out) and steered waits through the real tools: relative, absolute, parallel, input windows, the
+`exec_command` window, armed wakes, and Esc. Structured-result tests check every projection against
+its tool's output schema.
 
 CI runs the suite on ubuntu, macos, and windows runners.
+
+## Codemode
+
+Pi codemode gives a script the `structuredContent` of a tool that declares an `outputSchema`, and
+the text envelope of other tools. All five tools declare one:
+
+| Tool                          | Script result                                                                                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exec_command`, `write_stdin` | `status`, `running`, `session_id?`, `output`, `truncated`, `omitted_bytes?`, `exit_code?`, `signal?`, `failure_message?`, `log_path?`, `wall_time_seconds`, `note?`, `wait_status?`, `on_exit?`, `tool_time_utc?` |
+| `kill_session`                | `status`, `found`, `killed`, `running`, `escalated`, `session_id`, and the output fields above                                                                                                                    |
+| `set_on_exit`                 | `session_id`, `found`, `on_exit?`, `status?`, `running?`, `wake_armed?`                                                                                                                                           |
+| `list_sessions`               | `sessions[]` (`session_id`, `command`, `cwd?`, `tty`, `pid?`, `elapsed_ms`, `running`, `wake_armed`, `exit_code?`, `signal?`, `log_path?`), `active_count`, `just_exited_count`, `tool_time_utc`                  |
+
+`output` is the same bounded, terminal-safe tail that the model sees, with real newlines: print it
+with `text(r.output)` instead of printing the whole result object. Metadata strings are bounded and
+on one line. The model-visible `content`, the persisted `details`, and the TUI rendering do not
+change.
 
 ## Improvements over codex
 

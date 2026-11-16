@@ -4,7 +4,8 @@
  * Unlike collectOutputUntilDeadline, this wait never accumulates drained
  * output in a per-call array. A long noisy process retains bounded output:
  *
- *   - listens ONLY on process exit, external cancellation, and one timer;
+ *   - listens ONLY on process exit, external cancellation, a queued steer,
+ *     and one timer;
  *   - never drains process output (the session's HeadTailBuffer keeps its
  *     bounded head/tail retention, the rolling UI tail keeps rolling, and the
  *     log file keeps receiving every byte);
@@ -16,7 +17,7 @@
 
 import type { NotificationWait, Notify } from "./notify.ts";
 
-export type LongWaitOutcome = "exit" | "deadline" | "cancelled";
+export type LongWaitOutcome = "exit" | "deadline" | "cancelled" | "steered";
 
 /**
  * Max single setTimeout arm. Values above ~2^31-1 overflow and fire early;
@@ -45,6 +46,8 @@ export interface LongWaitInputs {
   exited: AbortSignal;
   /** External cancellation (Esc / tool-call abort). Never kills the child. */
   externalAbort?: AbortSignal | undefined;
+  /** A human steer is queued (src/steer-gate.ts). Ends the wait like an early deadline. */
+  steerAbort?: AbortSignal | undefined;
   /** Validated duration in ms; absolute callers compute it once from wall time. */
   durationMs: number;
   /** Injectable monotonic clock (default: performance.now). Test hook. */
@@ -55,13 +58,14 @@ export interface LongWaitInputs {
 }
 
 /**
- * Wait until the process exits, the tool call is cancelled, or the monotonic
- * deadline arrives — whichever happens first. All timers and listeners are
- * released on every exit path.
+ * Wait until the process exits, the tool call is cancelled, a human steer is
+ * queued, or the monotonic deadline arrives — whichever happens first. Exit
+ * wins over the other outcomes when both are already signalled. All timers and
+ * listeners are released on every exit path.
  */
 // eslint-disable-next-line complexity -- Preserve audited exit, abort, timer, and cleanup race handling.
 export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<LongWaitOutcome> {
-  const { exited, externalAbort, durationMs } = inputs;
+  const { exited, externalAbort, steerAbort, durationMs } = inputs;
   const monotonicNow = inputs.monotonicNow ?? (() => performance.now());
   const setTimeoutFn = inputs.setTimeoutFn ?? ((cb: () => void, ms: number) => setTimeout(cb, ms));
   const clearTimeoutFn = inputs.clearTimeoutFn ?? clearNativeTimer;
@@ -71,6 +75,7 @@ export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<Lon
   }
   if (exited.aborted) return "exit";
   if (externalAbort?.aborted) return "cancelled";
+  if (steerAbort?.aborted) return "steered";
   if (durationMs <= 0) return "deadline";
 
   // Subtract elapsed monotonic time instead of adding a very large duration.
@@ -79,18 +84,9 @@ export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<Lon
 
   const cleanups: Array<() => void> = [];
   try {
-    const exitP = new Promise<LongWaitOutcome>((resolve) => {
-      const onAbort = () => resolve("exit");
-      exited.addEventListener("abort", onAbort, { once: true });
-      cleanups.push(() => exited.removeEventListener("abort", onAbort));
-    });
-    const cancelP: Promise<LongWaitOutcome> = externalAbort
-      ? new Promise((resolve) => {
-          const onAbort = () => resolve("cancelled");
-          externalAbort.addEventListener("abort", onAbort, { once: true });
-          cleanups.push(() => externalAbort.removeEventListener("abort", onAbort));
-        })
-      : new Promise<never>(() => {});
+    const exitP = outcomeOnAbort(exited, "exit", cleanups);
+    const cancelP = outcomeOnAbort(externalAbort, "cancelled", cleanups);
+    const steerP = outcomeOnAbort(steerAbort, "steered", cleanups);
 
     // Single timer, re-armed only if it fires before the monotonic deadline
     // (coarse timer granularity, or multi-day waits chunked below the
@@ -110,8 +106,13 @@ export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<Lon
       });
 
     for (;;) {
-      const which = await Promise.race([exitP, cancelP, armTimer().then(() => "timer" as const)]);
-      if (which === "exit" || which === "cancelled") return which;
+      const which = await Promise.race([
+        exitP,
+        cancelP,
+        steerP,
+        armTimer().then(() => "timer" as const),
+      ]);
+      if (which !== "timer") return exited.aborted ? "exit" : which;
       // Timer fired: trust only the monotonic clock.
       if (remainingMs() <= 0) return "deadline";
       if (timerHandle !== undefined) {
@@ -122,6 +123,23 @@ export async function waitForExitOrDeadline(inputs: LongWaitInputs): Promise<Lon
   } finally {
     for (const cleanup of cleanups) cleanup();
   }
+}
+
+/**
+ * A promise that resolves to `outcome` when `signal` aborts, or never when
+ * there is no signal. The listener is removed through `cleanups`.
+ */
+function outcomeOnAbort(
+  signal: AbortSignal | undefined,
+  outcome: LongWaitOutcome,
+  cleanups: Array<() => void>,
+): Promise<LongWaitOutcome> {
+  if (!signal) return new Promise<never>(() => {});
+  return new Promise((resolve) => {
+    const onAbort = () => resolve(outcome);
+    signal.addEventListener("abort", onAbort, { once: true });
+    cleanups.push(() => signal.removeEventListener("abort", onAbort));
+  });
 }
 
 // ---------------- Rate-limited streaming for empty polls ----------------

@@ -63,6 +63,44 @@ function makeHarness(maxBytes = 64 * 1024) {
 }
 
 describe("collectOutputUntilDeadline", () => {
+  it("drains buffered output and returns early when the stop signal fires", async () => {
+    const h = makeHarness();
+    const stop = new AbortController();
+    h.push("before-steer\n");
+    setTimeout(() => {
+      h.push("at-steer\n");
+      stop.abort();
+    }, 50);
+    const startedAt = Date.now();
+    const out = await collectOutputUntilDeadline({
+      buffer: h.buffer,
+      outputNotify: h.outputNotify,
+      outputClosed: h.outputClosed,
+      exited: h.exited,
+      deadlineMs: Date.now() + 10_000,
+      stopSignal: stop.signal,
+    });
+    assert.ok(Date.now() - startedAt < 2000);
+    assert.match(text(out), /before-steer/);
+    assert.equal(getEventListeners(stop.signal, "abort").length, 0);
+  });
+
+  it("returns the buffered output at once when the stop signal already fired", async () => {
+    const h = makeHarness();
+    const stop = new AbortController();
+    stop.abort();
+    h.push("queued\n");
+    const out = await collectOutputUntilDeadline({
+      buffer: h.buffer,
+      outputNotify: h.outputNotify,
+      outputClosed: h.outputClosed,
+      exited: h.exited,
+      deadlineMs: Date.now() + 10_000,
+      stopSignal: stop.signal,
+    });
+    assert.equal(text(out), "queued\n");
+  });
+
   it("does not accumulate abort listeners across chatty iterations", async () => {
     const h = makeHarness();
     // Wake the collector many times within one call. A per-iteration

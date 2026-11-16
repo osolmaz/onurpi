@@ -3,9 +3,10 @@
 `@onurpi/unified-exec` is based on
 [`iamwrm/pi-unified-exec`](https://github.com/iamwrm/pi-unified-exec).
 
-- Release: `v0.11.0`
-- Commit: `e94a93f060ff8b27eaa185ca05640695158c4cfb`
-- Retrieved: September 23, 2026
+- Release: `v0.13.1`, except the compact codemode preview of v0.12.1 and v0.12.2 (see
+  [Updates from v0.12.0 through v0.13.1](#updates-from-v0120-through-v0131))
+- Commit: `1baa4161f3d556af9f3eb9ae26219983b5cfe96d`
+- Retrieved: November 16, 2026
 - License: MIT, preserved in [`LICENSE`](LICENSE)
 
 ## Reviewed material
@@ -54,7 +55,9 @@ TUI peer minimum is now 0.86.1; OnurPi uses 0.87.0 for development.
 - **Provider interception:** None.
 - **Project trust handlers:** None.
 - **Background resources:** It owns child processes, timers, output streams, and PTYs. Session
-  shutdown terminates owned processes and clears completion scheduling.
+  shutdown terminates owned processes and clears completion scheduling and steer confirmations.
+- **Input observation:** The `input` handler reads only `streamingBehavior` and returns nothing, so
+  it never transforms or handles input. The `message_start` handler reads only the message role.
 - **Native code:** PTY mode uses the optional, exactly pinned
   `@homebridge/node-pty-prebuilt-multiarch@0.15.0`. Pipe mode works when the optional module is
   unavailable.
@@ -165,3 +168,58 @@ the native module cannot load.
 - Keep OnurPi's command-policy events, final spawn/input guards, private logs, bounded collection,
   and opt-in completion wakes. No source files were replaced wholesale. The upstream change does not
   add the active model ID to child process environments.
+
+## Updates from v0.12.0 through v0.13.1
+
+The review compared all eight commits after v0.11.0 (`e94a93f`) up to `1baa416` (v0.13.1) and every
+changed production file: `src/codemode-render.ts`, `collect.ts`, `index.ts`, `long-wait.ts`,
+`render.ts`, `script-result.ts`, `session.ts`, `steer-gate.ts`, and `tool-result.ts`. It also
+covered the changed tests and fixtures, the changelog, README, design notes, and dependency
+manifests. No new runtime dependency, network request, credential access, or telemetry was added.
+
+Imported:
+
+- v0.13.0 and v0.13.1: a human steering message ends attached waits early (`src/steer-gate.ts`),
+  with upstream's model-facing notes, the error for nested codemode calls, the `steered` TUI badge,
+  and the `PI_UNIFIED_EXEC_STEER_INTERRUPT=0` opt-out.
+- v0.12.0: output schemas and structured results for codemode scripts (`src/script-result.ts`), with
+  upstream's prompt guideline.
+
+Not imported:
+
+- v0.12.1 and v0.12.2: the compact codemode preview (`src/codemode-render.ts`). It registers a
+  wrapped copy of Pi's built-in `codemode` tool at session start to clip its collapsed rendering.
+  That changes the presentation of another tool, not command execution, and belongs in a separate
+  package if it is wanted.
+- The development-dependency pins to Pi 1.0.0 and TypeBox 1.3.27, and the actual-CLI, tmux, and
+  codemode model-helper tests, which need upstream's harness.
+
+Local changes:
+
+- The gate requires Pi's `ExtensionContext.hasPendingMessages()`, which Pi 1.5.2 always provides,
+  instead of keeping a fallback for an older Pi.
+- The gate lives in the shared runtime state. Its Pi event handlers are gate methods
+  (`observeInput`, `observeMessageStart`), and the tools pass the steer signal as an explicit
+  argument, so tests drive the whole path without a stub Pi API.
+- The wait statuses are one list (`WAIT_STATUSES`) that the result types, the details type, and the
+  output schema share.
+- Structured results are built from typed optional fields instead of deleting undefined keys at
+  runtime, so strict optional property types hold without casts. The schemas use the package's
+  `stringEnum` helper.
+- The long wait's abort listeners share one helper, and the collect routine's early stop is a
+  helper, so that the routine stays within the function-length limit without a new suppression.
+- The tests were ported to Vitest. They start Node child processes instead of shell built-ins, and
+  use short input windows where an empty poll would wait at least five seconds.
+
+Limitation: `@onurpi/prompt-queue` keeps a typed prompt in its own queue while the agent runs and
+gives it to Pi at the end of the turn. With that package, a typed steer does not end a wait.
+
+Local verification with the Pi 1.5.2 CLI and a scripted offline provider, without credentials or
+model requests:
+
+- RPC mode: a `steer` command sent 400 ms into a 900-second `write_stdin` poll ended the poll 5 ms
+  later with `wait_status: interrupted_by_steer`. The child kept running, and the next turn saw both
+  the steer and the early result. Session shutdown then ended the child.
+- JSON mode with codemode on: a script received the `exec_command` result as an object (`exit_code`
+  0, `status` `exited`, 40 output lines with real newlines), and structured results from
+  `list_sessions` and from `kill_session` for an unknown id.

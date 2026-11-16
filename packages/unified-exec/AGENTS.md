@@ -6,6 +6,9 @@
   direct tool result or one follow-up, never both.
 - Never send a queued completion wake while an agent run is active. Flush eligible wakes only after
   `agent_settled`.
+- A queued human steer ends attached waits like an early deadline and never kills the process. Keep
+  exit winning over a steer, Esc cancelling without a drain, and nested codemode calls failing while
+  a steer is queued.
 - Keep output bounded in memory and complete in the per-session log. Create POSIX logs exclusively
   with mode `0600`.
 - Keep PTY support optional. Pipe mode must work when the native provider cannot load.

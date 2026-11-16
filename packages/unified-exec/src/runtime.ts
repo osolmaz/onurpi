@@ -9,6 +9,7 @@ import { COMMAND_ENVIRONMENT_EVENT } from "./command-environment.ts";
 import { COMMAND_INPUT_EVENT } from "./command-input.ts";
 import { LRU_PROTECTED_COUNT, MAX_SESSIONS } from "./constants.ts";
 import { SessionStore } from "./session-store.ts";
+import { SteerGate, steerInterruptEnabled } from "./steer-gate.ts";
 import type { AgentActivity, ExtensionRuntime } from "./tool-types.ts";
 
 type RuntimeOptions = Readonly<{
@@ -16,6 +17,7 @@ type RuntimeOptions = Readonly<{
   coordinator?: Omit<CompletionCoordinatorOptions, "send" | "canSend" | "onSendError">;
   prepareEnvironment?: ExtensionRuntime["prepareEnvironment"];
   prepareInput?: ExtensionRuntime["prepareInput"];
+  steer?: SteerGate;
 }>;
 
 export function createRuntimeState(options: RuntimeOptions): ExtensionRuntime {
@@ -45,6 +47,7 @@ export function createRuntimeState(options: RuntimeOptions): ExtensionRuntime {
     prepareInput: options.prepareInput ?? (() => undefined),
     shuttingDown: false,
     agentActivity,
+    steer: options.steer ?? new SteerGate({ enabled: steerInterruptEnabled() }),
   };
   return runtime;
 }

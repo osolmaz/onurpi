@@ -10,11 +10,10 @@ import type { PrepareCommandEnvironment } from "./command-environment.ts";
 import type { PrepareCommandInput } from "./command-input.ts";
 import type { SessionStore } from "./session-store.ts";
 import type { ExecSession } from "./session.ts";
-import type { TruncationMetadata } from "./tool-result.ts";
+import type { SteerGate } from "./steer-gate.ts";
+import type { TruncationMetadata, WaitStatus } from "./tool-result.ts";
 
 export type WaitMode = "relative" | "absolute";
-export type WaitStatus =
-  "completed" | "relative_deadline_reached" | "absolute_deadline_reached" | "cancelled";
 
 export type SessionListing = Readonly<{
   session_id: number;
@@ -115,4 +114,6 @@ export type ExtensionRuntime = {
   prepareInput: PrepareCommandInput;
   shuttingDown: boolean;
   agentActivity: AgentActivity;
+  /** Ends attached waits early while a human steer is queued (steer-gate.ts). */
+  steer: SteerGate;
 };

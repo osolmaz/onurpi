@@ -5,6 +5,7 @@
  */
 
 import { strict as assert } from "node:assert";
+import { getEventListeners } from "node:events";
 import { describe, it } from "vitest";
 import {
   MAX_TIMER_ARM_MS,
@@ -169,6 +170,59 @@ describe("waitForExitOrDeadline", () => {
     const exited2 = new AbortController();
     await waitForExitOrDeadline({ exited: exited2.signal, durationMs: 20 });
     exited2.abort(); // must be inert
+  });
+
+  it("returns 'steered' when a steer is already queued", async () => {
+    const steer = new AbortController();
+    steer.abort();
+    const outcome = await waitForExitOrDeadline({
+      exited: new AbortController().signal,
+      steerAbort: steer.signal,
+      durationMs: 60_000,
+    });
+    assert.equal(outcome, "steered");
+  });
+
+  it("returns 'steered' promptly mid-wait and removes the steer listener", async () => {
+    const steer = new AbortController();
+    const startedAt = Date.now();
+    setTimeout(() => steer.abort(), 50);
+    const outcome = await waitForExitOrDeadline({
+      exited: new AbortController().signal,
+      steerAbort: steer.signal,
+      durationMs: 60_000,
+    });
+    assert.equal(outcome, "steered");
+    assert.ok(Date.now() - startedAt < 2000);
+    assert.equal(getEventListeners(steer.signal, "abort").length, 0);
+  });
+
+  it("lets exit win over a simultaneous steer", async () => {
+    const exited = new AbortController();
+    const steer = new AbortController();
+    exited.abort();
+    steer.abort();
+    const outcome = await waitForExitOrDeadline({
+      exited: exited.signal,
+      steerAbort: steer.signal,
+      durationMs: 60_000,
+    });
+    assert.equal(outcome, "exit");
+  });
+
+  it("reports exit when the process exits in the same tick as the steer", async () => {
+    const exited = new AbortController();
+    const steer = new AbortController();
+    setTimeout(() => {
+      steer.abort();
+      exited.abort();
+    }, 20);
+    const outcome = await waitForExitOrDeadline({
+      exited: exited.signal,
+      steerAbort: steer.signal,
+      durationMs: 60_000,
+    });
+    assert.equal(outcome, "exit");
   });
 });
 

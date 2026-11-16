@@ -17,12 +17,13 @@ import { sanitizeOutputText } from "./output-safety.ts";
 import { decode, envelopeFromCollected } from "./response.ts";
 import { removeSession } from "./session-ui.ts";
 import type { ExecSession } from "./session.ts";
+import { endedBySteer, steeredNote } from "./steer-gate.ts";
 import { startStreaming } from "./streaming.ts";
 import { nowUtcIso, parseYieldUntil } from "./time.ts";
 import { clampYield, resolveEmptyPollYield, resolveWriteInput } from "./tool-helpers.ts";
 import { finalizeProcessResult } from "./tool-result.ts";
 import type { WriteStdinArgs } from "./tool-schema.ts";
-import type { ProcessResultDetails, ProcessResultExtra } from "./tool-result.ts";
+import type { ProcessResultDetails, ProcessResultExtra, WaitStatus } from "./tool-result.ts";
 import type { ExtensionRuntime, ToolUpdate, UnifiedExecDetails, WaitMode } from "./tool-types.ts";
 
 function validateWaitArguments(args: WriteStdinArgs, isEmptyPoll: boolean): void {
@@ -118,6 +119,7 @@ async function runInputWait(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   toolCallId: string,
+  steerSignal: AbortSignal | undefined,
 ): Promise<ProcessResultDetails> {
   const yieldTimeMs = clampYield(args.yield_time_ms, DEFAULT_WRITE_STDIN_YIELD_MS);
   const startedAt = Date.now();
@@ -141,6 +143,7 @@ async function runInputWait(
       exited: session.exited,
       deadlineMs,
       externalAbort: signal,
+      stopSignal: steerSignal,
     });
     stream.stop();
     if (session.hasExited) {
@@ -152,6 +155,7 @@ async function runInputWait(
     return finalizeInputRunning(runtime, session, toolCallId, startedAt, collected, {
       writeFailure,
       yieldTimeMs,
+      steered: endedBySteer(steerSignal, signal, deadlineMs),
     });
   } catch (error: unknown) {
     runtime.coordinator.releaseObservation(session.id, toolCallId);
@@ -168,9 +172,11 @@ function finalizeInputRunning(
   options: Readonly<{
     writeFailure: string | undefined;
     yieldTimeMs: number;
+    steered: boolean;
   }>,
 ): ProcessResultDetails {
   const armed = runtime.coordinator.isArmed(session.id);
+  const heldOpenNote = session.heldOpenNote;
   runtime.coordinator.releaseObservation(session.id, toolCallId);
   return finalizeProcessResult({
     operation: "write_stdin",
@@ -188,7 +194,8 @@ function finalizeInputRunning(
     yieldTimeMs: options.yieldTimeMs,
     extra: {
       tool_time_utc: nowUtcIso(),
-      note: session.heldOpenNote,
+      note: options.steered ? steeredNote(heldOpenNote) : heldOpenNote,
+      ...(options.steered ? { wait_status: "interrupted_by_steer" as const } : {}),
       ...(armed ? { on_exit: "wake" as const, completion_notification: "armed" as const } : {}),
     },
   });
@@ -243,25 +250,34 @@ function waitResultFields(wait: EmptyWait): {
     : { yieldUntil: wait.yieldUntil };
 }
 
+function attachedWaitStatus(
+  wait: EmptyWait,
+  outcome: Exclude<LongWaitOutcome, "exit">,
+): WaitStatus {
+  switch (outcome) {
+    case "cancelled":
+      return "cancelled";
+    case "steered":
+      return "interrupted_by_steer";
+    case "deadline":
+      return wait.mode === "relative" ? "relative_deadline_reached" : "absolute_deadline_reached";
+  }
+}
+
 function attachedResultExtra(
   wait: EmptyWait,
   outcome: Exclude<LongWaitOutcome, "exit">,
   armed: boolean,
-  note: string | undefined,
+  heldOpenNote: string | undefined,
   elapsedMs: number,
 ): ProcessResultExtra {
   return {
     wait_mode: wait.mode,
-    wait_status:
-      outcome === "cancelled"
-        ? "cancelled"
-        : wait.mode === "relative"
-          ? "relative_deadline_reached"
-          : "absolute_deadline_reached",
+    wait_status: attachedWaitStatus(wait, outcome),
     yield_until: wait.mode === "absolute" ? wait.yieldUntil : undefined,
     effective_wait_ms: outcome === "cancelled" ? undefined : elapsedMs,
     tool_time_utc: nowUtcIso(),
-    note,
+    note: outcome === "steered" ? steeredNote(heldOpenNote) : heldOpenNote,
     ...(armed ? { on_exit: "wake", completion_notification: "armed" } : {}),
   };
 }
@@ -275,6 +291,7 @@ async function finalizeAttachedNonExit(
   outcome: Exclude<LongWaitOutcome, "exit">,
 ): Promise<ProcessResultDetails> {
   // Pi can discard a cancelled result. Do not drain output on cancellation.
+  // A steered wait drains like a reached deadline; the session stays live.
   const collected =
     outcome === "cancelled"
       ? undefined
@@ -323,6 +340,7 @@ async function runAttachedWait(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   toolCallId: string,
+  steerSignal: AbortSignal | undefined,
 ): Promise<ProcessResultDetails> {
   const startedAt = Date.now();
   session.touch();
@@ -332,6 +350,7 @@ async function runAttachedWait(
     const outcome = await waitForExitOrDeadline({
       exited: session.exited,
       externalAbort: signal,
+      steerAbort: steerSignal,
       durationMs: wait.durationMs,
     });
     if (outcome === "exit" || session.hasExited) {
@@ -356,6 +375,7 @@ export async function runWriteStdin(
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
   toolCallId: string,
+  steerSignal?: AbortSignal,
 ): Promise<ProcessResultDetails> {
   const session = runtime.store.get(args.session_id);
   if (!session) throw new Error(`unknown session_id: ${String(args.session_id)}`);
@@ -391,7 +411,7 @@ export async function runWriteStdin(
     const wait: EmptyWait = parsed
       ? { mode: "absolute", durationMs: parsed.remainingMs, yieldUntil: parsed.normalized }
       : { mode: "relative", durationMs: resolveEmptyPollYield(args.yield_time_ms) };
-    return runAttachedWait(runtime, session, wait, signal, onUpdate, toolCallId);
+    return runAttachedWait(runtime, session, wait, signal, onUpdate, toolCallId, steerSignal);
   }
-  return runInputWait(runtime, session, args, bytes, signal, onUpdate, toolCallId);
+  return runInputWait(runtime, session, args, bytes, signal, onUpdate, toolCallId, steerSignal);
 }

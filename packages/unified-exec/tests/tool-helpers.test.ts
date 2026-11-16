@@ -3,10 +3,25 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "vitest";
 
 import {
+  normalizeSignal,
   resolveEmptyPollYield,
   resolveMaxEmptyPollMs,
   resolveWriteInput,
 } from "../src/tool-helpers.ts";
+
+describe("signal names", () => {
+  it("defaults to SIGTERM and accepts names with or without the SIG prefix in any case", () => {
+    assert.equal(normalizeSignal(undefined), "SIGTERM");
+    assert.equal(normalizeSignal(""), "SIGTERM");
+    assert.equal(normalizeSignal("term"), "SIGTERM");
+    assert.equal(normalizeSignal(" INT "), "SIGINT");
+    assert.equal(normalizeSignal("sigkill"), "SIGKILL");
+  });
+
+  it("rejects unknown signal names", () => {
+    assert.throws(() => normalizeSignal("SIGNOPE"), /unknown signal "SIGNOPE"/);
+  });
+});
 
 describe("empty poll durations", () => {
   it("accepts relative waits longer than the former 290-second limit", () => {

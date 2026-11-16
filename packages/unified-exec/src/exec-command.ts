@@ -31,6 +31,7 @@ import {
   resolveDefaultShell,
   resolveWindowsShell,
 } from "./shell.ts";
+import { endedBySteer, steeredNote } from "./steer-gate.ts";
 import { startStreaming } from "./streaming.ts";
 import { nowUtcIso } from "./time.ts";
 import { clampYield } from "./tool-helpers.ts";
@@ -50,7 +51,15 @@ type PreparedCommand = Readonly<{
   windowsVerbatimArguments: boolean | undefined;
 }>;
 
-type RunningCommand = PreparedCommand & Readonly<{ session: ExecSession; startedAt: number }>;
+type RunningCommand = PreparedCommand &
+  Readonly<{
+    session: ExecSession;
+    startedAt: number;
+    /** Aborted while a human steer is queued: the initial window ends early. */
+    steerSignal: AbortSignal | undefined;
+  }>;
+
+type InitialWindow = Readonly<{ collected: CollectedOutput; steered: boolean }>;
 
 // eslint-disable-next-line complexity -- Keep platform shell selection and one-time notices together.
 function resolveShell(runtime: ExtensionRuntime, requested: string | undefined): string {
@@ -231,7 +240,7 @@ async function collectInitialWindow(
   command: RunningCommand,
   signal: AbortSignal | undefined,
   onUpdate: ToolUpdate | undefined,
-): Promise<CollectedOutput> {
+): Promise<InitialWindow> {
   const deadlineMs = command.startedAt + command.yieldTimeMs;
   const stream = startStreaming(command.session, onUpdate, deadlineMs, signal);
   const collected = await collectOutputUntilDeadline({
@@ -241,19 +250,21 @@ async function collectInitialWindow(
     exited: command.session.exited,
     deadlineMs,
     externalAbort: signal,
+    stopSignal: command.steerSignal,
   });
   stream.stop();
   command.session.touch();
-  return collected;
+  return { collected, steered: endedBySteer(command.steerSignal, signal, deadlineMs) };
 }
 
 function finalizeRunning(
   runtime: ExtensionRuntime,
   command: RunningCommand,
   args: ExecCommandArgs,
-  collected: CollectedOutput,
+  { collected, steered }: InitialWindow,
 ): ProcessResultDetails {
   const wantsWake = args.on_exit === "wake";
+  const heldOpenNote = command.session.heldOpenNote;
   if (wantsWake) runtime.coordinator.register(command.session);
   return finalizeProcessResult({
     operation: "exec_command",
@@ -272,8 +283,9 @@ function finalizeRunning(
     extra: {
       on_exit: args.on_exit,
       ...(wantsWake ? { completion_notification: "armed" as const } : {}),
+      ...(steered ? { wait_status: "interrupted_by_steer" as const } : {}),
       tool_time_utc: nowUtcIso(),
-      note: command.session.heldOpenNote,
+      note: steered ? steeredNote(heldOpenNote) : heldOpenNote,
     },
   });
 }
@@ -290,8 +302,9 @@ async function runSpawned(
   if (command.session.hasExited && Date.now() <= earlyDeadline)
     return finalizeExited(command, args, signal);
   insertSession(runtime, command.session);
-  const collected = await collectInitialWindow(command, signal, onUpdate);
-  if (!command.session.hasExited) return finalizeRunning(runtime, command, args, collected);
+  const initial = await collectInitialWindow(command, signal, onUpdate);
+  if (!command.session.hasExited) return finalizeRunning(runtime, command, args, initial);
+  const { collected } = initial;
   // Process exited during this call → respond with exit info, not a
   // session_id. The wake is never armed: the exit was delivered directly.
   removeSession(runtime, command.session.id);
@@ -321,6 +334,7 @@ export async function runExecCommand(
   cwd: string,
   toolCallId: string,
   model?: CommandEnvironmentModel,
+  steerSignal?: AbortSignal,
 ): Promise<ProcessResultDetails> {
   if (runtime.shuttingDown) throw new Error("unified-exec: session is shutting down");
   const prepared = prepareCommand(runtime, args, cwd);
@@ -344,7 +358,7 @@ export async function runExecCommand(
   try {
     return await runSpawned(
       runtime,
-      { ...prepared, session, startedAt: Date.now() },
+      { ...prepared, session, startedAt: Date.now(), steerSignal },
       args,
       signal,
       onUpdate,

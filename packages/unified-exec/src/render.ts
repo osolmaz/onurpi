@@ -404,6 +404,7 @@ function buildStatusLine(
     bits.push(formatUntilLabel(details.yield_until));
   }
   if (details.wait_status === "cancelled") bits.push(theme.fg("warning", "cancelled"));
+  if (details.wait_status === "interrupted_by_steer") bits.push(theme.fg("accent", "steered"));
   if (details.completion_notification === "armed") bits.push("wake armed");
   if (details.log_path) bits.push(`log: ${safeOneLine(tildify(details.log_path))}`);
 

@@ -36,12 +36,22 @@ export default function unifiedExec(pi: ExtensionAPI): void {
   });
   pi.on("agent_settled", () => {
     runtime.agentActivity.active = false;
+    runtime.steer.reset();
     runtime.coordinator.flushPending();
+  });
+  // A human steer queued during a long wait ends the wait early, so that Pi
+  // can deliver it after this tool batch (see steer-gate.ts).
+  pi.on("input", (event, ctx) => {
+    runtime.steer.observeInput(event, ctx);
+  });
+  pi.on("message_start", (event) => {
+    runtime.steer.observeMessageStart(event);
   });
   pi.on("session_start", (_event, ctx) => {
     runtime.ui = ctx.ui;
     runtime.shuttingDown = false;
     runtime.agentActivity.active = false;
+    runtime.steer.reset();
     runtime.coordinator.reset();
     updateRunningSessionsUi(runtime);
     if (!keepBuiltinBash(pi)) {
@@ -59,6 +69,7 @@ export default function unifiedExec(pi: ExtensionAPI): void {
     });
   });
   pi.on("session_shutdown", async () => {
+    runtime.steer.reset();
     await shutdownSessions(runtime);
     clearSessionExitWatchers(runtime);
     updateRunningSessionsUi(runtime);

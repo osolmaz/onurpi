@@ -290,6 +290,29 @@ describe("unified-exec renderers", () => {
     assert.doesNotMatch(nextText, /old-8/);
   });
 
+  it("marks a wait that a steer ended early", () => {
+    const details = finalizeProcessResult({
+      operation: "write_stdin",
+      wallTimeSec: 0.3,
+      collected: encoder.encode("still working\n"),
+      sessionId: 5,
+      exitCode: undefined,
+      signal: null,
+      failure: null,
+      tty: false,
+      extra: { wait_mode: "relative", wait_status: "interrupted_by_steer" },
+    });
+    const component = renderProcessResult(
+      makeResult(details, renderProcessResultText(details)),
+      { expanded: false, isPartial: false },
+      plainTheme,
+      makeContext({}, {}),
+    );
+    const text = rendered(component);
+    assert.match(text, /session_id=5 · steered/);
+    assert.match(renderProcessResultText(details), /wait_status: interrupted_by_steer/);
+  });
+
   it("kill_session unknown-id results are compact errors", () => {
     const component = renderKillSessionResult(
       makeResult(

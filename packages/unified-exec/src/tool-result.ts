@@ -22,6 +22,15 @@ const textDecoder = new TextDecoder("utf-8", { fatal: false });
 export type ProcessOperation = "exec_command" | "write_stdin";
 export type ProcessStatus = "running" | "exited";
 export type KillStatus = "killed" | "kill_failed";
+/** How an attached wait ended. `interrupted_by_steer`: a human steer was queued. */
+export const WAIT_STATUSES = [
+  "completed",
+  "relative_deadline_reached",
+  "absolute_deadline_reached",
+  "cancelled",
+  "interrupted_by_steer",
+] as const;
+export type WaitStatus = (typeof WAIT_STATUSES)[number];
 export type TruncationMetadata = Omit<TruncationResult, "content">;
 
 function truncationMetadata(result: TruncationResult): TruncationMetadata {
@@ -71,8 +80,7 @@ export interface ProcessResultDetails extends OutputResultDetails {
   status: ProcessStatus;
   yield_time_ms?: number;
   wait_mode?: "relative" | "absolute";
-  wait_status?:
-    "completed" | "relative_deadline_reached" | "absolute_deadline_reached" | "cancelled";
+  wait_status?: WaitStatus;
   yield_until?: string;
   effective_wait_ms?: number;
   on_exit?: OnExitPolicy;
@@ -96,12 +104,7 @@ export interface KillResultDetails extends OutputResultDetails {
 /** Long-wait / wake metadata merged into a process result. */
 export type ProcessResultExtra = Readonly<{
   wait_mode?: "relative" | "absolute" | undefined;
-  wait_status?:
-    | "completed"
-    | "relative_deadline_reached"
-    | "absolute_deadline_reached"
-    | "cancelled"
-    | undefined;
+  wait_status?: WaitStatus | undefined;
   yield_until?: string | undefined;
   effective_wait_ms?: number | undefined;
   on_exit?: OnExitPolicy | undefined;
@@ -168,7 +171,7 @@ function decode(bytes: Uint8Array): string {
   return textDecoder.decode(bytes);
 }
 
-function safeMeta(value: string, max = 4096): string {
+export function safeMeta(value: string, max = 4096): string {
   // Metadata sits outside the 50 KiB child-output body. Bound both the scan and
   // rendered value so a malformed path/error cannot recreate an oversized
   // result through a header field.

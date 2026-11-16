@@ -6,7 +6,7 @@ import { Type, type Static } from "typebox";
  * Pi 1.5.0 stopped producing TypeBox schemas from `StringEnum()`, and the tool definition that
  * `registerTool()` takes still requires one, so the enum is built here.
  */
-function stringEnum<const T extends readonly string[]>(
+export function stringEnum<const T extends readonly string[]>(
   values: T,
   options: { readonly description?: string } = {},
 ) {

@@ -1,4 +1,8 @@
-import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 
 import { sanitizeMeta } from "./completion.ts";
 import { DEFAULT_MAX_BACKGROUND_POLL_MS } from "./constants.ts";
@@ -16,7 +20,19 @@ import {
   renderWriteStdinCall,
 } from "./render.ts";
 import { envelopeFromCollected } from "./response.ts";
+import {
+  killNotFoundScriptResult,
+  killScriptResult,
+  killScriptResultSchema,
+  listSessionsScriptResult,
+  listSessionsScriptResultSchema,
+  processScriptResult,
+  processScriptResultSchema,
+  setOnExitScriptResult,
+  setOnExitScriptResultSchema,
+} from "./script-result.ts";
 import { removeSession, updateRunningSessionsUi } from "./session-ui.ts";
+import { steerSignalFor } from "./steer-gate.ts";
 import { terminateSessionById } from "./termination.ts";
 import { normalizeSignal } from "./tool-helpers.ts";
 import {
@@ -39,6 +55,12 @@ import type {
 } from "./tool-types.ts";
 import { runWriteStdin } from "./write-stdin.ts";
 
+const CODEMODE_GUIDELINE =
+  "In codemode scripts, exec_command and write_stdin resolve to objects: print r.output with text(r.output) and check r.exit_code / r.session_id, instead of printing the whole result object.";
+
+const STEER_GUIDELINE =
+  'A wait with wait_status "interrupted_by_steer" ended early because the user sent a steering message; the process is still running. Address the steer first and re-poll only if it is still relevant.';
+
 function registerExecCommand(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
   const tool: ToolDefinition<typeof ExecCommandParameters, UnifiedExecDetails, RenderState> = {
     name: "exec_command",
@@ -51,10 +73,14 @@ function registerExecCommand(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
       "Use a short initial yield for quick commands, then poll long-running commands with write_stdin.",
       `Use repeated empty write_stdin polls up to ${String(DEFAULT_MAX_BACKGROUND_POLL_MS)} ms for ordinary progress.`,
       'on_exit defaults to "none". Use "wake" only when the human explicitly requests auto-resume, and disarm abandoned wakes with set_on_exit.',
+      STEER_GUIDELINE,
+      CODEMODE_GUIDELINE,
     ],
     parameters: ExecCommandParameters,
+    outputSchema: processScriptResultSchema,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
+      const steerSignal = steerSignalFor(runtime.steer, toolCallId, ctx);
       const details = await runExecCommand(
         runtime,
         params,
@@ -63,9 +89,14 @@ function registerExecCommand(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
         ctx.cwd,
         toolCallId,
         ctx.model,
+        steerSignal,
       );
       updateRunningSessionsUi(runtime);
-      return { content: [{ type: "text", text: renderProcessResultText(details) }], details };
+      return {
+        content: [{ type: "text", text: renderProcessResultText(details) }],
+        details,
+        structuredContent: processScriptResult(details),
+      };
     },
     renderCall: renderExecCommandCall,
     renderResult: renderProcessResult,
@@ -86,13 +117,27 @@ function registerWriteStdin(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
       "Never use yield_until for interactive or indefinite processes.",
       'A direct terminal result consumes an armed on_exit wake; set_on_exit with "none" disarms without killing.',
       "Submit TTY lines with \\r for portable Enter-key behavior.",
+      STEER_GUIDELINE,
     ],
     parameters: WriteStdinParameters,
+    outputSchema: processScriptResultSchema,
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
-      const details = await runWriteStdin(runtime, params, signal, onUpdate, toolCallId);
+      const steerSignal = steerSignalFor(runtime.steer, toolCallId, ctx);
+      const details = await runWriteStdin(
+        runtime,
+        params,
+        signal,
+        onUpdate,
+        toolCallId,
+        steerSignal,
+      );
       updateRunningSessionsUi(runtime);
-      return { content: [{ type: "text", text: renderProcessResultText(details) }], details };
+      return {
+        content: [{ type: "text", text: renderProcessResultText(details) }],
+        details,
+        structuredContent: processScriptResult(details),
+      };
     },
     renderCall: renderWriteStdinCall,
     renderResult: renderProcessResult,
@@ -112,15 +157,16 @@ function registerSetOnExit(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
       "set_on_exit does not stop the process; use kill_session to terminate it.",
     ],
     parameters: SetOnExitParameters,
+    outputSchema: setOnExitScriptResultSchema,
     // eslint-disable-next-line complexity -- Keep set_on_exit state reporting aligned with coordinator outcomes.
     execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
       const session = runtime.store.get(params.session_id);
       if (params.on_exit === "wake" && !session)
-        return Promise.resolve(notFound(params.session_id));
+        return Promise.resolve(setOnExitNotFound(params.session_id));
       const status = runtime.coordinator.setOnExit(params.session_id, params.on_exit, session);
       if (!session && status === "already_none")
-        return Promise.resolve(notFound(params.session_id));
+        return Promise.resolve(setOnExitNotFound(params.session_id));
       const details: UnifiedExecDetails = {
         session_id: params.session_id,
         found: true,
@@ -133,7 +179,18 @@ function registerSetOnExit(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
         tool_time_utc: nowUtcIso(),
       };
       const text = `set_on_exit session_id=${String(params.session_id)} on_exit=${params.on_exit} → ${status}; wake ${details.wake_armed ? "armed" : "not armed"}`;
-      return Promise.resolve({ content: [{ type: "text", text }], details });
+      return Promise.resolve({
+        content: [{ type: "text", text }],
+        details,
+        structuredContent: setOnExitScriptResult({
+          session_id: params.session_id,
+          found: true,
+          on_exit: params.on_exit,
+          status,
+          running: details.running,
+          wake_armed: details.wake_armed,
+        }),
+      });
     },
     renderCall: renderSetOnExitCall,
     renderResult: renderSetOnExitResult,
@@ -151,6 +208,13 @@ function notFound(sessionId: number): {
   };
 }
 
+function setOnExitNotFound(sessionId: number): AgentToolResult<UnifiedExecDetails> {
+  return {
+    ...notFound(sessionId),
+    structuredContent: setOnExitScriptResult({ session_id: sessionId, found: false }),
+  };
+}
+
 function registerKillSession(pi: ExtensionAPI, runtime: ExtensionRuntime): void {
   const tool: ToolDefinition<typeof KillSessionParameters, UnifiedExecDetails, RenderState> = {
     name: "kill_session",
@@ -159,12 +223,17 @@ function registerKillSession(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
       "Terminate a session with SIGTERM and bounded SIGKILL escalation. Killing also suppresses any armed wake.",
     promptSnippet: "Terminate a session",
     parameters: KillSessionParameters,
+    outputSchema: killScriptResultSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
       const initial = normalizeSignal(params.signal);
       const startedAt = Date.now();
       const outcome = await terminateSessionById(runtime, params.session_id, initial);
-      if (!outcome) return notFound(params.session_id);
+      if (!outcome)
+        return {
+          ...notFound(params.session_id),
+          structuredContent: killNotFoundScriptResult(params.session_id),
+        };
       updateRunningSessionsUi(runtime);
       const { session, escalated, collected, killed } = outcome;
       const killFailure = killed
@@ -196,6 +265,7 @@ function registerKillSession(pi: ExtensionAPI, runtime: ExtensionRuntime): void 
       return {
         content: [{ type: "text", text: renderKillResultText(details) }],
         details,
+        structuredContent: killScriptResult(details),
       };
     },
     renderCall: renderKillSessionCall,
@@ -259,6 +329,7 @@ function registerListSessions(pi: ExtensionAPI, runtime: ExtensionRuntime): void
     description: "List live sessions and report newly exited sessions once before removing them.",
     promptSnippet: "List live command sessions",
     parameters: ListSessionsParameters,
+    outputSchema: listSessionsScriptResultSchema,
     execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
       runtime.ui ??= ctx.ui;
       const now = Date.now();
@@ -294,6 +365,12 @@ function registerListSessions(pi: ExtensionAPI, runtime: ExtensionRuntime): void
           },
         ],
         details,
+        structuredContent: listSessionsScriptResult({
+          sessions,
+          active_count: activeCount,
+          just_exited_count: reapedCount,
+          tool_time_utc: toolTimeUtc,
+        }),
       });
     },
     renderCall: renderListSessionsCall,

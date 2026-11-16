@@ -512,6 +512,35 @@ describe("runtime integration", () => {
     assert.ok(log.length >= 100_000);
   });
 
+  it("rejects write_stdin arguments that cannot run", async () => {
+    const { runtime } = makeRuntime();
+    await assert.rejects(
+      runWriteStdin(runtime, { session_id: 404 }, undefined, undefined, "unknown"),
+      /unknown session_id: 404/,
+    );
+    const sessionId = requireSessionId(await start(runtime, delayedOutput(30_000)));
+    await assert.rejects(
+      runWriteStdin(
+        runtime,
+        { session_id: sessionId, yield_time_ms: 5000, yield_until: "2099-01-01T00:00:00Z" },
+        undefined,
+        undefined,
+        "both-waits",
+      ),
+      /either yield_time_ms or yield_until/,
+    );
+    await assert.rejects(
+      runWriteStdin(
+        runtime,
+        { session_id: sessionId, chars: "x", yield_until: "2099-01-01T00:00:00Z" },
+        undefined,
+        undefined,
+        "deadline-with-input",
+      ),
+      /yield_until is only valid for an empty poll/,
+    );
+  });
+
   it.skipIf(!isPtyAvailable())(
     "supports TTY sessions when the optional provider loads",
     async () => {

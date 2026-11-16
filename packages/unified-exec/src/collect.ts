@@ -60,6 +60,11 @@ export interface CollectInputs {
   deadlineMs: number;
   /** External abort (e.g. user pressed Esc). Breaks out immediately. */
   externalAbort?: AbortSignal | undefined;
+  /**
+   * Early deadline (a human steer is queued). Unlike externalAbort, the
+   * currently buffered output is still drained and returned.
+   */
+  stopSignal?: AbortSignal | undefined;
   /** Override the trailing-output grace after exit (ms). */
   postExitCloseWaitMs?: number | undefined;
 }
@@ -109,6 +114,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
     const deadlineP = timeoutPromise(deadlineMs - Date.now(), cleanups).then(
       () => "timeout" as const,
     );
+    const stop = earlyStop(inputs.stopSignal, deadlineMs, cleanups);
     let closedP: Promise<"closed"> | undefined;
     let graceP: Promise<"timeout"> | undefined;
 
@@ -126,7 +132,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
         if (exitSignalReceived && outputClosed.isClosed) break;
 
         const now = Date.now();
-        if (now >= deadlineMs) break;
+        if (stop.past()) break;
 
         if (exitSignalReceived) {
           // Process exited but stream not closed yet — give it a short grace.
@@ -153,6 +159,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
           outputWait.promise.then(() => "output" as const),
           exitedP,
           deadlineP,
+          stop.promise,
           externalP,
         ]).finally(outputWait.cancel);
         if (which === "timeout" || which === "external") break;
@@ -171,7 +178,7 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
       }
 
       if (exited.aborted) exitSignalReceived = true;
-      if (Date.now() >= deadlineMs) break;
+      if (stop.past()) break;
     }
   } finally {
     for (const cleanup of cleanups) cleanup();
@@ -181,6 +188,23 @@ export async function collectOutputUntilDeadline(inputs: CollectInputs): Promise
     bytes: collected.toBytes(),
     totalBytes,
     totalLines: newlineBytes + (totalBytes > 0 && finalByte !== 0x0a ? 1 : 0),
+  };
+}
+
+/**
+ * A queued steer is an early deadline: unlike an external abort, the output
+ * that is already buffered is still drained and returned.
+ */
+function earlyStop(
+  stopSignal: AbortSignal | undefined,
+  deadlineMs: number,
+  cleanups: Array<() => void>,
+): { promise: Promise<"timeout">; past: () => boolean } {
+  return {
+    promise: stopSignal
+      ? abortPromise(stopSignal, cleanups).then(() => "timeout" as const)
+      : new Promise<never>(() => {}),
+    past: () => Date.now() >= deadlineMs || stopSignal?.aborted === true,
   };
 }
 
