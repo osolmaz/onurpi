@@ -1,7 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { AdapterCoverage } from "./src/adapters.ts";
 import { registerShellGuards } from "./src/builtins.ts";
+import { guardConfigStatus, readGuardConfig, type GuardConfig } from "./src/config.ts";
 import { ExecutionCheckStore } from "./src/execution-check.ts";
 import { withCommandGuardGuidance } from "./src/guidance.ts";
 import { createGuardState, guardSwitchStatus, type GuardState } from "./src/state.ts";
@@ -16,12 +17,15 @@ async function statusText(
   coverage: AdapterCoverage,
   checks: ExecutionCheckStore,
   state: GuardState,
+  config: GuardConfig,
 ): Promise<string> {
+  const configLine = guardConfigStatus(config);
   if (!state.enabled) {
     return [
       "Command Guard is off for this session.",
       "Every guarded path runs without checks until you run `/command-guard on` or restart Pi.",
       guardSwitchStatus(state),
+      ...(configLine === undefined ? [] : [configLine]),
     ].join("\n");
   }
   coverage.enforce();
@@ -37,11 +41,37 @@ async function statusText(
     `Pending final command checks: ${String(checks.size)}.`,
     ...(await shellStatus()),
     guardSwitchStatus(state),
+    ...(configLine === undefined ? [] : [configLine]),
     `Non-control write_stdin input is blocked. There is no bypass or confirmation gate.`,
   ].join("\n");
 }
 
 export default function commandGuard(pi: ExtensionAPI): void {
+  registerCommandGuard(pi, readGuardConfig(getAgentDir()));
+}
+
+/** The status command alone, for a machine whose config file turns the guard off. */
+function registerOffByConfig(pi: ExtensionAPI, path: string): void {
+  pi.registerCommand("command-guard", {
+    description: "Show why Command Guard is off on this machine",
+    handler: async (_args, ctx) => {
+      await Promise.resolve();
+      ctx.ui.notify(
+        [
+          "Command Guard is off on this machine: it loaded no checks.",
+          `${path} sets "enabled": false. Remove the file or set "enabled": true, then restart Pi.`,
+        ].join("\n"),
+        "warning",
+      );
+    },
+  });
+}
+
+export function registerCommandGuard(pi: ExtensionAPI, config: GuardConfig): void {
+  if (config.mode === "off") {
+    registerOffByConfig(pi, config.path);
+    return;
+  }
   const checks = new ExecutionCheckStore();
   const coverage = new AdapterCoverage(pi);
   const state = createGuardState();
@@ -72,7 +102,7 @@ export default function commandGuard(pi: ExtensionAPI): void {
       }
       if (verb === "" || verb === "status") {
         ctx.ui.notify(
-          await statusText(pi, coverage, checks, state),
+          await statusText(pi, coverage, checks, state, config),
           state.enabled ? "info" : "warning",
         );
         return;

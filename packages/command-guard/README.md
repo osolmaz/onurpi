@@ -66,10 +66,11 @@ command, shell, working directory, referenced environment values, target paths, 
 identities. A changed request is blocked.
 
 There is no confirmation prompt, model-callable bypass, project setting, environment switch, or
-"allow always" choice. Exact deletions outside protected paths run normally. Storage commands can
-write regular image files outside protected paths, and `dd` can write safe endpoints such as
-`/dev/null`. Use a separate terminal when you deliberately need to delete a protected root or change
-a raw storage device.
+"allow always" choice. The owner can turn the guard off on a whole machine with one file (see
+[Machine switch](#machine-switch)). Exact deletions outside protected paths run normally. Storage
+commands can write regular image files outside protected paths, and `dd` can write safe endpoints
+such as `/dev/null`. Use a separate terminal when you deliberately need to delete a protected root
+or change a raw storage device.
 
 ## Unified Exec input
 
@@ -109,6 +110,24 @@ The switch is session-scoped. It always starts on, so a restart returns to a gua
 settings file, environment variable, project setting, model tool, or confirmation prompt can move
 it. Only a command the owner types moves it. When the switch is off, the status text says so, and
 the toast that confirms the change is a warning.
+
+## Machine switch
+
+To turn the guard off on a whole machine, write this file in the Pi agent directory
+(`~/.pi/agent/.command-guard.json` by default) and restart Pi:
+
+```json
+{ "enabled": false }
+```
+
+The extension then loads no checks in any session on that machine: no shell or tool guards, no
+Unified Exec final checks, no system prompt guidance, and no disabled command tools.
+`/command-guard` only says that the file turned it off. Delete the file or set `"enabled": true` and
+restart Pi to turn the guard back on.
+
+The package reads the file once when Pi loads it and never writes it. A missing file means on. A
+file that cannot be read, is not valid JSON, or holds anything but the `enabled` boolean keeps the
+guard on, and `/command-guard` names the reason.
 
 A refusal applies to the checked command. After a parser, syntax, platform, or tool-availability
 failure, the agent should test one small, independent read-only command through an available guarded

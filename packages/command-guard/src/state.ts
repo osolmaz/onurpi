@@ -3,7 +3,8 @@
  *
  * The switch starts enabled in every session and is never persisted: no settings file, environment
  * variable, project setting, or model-visible tool changes it. Only the operator's
- * `/command-guard on|off` command moves it.
+ * `/command-guard on|off` command moves it. The separate machine file in `config.ts` decides only
+ * whether the guard loads at all.
  */
 export type GuardState = {
   enabled: boolean;
