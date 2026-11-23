@@ -74,6 +74,8 @@ hc run --bg --name review --cwd /path/to/repo claude \
 - Run agents interactively. Never use a one-shot print mode such as `pi -p`.
   Agents stay watchable, steerable, and ready for another turn.
 - Codex needs `--no-daemon`, or its commands run outside `hc`.
+- After `hc send` to a Cursor `agent` terminal, also run `hc keys <t> enter`,
+  or the message can stay in its input box unsent.
 - Do not let children start more agents unless you assign that.
 - Ask every child to report with `hc send $HC_TERMINAL_ID`, and to write long
   answers to a file and send its path.
