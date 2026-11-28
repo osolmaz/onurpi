@@ -236,22 +236,22 @@ function interruptionFallback(theme: Theme | undefined, width: number): string[]
 }
 
 function settledFinal(
-  original: string[],
+  original: readonly string[],
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
-): string[] {
+): readonly string[] {
   const visible =
     original.length === 0 && summary.aborted ? interruptionFallback(theme, width) : original;
   return timestampAfterContent(visible, summary.completedAt, width, theme);
 }
 
 function settledSummaryAndFinal(
-  original: string[],
+  original: readonly string[],
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
-): string[] {
+): readonly string[] {
   return [
     ...renderSettledSummary(summary, width, theme),
     ...settledFinal(original, summary, width, theme),
@@ -275,11 +275,11 @@ function timestampBackground(
 }
 
 function timestampAfterContent(
-  original: string[],
+  original: readonly string[],
   timestamp: number | undefined,
   width: number,
   theme: Theme | undefined,
-): string[] {
+): readonly string[] {
   if (timestamp === undefined || width <= 0 || original.length === 0) return original;
   const label = truncateToWidth(formatLocalTimestamp(timestamp), width, "");
   if (!label) return original;
@@ -292,12 +292,12 @@ function timestampAfterContent(
 }
 
 function timestampOnBottomLine(
-  original: string[],
+  original: readonly string[],
   timestamp: number | undefined,
   width: number,
   theme: Theme | undefined,
   background: TimestampBackground,
-): string[] {
+): readonly string[] {
   if (timestamp === undefined || width <= 0 || original.length === 0) return original;
   const label = truncateToWidth(formatLocalTimestamp(timestamp), width, "");
   if (!label) return original;
@@ -381,7 +381,10 @@ function installUserTimestampPatches(
   const skillPrototype = SkillInvocationMessageComponent.prototype;
   const originalSkillRender = skillPrototype.render;
 
-  const patchedUserRender = function (this: UserMessageComponent, width: number): string[] {
+  const patchedUserRender = function (
+    this: UserMessageComponent,
+    width: number,
+  ): readonly string[] {
     state.associateUser(this);
     if (!state.userVisibleFor(this)) return [];
     return timestampOnBottomLine(
@@ -395,7 +398,7 @@ function installUserTimestampPatches(
   const patchedSkillRender = function (
     this: SkillInvocationMessageComponent,
     width: number,
-  ): string[] {
+  ): readonly string[] {
     const hasUserMessage = skillHasUserMessage(this);
     state.associateUser(this, !hasUserMessage);
     if (!state.userVisibleFor(this)) return [];
@@ -421,12 +424,12 @@ function installUserTimestampPatches(
 
 function renderFoldView(
   display: FoldDisplay,
-  original: () => string[],
+  original: () => readonly string[],
   summary: FoldSummary,
   width: number,
   theme: Theme | undefined,
   finalTimestamp = summary.completedAt,
-): string[] {
+): readonly string[] {
   if (display === "original") return original();
   if (display === "hidden") return [];
   if (display === "streaming-summary") return renderStreamingSummary(summary, width, theme);
@@ -448,7 +451,7 @@ function installCompactionRenderPatch(
   const patchedRender = function (
     this: CompactionSummaryMessageComponent,
     width: number,
-  ): string[] {
+  ): readonly string[] {
     const message: unknown = Reflect.get(this, "message");
     state.associateCompaction(this, message);
     if (!state.compactionVisibleFor(this)) return [];
@@ -475,10 +478,10 @@ function renderAssistantView(
   component: AssistantMessageComponent,
   state: TurnFoldState,
   lastMessage: unknown,
-  original: () => string[],
+  original: () => readonly string[],
   width: number,
   theme: Theme | undefined,
-): string[] {
+): readonly string[] {
   state.associateAssistant(component, lastMessage);
   const view = state.viewFor(component);
   const timestamp = finiteNumber(lastMessage, "timestamp");
@@ -521,7 +524,7 @@ export function installRenderPatches(
   const patchedAssistantRender = function (
     this: AssistantMessageComponent,
     width: number,
-  ): string[] {
+  ): readonly string[] {
     const lastMessage: unknown = Reflect.get(this, "lastMessage");
     return renderAssistantView(
       this,
@@ -539,7 +542,10 @@ export function installRenderPatches(
     originalToolMarkExecutionStarted.call(this);
   };
 
-  const patchedToolRender = function (this: ToolExecutionComponent, width: number): string[] {
+  const patchedToolRender = function (
+    this: ToolExecutionComponent,
+    width: number,
+  ): readonly string[] {
     removeToolHorizontalPadding(this);
     const toolCallId = privateString(this, "toolCallId");
     if (toolCallId) state.associateTool(this, toolCallId);

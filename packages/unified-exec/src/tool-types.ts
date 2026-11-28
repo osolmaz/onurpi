@@ -84,7 +84,7 @@ export type RenderState = {
   liveTicker?: NodeJS.Timeout | undefined;
   cachedWidth?: number | undefined;
   cachedBody?: string | undefined;
-  cachedLines?: string[] | undefined;
+  cachedLines?: readonly string[] | undefined;
   cachedSkipped?: number | undefined;
 };
 

@@ -116,7 +116,7 @@ export function installPromptHeaderPatches(
 
   const containerPrototype = Container.prototype;
   const originalRender = containerPrototype.render;
-  const patchedRender = function (this: Container, width: number): string[] {
+  const patchedRender = function (this: Container, width: number): readonly string[] {
     const lines = originalRender.call(this, width);
     const scrollTop = scrollByContent.get(this)?.scrollTop;
     if (scrollTop === undefined || lines.length === 0) return lines;

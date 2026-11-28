@@ -108,7 +108,7 @@ function stoppedTui(): TuiMainScreen {
 }
 
 function frame(transcript: Container, workingLine?: Text): string {
-  const lines = transcript.render(120);
+  const lines = [...transcript.render(120)];
   if (workingLine) lines.push(...workingLine.render(120));
   return lines.join("\n");
 }

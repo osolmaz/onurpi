@@ -299,7 +299,7 @@ function rebuildOutputResult(
       container.addChild(new Text(`\n${styled}`, 0, 0));
     } else {
       container.addChild({
-        render: (width: number): string[] => {
+        render: (width: number): readonly string[] => {
           if (state.cachedLines === undefined || state.cachedWidth !== width) {
             const preview = truncateToVisualLines(styled, PREVIEW_LINES, width);
             state.cachedLines = preview.visualLines;

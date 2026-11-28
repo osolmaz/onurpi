@@ -13,47 +13,72 @@ type Span = {
   readonly start: number;
 };
 
-type LayoutChild = { readonly component: object; readonly height: number };
-type MouseLayout = { readonly children: readonly LayoutChild[]; readonly width: number };
+type ChildLayout = {
+  readonly children: readonly object[];
+  readonly parts: readonly (readonly string[])[];
+  readonly width: number;
+};
 
-function layoutChild(value: unknown): LayoutChild | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
-  const component: unknown = Reflect.get(value, "component");
-  const height: unknown = Reflect.get(value, "height");
-  if (typeof component !== "object" || component === null) return undefined;
-  if (typeof height !== "number" || !Number.isFinite(height)) return undefined;
-  return { component, height };
+function isObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
 }
 
-function mouseLayout(container: object): MouseLayout | undefined {
-  const layout: unknown = Reflect.get(container, "mouseLayout");
-  if (typeof layout !== "object" || layout === null) return undefined;
-  const width: unknown = Reflect.get(layout, "width");
-  const children: unknown = Reflect.get(layout, "children");
-  if (typeof width !== "number" || !Array.isArray(children)) return undefined;
-  const parsed: LayoutChild[] = [];
-  for (const child of children as readonly unknown[]) {
-    const entry = layoutChild(child);
-    if (entry === undefined) return undefined;
-    parsed.push(entry);
+function stringLines(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return (value as readonly unknown[]).every((line) => typeof line === "string")
+    ? (value as readonly string[])
+    : undefined;
+}
+
+function partsOf(rawParts: unknown): readonly (readonly string[])[] | undefined {
+  if (!Array.isArray(rawParts)) return undefined;
+  const parts: (readonly string[])[] = [];
+  for (const rawPart of rawParts as readonly unknown[]) {
+    const part = stringLines(rawPart);
+    if (part === undefined) return undefined;
+    parts.push(part);
   }
-  return { children: parsed, width };
+  return parts;
+}
+
+function objectsOf(rawChildren: unknown): readonly object[] | undefined {
+  if (!Array.isArray(rawChildren)) return undefined;
+  const children = (rawChildren as readonly unknown[]).filter(isObject);
+  return children.length === rawChildren.length ? children : undefined;
+}
+
+/**
+ * The container's per-child line cache from its last render. pi-tui keeps it on `childLines` as
+ * `{ width, children, parts, lines }`, and reuses the same object while children and their lines
+ * stay the same.
+ */
+function childLayout(container: object): ChildLayout | undefined {
+  const layout: unknown = Reflect.get(container, "childLines");
+  if (!isObject(layout)) return undefined;
+  const width: unknown = Reflect.get(layout, "width");
+  if (typeof width !== "number") return undefined;
+  const children = objectsOf(Reflect.get(layout, "children"));
+  const parts = partsOf(Reflect.get(layout, "parts"));
+  if (children === undefined || parts === undefined) return undefined;
+  if (children.length !== parts.length) return undefined;
+  return { children, parts, width };
 }
 
 /** Width of the container's last render, or undefined when it has not rendered yet. */
 export function layoutWidth(container: object): number | undefined {
-  return mouseLayout(container)?.width;
+  return childLayout(container)?.width;
 }
 
 /** Line spans of the container's direct children from its last render at this width. */
 export function childSpans(container: object, width: number): readonly Span[] | undefined {
-  const layout = mouseLayout(container);
+  const layout = childLayout(container);
   if (layout?.width !== width) return undefined;
   const spans: Span[] = [];
   let start = 0;
-  for (const child of layout.children) {
-    spans.push({ component: child.component, end: start + child.height, start });
-    start += child.height;
+  for (const [index, child] of layout.children.entries()) {
+    const height = layout.parts[index]?.length ?? 0;
+    spans.push({ component: child, end: start + height, start });
+    start += height;
   }
   return spans;
 }

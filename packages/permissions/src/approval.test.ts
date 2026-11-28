@@ -58,7 +58,7 @@ function createHarness(summary = "bash: npm test", now = 10_000, clock?: () => n
   return { component, done };
 }
 
-function render(component: Component, width = 40): string[] {
+function render(component: Component, width = 40): readonly string[] {
   return component.render(width);
 }
 

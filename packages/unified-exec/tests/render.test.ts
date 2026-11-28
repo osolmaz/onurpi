@@ -106,7 +106,7 @@ class PlainTheme extends Theme {
 
 const plainTheme = new PlainTheme();
 
-function rendered(component: { render(width: number): string[] }, width = 100): string {
+function rendered(component: { render(width: number): readonly string[] }, width = 100): string {
   return component
     .render(width)
     .map((line) => line.trimEnd())

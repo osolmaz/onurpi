@@ -130,7 +130,7 @@ export class TurnFoldShortcutEditor implements EditorComponent {
     this.base.borderColor = handler;
   }
 
-  render(width: number): string[] {
+  render(width: number): readonly string[] {
     return this.base.render(width);
   }
 

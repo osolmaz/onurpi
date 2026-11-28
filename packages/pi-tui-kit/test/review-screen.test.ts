@@ -493,10 +493,10 @@ function reviewComponentHarness(screen: ReviewScreen<ActionId>, themed = false, 
   };
 }
 
-function plainLines(component: { render(width: number): string[] }, width: number) {
+function plainLines(component: { render(width: number): readonly string[] }, width: number) {
   return component.render(width).map((line) => stripVTControlCharacters(line));
 }
 
-function plainRender(component: { render(width: number): string[] }, width: number) {
+function plainRender(component: { render(width: number): readonly string[] }, width: number) {
   return plainLines(component, width).join("\n");
 }
